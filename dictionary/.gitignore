@@ -1,0 +1,7 @@
+*.apk
+build/
+.gradle/
+local.properties
+# The WordNet download; tools/build_dict.py turns it into app/src/main/assets.
+wordnet/
+__pycache__/

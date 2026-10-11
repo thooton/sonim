@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Street address leads, city line is demoted, status last, price column on the
+     right. Price is the one number people compare chargers on, so it gets the
+     largest, darkest type in the row and its own column rather than a clause in
+     the muted status line. Text wraps rather than scrolls: a marquee on a 240px
+     row is unreadable, since it is in motion for as long as you are trying to
+     read it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="@dimen/row_height"
+    android:background="@drawable/focus_selector"
+    android:clickable="false"
+    android:focusable="false"
+    android:focusableInTouchMode="false"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingLeft="@dimen/row_pad_h"
+    android:paddingRight="@dimen/row_pad_h"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/site_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:lineSpacingExtra="1dp"
+            android:includeFontPadding="false"
+            android:textColor="@color/text"
+            android:textSize="@dimen/text_title" />
+
+        <TextView
+            android:id="@+id/site_address"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:textColor="@color/text_muted"
+            android:textSize="@dimen/text_sub" />
+
+        <TextView
+            android:id="@+id/site_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:textColor="@color/text_muted"
+            android:textSize="@dimen/text_sub" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:gravity="right"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/site_price"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:gravity="right"
+            android:includeFontPadding="false"
+            android:textColor="@color/text"
+            android:textStyle="bold"
+            android:textSize="@dimen/text_price" />
+
+        <!-- The unit rides under the amount instead of beside it: "$0.36/kWh"
+             set at price size would eat a third of a 240px row. -->
+        <TextView
+            android:id="@+id/site_price_unit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:gravity="right"
+            android:includeFontPadding="false"
+            android:textColor="@color/text_muted"
+            android:textSize="@dimen/text_price_unit" />
+    </LinearLayout>
+</LinearLayout>

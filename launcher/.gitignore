@@ -1,0 +1,21 @@
+# Build outputs
+/build/
+/AppDrawer.apk
+*.apk.idsig
+*.class
+*.dex
+
+# Local signing material
+/signing/
+
+# Android and IDE files
+/.gradle/
+/local.properties
+/.idea/
+*.iml
+
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+*~
+*.swp

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <layer-list>
+            <item><color android:color="@color/press_fill" /></item>
+            <item android:left="-4dp" android:right="-4dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke android:width="@dimen/focus_rule" android:color="@color/focus_rule" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item android:state_selected="true">
+        <layer-list>
+            <item><color android:color="@color/focus_fill" /></item>
+            <item android:left="-4dp" android:right="-4dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke android:width="@dimen/focus_rule" android:color="@color/focus_rule" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item android:state_focused="true">
+        <layer-list>
+            <item><color android:color="@color/focus_fill" /></item>
+            <item android:left="-4dp" android:right="-4dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke android:width="@dimen/focus_rule" android:color="@color/focus_rule" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item><color android:color="@color/row" /></item>
+</selector>

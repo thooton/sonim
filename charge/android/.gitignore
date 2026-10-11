@@ -1,0 +1,8 @@
+.gradle/
+local.properties
+.tokens.json
+.env
+app/build/
+build/
+*.jks
+*.keystore

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="drawer_background">#FFFFFFFF</color>
+    <color name="app_label">#FF000000</color>
+    <color name="selection">#FF9599E4</color>
+</resources>

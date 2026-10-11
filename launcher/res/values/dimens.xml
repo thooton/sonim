@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="app_item_height">76dp</dimen>
+    <dimen name="app_icon_size">42dp</dimen>
+    <dimen name="app_icon_top_margin">7dp</dimen>
+    <dimen name="app_label_top_margin">2dp</dimen>
+    <dimen name="app_label_size">13sp</dimen>
+    <dimen name="empty_hint_padding">16dp</dimen>
+</resources>

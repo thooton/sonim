@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One line of the checklist: a box, then the task. Text wraps to three
+     lines rather than scrolling, since a marquee on a 240px row is in motion
+     for as long as you are trying to read it. The box is centred on the first
+     line, not the row, so a long item still reads as one tick and one task. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="@dimen/item_min_height"
+    android:background="@drawable/focus_selector"
+    android:clickable="false"
+    android:descendantFocusability="blocksDescendants"
+    android:focusable="false"
+    android:focusableInTouchMode="false"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingLeft="@dimen/row_pad_h"
+    android:paddingRight="@dimen/row_pad_h"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <ImageView
+        android:id="@+id/item_check"
+        android:layout_width="@dimen/check_size"
+        android:layout_height="@dimen/check_size"
+        android:layout_gravity="top"
+        android:layout_marginRight="@dimen/check_gap"
+        android:layout_marginTop="1dp"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:id="@+id/item_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:maxLines="3"
+        android:ellipsize="end"
+        android:lineSpacingExtra="1dp"
+        android:includeFontPadding="false"
+        android:textColor="@color/text"
+        android:textSize="@dimen/text_item" />
+</LinearLayout>

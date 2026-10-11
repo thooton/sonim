@@ -1,0 +1,202 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+plugins {
+    id "com.android.application"
+}
+
+/*
+ * The bundled setup, for a personal deployment.
+ *
+ * This is one person's phone, so the app ships already signed in rather than
+ * asking somebody to type a Canvas address and a forty character token into a
+ * T9 keypad. The values are read at build time from files that live outside
+ * this repository — the canvas project's own config beside it, plus Codex or
+ * Pi credentials in the home directory. A local claude-auth.json beside the
+ * android directory can explicitly select Claude and provide its complete
+ * rotating OAuth entry; claude-token.txt remains available for access-token-only
+ * setups. Values are written into a generated source file under build/. Nothing
+ * secret is ever committed, and a checkout on any other machine simply builds
+ * an app with an empty setup screen.
+ *
+ * ChatGPT bundles only its refresh token. Claude can import Pi's complete
+ * OAuth entry, including its expiry; both providers rotate and persist their
+ * refresh tokens after installation.
+ *
+ * The APK that comes out of this contains live credentials. It is gitignored,
+ * and it should be treated as a password: anything with the file can read this
+ * Canvas account and spend the configured model subscription.
+ */
+def bundledSource = layout.buildDirectory.dir("generated/bundled")
+
+tasks.register("generateDefaults") {
+    description = "Bakes this deployment's Canvas and model setup into the APK."
+    def canvasConfig = file(project.findProperty("todo.canvasConfig") ?: "${rootDir}/../../canvas/auth.json")
+    def serviceToken = file(project.findProperty("todo.serviceToken") ?: "${rootDir}/../../canvas/service-api-token.txt")
+    def codexAuth = file(project.findProperty("todo.codexAuth") ?: "${System.getProperty("user.home")}/.codex/auth.json")
+    def piAuth = file(project.findProperty("todo.piAuth") ?: "${System.getProperty("user.home")}/.pi/agent/auth.json")
+    def localClaudeAuth = file(project.findProperty("todo.claudeAuth") ?: "${rootDir}/../claude-auth.json")
+    def claudeTokenFile = file(project.findProperty("todo.claudeToken") ?: "${rootDir}/../claude-token.txt")
+
+    inputs.files(canvasConfig, serviceToken, codexAuth, piAuth, localClaudeAuth, claudeTokenFile)
+        .withPropertyName("sources")
+        .ignoreEmptyDirectories().optional(true)
+    outputs.dir(bundledSource)
+
+    doLast {
+        def read = { File source -> source.isFile() ? new JsonSlurper().parse(source) : [:] }
+        def config = read(canvasConfig)
+        def tokens = read(codexAuth).tokens ?: [:]
+        def claude = read(piAuth).anthropic ?: [:]
+        def localClaude = read(localClaudeAuth).anthropic ?: [:]
+        def localClaudeRevision = ""
+        if (localClaude.access || localClaude.refresh) {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(localClaudeAuth.bytes)
+            localClaudeRevision = digest.collect { String.format("%02x", it & 0xff) }.join()
+        }
+        def token = serviceToken.isFile() ? serviceToken.text.trim() : null
+        def claudeToken = claudeTokenFile.isFile() ? claudeTokenFile.text.trim() : null
+
+        def service = [:]
+        if (config.canvas?.cookieService?.url) service.url = config.canvas.cookieService.url
+        if (token) service.token = token
+
+        def canvas = [:]
+        if (config.canvas?.baseUrl) canvas.baseUrl = config.canvas.baseUrl
+        if (service) canvas.cookieService = service
+
+        def openai = [:]
+        // A local OAuth file is an explicit opt-in to the Claude build and wins
+        // over ambient Pi/Codex credentials. Keep the complete pair together:
+        // Claude rotates the refresh token, and the app persists each rotation.
+        if (localClaude.access || localClaude.refresh) {
+            openai.provider = "claude"
+            openai.model = config.openai?.provider == "claude" && config.openai?.model
+                ? config.openai.model : "claude-opus-4-6"
+            if (localClaude.access) openai.accessToken = localClaude.access
+            if (localClaude.refresh) openai.refreshToken = localClaude.refresh
+            if (localClaude.expires) openai.expiresAt = localClaude.expires
+        } else if (claudeToken) {
+            openai.provider = "claude"
+            openai.model = "claude-opus-4-6"
+            openai.accessToken = claudeToken
+        } else {
+            openai.provider = config.openai?.provider ?: "api"
+            if (config.openai?.model) openai.model = config.openai.model
+        }
+        if (!localClaude.access && !localClaude.refresh && !claudeToken
+            && openai.provider == "claude") {
+            // Pi stores the Claude Pro/Max OAuth pair under `anthropic`.
+            // Keep its expiry too so a freshly built app need not rotate a
+            // still-live token on its first request.
+            if (claude.access) openai.accessToken = claude.access
+            if (claude.refresh) openai.refreshToken = claude.refresh
+            if (claude.expires) openai.expiresAt = claude.expires
+        } else if (!localClaude.access && !localClaude.refresh && !claudeToken
+            && openai.provider == "codex") {
+            // The refresh token only. An access token would be a second live
+            // credential in the APK that is worthless within about ten days,
+            // and one is minted from this on the first question anyway — which
+            // is also what stops a build going stale on the shelf.
+            if (tokens.refresh_token) openai.refreshToken = tokens.refresh_token
+            if (tokens.account_id) openai.accountId = tokens.account_id
+        } else if (!localClaude.access && !localClaude.refresh && !claudeToken
+            && config.openai?.apiKey) {
+            openai.apiKey = config.openai.apiKey
+        }
+
+        def root = [:]
+        if (canvas) root.canvas = canvas
+        root.openai = openai
+        if (config.timezone) root.timezone = config.timezone
+
+        // Only claim a bundled setup when Canvas is actually complete; a
+        // half-filled one would seed settings that cannot fetch anything.
+        def usable = canvas.baseUrl && service.url && service.token
+        def settings = usable ? JsonOutput.toJson(root) : ""
+        def quoted = settings.replace("\\", "\\\\").replace('"', '\\"')
+
+        def target = new File(bundledSource.get().asFile, "com/canvas/xp3")
+        target.mkdirs()
+        new File(target, "Defaults.java").text = """package com.canvas.xp3;
+
+import com.canvas.xp3.net.Config;
+
+/**
+ * The setup baked in at build time. GENERATED - do not edit, do not commit.
+ *
+ * Empty when the build had no credentials to hand, which is what a checkout on
+ * another machine gets: the app then opens on its setup screen as normal.
+ */
+final class Defaults {
+
+    private Defaults() {}
+
+    private static final String SETTINGS = "${quoted}";
+    private static final String REVISION = "${localClaudeRevision}";
+
+    /** Whether this build came with a setup in it. */
+    static boolean available() {
+        return SETTINGS.length() > 0;
+    }
+
+    /** Identifies an explicitly supplied local OAuth entry without exposing it. */
+    static String revision() {
+        return REVISION;
+    }
+
+    /** The bundled setup, validated the same way a typed one is. */
+    static Config config() {
+        return Config.parse(SETTINGS);
+    }
+}
+"""
+        logger.lifecycle(usable
+            ? "Bundled setup: canvas ${canvas.baseUrl}, model ${openai.model}, ${openai.provider} login"
+            : "Bundled setup: none found; the app will open on its setup screen")
+    }
+}
+
+tasks.named("preBuild") { dependsOn "generateDefaults" }
+
+// One dependency, and it is the other half of this repository. Nothing third
+// party: no AndroidX, no Material components, no Markdown, JSON or HTTP
+// library. Everything this module draws is a View from android.widget and
+// everything it fetches goes through java.net, which is what keeps a debug APK
+// for a 240x320 phone in the low hundreds of kilobytes.
+//
+// :core is the Android-free half: the assignment model, the Canvas client and
+// the agent, all plain Java so they can be tested on a desktop JVM.
+dependencies {
+    implementation project(":core")
+}
+
+android {
+    namespace "com.canvas.xp3"
+    compileSdk 35
+    buildToolsVersion "35.0.1"
+
+    defaultConfig {
+        // Kept from before the rename to Canvas: a new applicationId would
+        // install a second app beside the old one, without its settings,
+        // cached work, chat, or the refresh tokens rotated since the APK was
+        // built.
+        applicationId "com.todo.xp3"
+        minSdk 27
+        targetSdk 27
+        versionCode 2
+        versionName "1.0.0"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    sourceSets {
+        main {
+            java.srcDir bundledSource
+        }
+    }
+}

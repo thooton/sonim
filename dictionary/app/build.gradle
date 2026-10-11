@@ -1,0 +1,44 @@
+plugins {
+    id "com.android.application"
+}
+
+// No dependencies at all: the dictionary is inflated with java.util.zip.
+android {
+    namespace "com.dictionary.xp3"
+    compileSdk 35
+    buildToolsVersion "35.0.1"
+
+    defaultConfig {
+        applicationId "com.dictionary.xp3"
+        minSdk 27
+        targetSdk 27
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt")
+            // A personal sideload: signed with this machine's debug key, so
+            // it installs over a debug build and needs no secret of its own.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    // Targets the XP3's own Android 8.1 on purpose; this is not for Play.
+    lint {
+        disable "ExpiredTargetSdkVersion"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    // The data files are deflated already. Storing them as they are lets the
+    // app seek straight to a block instead of inflating the asset twice.
+    androidResources {
+        noCompress "dat"
+    }
+}

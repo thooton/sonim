@@ -1,0 +1,104 @@
+import groovy.json.JsonSlurper
+
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.teslacharge.xp3"
+    compileSdk 35
+    buildToolsVersion "35.0.1"
+
+    defaultConfig {
+        applicationId "com.teslacharge.xp3"
+        minSdk 27
+        targetSdk 27
+        versionCode 3
+        versionName "1.0.2"
+    }
+
+    sourceSets.main.java.srcDir layout.buildDirectory.dir("generated/source/secrets")
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+def javaLiteral = { Object value ->
+    String.valueOf(value ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+}
+
+tasks.register("generateBundledSecrets") {
+    def tokenFile = rootProject.file(".tokens.json")
+    def envFile = rootProject.file(".env")
+    def outputDir = layout.buildDirectory.dir("generated/source/secrets")
+    inputs.files(tokenFile, envFile)
+    outputs.dir(outputDir)
+
+    doLast {
+        if (!tokenFile.exists()) {
+            throw new GradleException("Missing android/.tokens.json. Add a Tesla refresh token before building the private APK.")
+        }
+        def tokens = new JsonSlurper().parse(tokenFile)
+        if (!tokens.refreshToken) {
+            throw new GradleException("android/.tokens.json has no refreshToken.")
+        }
+
+        def env = [:]
+        if (envFile.exists()) {
+            envFile.eachLine { raw ->
+                def line = raw.trim()
+                if (line && !line.startsWith("#") && line.contains("=")) {
+                    def split = line.indexOf("=")
+                    def key = line.substring(0, split).trim()
+                    def value = line.substring(split + 1).trim()
+                    if ((value.startsWith("\"") && value.endsWith("\"")) ||
+                        (value.startsWith("'") && value.endsWith("'"))) {
+                        value = value.substring(1, value.length() - 1)
+                    }
+                    env[key] = value
+                }
+            }
+        }
+
+        def pkgDir = outputDir.get().file("com/teslacharge/xp3/data").asFile
+        pkgDir.mkdirs()
+        new File(pkgDir, "BundledSecrets.java").text = """package com.teslacharge.xp3.data;
+
+/** Generated at build time. Never commit this file or print these values. */
+public final class BundledSecrets {
+    private BundledSecrets() {}
+    public static final String REFRESH_TOKEN = \"${javaLiteral(tokens.refreshToken)}\";
+    public static final String PREVIOUS_REFRESH_TOKEN = \"${javaLiteral(tokens.previousRefreshToken)}\";
+    public static final String ACCESS_TOKEN = \"${javaLiteral(tokens.accessToken)}\";
+    public static final long ACCESS_EXPIRES_AT = ${tokens.accessExpiresAt ?: 0}L;
+    public static final String GOOGLE_MAPS_KEY = \"${javaLiteral(env.GOOGLE_MAPS_API_KEY)}\";
+    public static final String GEOCODE_EMAIL = \"${javaLiteral(env.GEOCODE_CONTACT_EMAIL)}\";
+    public static final String DEVICE_COUNTRY = \"${javaLiteral(env.TESLA_DEVICE_COUNTRY ?: "US")}\";
+    public static final String DEVICE_LANGUAGE = \"${javaLiteral(env.TESLA_DEVICE_LANGUAGE ?: "en")}\";
+    public static final String CURRENCY_CODE = \"${javaLiteral(env.TESLA_CURRENCY_CODE ?: "USD")}\";
+    public static final String TTP_LOCALE = \"${javaLiteral(env.TESLA_TTP_LOCALE ?: "en_US")}\";
+    public static final String VEHICLE_MAKE_TYPE = \"${javaLiteral(env.TESLA_VEHICLE_MAKE_TYPE ?: "NTSLA")}\";
+    public static final String APP_VERSION = \"${javaLiteral(env.TESLA_APP_VERSION ?: "4.60.0")}\";
+    public static final String TESLA_USER_AGENT = \"${javaLiteral(env.TESLA_USER_AGENT ?: "TeslaApp/4.60.0/07b1bbdf9/ios/26.0")}\";
+}
+"""
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("generateBundledSecrets")
+}

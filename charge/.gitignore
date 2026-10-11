@@ -1,0 +1,9 @@
+# Build outputs. The release APK embeds a live Tesla refresh token in its DEX,
+# so it must never be committed: anyone with the file has the account.
+*.apk
+*.apk.idsig
+
+# Signing material
+*.jks
+*.keystore
+INSTRUCTIONS.md

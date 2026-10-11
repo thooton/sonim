@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Charge</string>
+    <string name="favorites">Favorites</string>
+    <string name="discover">Discover</string>
+    <string name="session">Session</string>
+    <string name="history">History</string>
+    <string name="search_hint">ZIP code or address</string>
+</resources>

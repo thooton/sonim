@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Downloader</string>
+    <string name="address_label">APK address</string>
+    <string name="address_hint">example.com/app.apk</string>
+    <string name="idle">Type the address, then press OK.</string>
+</resources>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Label above, value below. The other way round reads better on a wide
+     screen, where the two sit side by side and the label is a column heading,
+     but at 240px the value is what needs the full width and a label sharing
+     the line with it would leave a token four characters. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/focus_selector"
+    android:clickable="false"
+    android:descendantFocusability="blocksDescendants"
+    android:focusable="false"
+    android:focusableInTouchMode="false"
+    android:minHeight="40dp"
+    android:orientation="vertical"
+    android:paddingLeft="@dimen/row_pad_h"
+    android:paddingRight="@dimen/row_pad_h"
+    android:paddingTop="5dp"
+    android:paddingBottom="6dp">
+
+    <TextView
+        android:id="@+id/setting_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:textColor="@color/text_muted"
+        android:textSize="@dimen/text_sub" />
+
+    <TextView
+        android:id="@+id/setting_value"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:includeFontPadding="false"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:textColor="@color/text"
+        android:textSize="@dimen/text_body" />
+</LinearLayout>
