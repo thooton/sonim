@@ -1,0 +1,183 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+plugins {
+    id "com.android.application"
+}
+
+/*
+ * The bundled logins, for a personal deployment.
+ *
+ * This is one person's phone, so the app ships already signed in rather than
+ * asking somebody to complete an OAuth flow or type a 49-character token on a
+ * T9 keypad. Both logins are read at build time and written into a generated
+ * source file under build/. Nothing secret is ever committed, and a checkout
+ * on any other machine (or CI) simply builds an app with no login. Installed
+ * over a copy that has one, such a build keeps it: a bundled login is adopted
+ * once per revision, and an absent one changes nothing.
+ *
+ * The Claude login is the complete rotating OAuth entry, from, in order:
+ * -Pdelta.claudeAuth=<file>, claude-auth.json beside the android directory,
+ * or the claude_cloud/auth.json that sits beside this repository (all the
+ * same shape Pi writes, under `anthropic`).
+ *
+ * The command center is the address and token `delta set-auth` saves, from:
+ * -Pdelta.center=<file>, delta-center.json beside the android directory, or
+ * the CLI's own config ($XDG_CONFIG_HOME/delta/config.json, usually
+ * ~/.config/delta/config.json). All are {"server": "...", "token": "..."}.
+ * The app only talks to a command center over https.
+ *
+ * The APK that comes out of this contains live credentials. It is gitignored,
+ * and it should be treated as a password: anything with the file can spend the
+ * configured Claude subscription and run code on the command center.
+ */
+def bundledSource = layout.buildDirectory.dir("generated/bundled")
+
+def firstFile(String property, List<String> candidates) {
+    def chosen = project.findProperty(property) ?: candidates.find { new File(it).isFile() } ?: candidates[0]
+    return file(chosen)
+}
+
+static String sha256(File source) {
+    byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(source.bytes)
+    return digest.collect { String.format("%02x", it & 0xff) }.join()
+}
+
+tasks.register("generateDefaults") {
+    description = "Bakes this deployment's Claude login and command center into the APK."
+    def configHome = System.getenv("XDG_CONFIG_HOME") ?: "${System.getProperty("user.home")}/.config"
+    def localClaudeAuth = firstFile("delta.claudeAuth", [
+        "${rootDir}/../claude-auth.json",
+        "${rootDir}/../../../claude_cloud/auth.json",
+    ])
+    def localCenter = firstFile("delta.center", [
+        "${rootDir}/../delta-center.json",
+        "${configHome}/delta/config.json",
+    ])
+
+    inputs.files(localClaudeAuth, localCenter)
+        .withPropertyName("sources")
+        .ignoreEmptyDirectories().optional(true)
+    outputs.dir(bundledSource)
+
+    doLast {
+        def settings = [:]
+        def claudeRevision = ""
+        def centerRevision = ""
+
+        def claude = localClaudeAuth.isFile() ? (new JsonSlurper().parse(localClaudeAuth).anthropic ?: [:]) : [:]
+        if (claude.access || claude.refresh) {
+            // Keep the complete pair together, with its expiry: Claude rotates
+            // the refresh token, and the app persists each rotation.
+            def entry = [:]
+            if (claude.access) entry.accessToken = claude.access
+            if (claude.refresh) entry.refreshToken = claude.refresh
+            if (claude.expires) entry.expiresAt = claude.expires
+            settings.claude = entry
+            claudeRevision = sha256(localClaudeAuth)
+            logger.lifecycle("Bundled setup: Claude login from ${localClaudeAuth}")
+        } else {
+            logger.lifecycle("Bundled setup: no Claude login found; the app will have none")
+        }
+
+        def center = localCenter.isFile() ? new JsonSlurper().parse(localCenter) : [:]
+        if (center.server && center.token) {
+            if (center.server.toString().toLowerCase().startsWith("https://")) {
+                settings.center = [server: center.server.toString(), token: center.token.toString()]
+                centerRevision = sha256(localCenter)
+                logger.lifecycle("Bundled setup: command center from ${localCenter}")
+            } else {
+                logger.warn("Bundled setup: the command center in ${localCenter} is not https; left out")
+            }
+        } else {
+            logger.lifecycle("Bundled setup: no command center found; add one from the app's Files tab")
+        }
+
+        def json = settings ? JsonOutput.toJson(settings) : ""
+        def quoted = json.replace("\\", "\\\\").replace('"', '\\"')
+
+        def target = new File(bundledSource.get().asFile, "com/delta/xp3")
+        target.mkdirs()
+        new File(target, "Defaults.java").text = """package com.delta.xp3;
+
+import com.delta.xp3.data.Store;
+import com.delta.xp3.net.Config;
+
+/**
+ * The logins baked in at build time. GENERATED - do not edit, do not commit.
+ *
+ * Empty when the build had no credentials to hand, which is what a checkout on
+ * another machine gets: the app then keeps whatever it already has.
+ */
+final class Defaults {
+
+    private Defaults() {}
+
+    private static final String SETTINGS = "${quoted}";
+    private static final String CLAUDE_REVISION = "${claudeRevision}";
+    private static final String CENTER_REVISION = "${centerRevision}";
+
+    /** Identifies one bundled login without exposing it; empty when there is none. */
+    static String revision(String part) {
+        return Store.CLAUDE.equals(part) ? CLAUDE_REVISION : Store.CENTER.equals(part) ? CENTER_REVISION : "";
+    }
+
+    /** The bundled logins, validated the same way stored ones are. */
+    static Config config() {
+        return SETTINGS.length() == 0 ? Config.blank() : Config.parse(SETTINGS);
+    }
+}
+"""
+    }
+}
+
+tasks.named("preBuild") { dependsOn "generateDefaults" }
+
+// One dependency, and it is the other half of this repository. Nothing third
+// party: no AndroidX, no Material components, no Markdown, JSON or HTTP
+// library. Everything this module draws is a View from android.widget and
+// everything it fetches goes through java.net, which is what keeps a debug APK
+// for a 240x320 phone in the low hundreds of kilobytes.
+//
+// :core is the Android-free half: the logins, the cloud session protocol, the
+// command center's routes and the transcript built from it, all plain Java so
+// they can be tested on a desktop JVM.
+dependencies {
+    implementation project(":core")
+}
+
+android {
+    // The repository's shared debug key (signing/debug.keystore), so a build
+    // from any checkout or from CI installs over any other.
+    signingConfigs {
+        debug {
+            storeFile rootProject.file("../../signing/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
+    namespace "com.delta.xp3"
+    compileSdk 35
+    buildToolsVersion "35.0.1"
+
+    defaultConfig {
+        applicationId "com.delta.xp3"
+        minSdk 27
+        targetSdk 27
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    sourceSets {
+        main {
+            java.srcDir bundledSource
+        }
+    }
+}
