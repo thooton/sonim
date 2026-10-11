@@ -25,7 +25,7 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :app:assembleRelease
 adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-The release build is signed with this machine's Android debug key, which is enough for sideloading; keep `~/.android/debug.keystore` to install updates over it. It also appears in `../launcher` (App Drawer).
+The release build is signed with the repository's shared debug key (`../signing/debug.keystore`), which is enough for sideloading and lets a build from any checkout install over another. It also appears in `../launcher` (App Drawer).
 
 To rebuild the data (the generated assets are already in the tree):
 
