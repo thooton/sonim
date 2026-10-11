@@ -26,10 +26,10 @@ jobs:
             dir: canvas/android
           - app: charge
             dir: charge/android
+          - app: delta
+            dir: delta/android
           - app: dictionary
             dir: dictionary
-          - app: downloader
-            dir: downloader/android
           - app: flashcards
             dir: flashcards/android
           - app: list
@@ -54,6 +54,13 @@ jobs:
       - name: Placeholder Charge token
         if: matrix.app == 'charge'
         run: echo '{"refreshToken":"ci-placeholder"}' > charge/android/.tokens.json
+
+      # Delta's protocol, store and command-center client are plain Java with
+      # their own runner. CI has no logins, so the APK it builds carries none.
+      - name: Delta self-test
+        if: matrix.app == 'delta'
+        working-directory: ${{ matrix.dir }}
+        run: ./gradlew --no-daemon :core:selfTest
 
       - name: Build debug APK
         working-directory: ${{ matrix.dir }}
