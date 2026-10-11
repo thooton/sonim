@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The stock Messages compose box, matched: white fill, a 3dp rule of half
+     black, square corners. It is the shape anybody on this phone already types
+     into, so the chat field is not going to invent a second one.
+
+     What is added is a focused state, which Messages has no need of because
+     its field is the only thing on the screen that takes focus. Here you can
+     move up into the transcript to read it, so the field has to be able to say
+     whether the next keypress will be a letter. The rule keeps its 3dp so
+     nothing shifts when it changes colour; only the colour changes, to the
+     same colour every focused row in the app uses. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF" />
+            <stroke android:width="3dp" android:color="@color/focus_rule" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF" />
+            <stroke android:width="3dp" android:color="@color/input_border" />
+        </shape>
+    </item>
+</selector>

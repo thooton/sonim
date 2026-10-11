@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A tool call is one muted monospace line under Claude's text: enough to
+     follow what it is doing without the output burying the conversation. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/chat_row_selector"
+    android:clickable="false"
+    android:descendantFocusability="blocksDescendants"
+    android:focusable="false"
+    android:focusableInTouchMode="false"
+    android:orientation="vertical"
+    android:paddingLeft="@dimen/bubble_pad_h"
+    android:paddingRight="@dimen/bubble_pad_h"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp">
+
+    <TextView
+        android:id="@+id/tool_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:fontFamily="monospace"
+        android:maxLines="2"
+        android:textColor="@color/text_muted"
+        android:textSize="@dimen/text_tool" />
+</LinearLayout>
