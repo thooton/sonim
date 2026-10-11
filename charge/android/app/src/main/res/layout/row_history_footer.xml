@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The row under the last loaded session: a spinner while the next page is in
+     flight, and the same row without one when it is waiting to be asked or
+     reporting that it could not be fetched. Centred rather than laid out like
+     a session row, since it is a status line and not something to compare
+     against the rows above it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="@dimen/row_height"
+    android:background="@drawable/focus_selector"
+    android:clickable="false"
+    android:focusable="false"
+    android:focusableInTouchMode="false"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:paddingLeft="@dimen/row_pad_h"
+    android:paddingRight="@dimen/row_pad_h"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <ProgressBar
+        android:id="@+id/footer_progress"
+        style="?android:attr/progressBarStyleSmall"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_marginRight="8dp" />
+
+    <TextView
+        android:id="@+id/footer_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:textColor="@color/text_muted"
+        android:textSize="@dimen/text_sub" />
+</LinearLayout>

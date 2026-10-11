@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">App Drawer</string>
+    <string name="todo_name">Todo</string>
+    <string name="charge_name">Charge</string>
+    <string name="flashcards_name">Flashcards</string>
+    <string name="list_name">List</string>
+    <string name="dictionary_name">Dictionary</string>
+    <string name="app_unavailable">%1$s is not installed</string>
+    <string name="menu_add_program">Add program</string>
+    <string name="menu_remove_program">Remove program</string>
+    <string name="no_programs_to_add">No other programs to add</string>
+    <string name="drawer_empty">No programs. Press Menu to add one.</string>
+</resources>

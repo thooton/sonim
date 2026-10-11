@@ -1,0 +1,15 @@
+# The debug APK has this deployment's live credentials baked into it by
+# :app:generateDefaults. Anything holding the file can read this Canvas account
+# and spend the configured model subscription, so it is built locally and never
+# committed. Earlier revisions of it in history predate the bundling and hold
+# nothing.
+Canvas-XP3-debug.apk
+Canvas-XP3-release.apk
+# Copies built before the rename to Canvas carry the same credentials.
+Todo-XP3-debug.apk
+Todo-XP3-release.apk
+claude-token.txt
+claude-auth.json
+
+*.class
+bin/

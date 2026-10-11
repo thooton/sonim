@@ -1,0 +1,24 @@
+plugins {
+    id "com.android.application"
+}
+
+// No dependencies: everything this app draws is a View from android.widget and
+// everything it fetches goes through java.net.
+android {
+    namespace "com.downloader.xp3"
+    compileSdk 35
+    buildToolsVersion "35.0.1"
+
+    defaultConfig {
+        applicationId "com.downloader.xp3"
+        minSdk 27
+        targetSdk 27
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}

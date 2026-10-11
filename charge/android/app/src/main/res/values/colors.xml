@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Chrome is deep navy, not a saturated blue: it is a band across the top
+         of every screen, so it has to sit back rather than shout. -->
+    <color name="primary">#0A2A57</color>
+    <color name="primary_dark">#071B39</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_primary_dim">#8CA3C4</color>
+
+    <color name="page">#FAFAFA</color>
+    <color name="row">#FFFFFF</color>
+    <color name="divider">#DCDCDC</color>
+    <color name="outline">#C7D2E0</color>
+
+    <!-- Focus is the one place colour is allowed to be assertive, and even
+         there it is a 2dp rule and a pale wash rather than a filled block. -->
+    <color name="focus_fill">#E6EDF7</color>
+    <color name="focus_rule">#14417F</color>
+    <color name="press_fill">#D3DFEE</color>
+
+    <color name="text">#1A1A1A</color>
+    <color name="text_muted">#6B7280</color>
+    <color name="capacity_low">#B45309</color>
+    <color name="warning">#B3261E</color>
+    <color name="success">#1B7A3E</color>
+    <color name="disabled">#F2F2F2</color>
+    <color name="disabled_text">#A0A0A0</color>
+</resources>

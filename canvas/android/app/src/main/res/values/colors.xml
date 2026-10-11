@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Chrome is a maroon taken from Canvas's red, so the app reads as the
+         Canvas it opens without its alarm: the band across the top of every
+         screen has to sit back rather than shout, and the darker shade gives
+         white tab labels the contrast a small screen read outdoors needs. -->
+    <color name="primary">#7B1E2E</color>
+    <color name="primary_dark">#5C1622</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_primary_dim">#D9A5AD</color>
+
+    <color name="page">#FAFAFA</color>
+    <color name="row">#FFFFFF</color>
+    <color name="section_fill">#EFEFEF</color>
+    <color name="divider">#DCDCDC</color>
+    <color name="outline">#D2C7C9</color>
+
+    <!-- Focus is the one place colour is allowed to be assertive, and even
+         there it is a 2dp rule and a pale wash rather than a filled block. -->
+    <color name="focus_fill">#F5E9EB</color>
+    <color name="focus_rule">#7B1E2E</color>
+    <color name="press_fill">#EBD4D8</color>
+
+    <color name="text">#1A1A1A</color>
+    <color name="text_muted">#6B7280</color>
+    <!-- Overdue work, and the only bright red in the app. The chrome and focus
+         are maroon, and no other text in a list is red: red words on a white
+         row still mean late, and nothing else.
+         Due-soon and done stay green, the one colour that cannot be mistaken
+         for either the chrome or a warning. -->
+    <color name="overdue">#B3261E</color>
+    <color name="due_soon">#1B7A3E</color>
+    <color name="disabled">#F2F2F2</color>
+    <color name="disabled_text">#A0A0A0</color>
+
+    <!-- Chat is a transcript of full-width text areas: grey for the user and
+         white for the assistant. -->
+    <color name="chat_page">#FFFFFF</color>
+    <color name="bubble_you">#E5E7EB</color>
+    <color name="bubble_agent">#FFFFFF</color>
+    <color name="chat_time_agent">#99000000</color>
+    <color name="chat_time_you">#99000000</color>
+    <color name="code_fill">#F0F0EE</color>
+
+    <!-- Read off the stock Messages compose field, so the one place in this
+         app where you type looks like the place you already type on this
+         phone: 85% black text, 50% black hint, and the same 50% black in the
+         3dp rule around the box. -->
+    <color name="input_text">#D8000000</color>
+    <color name="input_hint">#7F000000</color>
+    <color name="input_border">#7F000000</color>
+</resources>

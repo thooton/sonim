@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The main action on a screen. Outlined rather than filled: a solid slab of
+     colour on a 240px screen reads as a banner, not a button. Weight comes
+     from the heavier border and the navy label. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/disabled" />
+            <stroke android:width="1dp" android:color="@color/outline" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/press_fill" />
+            <stroke android:width="2dp" android:color="@color/focus_rule" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/focus_fill" />
+            <stroke android:width="2dp" android:color="@color/focus_rule" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/focus_fill" />
+            <stroke android:width="2dp" android:color="@color/focus_rule" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/row" />
+            <stroke android:width="2dp" android:color="@color/primary" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+</selector>

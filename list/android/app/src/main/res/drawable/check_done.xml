@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A finished task: the box filled in the chrome grey with a white tick,
+     so done is visible at arm's length even though its text is greyed. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="18dp" android:height="18dp" android:viewportWidth="18" android:viewportHeight="18">
+    <path android:fillColor="@color/primary" android:pathData="M2,2h14v14h-14z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M7.4,12.6l-3.5,-3.5l1.1,-1.1l2.4,2.4l5.6,-5.6l1.1,1.1z" />
+</vector>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Measured against the XP3's 240x320 mdpi panel: 24dp status bar, 36dp
+         tab bar, leaving 260dp of content. A one-line item is 40dp, so six
+         fit with room for the edge of a seventh to say the list goes on. -->
+    <dimen name="tab_bar_height">36dp</dimen>
+    <dimen name="tab_underline">3dp</dimen>
+    <dimen name="tab_text">13sp</dimen>
+
+    <dimen name="item_min_height">40dp</dimen>
+    <dimen name="row_pad_h">10dp</dimen>
+    <dimen name="focus_rule">2dp</dimen>
+    <dimen name="text_item">14sp</dimen>
+    <dimen name="check_size">18dp</dimen>
+    <dimen name="check_gap">10dp</dimen>
+
+    <!-- Full-width chat areas keep only readable inner padding and a small
+         separator between turns. -->
+    <dimen name="text_bubble">14sp</dimen>
+    <dimen name="text_bubble_time">10sp</dimen>
+    <dimen name="bubble_pad_h">10dp</dimen>
+    <dimen name="bubble_pad_top">13dp</dimen>
+    <dimen name="bubble_pad_bottom">4dp</dimen>
+    <dimen name="bubble_time_gap">5dp</dimen>
+    <dimen name="chat_area_gap">1dp</dimen>
+</resources>

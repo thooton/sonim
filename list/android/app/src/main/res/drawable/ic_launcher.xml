@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A checklist with a speech mark: the two tabs of the app in one icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#424242" android:pathData="M4,4h40v40h-40z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M9,10h6v6h-6z" />
+    <path android:fillColor="#424242" android:pathData="M10.5,11.5h3v3h-3z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M19,11.5h20v3h-20z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M9,21h6v6h-6z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M19,22.5h14v3h-14z" />
+    <path android:fillColor="#A8A8A8" android:pathData="M22,31h17a2,2 0,0 1,2 2v5a2,2 0,0 1,-2 2h-11l-4,3v-3h-2a2,2 0,0 1,-2 -2v-5a2,2 0,0 1,2 -2z" />
+</vector>
