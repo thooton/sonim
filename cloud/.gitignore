@@ -1,0 +1,12 @@
+# An assembled APK has this deployment's live Claude login baked into it by
+# :app:generateDefaults. Anything holding the file can spend the subscription,
+# so it is built locally and never committed.
+*.apk
+claude-auth.json
+auth.json
+
+*.class
+bin/
+build/
+.gradle/
+android/local.properties

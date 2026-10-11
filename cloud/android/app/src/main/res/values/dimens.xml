@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Measured against the XP3's 240x320 mdpi panel: 24dp status bar and a
+         28dp title bar leave the transcript nearly the whole screen. -->
+    <dimen name="title_bar_height">28dp</dimen>
+    <dimen name="title_text">13sp</dimen>
+    <dimen name="state_text">11sp</dimen>
+
+    <dimen name="row_pad_h">10dp</dimen>
+    <dimen name="focus_rule">2dp</dimen>
+
+    <!-- Full-width chat areas keep only readable inner padding and a small
+         separator between turns. -->
+    <dimen name="text_bubble">14sp</dimen>
+    <dimen name="text_tool">11sp</dimen>
+    <dimen name="bubble_pad_h">10dp</dimen>
+    <dimen name="bubble_pad_top">9dp</dimen>
+    <dimen name="bubble_pad_bottom">9dp</dimen>
+    <dimen name="chat_area_gap">1dp</dimen>
+</resources>

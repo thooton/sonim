@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cloud</string>
+    <string name="new_session">New session</string>
+    <string name="chat_hint">What should Claude do?</string>
+</resources>
