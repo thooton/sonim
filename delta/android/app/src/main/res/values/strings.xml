@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Delta</string>
+    <string name="chats">Chats</string>
+    <string name="session">Session</string>
+    <string name="files">Files</string>
+    <string name="new_session">New session</string>
+    <string name="chat_hint">What should Claude do?</string>
+</resources>
