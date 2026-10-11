@@ -8,7 +8,7 @@ unsigned="$root/android/app/build/outputs/apk/release/app-release-unsigned.apk"
 output="$root/Canvas-XP3-release.apk"
 sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/opt/android-sdk}}"
 signer="${TODO_APKSIGNER:-$sdk/build-tools/35.0.1/apksigner}"
-keystore="${TODO_KEYSTORE:-$HOME/.android/debug.keystore}"
+keystore="${TODO_KEYSTORE:-$root/../signing/debug.keystore}"
 : "${TODO_STORE_PASSWORD:=android}"
 : "${TODO_KEY_PASSWORD:=$TODO_STORE_PASSWORD}"
 export TODO_STORE_PASSWORD TODO_KEY_PASSWORD

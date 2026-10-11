@@ -1,0 +1,115 @@
+name: Build APKs
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ANDROID_PLATFORM: android-35
+  ANDROID_BUILD_TOOLS: 35.0.1
+
+jobs:
+  gradle:
+    name: ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: canvas
+            dir: canvas/android
+          - app: charge
+            dir: charge/android
+          - app: dictionary
+            dir: dictionary
+          - app: downloader
+            dir: downloader/android
+          - app: flashcards
+            dir: flashcards/android
+          - app: list
+            dir: list/android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;${{ env.ANDROID_PLATFORM }} build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Charge refuses to build without android/.tokens.json. CI never bakes a
+      # real Tesla credential into a downloadable artifact, so it gets a
+      # placeholder: the APK builds, but has no working login.
+      - name: Placeholder Charge token
+        if: matrix.app == 'charge'
+        run: echo '{"refreshToken":"ci-placeholder"}' > charge/android/.tokens.json
+
+      - name: Build debug APK
+        working-directory: ${{ matrix.dir }}
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp ${{ matrix.dir }}/app/build/outputs/apk/debug/app-debug.apk out/${{ matrix.app }}-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-apk
+          path: out/*.apk
+          if-no-files-found: error
+
+  launcher:
+    name: launcher
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;${{ env.ANDROID_PLATFORM }} build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+
+      # build.sh calls `aapt` from PATH and signs with launcher/signing/.
+      - name: Build AppDrawer APK
+        run: |
+          export PATH="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS:$PATH"
+          ./launcher/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-apk
+          path: launcher/AppDrawer.apk
+          if-no-files-found: error
+
+  bundle:
+    name: All APKs
+    needs: [gradle, launcher]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-apk'
+          path: apks
+          merge-multiple: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: all-apks
+          path: apks/*.apk
+          if-no-files-found: error

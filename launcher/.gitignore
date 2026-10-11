@@ -5,8 +5,6 @@
 *.class
 *.dex
 
-# Local signing material
-/signing/
 
 # Android and IDE files
 /.gradle/

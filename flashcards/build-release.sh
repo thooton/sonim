@@ -21,7 +21,7 @@ fi
 
 printf 'sdk.dir=%s\n' "${android_sdk}" > "${android_dir}/local.properties"
 
-keystore="${FLASHCARDS_KEYSTORE:-${HOME}/.android/debug.keystore}"
+keystore="${FLASHCARDS_KEYSTORE:-${repo_dir}/../signing/debug.keystore}"
 key_alias="${FLASHCARDS_KEY_ALIAS:-androiddebugkey}"
 : "${FLASHCARDS_STORE_PASSWORD:=android}"
 : "${FLASHCARDS_KEY_PASSWORD:=${FLASHCARDS_STORE_PASSWORD}}"

@@ -24,7 +24,7 @@ fi
 # the variables above.
 printf 'sdk.dir=%s\n' "${android_sdk}" > "${android_dir}/local.properties"
 
-keystore="${CHARGE_KEYSTORE:-${HOME}/.android/debug.keystore}"
+keystore="${CHARGE_KEYSTORE:-${repo_dir}/../signing/debug.keystore}"
 key_alias="${CHARGE_KEY_ALIAS:-androiddebugkey}"
 : "${CHARGE_STORE_PASSWORD:=android}"
 : "${CHARGE_KEY_PASSWORD:=${CHARGE_STORE_PASSWORD}}"
