@@ -23,7 +23,7 @@ Both logins are baked in at build time, and a build without them keeps whatever 
 - **Claude**: `-Pdelta.claudeAuth=<file>`, else `claude-auth.json` beside `android/`, else `claude_cloud/auth.json` beside this repository, all in Pi's shape under `anthropic`. The app renews the login and saves each rotation, so once the phone has renewed it, the refresh token in the file stops working. Give Delta its own login if you can.
 - **Command center**: `-Pdelta.center=<file>`, else `delta-center.json` beside `android/`, else the CLI's own `~/.config/delta/config.json` (written by `delta set-auth`). The format is `{"server": "https://…", "token": "delta_…"}`. Without one, use **Menu → Command center** on the Files tab. The app only connects over https.
 
-The cloud environment has to be able to reach the command center's host. If the app has to create your first cloud environment, it adds the host for you. Otherwise, add it to the environment's allowed hosts on claude.ai/code.
+The cloud environment has to be able to reach the command center's host. If the app has to create your first cloud environment, it gives it full network access. Otherwise, set the environment's network access to **Full** (or add the host) on claude.ai/code.
 
 ## Controls
 

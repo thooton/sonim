@@ -15,7 +15,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +64,7 @@ final class Backend {
                     rotated(access, refresh, expiresAt);
                 }
             });
-        cloud = new Cloud(http, credentials, host(config.server()));
+        cloud = new Cloud(http, credentials);
     }
 
     /**
@@ -119,15 +118,6 @@ final class Backend {
             // The renewed login remains usable in memory for this run.
         } catch (RuntimeException e) {
             // Bookkeeping must not break a request.
-        }
-    }
-
-    private static String host(String server) {
-        if (server == null) return null;
-        try {
-            return URI.create(server).getHost();
-        } catch (IllegalArgumentException e) {
-            return null;
         }
     }
 
