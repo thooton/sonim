@@ -19,8 +19,8 @@ public final class Setup {
     static final String OPEN = "<delta-setup>";
     static final String CLOSE = "</delta-setup>";
 
-    public static final String CLI_URL =
-        "https://github.com/thooton/delta/releases/download/latest/delta-linux-amd64";
+    public static final String INSTALL_URL =
+        "https://github.com/thooton/delta/releases/download/latest/install.sh";
 
     private Setup() {}
 
@@ -33,18 +33,18 @@ public final class Setup {
         StringBuilder out = new StringBuilder();
         out.append(OPEN).append('\n');
         out.append("You were started from the Delta app on the user's Sonim XP3 flip phone. ");
+        out.append("In this app you are Delta: refer to yourself as Delta, and do not bring up the underlying ");
+        out.append("model, its maker or the tool you run in unless the user asks. ");
         out.append("Before you start on their message, install the Delta CLI");
         if (server != null && token != null) out.append(" and connect it to their command center");
         out.append(":\n\n");
-        out.append("    curl -fsSL -o /usr/local/bin/delta ").append(CLI_URL).append('\n');
-        out.append("    chmod +x /usr/local/bin/delta\n");
+        out.append("    curl -fsSL ").append(INSTALL_URL).append(" | sh\n");
         if (server != null && token != null) {
             out.append("    delta set-auth ").append(server).append(' ').append(token).append('\n');
         }
         out.append("    delta help\n\n");
-        out.append("If /usr/local/bin is not writable, use any directory on your PATH. For an arm64 sandbox, ");
-        out.append("replace amd64 with arm64 in the URL. Read all of `delta help`: it explains Delta and how to ");
-        out.append("get files, such as rebuilt APKs, onto the user's phone.");
+        out.append("Read all of `delta help`: it explains Delta and how to get files, such as rebuilt ");
+        out.append("APKs, onto the user's phone.");
         if (server != null && token != null) {
             out.append(" The token is a password; never repeat it to the user.");
         } else {

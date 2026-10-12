@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A tool call is one muted monospace line under Claude's text: enough to
+<!-- A tool call is one muted monospace line under Delta's text: enough to
      follow what it is doing without the output burying the conversation. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"

@@ -6,7 +6,7 @@ import com.delta.xp3.data.Setup;
 import com.delta.xp3.data.Store;
 import com.delta.xp3.data.Transcript;
 import com.delta.xp3.net.Center;
-import com.delta.xp3.net.ClaudeAuth;
+import com.delta.xp3.net.CloudAuth;
 import com.delta.xp3.net.Cloud;
 import com.delta.xp3.net.Config;
 import com.delta.xp3.net.Http;
@@ -23,7 +23,7 @@ import java.util.Set;
 /**
  * Everything with a network or a disk behind it, in one place.
  *
- * The cloud client is built once, from the Claude login; a rotated login is
+ * The cloud client is built once, from the cloud login; a rotated login is
  * written back so the next launch starts from the live pair. The command
  * center client is rebuilt whenever its address or token is changed from the
  * Files tab.
@@ -31,7 +31,7 @@ import java.util.Set;
 final class Backend {
 
     static final String NO_LOGIN =
-        "This build has no Claude login. Put claude-auth.json beside the android folder and rebuild.";
+        "This build has no cloud login. Put cloud-auth.json beside the android folder and rebuild.";
     static final String NO_CENTER =
         "No command center yet. Open Menu, then Command center, to add its address and token.";
 
@@ -41,7 +41,7 @@ final class Backend {
     private final Store store;
     private final File downloads;
     private final Http http = new Http();
-    /** Null when this build has no Claude login. */
+    /** Null when this build has no cloud login. */
     private final Cloud cloud;
     /** Guarded by this: both halves are rewritten from different threads. */
     private Config config;
@@ -57,8 +57,8 @@ final class Backend {
             cloud = null;
             return;
         }
-        ClaudeAuth credentials = new ClaudeAuth(http, config.accessToken(),
-            config.refreshToken(), config.expiresAt(), new ClaudeAuth.Rotated() {
+        CloudAuth credentials = new CloudAuth(http, config.accessToken(),
+            config.refreshToken(), config.expiresAt(), new CloudAuth.Rotated() {
                 @Override
                 public void store(String access, String refresh, long expiresAt) {
                     rotated(access, refresh, expiresAt);
@@ -70,7 +70,7 @@ final class Backend {
     /**
      * The logins to use: the saved ones, except where this APK carries a
      * bundled login it has not adopted yet. Each is adopted on its own, by its
-     * own revision marker, which is what stops the stale copy of the Claude
+     * own revision marker, which is what stops the stale copy of the cloud
      * login in the APK replacing one that has rotated since it was installed,
      * just because the command center changed.
      */
@@ -83,16 +83,16 @@ final class Backend {
             return saved;
         }
         Config next = saved;
-        String claudeRevision = Defaults.revision(Store.CLAUDE);
-        boolean adoptClaude = bundled.ready() && !claudeRevision.equals(store.bundledRevision(Store.CLAUDE));
-        if (adoptClaude) next = next.withClaudeOf(bundled);
+        String cloudRevision = Defaults.revision(Store.CLOUD);
+        boolean adoptCloud = bundled.ready() && !cloudRevision.equals(store.bundledRevision(Store.CLOUD));
+        if (adoptCloud) next = next.withCloudOf(bundled);
         String centerRevision = Defaults.revision(Store.CENTER);
         boolean adoptCenter = bundled.centerReady() && !centerRevision.equals(store.bundledRevision(Store.CENTER));
         if (adoptCenter) next = next.withCenterOf(bundled);
-        if (adoptClaude || adoptCenter) {
+        if (adoptCloud || adoptCenter) {
             try {
                 store.saveSettings(next);
-                if (adoptClaude) store.saveBundledRevision(Store.CLAUDE, claudeRevision);
+                if (adoptCloud) store.saveBundledRevision(Store.CLOUD, cloudRevision);
                 if (adoptCenter) store.saveBundledRevision(Store.CENTER, centerRevision);
             } catch (IOException e) {
                 // Still good for this run; the next launch adopts it again.
@@ -110,7 +110,7 @@ final class Backend {
         try {
             Config next;
             synchronized (this) {
-                config = config.withClaude(access, refresh, expiresAt);
+                config = config.withCloud(access, refresh, expiresAt);
                 next = config;
             }
             store.saveSettings(next);

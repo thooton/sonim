@@ -68,7 +68,7 @@ import java.util.concurrent.ThreadFactory;
  * Delta on the phone: three tabs over the cloud sessions and the command
  * center.
  *
- * - Chats lists the account's Claude Code sessions in the cloud. OK opens
+ * - Chats lists the account's agent sessions in the cloud. OK opens
  *   one in Session; the first row starts a new one.
  * - Session is one conversation, and a box to add to it. The first message
  *   of a new session creates it, carrying the Delta setup ahead of what was
@@ -416,7 +416,7 @@ public final class MainActivity extends Activity {
                 }
             });
             // A session is titled by the cloud after its first turn, or renamed
-            // on claude.ai/code; the open one follows.
+            // on the web; the open one follows.
             for (Chat chat : fetched) {
                 if (chat.id.equals(sessionId) && !chat.title.equals(title)) {
                     title = chat.title;
@@ -455,7 +455,7 @@ public final class MainActivity extends Activity {
         RowAdapter.Row was = rowAdapter.selected();
         List<RowAdapter.Row> rows = new ArrayList<>();
         rows.add(new RowAdapter.Row(NEW_ROW, getString(R.string.new_session),
-            sessionId == null && transcript.size() > 0 ? "Open" : "Start a conversation with Claude", null));
+            sessionId == null && transcript.size() > 0 ? "Open" : "Start a conversation with Delta", null));
         for (Chat chat : chats) {
             String when = when(chat.updated);
             boolean open = chat.id.equals(sessionId);
@@ -521,7 +521,7 @@ public final class MainActivity extends Activity {
     private void confirmArchive(final Chat chat) {
         new AlertDialog.Builder(this)
             .setTitle("Archive")
-            .setMessage("Archive \"" + chat.title + "\"? It leaves this list and claude.ai/code's.")
+            .setMessage("Archive \"" + chat.title + "\"? It leaves this list and the web app's.")
             .setPositiveButton("Archive", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
@@ -747,7 +747,7 @@ public final class MainActivity extends Activity {
         });
     }
 
-    /** The first line of the first message, which is what Claude Code titles a session with too. */
+    /** The first line of the first message, which is what the cloud titles a session with too. */
     private static String titleFor(String message) {
         String line = message.split("\n", 2)[0].trim();
         return line.length() <= MAX_TITLE ? line : line.substring(0, MAX_TITLE - 1) + "…";
@@ -780,7 +780,7 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * Answers the permission request Claude is waiting on. Auto mode settles
+     * Answers the permission request the agent is waiting on. Auto mode settles
      * most calls itself; this is for the ones it still asks a person about.
      */
     private void answer(final boolean allow) {

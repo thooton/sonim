@@ -13,8 +13,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Claude Code cloud sessions: the protocol behind `claude --cloud`, as far as
- * a phone needs it.
+ * Cloud agent sessions: the provider's cloud session protocol, as far as a
+ * phone needs it.
  *
  * A session is created once with the first message riding along, and after
  * that everything is events. Messages and control requests are posted to the
@@ -22,7 +22,7 @@ import java.util.UUID;
  * stream that replays from any sequence number, so a dropped connection
  * resumes where it stopped instead of starting over.
  *
- * Every message is preceded by a request for Auto permission mode, so Claude
+ * Every message is preceded by a request for Auto permission mode, so the agent
  * decides which tool calls are safe in the sandbox rather than stopping to
  * ask. Sent each time rather than once, because the worker behind a session is
  * started afresh after it has been idle.
@@ -38,20 +38,20 @@ public final class Cloud {
     private static final String CLI_VERSION = "2.1.263";
     private static final String BETA = "ccr-byoc-2025-07-29";
 
-    /** Where a session runs when it runs in Anthropic's cloud rather than on someone's computer. */
+    /** Where a session runs when it runs in the provider's cloud rather than on someone's computer. */
     static final String CLOUD_KIND = "anthropic_cloud";
 
     private final Http http;
-    private final ClaudeAuth auth;
+    private final CloudAuth auth;
     private final URI base;
     private String organization;
     private String environment;
 
-    public Cloud(Http http, ClaudeAuth auth) {
+    public Cloud(Http http, CloudAuth auth) {
         this(http, auth, API);
     }
 
-    Cloud(Http http, ClaudeAuth auth, URI base) {
+    Cloud(Http http, CloudAuth auth, URI base) {
         this.http = http;
         this.auth = auth;
         this.base = base;
@@ -64,7 +64,7 @@ public final class Cloud {
      * which a phone has no business driving.
      */
     public List<Chat> sessions() throws IOException, InterruptedException {
-        // Unscoped, as `claude --teleport` lists them: this route reads the
+        // Unscoped, as the provider's CLI lists them: this route reads the
         // organization from the login.
         Map<String, Object> listed = object(request("/v1/code/sessions", null, false, false), "session list");
         List<Chat> chats = new ArrayList<Chat>();
@@ -91,13 +91,13 @@ public final class Cloud {
     }
 
     /**
-     * Puts a session away, as claude.ai/code's archive does. It stops showing
+     * Puts a session away, as the web app's archive does. It stops showing
      * up in `sessions`; one already archived counts as done.
      */
     public void archive(String session) throws IOException, InterruptedException {
         int status = statusOf("/v1/code/sessions/" + cse(session) + "/archive", "{}");
         if (status == 409) return;
-        Http.requireSuccess(status, "Claude cloud");
+        Http.requireSuccess(status, "Cloud");
     }
 
     /**
@@ -187,7 +187,7 @@ public final class Cloud {
             if (stream.status() < 200 || stream.status() >= 300) {
                 int status = stream.status();
                 stream.close();
-                Http.requireSuccess(status, "Claude cloud");
+                Http.requireSuccess(status, "Cloud");
             }
             return stream;
         }
@@ -218,7 +218,7 @@ public final class Cloud {
 
     /**
      * Plain text alone, or content blocks when there are pictures: each one
-     * inline as base64, the way Claude Code's own clients send a pasted
+     * inline as base64, the way the provider's own clients send a pasted
      * image, then the text after them.
      */
     static Object content(String text, List<byte[]> jpegs) {
@@ -267,8 +267,8 @@ public final class Cloud {
 
     /**
      * The first cloud environment on the account, made if there is none. A
-     * made one has full network access (`*`, the "Full" setting on
-     * claude.ai/code), so the sandbox can reach the command center and
+     * made one has full network access (`*`, the "Full" setting in
+     * the web app), so the sandbox can reach the command center and
      * anything else a task needs. One that already exists is used as it is.
      */
     private synchronized String environment() throws IOException, InterruptedException {
@@ -278,14 +278,14 @@ public final class Cloud {
         for (Object entry : all) {
             if (!(entry instanceof Map)) continue;
             Map<String, Object> candidate = Json.object(entry);
-            if ("anthropic_cloud".equals(Json.text(candidate, "kind"))) {
+            if (CLOUD_KIND.equals(Json.text(candidate, "kind"))) {
                 environment = Json.string(candidate, "environment_id");
                 return environment;
             }
         }
         Map<String, Object> made = object(post("/v1/environment_providers/cloud/create", Json.write(Json.map(
             "name", "Default",
-            "kind", "anthropic_cloud",
+            "kind", CLOUD_KIND,
             "description", "Default - full network access",
             "config", Json.map(
                 "environment_type", "anthropic",
@@ -327,7 +327,7 @@ public final class Cloud {
                 auth.invalidate();
                 continue;
             }
-            Http.requireSuccess(response.status(), "Claude cloud");
+            Http.requireSuccess(response.status(), "Cloud");
             return response.body();
         }
     }

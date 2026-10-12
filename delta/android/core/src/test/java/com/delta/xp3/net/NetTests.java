@@ -63,7 +63,7 @@ public final class NetTests {
                     }
                 });
                 try {
-                    ClaudeAuth auth = new ClaudeAuth(new Http(), "tok-1", null, 0, null);
+                    CloudAuth auth = new CloudAuth(new Http(), "tok-1", null, 0, null);
                     Cloud cloud = new Cloud(new Http(), auth, server.uri(""));
 
                     String id = cloud.create("Hello", "uuid-1", "Hello there");
@@ -165,8 +165,8 @@ public final class NetTests {
                 });
                 try {
                     final String[] stored = new String[1];
-                    ClaudeAuth auth = new ClaudeAuth(new Http(), server.uri("/token"), "old", "r1",
-                        System.currentTimeMillis() + 3600000L, new ClaudeAuth.Rotated() {
+                    CloudAuth auth = new CloudAuth(new Http(), server.uri("/token"), "old", "r1",
+                        System.currentTimeMillis() + 3600000L, new CloudAuth.Rotated() {
                             @Override
                             public void store(String access, String refresh, long expiresAt) {
                                 stored[0] = refresh;
@@ -195,7 +195,7 @@ public final class NetTests {
                     }
                 });
                 try {
-                    final Cloud cloud = new Cloud(new Http(), new ClaudeAuth(new Http(), "t", null, 0, null),
+                    final Cloud cloud = new Cloud(new Http(), new CloudAuth(new Http(), "t", null, 0, null),
                         server.uri(""));
                     check.fails("rate limit", "usage limit", new Check.Body() {
                         @Override
@@ -244,7 +244,7 @@ public final class NetTests {
                     }
                 });
                 try {
-                    Cloud cloud = new Cloud(new Http(), new ClaudeAuth(new Http(), "tok", null, 0, null), server.uri(""));
+                    Cloud cloud = new Cloud(new Http(), new CloudAuth(new Http(), "tok", null, 0, null), server.uri(""));
                     List<com.delta.xp3.data.Chat> chats = cloud.sessions();
                     check.same("cloud sessions only, archived and odd ids left out", 2, chats.size());
                     check.same("newest first", "session_new", chats.get(0).id);
@@ -288,7 +288,7 @@ public final class NetTests {
                     }
                 });
                 try {
-                    Cloud cloud = new Cloud(new Http(), new ClaudeAuth(new Http(), "tok", null, 0, null),
+                    Cloud cloud = new Cloud(new Http(), new CloudAuth(new Http(), "tok", null, 0, null),
                         server.uri(""));
                     cloud.create("t", "u", "hi");
                     Map<String, Object> made = Json.object(Json.parse(

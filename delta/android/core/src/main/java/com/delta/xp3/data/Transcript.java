@@ -13,8 +13,8 @@ import java.util.Map;
  * The stream carries everything the cloud worker and every attached client do:
  * sandbox start-up logs, MCP handshakes, context-usage polls, rate-limit
  * notices. Almost none of it is conversation. What is kept is what a person
- * would want on a 240px screen: what was said to Claude, what Claude said,
- * a line per tool call, and the odd note when a turn ends badly or Claude is
+ * would want on a 240px screen: what was said to the agent, what it said,
+ * a line per tool call, and the odd note when a turn ends badly or the agent is
  * waiting for permission.
  *
  * Events are applied in sequence order and an event at or below the last
@@ -174,14 +174,14 @@ public final class Transcript {
         if ("env_manager_log".equals(type)) {
             String line = Json.text(Json.child(payload, "data"), "content");
             if (line == null || line.trim().length() == 0) return false;
-            status = oneLine(line);
+            status = oneLine(rebrand(line));
             return working;
         }
         return false;
     }
 
     /**
-     * A message to Claude. Only the client's own are shown: user frames from
+     * A message to the agent. Only the client's own are shown: user frames from
      * the worker are tool results and interrupt markers, which are its
      * bookkeeping rather than anything anybody said.
      */
@@ -218,7 +218,7 @@ public final class Transcript {
             if ("text".equals(type)) {
                 String text = Json.text(part, "text");
                 if (text == null || text.trim().length() == 0) continue;
-                add(new Entry(Entry.CLAUDE, text.trim(), null));
+                add(new Entry(Entry.AGENT, text.trim(), null));
                 changed = true;
             } else if ("tool_use".equals(type)) {
                 add(new Entry(Entry.TOOL, tool(Json.text(part, "name"), Json.child(part, "input")), null));
@@ -239,10 +239,10 @@ public final class Transcript {
             note("Stopped at the turn limit.");
         } else if (Json.flag(payload, "is_error") || (subtype != null && !"success".equals(subtype))) {
             String said = Json.text(payload, "result");
-            // A usage limit arrives as Claude's own words and then again as
+            // A usage limit arrives as the agent's own words and then again as
             // the result; once on a 240px screen is enough.
             if (said != null && repeatsLastReply(said)) return true;
-            note(said != null && said.trim().length() > 0 ? oneLine(said) : "The turn ended with an error.");
+            note(said != null && said.trim().length() > 0 ? oneLine(rebrand(said)) : "The turn ended with an error.");
         }
         return true;
     }
@@ -250,7 +250,7 @@ public final class Transcript {
     private boolean repeatsLastReply(String said) {
         if (entries.isEmpty()) return false;
         Entry last = entries.get(entries.size() - 1);
-        return last.kind == Entry.CLAUDE && last.text.equals(said.trim());
+        return last.kind == Entry.AGENT && last.text.equals(said.trim());
     }
 
     /** The worker asking permission for a tool call. Requests to the worker are not ours to show. */
@@ -264,11 +264,11 @@ public final class Transcript {
         Map<String, Object> input = Json.child(request, "input");
         String summary = summary(name, input);
         pending = new Permission(requestId, name, summary, new LinkedHashMap<String, Object>(input));
-        note("Claude asks to use " + tool(name, input) + ". Menu to allow or deny.");
+        note("Delta asks to use " + tool(name, input) + ". Menu to allow or deny.");
         return true;
     }
 
-    /** A request answered or withdrawn elsewhere: claude.ai, the CLI, or a timeout. */
+    /** A request answered or withdrawn elsewhere: the web app, the CLI, or a timeout. */
     private boolean settled(String requestId) {
         if (pending == null || requestId == null || !requestId.equals(pending.requestId)) return false;
         pending = null;
@@ -323,6 +323,15 @@ public final class Transcript {
             if (value instanceof String && ((String) value).trim().length() > 0) return oneLine((String) value);
         }
         return "";
+    }
+
+    /**
+     * The app's own status and note lines are white-labelled: the worker's
+     * start-up log and error results name the provider's product, and on
+     * this phone the agent is Delta. The agent's own words are left alone.
+     */
+    static String rebrand(String text) {
+        return text.replaceAll("\\bClaude(?: Code| AI)?\\b", "Delta");
     }
 
     private static String oneLine(String text) {

@@ -5,8 +5,8 @@ public final class Entry {
 
     /** Something you sent, from this phone or anywhere else. */
     public static final int YOU = 0;
-    /** Claude's own words, as Markdown. */
-    public static final int CLAUDE = 1;
+    /** The agent's own words, as Markdown. */
+    public static final int AGENT = 1;
     /** A one-line record of a tool call: "Bash: ls -la". */
     public static final int TOOL = 2;
     /** A quiet line from the app itself: a failure, a stop, a question. */
@@ -38,6 +38,6 @@ public final class Entry {
     }
 
     public boolean isMessage() {
-        return kind == YOU || kind == CLAUDE;
+        return kind == YOU || kind == AGENT;
     }
 }

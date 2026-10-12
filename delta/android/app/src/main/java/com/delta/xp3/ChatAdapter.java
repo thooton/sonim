@@ -77,7 +77,7 @@ final class ChatAdapter extends SelectableAdapter {
             text.setText(entry.text);
             text.setVisibility(entry.text.length() == 0 ? View.GONE : View.VISIBLE);
             bindPictures((LinearLayout) view.findViewById(R.id.bubble_pictures), entry);
-        } else if (entry.kind == Entry.CLAUDE) {
+        } else if (entry.kind == Entry.AGENT) {
             LinearLayout message = view.findViewById(R.id.bubble_text);
             // Recycled rows keep their old blocks; rebuild them every time.
             message.removeAllViews();
@@ -127,7 +127,7 @@ final class ChatAdapter extends SelectableAdapter {
 
     private static int layout(int kind) {
         if (kind == Entry.YOU) return R.layout.row_chat_you;
-        if (kind == Entry.CLAUDE) return R.layout.row_chat_agent;
+        if (kind == Entry.AGENT) return R.layout.row_chat_agent;
         if (kind == Entry.TOOL) return R.layout.row_chat_tool;
         return R.layout.row_chat_note;
     }

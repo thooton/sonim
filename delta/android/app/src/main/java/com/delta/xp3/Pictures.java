@@ -21,7 +21,7 @@ import java.util.Set;
 /**
  * The pictures a message carries, from the camera or the gallery to the cloud.
  *
- * A picture is shrunk to what Claude can use before it goes anywhere: no more
+ * A picture is shrunk to what the model can use before it goes anywhere: no more
  * than MAX_EDGE on its long side (larger is scaled down by the model anyway,
  * after being paid for in upload time), turned upright from its EXIF
  * orientation, and saved as a JPEG. The XP3's camera writes several megabytes

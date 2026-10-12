@@ -2,12 +2,19 @@
 
 ## Purpose and scope
 
+Delta is white-labelled: the app, its README and the agent itself say
+"Delta", never the provider's or model's name. Only the wire protocol
+(endpoints, headers, OAuth scopes, `anthropic_cloud`) and legacy storage keys
+keep the provider's names, because the service and older installs need them.
+`Transcript.rebrand` renames the product in the worker's status and error
+lines; the agent's own replies are left as written.
+
 The phone end of Delta (https://github.com/thooton/delta): a small,
-dependency-free Android client for Claude Code cloud sessions and for the
+dependency-free Android client for cloud agent sessions and for the
 Delta command center, for the Sonim XP3. It replaced `cloud` (one session) and
 `downloader` (fetch and install an APK). It is a sibling of `../list`,
 `../canvas` and `../charge`, and shares their constraints and much of their
-code (HTTP, JSON, Claude OAuth, chat views, Markdown, tabs).
+code (HTTP, JSON, cloud OAuth, chat views, Markdown, tabs).
 
 - Target: 240x320 mdpi, portrait, d-pad/keypad-driven. Not touch-first.
 - Platform Android only: no AndroidX, Material, Compose, or third-party
@@ -20,8 +27,8 @@ code (HTTP, JSON, Claude OAuth, chat views, Markdown, tabs).
 
 An agent is started from the Session tab. The first message of every new
 session is `Setup.wrap(typed, server, token)`: a `<delta-setup>` block telling
-the agent to download the `delta` CLI from the delta repo's `latest` release,
-run `delta set-auth <server> <token>`, and read `delta help`, followed by what
+the agent to call itself Delta, install the `delta` CLI with the delta repo's
+`latest` release `install.sh` (`curl -fsSL … | sh`), run `delta set-auth <server> <token>`, and read `delta help`, followed by what
 was typed. `Transcript` removes that block again (`Setup.strip`), so the phone
 never shows it, including when an older session is replayed. The agent then
 uses `delta push` to put files on the command center, and they appear in the
@@ -40,7 +47,7 @@ only. In the composer, left and right move the cursor until it reaches an end
 of the text (`cursorOwns`, as in Canvas).
 
 - **Chats**: `Cloud.sessions()` (`GET /v1/code/sessions`, unscoped, as
-  `claude --teleport` lists them), keeping only `anthropic_cloud` sessions
+  the provider's CLI lists them), keeping only `anthropic_cloud` sessions
   (or ones with no kind) that are not archived. `bridge` sessions are Remote
   Control sessions on someone's own computer and are left out on purpose.
   Ids may arrive as `cse_…`; they are always stored as `session_…`
@@ -62,8 +69,8 @@ of the text (`cursorOwns`, as in Canvas).
 
 ## The protocol
 
-`Cloud` is the protocol behind `claude --cloud` (see `claude_cloud/cloud_demo.py`
-beside this repository):
+`Cloud` is the provider's cloud session protocol (see the cloud demo's
+`cloud_demo.py` beside this repository):
 
 - `GET /api/oauth/profile` gives the organization; most calls send it as
   `x-organization-uuid`. Session create and environment create also send
@@ -72,7 +79,7 @@ beside this repository):
   event. Later sends go to `POST /v1/code/sessions/cse_…/events` (the same id
   with `session_` swapped for `cse_`).
 - `GET /v1/code/sessions/cse_…/events/stream` is SSE. `client_event` frames
-  have the sequence number as their `id:` and a Claude Code stream-json
+  have the sequence number as their `id:` and a stream-json
   `payload`. `?from_sequence_num=N` (plus `Last-Event-ID`) replays everything
   after N, so `Transcript.sequence()` is saved per session and a reconnect
   resumes there.
@@ -82,10 +89,10 @@ beside this repository):
   `can_use_tool` requests, because that would override Auto's own decisions.
   They are shown, and the person allows or denies them from the menu.
 - A newly created environment (only when the account has none) has
-  `allowed_hosts: ["*"]`, which is "Full" network access on claude.ai/code,
+  `allowed_hosts: ["*"]`, which is "Full" network access in the web app,
   so the sandbox can run `delta` against the command center and reach
   anything else. An existing environment is used as it is; there is no
-  OAuth call to change it, so its network access is set on claude.ai/code.
+  OAuth call to change it, so its network access is set in the web app.
 
 `Transcript` keeps only what a person reads: client `user` messages (echoes
 of our own matched by uuid), top-level `assistant` text and `tool_use` lines,
@@ -96,7 +103,8 @@ Subagent output, tool results, logs and control chatter are dropped. Extend
 ## Storage
 
 `Store` writes `settings.json` (both logins, owner-only), the
-`bundled-claude.txt` / `bundled-center.txt` revision markers, `open.txt`,
+`bundled-cloud.txt` / `bundled-center.txt` revision markers (an older
+`bundled-claude.txt`, and a `claude` key in `settings.json`, are still read), `open.txt`,
 `chats.json`, `sessions/<session id>.json` and `downloads.json`. Session ids
 and file names are validated (`Chat.validId`, `RemoteFile.validName`) before
 they become file names. `prune` keeps the 20 most recent transcripts plus the
@@ -114,7 +122,7 @@ At most four per message.
 
 ## Layout
 
-- `android/core`: `net/` (`Http`, `Json`, `Config`, `ClaudeAuth`, `Sse`,
+- `android/core`: `net/` (`Http`, `Json`, `Config`, `CloudAuth`, `Sse`,
   `Cloud`, `Center`) and `data/` (`Entry`, `Transcript`, `Store`, `Chat`,
   `RemoteFile`, `Setup`). Tests in `src/test` run via `:core:selfTest` with
   the tiny `Check` harness and loopback `TestServer`.
@@ -151,12 +159,12 @@ checks on the handset.
 
 ## Credentials
 
-There is no in-app Claude sign-in, by design. `android/app/build.gradle` bakes
-in the Claude login (`-Pdelta.claudeAuth`, `../claude-auth.json`,
-`../../../claude_cloud/auth.json`) and the command center (`-Pdelta.center`,
+There is no in-app cloud sign-in, by design. `android/app/build.gradle` bakes
+in the cloud login (`-Pdelta.cloudAuth`, `../cloud-auth.json`, or the cloud
+demo's `auth.json` beside this repository) and the command center (`-Pdelta.center`,
 `../delta-center.json`, the CLI's `~/.config/delta/config.json`). It writes
 them into a generated `Defaults.java` under `android/app/build/`, with one
 revision marker per login, so a new command center doesn't replace a rotated
-Claude login. A build with neither, such as a CI build or one made in an
+cloud login. A build with neither, such as a CI build or one made in an
 agent's sandbox, installs over a configured copy and keeps its logins. Never
 print, commit, or attach the auth files, the generated source, or any APK.

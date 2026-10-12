@@ -26,7 +26,7 @@
          reads as the app's own word about the row rather than as part of it. -->
     <color name="accent_text">#0F6363</color>
 
-    <!-- The transcript: grey for you, white for Claude. -->
+    <!-- The transcript: grey for you, white for Delta. -->
     <color name="chat_page">#FFFFFF</color>
     <color name="bubble_you">#E6E6E6</color>
     <color name="bubble_agent">#FFFFFF</color>
