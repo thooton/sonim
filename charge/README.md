@@ -17,10 +17,11 @@ private `android/.tokens.json` containing a Tesla refresh token.
 
 ```bash
 cd android
-./gradlew assembleDebug
+./gradlew :app:assembleRelease
 ```
 
-For a signed, optimized APK, run `./build-release.sh` from the repository root.
+This writes the signed, optimized APK to
+`android/app/build/outputs/apk/release/app-release.apk`.
 
 > **Important:** Every APK embeds a live Tesla credential. Keep APKs, token
 > files, environment files, and signing keys private and out of source control.

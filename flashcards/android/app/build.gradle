@@ -12,17 +12,6 @@ dependencies {
 }
 
 android {
-    // The repository's shared debug key (signing/debug.keystore), so a build
-    // from any checkout or from CI installs over any other.
-    signingConfigs {
-        debug {
-            storeFile rootProject.file("../../signing/debug.keystore")
-            storePassword "android"
-            keyAlias "androiddebugkey"
-            keyPassword "android"
-        }
-    }
-
     namespace "com.flashcards.xp3"
     compileSdk 35
     buildToolsVersion "35.0.1"
@@ -35,8 +24,17 @@ android {
         versionName "1.0.0"
     }
 
+    // Targets the XP3's own Android 8.1 on purpose; this is not for Play.
+    lint {
+        disable "ExpiredTargetSdkVersion"
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
 }
+
+// Debug and release builds alike are signed with the shared key, which the
+// copies on the phone were signed with too (see that file).
+apply from: rootProject.file("../../signing/signing.gradle")

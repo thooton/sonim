@@ -8,8 +8,8 @@ It keeps assignments available offline, groups them into Assigned, Missing, and 
 
 ```bash
 cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
 ## Setup

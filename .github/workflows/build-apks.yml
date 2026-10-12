@@ -62,14 +62,16 @@ jobs:
         working-directory: ${{ matrix.dir }}
         run: ./gradlew --no-daemon :core:selfTest
 
-      - name: Build debug APK
+      # Release builds are signed with the shared key in signing/, the same
+      # one the copies on the phone carry, so they install over them.
+      - name: Build release APK
         working-directory: ${{ matrix.dir }}
-        run: ./gradlew --no-daemon :app:assembleDebug
+        run: ./gradlew --no-daemon :app:assembleRelease
 
       - name: Collect APK
         run: |
           mkdir -p out
-          cp ${{ matrix.dir }}/app/build/outputs/apk/debug/app-debug.apk out/${{ matrix.app }}-debug.apk
+          cp ${{ matrix.dir }}/app/build/outputs/apk/release/app-release.apk out/${{ matrix.app }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
@@ -140,3 +142,8 @@ jobs:
             gh release create latest --title "Sonim apps (latest)" --notes-file notes.md
           gh release edit latest --notes-file notes.md
           gh release upload latest apks/*.apk --clobber
+          # Drop assets no build produces any more, such as the old
+          # *-debug.apk files.
+          gh release view latest --json assets -q '.assets[].name' | while read -r name; do
+            [ -f "apks/$name" ] || gh release delete-asset latest "$name" -y
+          done
