@@ -16,10 +16,10 @@ plugins {
  * over a copy that has one, such a build keeps it: a bundled login is adopted
  * once per revision, and an absent one changes nothing.
  *
- * The Claude login is the complete rotating OAuth entry, from, in order:
- * -Pdelta.claudeAuth=<file>, claude-auth.json beside the android directory,
- * or the claude_cloud/auth.json that sits beside this repository (all the
- * same shape Pi writes, under `anthropic`).
+ * The cloud login is the complete rotating OAuth entry, from, in order:
+ * -Pdelta.cloudAuth=<file>, cloud-auth.json beside the android directory,
+ * or the auth.json in the cloud demo directory that sits beside this
+ * repository (all the same shape Pi writes, under the provider's key).
  *
  * The command center is the address and token `delta set-auth` saves, from:
  * -Pdelta.center=<file>, delta-center.json beside the android directory, or
@@ -29,7 +29,7 @@ plugins {
  *
  * The APK that comes out of this contains live credentials. It is gitignored,
  * and it should be treated as a password: anything with the file can spend the
- * configured Claude subscription and run code on the command center.
+ * configured cloud subscription and run code on the command center.
  */
 def bundledSource = layout.buildDirectory.dir("generated/bundled")
 
@@ -44,10 +44,10 @@ static String sha256(File source) {
 }
 
 tasks.register("generateDefaults") {
-    description = "Bakes this deployment's Claude login and command center into the APK."
+    description = "Bakes this deployment's cloud login and command center into the APK."
     def configHome = System.getenv("XDG_CONFIG_HOME") ?: "${System.getProperty("user.home")}/.config"
-    def localClaudeAuth = firstFile("delta.claudeAuth", [
-        "${rootDir}/../claude-auth.json",
+    def localCloudAuth = firstFile("delta.cloudAuth", [
+        "${rootDir}/../cloud-auth.json",
         "${rootDir}/../../../claude_cloud/auth.json",
     ])
     def localCenter = firstFile("delta.center", [
@@ -55,29 +55,29 @@ tasks.register("generateDefaults") {
         "${configHome}/delta/config.json",
     ])
 
-    inputs.files(localClaudeAuth, localCenter)
+    inputs.files(localCloudAuth, localCenter)
         .withPropertyName("sources")
         .ignoreEmptyDirectories().optional(true)
     outputs.dir(bundledSource)
 
     doLast {
         def settings = [:]
-        def claudeRevision = ""
+        def cloudRevision = ""
         def centerRevision = ""
 
-        def claude = localClaudeAuth.isFile() ? (new JsonSlurper().parse(localClaudeAuth).anthropic ?: [:]) : [:]
-        if (claude.access || claude.refresh) {
-            // Keep the complete pair together, with its expiry: Claude rotates
-            // the refresh token, and the app persists each rotation.
+        def cloud = localCloudAuth.isFile() ? (new JsonSlurper().parse(localCloudAuth).anthropic ?: [:]) : [:]
+        if (cloud.access || cloud.refresh) {
+            // Keep the complete pair together, with its expiry: the provider
+            // rotates the refresh token, and the app persists each rotation.
             def entry = [:]
-            if (claude.access) entry.accessToken = claude.access
-            if (claude.refresh) entry.refreshToken = claude.refresh
-            if (claude.expires) entry.expiresAt = claude.expires
-            settings.claude = entry
-            claudeRevision = sha256(localClaudeAuth)
-            logger.lifecycle("Bundled setup: Claude login from ${localClaudeAuth}")
+            if (cloud.access) entry.accessToken = cloud.access
+            if (cloud.refresh) entry.refreshToken = cloud.refresh
+            if (cloud.expires) entry.expiresAt = cloud.expires
+            settings.cloud = entry
+            cloudRevision = sha256(localCloudAuth)
+            logger.lifecycle("Bundled setup: cloud login from ${localCloudAuth}")
         } else {
-            logger.lifecycle("Bundled setup: no Claude login found; the app will have none")
+            logger.lifecycle("Bundled setup: no cloud login found; the app will have none")
         }
 
         def center = localCenter.isFile() ? new JsonSlurper().parse(localCenter) : [:]
@@ -114,12 +114,12 @@ final class Defaults {
     private Defaults() {}
 
     private static final String SETTINGS = "${quoted}";
-    private static final String CLAUDE_REVISION = "${claudeRevision}";
+    private static final String CLOUD_REVISION = "${cloudRevision}";
     private static final String CENTER_REVISION = "${centerRevision}";
 
     /** Identifies one bundled login without exposing it; empty when there is none. */
     static String revision(String part) {
-        return Store.CLAUDE.equals(part) ? CLAUDE_REVISION : Store.CENTER.equals(part) ? CENTER_REVISION : "";
+        return Store.CLOUD.equals(part) ? CLOUD_REVISION : Store.CENTER.equals(part) ? CENTER_REVISION : "";
     }
 
     /** The bundled logins, validated the same way stored ones are. */

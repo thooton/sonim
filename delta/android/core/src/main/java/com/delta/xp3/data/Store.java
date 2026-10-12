@@ -38,7 +38,7 @@ import java.util.Set;
 public final class Store {
 
     /** Which login a bundled revision marker belongs to. */
-    public static final String CLAUDE = "claude";
+    public static final String CLOUD = "cloud";
     public static final String CENTER = "center";
 
     private static final String SETTINGS = "settings.json";
@@ -89,6 +89,8 @@ public final class Store {
     /** The bundled login of kind `part` already adopted by this installation, if any. */
     public String bundledRevision(String part) {
         String revision = read(revisionFile(part));
+        // Installs from before the white-label rename have the old marker name.
+        if (revision == null && CLOUD.equals(part)) revision = read("bundled-claude.txt");
         return revision == null ? "" : revision.trim();
     }
 
@@ -97,7 +99,7 @@ public final class Store {
     }
 
     private static String revisionFile(String part) {
-        if (!CLAUDE.equals(part) && !CENTER.equals(part)) throw new IllegalArgumentException("Unknown login");
+        if (!CLOUD.equals(part) && !CENTER.equals(part)) throw new IllegalArgumentException("Unknown login");
         return "bundled-" + part + ".txt";
     }
 

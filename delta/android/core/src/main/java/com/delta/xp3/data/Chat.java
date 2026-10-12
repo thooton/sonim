@@ -13,7 +13,7 @@ public final class Chat {
     /** Nothing running; the session can take a message. */
     public static final String IDLE = "idle";
 
-    /** Always the session_… form, which is also what claude.ai/code links use. */
+    /** Always the session_… form, which is also what the web app's links use. */
     public final String id;
     public final String title;
     public final String status;

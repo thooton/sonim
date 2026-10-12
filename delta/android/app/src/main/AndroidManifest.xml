@@ -8,7 +8,7 @@
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
-    <!-- Cleartext is off: the app talks to Anthropic and to the command
+    <!-- Cleartext is off: the app talks to the cloud and to the command
          center, both over https, and turning this off means nothing can
          quietly send either login in the clear. -->
     <application

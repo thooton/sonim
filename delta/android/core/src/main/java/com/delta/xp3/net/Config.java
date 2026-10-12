@@ -8,8 +8,8 @@ import java.util.Map;
 /**
  * The two logins the app holds, and nothing else.
  *
- * The Claude login is the rotating OAuth pair, written back here every time
- * Anthropic renews it. The command center is an address and a bearer token,
+ * The cloud login is the rotating OAuth pair, written back here every time
+ * it is renewed. The command center is an address and a bearer token,
  * the same pair `delta set-auth` saves for the CLI; it never rotates.
  *
  * There is no model, environment or repository to configure: the cloud session
@@ -17,6 +17,10 @@ import java.util.Map;
  * every session starts with an empty sandbox.
  */
 public final class Config {
+
+    private static final String CLOUD = "cloud";
+    /** Where versions before the white-label rename kept the cloud login. */
+    private static final String LEGACY_CLOUD = "claude";
 
     private final String accessToken;
     private final String refreshToken;
@@ -36,19 +40,21 @@ public final class Config {
         return new Config(null, null, 0, null, null);
     }
 
-    /** A Claude login alone. */
+    /** A cloud login alone. */
     public static Config of(String accessToken, String refreshToken, long expiresAt) {
-        return blank().withClaude(accessToken, refreshToken, expiresAt);
+        return blank().withCloud(accessToken, refreshToken, expiresAt);
     }
 
     public static Config parse(String json) {
         Map<String, Object> root = Json.object(Json.parse(json));
-        Map<String, Object> claude = Json.child(root, "claude");
+        Map<String, Object> cloud = Json.child(root, CLOUD);
+        // Settings written before the rename keep the login under the old key.
+        if (cloud.isEmpty()) cloud = Json.child(root, LEGACY_CLOUD);
         Map<String, Object> center = Json.child(root, "center");
-        Double expiry = Json.number(claude, "expiresAt");
+        Double expiry = Json.number(cloud, "expiresAt");
         Config config = of(
-            Json.text(claude, "accessToken"),
-            Json.text(claude, "refreshToken"),
+            Json.text(cloud, "accessToken"),
+            Json.text(cloud, "refreshToken"),
             expiry == null ? 0 : (long) expiry.doubleValue()
         );
         String server = Json.text(center, "server");
@@ -57,18 +63,18 @@ public final class Config {
         try {
             return config.withCenter(server, token);
         } catch (IllegalArgumentException e) {
-            // A command center this version refuses must not cost the Claude
+            // A command center this version refuses must not cost the cloud
             // login saved beside it.
             return config;
         }
     }
 
-    public Config withClaude(String accessToken, String refreshToken, long expiresAt) {
+    public Config withCloud(String accessToken, String refreshToken, long expiresAt) {
         return new Config(credential(accessToken), credential(refreshToken), Math.max(0, expiresAt), server, token);
     }
 
-    /** The Claude half of `other`, with this config's command center. */
-    public Config withClaudeOf(Config other) {
+    /** The cloud half of `other`, with this config's command center. */
+    public Config withCloudOf(Config other) {
         return new Config(other.accessToken, other.refreshToken, other.expiresAt, server, token);
     }
 
@@ -85,7 +91,7 @@ public final class Config {
         return new Config(accessToken, refreshToken, expiresAt, address, bearer);
     }
 
-    /** The command center of `other`, with this config's Claude login. */
+    /** The command center of `other`, with this config's cloud login. */
     public Config withCenterOf(Config other) {
         return new Config(accessToken, refreshToken, expiresAt, other.server, other.token);
     }
@@ -139,11 +145,11 @@ public final class Config {
     }
 
     public String toJson() {
-        Map<String, Object> claude = new LinkedHashMap<String, Object>();
-        if (accessToken != null) claude.put("accessToken", accessToken);
-        if (refreshToken != null) claude.put("refreshToken", refreshToken);
-        if (expiresAt > 0) claude.put("expiresAt", Long.valueOf(expiresAt));
-        Map<String, Object> root = Json.map("claude", claude);
+        Map<String, Object> cloud = new LinkedHashMap<String, Object>();
+        if (accessToken != null) cloud.put("accessToken", accessToken);
+        if (refreshToken != null) cloud.put("refreshToken", refreshToken);
+        if (expiresAt > 0) cloud.put("expiresAt", Long.valueOf(expiresAt));
+        Map<String, Object> root = Json.map(CLOUD, cloud);
         if (centerReady()) root.put("center", Json.map("server", server, "token", token));
         return Json.write(root);
     }

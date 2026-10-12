@@ -25,7 +25,7 @@ public final class DataTests {
                 check.ok("prompt starts a turn", t.working());
                 t.apply("client_event", "3", frame(3, "worker",
                     Json.map("type", "env_manager_log", "data", Json.map("content", "Starting Claude Code"))));
-                check.same("start-up line is the status", "Starting Claude Code", t.status());
+                check.same("start-up line is the status, white-labelled", "Starting Delta", t.status());
                 t.apply("client_event", "4", frame(4, "worker", assistant(null,
                     Json.map("type", "tool_use", "name", "Bash", "input", Json.map("command", "ls\n-la"))
                 )));
@@ -41,7 +41,7 @@ public final class DataTests {
                     "is_error", Boolean.FALSE, "result", "Done.")));
                 check.ok("result ends the turn", !t.working());
                 List<Entry> entries = t.entries();
-                check.same("you, tool, claude", 3, entries.size());
+                check.same("you, tool, agent", 3, entries.size());
                 check.same("prompt", "Hello", entries.get(0).text);
                 check.same("tool line flattened", "Bash: ls -la", entries.get(1).text);
                 check.same("tool kind", Entry.TOOL, entries.get(1).kind);
@@ -104,7 +104,7 @@ public final class DataTests {
                     Json.map("type", "text", "text", "You've hit your session limit"))));
                 t.apply("client_event", "4", frame(4, "worker", Json.map("type", "result",
                     "subtype", "success", "is_error", Boolean.TRUE, "result", "You've hit your session limit")));
-                check.same("a limit Claude already said is not said twice", 5, t.size());
+                check.same("a limit the agent already said is not said twice", 5, t.size());
                 check.ok("still ends the turn", !t.working());
             }
         });
@@ -123,7 +123,7 @@ public final class DataTests {
                 check.ok("pending", pending != null);
                 check.same("request id", "p1", pending.requestId);
                 check.same("input kept", "rm -rf build", pending.input.get("command"));
-                check.same("note", "Claude asks to use Bash: rm -rf build. Menu to allow or deny.",
+                check.same("note", "Delta asks to use Bash: rm -rf build. Menu to allow or deny.",
                     t.entries().get(0).text);
                 check.ok("other responses leave it", !t.apply("client_event", "3", frame(3, "worker",
                     Json.map("type", "control_response", "response", Json.map("request_id", "c1")))));
@@ -180,7 +180,7 @@ public final class DataTests {
                 check.same("entries", 2, back.transcript.size());
                 check.same("own id kept", "u-1", back.transcript.entries().get(0).id);
                 check.same("pictures kept", 2, back.transcript.entries().get(0).pictures);
-                check.same("none on claude's", 0, back.transcript.entries().get(1).pictures);
+                check.same("none on the agent's", 0, back.transcript.entries().get(1).pictures);
                 check.ok("echo still recognised after restore", !back.transcript.apply("client_event", "13",
                     frame(13, "client", user("u-1", "Hi"))));
                 check.same("open session", "session_01abc", store.openSession());
@@ -276,7 +276,8 @@ public final class DataTests {
             public void run() {
                 String wrapped = Setup.wrap("  Fix the list app  ", "https://cc.example.com", "delta_tok");
                 check.ok("set-auth line", wrapped.contains("delta set-auth https://cc.example.com delta_tok\n"));
-                check.ok("cli url", wrapped.contains(Setup.CLI_URL));
+                check.ok("install script", wrapped.contains("curl -fsSL " + Setup.INSTALL_URL + " | sh"));
+                check.ok("agent is Delta", wrapped.contains("you are Delta"));
                 check.ok("help", wrapped.contains("delta help"));
                 check.ok("message last", wrapped.endsWith("\n\nFix the list app"));
                 check.same("stripped", "Fix the list app", Setup.strip(wrapped));
@@ -305,9 +306,9 @@ public final class DataTests {
                 Config back = Config.parse(both.toJson());
                 check.same("server", "https://cc.example.com", back.server());
                 check.same("token", "delta_t", back.token());
-                check.same("claude kept", "r", back.refreshToken());
+                check.same("cloud kept", "r", back.refreshToken());
                 check.ok("center ready", back.centerReady());
-                check.ok("claude only", !Config.of("a", null, 0).centerReady());
+                check.ok("cloud only", !Config.of("a", null, 0).centerReady());
                 check.same("prefix kept", "https://example.com/delta",
                     Config.blank().withCenter("https://example.com/delta", "t").server());
                 check.fails("plain http refused", "https", new Check.Body() {
@@ -330,11 +331,14 @@ public final class DataTests {
                 });
                 Config bad = Config.parse("{\"claude\":{\"refreshToken\":\"r\"},"
                     + "\"center\":{\"server\":\"http://x\",\"token\":\"t\"}}");
-                check.ok("a refused center keeps the claude login", bad.ready() && !bad.centerReady());
-                Config rotated = both.withClaude("a2", "r2", 9);
+                check.ok("a refused center keeps the cloud login", bad.ready() && !bad.centerReady());
+                Config rotated = both.withCloud("a2", "r2", 9);
                 check.same("rotation keeps the center", "delta_t", rotated.token());
                 check.same("center of another", "delta_t", Config.of("x", "y", 1).withCenterOf(both).token());
-                check.same("claude of another", "r", Config.blank().withClaudeOf(both).refreshToken());
+                check.same("cloud of another", "r", Config.blank().withCloudOf(both).refreshToken());
+                check.same("legacy login key still read", "r",
+                    Config.parse("{\"claude\":{\"refreshToken\":\"r\"}}").refreshToken());
+                check.ok("written under the new key", both.toJson().contains("\"cloud\""));
             }
         });
     }

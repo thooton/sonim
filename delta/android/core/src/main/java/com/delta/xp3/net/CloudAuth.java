@@ -5,18 +5,18 @@ import java.net.URI;
 import java.util.Map;
 
 /**
- * The bundled Claude Pro/Max OAuth login, renewed as it expires.
+ * The bundled subscription OAuth login, renewed as it expires.
  *
  * The access token is short-lived and is renewed from the refresh token. Each
  * renewal also replaces the refresh token, so the new pair is reported to
  * `Rotated` to be written down: the old refresh token stops working.
  */
-public final class ClaudeAuth {
+public final class CloudAuth {
 
     private static final String CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
     private static final URI TOKEN_URL = URI.create("https://platform.claude.com/v1/oauth/token");
     /**
-     * Asked for again on every renewal, as Claude Code itself does: the
+     * Asked for again on every renewal, as the provider's own CLI does: the
      * sessions scope is what lets this login drive cloud sessions at all.
      */
     private static final String SCOPES =
@@ -34,11 +34,11 @@ public final class ClaudeAuth {
     private String refresh;
     private long expiresAt;
 
-    public ClaudeAuth(Http http, String access, String refresh, long expiresAt, Rotated listener) {
+    public CloudAuth(Http http, String access, String refresh, long expiresAt, Rotated listener) {
         this(http, TOKEN_URL, access, refresh, expiresAt, listener);
     }
 
-    ClaudeAuth(Http http, URI endpoint, String access, String refresh, long expiresAt, Rotated listener) {
+    CloudAuth(Http http, URI endpoint, String access, String refresh, long expiresAt, Rotated listener) {
         this.http = http;
         this.endpoint = endpoint;
         this.access = empty(access) ? null : access;
@@ -54,7 +54,7 @@ public final class ClaudeAuth {
         }
         if (refresh == null) {
             if (access != null) return access;
-            throw new IOException("This build has no Claude login");
+            throw new IOException("This build has no cloud login");
         }
         renew();
         return access;
@@ -79,9 +79,9 @@ public final class ClaudeAuth {
                 "scope", SCOPES
             ))));
         if (response.status() == 400 || response.status() == 401 || response.status() == 403) {
-            throw new IOException("The Claude login was rejected; rebuild the app with a fresh login");
+            throw new IOException("The cloud login was rejected; rebuild the app with a fresh login");
         }
-        Http.requireSuccess(response.status(), "Claude login");
+        Http.requireSuccess(response.status(), "Cloud login");
         try {
             Map<String, Object> json = Json.object(Json.parse(response.body()));
             String nextAccess = Json.string(json, "access_token");
@@ -95,7 +95,7 @@ public final class ClaudeAuth {
             refresh = nextRefresh;
             expiresAt = System.currentTimeMillis() + (long) (seconds.doubleValue() * 1000);
         } catch (RuntimeException e) {
-            throw new IOException("The Claude login endpoint returned something unreadable");
+            throw new IOException("The cloud login endpoint returned something unreadable");
         }
         if (listener != null) listener.store(access, refresh, expiresAt);
     }
