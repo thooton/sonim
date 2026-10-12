@@ -6,6 +6,7 @@ import com.delta.xp3.net.Json;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -365,6 +366,14 @@ public final class DataTests {
                 new File(folder, "notes").createNewFile();
                 check.same("no extension", "notes (2)", Folders.unused(folder, "notes").getName());
                 check.same("same folder", folder, Folders.unused(folder, "notes").getParentFile());
+
+                new File(folder, "beta").mkdir();
+                new File(folder, "Alpha").mkdir();
+                new File(folder, ".thumbnails").mkdir();
+                check.same("subfolders in order, files and hidden ones left out",
+                    Arrays.asList("Alpha", "beta"), Folders.subfolders(folder));
+                check.same("nothing inside a missing folder", 0,
+                    Folders.subfolders(new File(folder, "missing")).size());
             }
         });
     }

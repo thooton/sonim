@@ -224,9 +224,8 @@ public final class MainActivity extends Activity {
     private boolean installUpdate;
     /** The file being moved into a shared folder, by name, or null. */
     private String moving;
-    /** A move waiting on the storage permission: the file's name and the folder. */
+    /** The file whose Move to is waiting on the storage permission, by name. */
     private String pendingMove;
-    private String pendingFolder;
 
     // ------------------------------------------------------------------
     // The session screen
@@ -262,7 +261,6 @@ public final class MainActivity extends Activity {
             installLabel = state.getString("installLabel");
             installUpdate = state.getBoolean("installUpdate");
             pendingMove = state.getString("pendingMove");
-            pendingFolder = state.getString("pendingFolder");
         }
         openSaved(backend.openSession());
         chats = backend.savedChats();
@@ -315,7 +313,6 @@ public final class MainActivity extends Activity {
         state.putString("installLabel", installLabel);
         state.putBoolean("installUpdate", installUpdate);
         state.putString("pendingMove", pendingMove);
-        state.putString("pendingFolder", pendingFolder);
     }
 
     @Override
@@ -1519,38 +1516,17 @@ public final class MainActivity extends Activity {
         updateFileRows();
     }
 
-    /** The shared folders, the likeliest for this file first. */
-    private void chooseFolder(final RemoteFile file) {
-        final List<String> folders = Folders.forName(file.name);
-        new AlertDialog.Builder(this)
-            .setTitle("Move to")
-            .setItems(folders.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    moveTo(file.name, folders.get(which));
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
-    }
-
     /**
-     * Moves the phone's copy of a file into a shared folder, fetching it
-     * first when the phone has none or an older one. Shared storage needs
-     * the storage permission, which is asked for the first time it is used.
+     * Move to: the storage permission first, since the folders are listed as
+     * well as written to, then the shared folders.
      */
-    private void moveTo(String name, String folder) {
+    private void chooseFolder(RemoteFile file) {
         if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            pendingMove = name;
-            pendingFolder = folder;
+            pendingMove = file.name;
             requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE);
             return;
         }
-        RemoteFile file = null;
-        for (RemoteFile each : files) if (each.name.equals(name)) file = each;
-        if (file == null) return;
-        if (copyOf(file) == CURRENT) move(file, folder);
-        else download(file, folder);
+        showFolders(file.name);
     }
 
     @Override
@@ -1558,12 +1534,127 @@ public final class MainActivity extends Activity {
         super.onRequestPermissionsResult(request, permissions, results);
         if (request != STORAGE) return;
         String name = pendingMove;
-        String folder = pendingFolder;
         pendingMove = null;
-        pendingFolder = null;
-        if (name == null || folder == null) return;
-        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) moveTo(name, folder);
+        if (name == null) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) showFolders(name);
         else toast("Delta needs storage access to move files");
+    }
+
+    /** The top level: the shared folders, the likeliest for this file first. */
+    private void showFolders(final String name) {
+        final List<String> folders = Folders.forName(name);
+        new AlertDialog.Builder(this)
+            .setTitle("Move to")
+            .setItems(folders.toArray(new String[0]), new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    browse(name, folders.get(which));
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    /**
+     * One folder, by its path in shared storage ("Music/Some Album"): move
+     * the file here, make a folder in it, or open one of the folders inside.
+     * Back goes up a level, and from a shared folder to the list of them.
+     */
+    private void browse(final String name, final String path) {
+        final List<String> inside = Folders.subfolders(shared(path));
+        List<String> items = new ArrayList<>();
+        items.add("Move here");
+        items.add("New folder…");
+        for (String folder : inside) items.add(folder + "/");
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(path)
+            .setItems(items.toArray(new String[0]), new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    if (which == 0) moveTo(name, path);
+                    else if (which == 1) newFolder(name, path);
+                    else browse(name, path + "/" + inside.get(which - 2));
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .create();
+        dialog.setOnKeyListener(new DialogInterface.OnKeyListener() {
+            @Override
+            public boolean onKey(DialogInterface dialog, int keyCode, KeyEvent event) {
+                if (keyCode != KeyEvent.KEYCODE_BACK) return false;
+                if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
+                    dialog.dismiss();
+                    int slash = path.lastIndexOf('/');
+                    if (slash < 0) showFolders(name);
+                    else browse(name, path.substring(0, slash));
+                }
+                return true;
+            }
+        });
+        dialog.show();
+    }
+
+    /** Makes a folder inside `path` and opens it; giving up goes back to `path`. */
+    private void newFolder(final String name, final String path) {
+        final EditText field = new EditText(this);
+        field.setSingleLine(true);
+        // AUTO_CORRECT keeps T9's word suggestions, as in the composer.
+        field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT);
+        field.setHint("Folder name");
+        LinearLayout form = vertical();
+        form.setPadding(dp(16), dp(8), dp(16), 0);
+        form.addView(field);
+        final DialogInterface.OnClickListener back = new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                browse(name, path);
+            }
+        };
+        new AlertDialog.Builder(this)
+            .setTitle("New folder in " + path)
+            .setView(form)
+            .setPositiveButton("Create", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    String folder = field.getText().toString().trim();
+                    File made = new File(shared(path), folder);
+                    if (!RemoteFile.validName(folder)) {
+                        toast("Not a folder name");
+                        browse(name, path);
+                    } else if (!made.isDirectory() && !made.mkdirs()) {
+                        toast("Couldn't make the folder");
+                        browse(name, path);
+                    } else {
+                        browse(name, path + "/" + folder);
+                    }
+                }
+            })
+            .setNegativeButton("Cancel", back)
+            .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                @Override
+                public void onCancel(DialogInterface dialog) {
+                    browse(name, path);
+                }
+            })
+            .show();
+    }
+
+    /** A folder in shared storage, by its path there. */
+    private static File shared(String path) {
+        return new File(Environment.getExternalStorageDirectory(), path);
+    }
+
+    /**
+     * Moves the phone's copy of a file into a folder in shared storage,
+     * fetching it first when the phone has none or an older one.
+     */
+    private void moveTo(String name, String folder) {
+        RemoteFile file = null;
+        for (RemoteFile each : files) if (each.name.equals(name)) file = each;
+        if (file == null) return;
+        if (copyOf(file) == CURRENT) move(file, folder);
+        else download(file, folder);
     }
 
     private void move(final RemoteFile file, final String folder) {
@@ -1572,7 +1663,7 @@ public final class MainActivity extends Activity {
             return;
         }
         moving = file.name;
-        final File into = Environment.getExternalStoragePublicDirectory(folder);
+        final File into = shared(folder);
         moves.execute(new Runnable() {
             @Override
             public void run() {
@@ -1834,7 +1925,7 @@ public final class MainActivity extends Activity {
     /** One download, on the downloads worker; reports back through the main handler. */
     private final class Download implements Runnable, Center.Progress {
         final RemoteFile file;
-        /** The shared folder to move it into once it is here, or null. */
+        /** The folder in shared storage to move it into once it is here, or null. */
         final String folder;
         volatile boolean cancelled;
         /** Read on the main thread only. */
