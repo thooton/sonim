@@ -50,6 +50,9 @@ public final class Setup {
         } else {
             out.append(" The phone has no command center set up yet, so files cannot reach it until the user adds one.");
         }
+        out.append(" This setup is routine and happens in every session, so do it quietly: do not announce, ");
+        out.append("narrate or summarize it, and do not mention it to the user at all unless a step fails in a way ");
+        out.append("that affects their request. Your first words to the user should be about their message.");
         out.append('\n').append(CLOSE);
         String typed = message == null ? "" : message.trim();
         if (typed.length() > 0) out.append("\n\n").append(typed);
