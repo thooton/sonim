@@ -341,6 +341,32 @@ public final class DataTests {
                 check.ok("written under the new key", both.toJson().contains("\"cloud\""));
             }
         });
+
+        check.run("folders to move a file into", new Check.Body() {
+            @Override
+            public void run() throws Exception {
+                check.same("music first for a song", Folders.MUSIC, Folders.forName("Artist - Song.FLAC").get(0));
+                check.same("ringtones next", Folders.RINGTONES, Folders.forName("a.mp3").get(1));
+                check.same("pictures first for a photo", Folders.PICTURES, Folders.forName("x.jpg").get(0));
+                check.same("movies first for a video", Folders.MOVIES, Folders.forName("x.mp4").get(0));
+                check.same("documents first for a book", Folders.DOCUMENTS, Folders.forName("A - B.epub").get(0));
+                check.same("download first for anything else", Folders.DOWNLOAD, Folders.forName("app.apk").get(0));
+                check.same("download first without an extension", Folders.DOWNLOAD, Folders.forName("README").get(0));
+                List<String> all = Folders.forName("x.mp3");
+                check.same("every folder offered once", 9, all.size());
+                check.same("no repeats", 9, new java.util.HashSet<String>(all).size());
+
+                File folder = Files.createTempDirectory("delta-folders").toFile();
+                check.same("free name kept", "a.mp3", Folders.unused(folder, "a.mp3").getName());
+                new File(folder, "a.mp3").createNewFile();
+                check.same("taken name numbered", "a (2).mp3", Folders.unused(folder, "a.mp3").getName());
+                new File(folder, "a (2).mp3").createNewFile();
+                check.same("next number", "a (3).mp3", Folders.unused(folder, "a.mp3").getName());
+                new File(folder, "notes").createNewFile();
+                check.same("no extension", "notes (2)", Folders.unused(folder, "notes").getName());
+                check.same("same folder", folder, Folders.unused(folder, "notes").getParentFile());
+            }
+        });
     }
 
     private static long sequenceAfter(String id, int sequence) {

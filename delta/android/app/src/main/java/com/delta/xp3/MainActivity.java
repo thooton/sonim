@@ -5,13 +5,17 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.ColorDrawable;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -43,6 +47,7 @@ import android.widget.Toast;
 
 import com.delta.xp3.data.Chat;
 import com.delta.xp3.data.Entry;
+import com.delta.xp3.data.Folders;
 import com.delta.xp3.data.RemoteFile;
 import com.delta.xp3.data.Store;
 import com.delta.xp3.data.Transcript;
@@ -75,7 +80,8 @@ import java.util.concurrent.ThreadFactory;
  *   typed. What is on screen is built from the session's event stream, which
  *   stays open while the app is visible, whichever tab is showing.
  * - Files lists what agents have pushed to the command center. OK downloads a
- *   file, then installs it if it is an APK or opens it if not.
+ *   file, then installs it if it is an APK or opens it if not. "Move to"
+ *   puts the phone's copy in a shared folder such as Music.
  *
  * Nothing on this side of the app touches a network. Session requests run in
  * order on one worker, list fetches on another, downloads on a third, the
@@ -119,11 +125,15 @@ public final class MainActivity extends Activity {
     private static final int MENU_DELETE = 17;
     private static final int MENU_CANCEL = 18;
     private static final int MENU_CENTER = 19;
+    private static final int MENU_MOVE = 20;
 
     /** Activity results. */
     private static final int TAKE_PICTURE = 1;
     private static final int PICK_PICTURE = 2;
     private static final int INSTALL = 3;
+
+    /** Permission requests. */
+    private static final int STORAGE = 1;
 
     /**
      * The Installer helper (../installer). The XP3's own installer screen
@@ -144,6 +154,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService lists = pool("delta-list");
     private final ExecutorService downloads = pool("delta-download");
     private final ExecutorService picturesWork = pool("delta-pictures");
+    private final ExecutorService moves = pool("delta-move");
 
     private static ExecutorService pool(final String name) {
         return Executors.newSingleThreadExecutor(new ThreadFactory() {
@@ -211,6 +222,11 @@ public final class MainActivity extends Activity {
     private String installing;
     private String installLabel;
     private boolean installUpdate;
+    /** The file being moved into a shared folder, by name, or null. */
+    private String moving;
+    /** A move waiting on the storage permission: the file's name and the folder. */
+    private String pendingMove;
+    private String pendingFolder;
 
     // ------------------------------------------------------------------
     // The session screen
@@ -245,6 +261,8 @@ public final class MainActivity extends Activity {
             installing = state.getString("installing");
             installLabel = state.getString("installLabel");
             installUpdate = state.getBoolean("installUpdate");
+            pendingMove = state.getString("pendingMove");
+            pendingFolder = state.getString("pendingFolder");
         }
         openSaved(backend.openSession());
         chats = backend.savedChats();
@@ -296,6 +314,8 @@ public final class MainActivity extends Activity {
         state.putString("installing", installing);
         state.putString("installLabel", installLabel);
         state.putBoolean("installUpdate", installUpdate);
+        state.putString("pendingMove", pendingMove);
+        state.putString("pendingFolder", pendingFolder);
     }
 
     @Override
@@ -313,6 +333,7 @@ public final class MainActivity extends Activity {
         // the process for once the screen is gone.
         saves.shutdown();
         picturesWork.shutdown();
+        moves.shutdown();
         requests.shutdownNow();
         lists.shutdownNow();
         downloads.shutdownNow();
@@ -1432,6 +1453,7 @@ public final class MainActivity extends Activity {
         if (running != null && running.file.name.equals(file.name)) {
             return running.total > 0 ? (int) (running.done * 100 / running.total) + "%" : "Getting";
         }
+        if (file.name.equals(moving)) return "Moving";
         int copy = copyOf(file);
         if (copy == CURRENT) return file.isApk() ? "Install" : "On phone";
         if (copy == CHANGED) return "Changed";
@@ -1452,6 +1474,10 @@ public final class MainActivity extends Activity {
             toast("Downloading…");
             return;
         }
+        if (file.name.equals(moving)) {
+            toast("Moving…");
+            return;
+        }
         if (copyOf(file) == CURRENT) {
             if (file.isApk()) install(file);
             else open(file);
@@ -1461,11 +1487,16 @@ public final class MainActivity extends Activity {
     }
 
     private void download(RemoteFile file) {
+        download(file, null);
+    }
+
+    /** Fetches a file, then moves it into `folder` when that is not null. */
+    private void download(RemoteFile file, String folder) {
         if (running != null) {
             toast("Wait for " + running.file.name + " first");
             return;
         }
-        running = new Download(file);
+        running = new Download(file, folder);
         // A large APK on a slow line outlasts the screen timeout.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         downloads.execute(running);
@@ -1482,7 +1513,102 @@ public final class MainActivity extends Activity {
         } else {
             local.put(download.file.name, download.file);
             saveDownloads();
-            toast("Downloaded " + download.file.name);
+            if (download.folder != null) move(download.file, download.folder);
+            else toast("Downloaded " + download.file.name);
+        }
+        updateFileRows();
+    }
+
+    /** The shared folders, the likeliest for this file first. */
+    private void chooseFolder(final RemoteFile file) {
+        final List<String> folders = Folders.forName(file.name);
+        new AlertDialog.Builder(this)
+            .setTitle("Move to")
+            .setItems(folders.toArray(new String[0]), new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    moveTo(file.name, folders.get(which));
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    /**
+     * Moves the phone's copy of a file into a shared folder, fetching it
+     * first when the phone has none or an older one. Shared storage needs
+     * the storage permission, which is asked for the first time it is used.
+     */
+    private void moveTo(String name, String folder) {
+        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            pendingMove = name;
+            pendingFolder = folder;
+            requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE);
+            return;
+        }
+        RemoteFile file = null;
+        for (RemoteFile each : files) if (each.name.equals(name)) file = each;
+        if (file == null) return;
+        if (copyOf(file) == CURRENT) move(file, folder);
+        else download(file, folder);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        if (request != STORAGE) return;
+        String name = pendingMove;
+        String folder = pendingFolder;
+        pendingMove = null;
+        pendingFolder = null;
+        if (name == null || folder == null) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) moveTo(name, folder);
+        else toast("Delta needs storage access to move files");
+    }
+
+    private void move(final RemoteFile file, final String folder) {
+        if (moving != null) {
+            toast("Wait for " + moving + " first");
+            return;
+        }
+        moving = file.name;
+        final File into = Environment.getExternalStoragePublicDirectory(folder);
+        moves.execute(new Runnable() {
+            @Override
+            public void run() {
+                File placed = null;
+                String problem = null;
+                try {
+                    placed = backend.moveOut(file.name, into);
+                } catch (IOException e) {
+                    problem = reason(e);
+                }
+                final File where = placed;
+                final String said = problem;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        moved(file.name, folder, where, said);
+                    }
+                });
+            }
+        });
+        updateFileRows();
+    }
+
+    /**
+     * The phone's copy now lives in the shared folder, so the app forgets it;
+     * the media scanner is told, so the music player and the gallery see it.
+     */
+    private void moved(String name, String folder, File placed, String problem) {
+        moving = null;
+        if (problem != null) {
+            toast("Not moved: " + problem);
+        } else {
+            local.remove(name);
+            saveDownloads();
+            MediaScannerConnection.scanFile(getApplicationContext(), new String[] {placed.getPath()}, null, null);
+            toast(placed.getName().equals(name) ? "Moved to " + folder : "Moved to " + folder + " as " + placed.getName());
         }
         updateFileRows();
     }
@@ -1708,14 +1834,17 @@ public final class MainActivity extends Activity {
     /** One download, on the downloads worker; reports back through the main handler. */
     private final class Download implements Runnable, Center.Progress {
         final RemoteFile file;
+        /** The shared folder to move it into once it is here, or null. */
+        final String folder;
         volatile boolean cancelled;
         /** Read on the main thread only. */
         long done;
         long total = -1;
         private long lastUpdate;
 
-        Download(RemoteFile file) {
+        Download(RemoteFile file, String folder) {
             this.file = file;
+            this.folder = folder;
         }
 
         @Override
@@ -2073,11 +2202,13 @@ public final class MainActivity extends Activity {
     private void filesMenu() {
         RemoteFile file = fileFor(menuRow);
         if (file != null) {
-            boolean busy = running != null && running.file.name.equals(file.name);
+            boolean fetching = running != null && running.file.name.equals(file.name);
+            boolean busy = fetching || file.name.equals(moving);
             int copy = copyOf(file);
-            if (busy) add(MENU_CANCEL, "Cancel download");
-            else if (copy == CURRENT && file.isApk()) add(MENU_INSTALL, "Install");
-            else if (copy == CURRENT) add(MENU_OPEN, "Open");
+            if (fetching) add(MENU_CANCEL, "Cancel download");
+            else if (!busy && copy == CURRENT && file.isApk()) add(MENU_INSTALL, "Install");
+            else if (!busy && copy == CURRENT) add(MENU_OPEN, "Open");
+            if (!busy) add(MENU_MOVE, "Move to…");
             if (!busy) add(MENU_DOWNLOAD, copy == ABSENT ? "Download" : "Download again");
             if (copy != ABSENT && !busy) add(MENU_FORGET, "Remove from phone");
             add(MENU_DELETE, "Delete from command center");
@@ -2150,6 +2281,9 @@ public final class MainActivity extends Activity {
                 break;
             case MENU_OPEN:
                 if (file != null) open(file);
+                break;
+            case MENU_MOVE:
+                if (file != null) chooseFolder(file);
                 break;
             case MENU_FORGET:
                 if (file != null) forget(file.name);
