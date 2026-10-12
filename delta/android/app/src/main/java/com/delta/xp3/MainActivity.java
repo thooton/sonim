@@ -2037,10 +2037,7 @@ public final class MainActivity extends Activity {
         Chat chat = chatFor(menuRow);
         add(MENU_REFRESH, "Refresh");
         add(MENU_NEW, "New session");
-        if (chat != null) {
-            add(MENU_LINK, "Copy session link");
-            add(MENU_ARCHIVE, "Archive");
-        }
+        if (chat != null) add(MENU_ARCHIVE, "Archive");
     }
 
     private void filesMenu() {
