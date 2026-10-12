@@ -108,7 +108,11 @@ jobs:
     name: All APKs
     needs: [gradle, launcher]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           pattern: '*-apk'
@@ -120,3 +124,19 @@ jobs:
           name: all-apks
           path: apks/*.apk
           if-no-files-found: error
+
+      # Pushes to master also publish the APKs to the rolling "latest" release.
+      - name: Publish to the "latest" release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag -f latest
+          git push -f origin latest
+          cat > notes.md <<'EOF'
+          Built automatically from master. Download the APK for the app you want and install it with `adb install <file>.apk`.
+          EOF
+          gh release view latest >/dev/null 2>&1 || \
+            gh release create latest --title "Sonim apps (latest)" --notes-file notes.md
+          gh release edit latest --notes-file notes.md
+          gh release upload latest apks/*.apk --clobber
