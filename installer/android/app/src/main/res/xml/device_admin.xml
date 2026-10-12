@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No policies: being the device owner is all this app wants, and only so
+     that its install sessions need no confirmation. -->
+<device-admin>
+    <uses-policies />
+</device-admin>

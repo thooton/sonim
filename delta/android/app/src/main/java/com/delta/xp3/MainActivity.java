@@ -125,6 +125,15 @@ public final class MainActivity extends Activity {
     private static final int PICK_PICTURE = 2;
     private static final int INSTALL = 3;
 
+    /**
+     * The Installer helper (../installer). The XP3's own installer screen
+     * refuses anything not signed by Sonim, so when the helper is on the phone
+     * the APK goes to it instead; it installs as the device owner.
+     */
+    private static final ComponentName HELPER =
+        new ComponentName("com.installer.xp3", "com.installer.xp3.InstallActivity");
+    private static final String HELPER_MESSAGE = "message";
+
     private static final int MAX_TITLE = 60;
     private static final long SAVE_DELAY_MS = 1000;
     /** The first row of Chats, which is not a session. */
@@ -858,7 +867,8 @@ public final class MainActivity extends Activity {
     protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
         if (request == INSTALL) {
-            installed(result == RESULT_OK);
+            installed(result == RESULT_OK,
+                data == null ? null : data.getStringExtra(HELPER_MESSAGE));
             return;
         }
         if (result != RESULT_OK) return;
@@ -1499,6 +1509,7 @@ public final class MainActivity extends Activity {
             .setDataAndType(ShareProvider.uri(file.name), ShareProvider.APK)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             .putExtra(Intent.EXTRA_RETURN_RESULT, true);
+        if (hasHelper()) intent.setComponent(HELPER);
         try {
             startActivityForResult(intent, INSTALL);
         } catch (ActivityNotFoundException e) {
@@ -1507,16 +1518,35 @@ public final class MainActivity extends Activity {
         }
     }
 
-    /** The installer's answer. An installed APK has done its job, so its copy goes. */
-    private void installed(boolean ok) {
+    private boolean hasHelper() {
+        try {
+            getPackageManager().getActivityInfo(HELPER, 0);
+            return true;
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    /**
+     * The installer's answer, with the helper's reason when it gave one. An
+     * installed APK has done its job, so its copy goes.
+     */
+    private void installed(boolean ok, String why) {
         String name = installing;
         installing = null;
         if (name == null) return;
+        String outcome = installLabel + (installUpdate ? " was not updated" : " was not installed");
         if (ok) {
             toast((installUpdate ? "Updated " : "Installed ") + installLabel);
             forget(name);
+        } else if (why != null) {
+            new AlertDialog.Builder(this)
+                .setTitle(outcome)
+                .setMessage(why)
+                .setPositiveButton("OK", null)
+                .show();
         } else {
-            toast(installLabel + (installUpdate ? " was not updated" : " was not installed"));
+            toast(outcome);
         }
     }
 

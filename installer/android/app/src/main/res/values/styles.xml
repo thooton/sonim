@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorPrimary">#2E5B4F</item>
+        <item name="android:colorPrimaryDark">#1F4037</item>
+        <item name="android:colorAccent">#2E5B4F</item>
+        <item name="android:statusBarColor">#1F4037</item>
+        <item name="android:navigationBarColor">#1F4037</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+
+    <!-- The caller stays on screen while an install runs. -->
+    <style name="Invisible" parent="android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>
