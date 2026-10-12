@@ -49,6 +49,7 @@ javac -source 8 -target 8 \
     "$PROJECT_DIR/src/com/custom/appdrawer/AppDrawerActivity.java"
 
 "$TOOLS_DIR/d8" \
+    --release \
     --min-api 27 \
     --lib "$ANDROID_JAR" \
     --output "$BUILD_DIR/dex" \
