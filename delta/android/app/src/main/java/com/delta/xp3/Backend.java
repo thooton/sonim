@@ -30,10 +30,8 @@ import java.util.Set;
  */
 final class Backend {
 
-    static final String NO_LOGIN =
-        "This build has no cloud login. Put cloud-auth.json beside the android folder and rebuild.";
-    static final String NO_CENTER =
-        "No command center yet. Open Menu, then Command center, to add its address and token.";
+    static final String NO_LOGIN = "This build has no cloud login.";
+    static final String NO_CENTER = "No command center set.";
 
     /** Transcripts kept on the phone besides the open one. */
     private static final int KEEP_SESSIONS = 20;

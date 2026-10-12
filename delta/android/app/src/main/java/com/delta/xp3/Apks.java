@@ -47,12 +47,11 @@ final class Apks {
 
         PackageInfo installed = installed(pm, info.packageName);
         if (installed != null && !Arrays.equals(installed.signatures, info.signatures)) {
-            return new Verdict("Can't update " + label + ": this APK was signed by someone other than "
-                + "whoever made the copy on the phone. Uninstall that one first to switch.", label, true);
+            return new Verdict("Can't update " + label + ": signed with a different key.", label, true);
         }
         if (installed != null && versionCode(info) < versionCode(installed)) {
-            return new Verdict("Can't update " + label + ": this APK is " + version(info)
-                + ", older than the " + version(installed) + " on the phone, and Android won't go back.", label, true);
+            return new Verdict("Can't update " + label + ": " + version(info)
+                + " is older than the installed " + version(installed) + ".", label, true);
         }
         if (installed != null) {
             return new Verdict(null, label + " " + version(installed) + " → " + version(info), true);

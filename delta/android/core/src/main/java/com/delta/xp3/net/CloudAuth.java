@@ -79,7 +79,7 @@ public final class CloudAuth {
                 "scope", SCOPES
             ))));
         if (response.status() == 400 || response.status() == 401 || response.status() == 403) {
-            throw new IOException("The cloud login was rejected; rebuild the app with a fresh login");
+            throw new IOException("The cloud login was rejected");
         }
         Http.requireSuccess(response.status(), "Cloud login");
         try {

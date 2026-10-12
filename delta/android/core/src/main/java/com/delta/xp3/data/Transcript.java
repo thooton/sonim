@@ -264,7 +264,7 @@ public final class Transcript {
         Map<String, Object> input = Json.child(request, "input");
         String summary = summary(name, input);
         pending = new Permission(requestId, name, summary, new LinkedHashMap<String, Object>(input));
-        note("Delta asks to use " + tool(name, input) + ". Menu to allow or deny.");
+        note("Delta asks to use " + tool(name, input) + ".");
         return true;
     }
 

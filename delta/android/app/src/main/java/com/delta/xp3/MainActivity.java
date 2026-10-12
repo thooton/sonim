@@ -128,7 +128,6 @@ public final class MainActivity extends Activity {
     private static final int MAX_TITLE = 60;
     private static final long SAVE_DELAY_MS = 1000;
     /** The first row of Chats, which is not a session. */
-    private static final String NEW_ROW = "";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService saves = pool("delta-save");
@@ -454,8 +453,6 @@ public final class MainActivity extends Activity {
         if (currentTab != CHATS || rowAdapter == null) return;
         RowAdapter.Row was = rowAdapter.selected();
         List<RowAdapter.Row> rows = new ArrayList<>();
-        rows.add(new RowAdapter.Row(NEW_ROW, getString(R.string.new_session),
-            sessionId == null && transcript.size() > 0 ? "Open" : "Start a conversation with Delta", null));
         for (Chat chat : chats) {
             String when = when(chat.updated);
             boolean open = chat.id.equals(sessionId);
@@ -489,11 +486,6 @@ public final class MainActivity extends Activity {
     }
 
     private void activateChat(RowAdapter.Row row) {
-        if (NEW_ROW.equals(row.key)) {
-            if (sessionId != null) newSession();
-            showTab(SESSION, true);
-            return;
-        }
         for (Chat chat : chats) {
             if (chat.id.equals(row.key)) {
                 openChat(chat);
@@ -521,7 +513,7 @@ public final class MainActivity extends Activity {
     private void confirmArchive(final Chat chat) {
         new AlertDialog.Builder(this)
             .setTitle("Archive")
-            .setMessage("Archive \"" + chat.title + "\"? It leaves this list and the web app's.")
+            .setMessage("Archive \"" + chat.title + "\"?")
             .setPositiveButton("Archive", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
@@ -1379,7 +1371,7 @@ public final class MainActivity extends Activity {
         if (files.isEmpty()) {
             String said = filesProblem != null ? filesProblem
                 : filesLoading || !filesLoaded ? "Loading…"
-                : "No files yet.\n\nWhen an agent runs delta push, what it sends shows up here.";
+                : "No files yet.";
             replaceContent(emptyMessage(said));
             return;
         }
@@ -1447,7 +1439,7 @@ public final class MainActivity extends Activity {
         RemoteFile file = fileFor(row);
         if (file == null) return;
         if (running != null && running.file.name.equals(file.name)) {
-            toast("Downloading… Back cancels");
+            toast("Downloading…");
             return;
         }
         if (copyOf(file) == CURRENT) {
@@ -1480,7 +1472,7 @@ public final class MainActivity extends Activity {
         } else {
             local.put(download.file.name, download.file);
             saveDownloads();
-            toast(download.file.isApk() ? "Downloaded. OK installs it." : "Downloaded. OK opens it.");
+            toast("Downloaded " + download.file.name);
         }
         updateFileRows();
     }
@@ -1511,7 +1503,7 @@ public final class MainActivity extends Activity {
             startActivityForResult(intent, INSTALL);
         } catch (ActivityNotFoundException e) {
             installing = null;
-            toast("This phone has no installer to hand the APK to.");
+            toast("No installer on this phone");
         }
     }
 
@@ -1560,8 +1552,7 @@ public final class MainActivity extends Activity {
     private void confirmDelete(final RemoteFile file) {
         new AlertDialog.Builder(this)
             .setTitle("Delete")
-            .setMessage("Delete " + file.name + " from the command center? It is gone for good, "
-                + "until an agent pushes it again.")
+            .setMessage("Delete " + file.name + " from the command center?")
             .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
