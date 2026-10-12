@@ -67,10 +67,12 @@ of the text (`cursorOwns`, as in Canvas).
   Downloader's checks (signing key, downgrade) before `ACTION_INSTALL_PACKAGE`.
   A successful install deletes the local copy. "Move to…" copies the local
   copy into a shared folder (`Folders`: Music, Pictures, Download, …, the
-  likeliest for the extension first) under a free name (`Folders.unused`),
-  then deletes it here and tells the media scanner. A missing or Changed copy
-  is downloaded first. It is the only use of shared storage, so
-  `WRITE_EXTERNAL_STORAGE` is asked for when it is first used.
+  likeliest for the extension first, then any folder inside one, browsed
+  with `Folders.subfolders`, where Back goes up a level and "New folder…"
+  makes one) under a free name (`Folders.unused`), then deletes it here and
+  tells the media scanner. A missing or Changed copy is downloaded first.
+  It is the only use of shared storage, so `WRITE_EXTERNAL_STORAGE` is
+  asked for on first use, before the folders are listed.
 
 ## The protocol
 
@@ -150,6 +152,8 @@ At most four per message.
 - Rows paint their own highlight (`SelectableAdapter`); the ListView selector
   is transparent.
 - Back cancels a running download while on Files.
+- In the Move to folder dialogs, Back goes up a level instead of closing
+  (`setOnKeyListener`, acting on the release).
 
 ## Build and validation
 

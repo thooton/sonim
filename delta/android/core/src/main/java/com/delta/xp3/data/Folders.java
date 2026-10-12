@@ -3,6 +3,7 @@ package com.delta.xp3.data;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -56,6 +57,18 @@ public final class Folders {
         else order.add(DOWNLOAD);
         order.addAll(ALL);
         return new ArrayList<String>(order);
+    }
+
+    /** The folders directly inside `folder`, by name and in order, leaving out hidden ones. */
+    public static List<String> subfolders(File folder) {
+        List<String> names = new ArrayList<String>();
+        File[] found = folder.listFiles();
+        if (found == null) return names;
+        for (File each : found) {
+            if (each.isDirectory() && !each.getName().startsWith(".")) names.add(each.getName());
+        }
+        Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
+        return names;
     }
 
     /**
