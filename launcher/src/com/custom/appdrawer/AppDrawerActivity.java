@@ -3,9 +3,12 @@ package com.custom.appdrawer;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
@@ -42,7 +45,9 @@ import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A deliberately tiny app drawer for the sideloaded XP3 applications.
@@ -74,6 +79,26 @@ public final class AppDrawerActivity extends Activity {
     private static final int MENU_REMOVE = Menu.FIRST + 1;
 
     private final List<Target> targets = new ArrayList<>();
+
+    /**
+     * Icons and labels already read from other apps' APKs, by component. Loading
+     * them is the slowest part of showing the drawer, so it is done once per
+     * process rather than on every resume; {@link #packageReceiver} empties the
+     * cache whenever an app is installed, updated, or removed.
+     */
+    private final Map<ComponentName, Presentation> presentations = new HashMap<>();
+
+    private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            presentations.clear();
+            if (resumed) {
+                refreshApps();
+            }
+        }
+    };
+
+    private boolean resumed;
 
     private FrameLayout root;
     private GridView grid;
@@ -143,17 +168,35 @@ public final class AppDrawerActivity extends Activity {
 
         setContentView(root);
         loadTargets();
-        refreshApps();
-        focusFirstApp();
+
+        IntentFilter packageFilter = new IntentFilter();
+        packageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
+        packageFilter.addAction(Intent.ACTION_PACKAGE_CHANGED);
+        packageFilter.addAction(Intent.ACTION_PACKAGE_REPLACED);
+        packageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+        packageFilter.addDataScheme("package");
+        registerReceiver(packageReceiver, packageFilter);
+        // onResume, which always follows, fills the grid and focuses the first app.
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (adapter != null) {
-            refreshApps();
-            focusFirstApp();
-        }
+        resumed = true;
+        refreshApps();
+        focusFirstApp();
+    }
+
+    @Override
+    protected void onPause() {
+        resumed = false;
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        unregisterReceiver(packageReceiver);
+        super.onDestroy();
     }
 
     @Override
@@ -356,14 +399,17 @@ public final class AppDrawerActivity extends Activity {
             Intent launchIntent = null;
 
             try {
-                ActivityInfo info = pm.getActivityInfo(component, 0);
-                Drawable loadedIcon = info.loadIcon(pm);
-                CharSequence loadedLabel = info.loadLabel(pm);
-                if (loadedIcon != null) {
-                    icon = loadedIcon;
+                Presentation cached = presentations.get(component);
+                if (cached == null) {
+                    ActivityInfo info = pm.getActivityInfo(component, 0);
+                    cached = new Presentation(info.loadIcon(pm), info.loadLabel(pm));
+                    presentations.put(component, cached);
                 }
-                if (!TextUtils.isEmpty(loadedLabel)) {
-                    label = loadedLabel;
+                if (cached.icon != null) {
+                    icon = cached.icon;
+                }
+                if (!TextUtils.isEmpty(cached.label)) {
+                    label = cached.label;
                 }
                 launchIntent = new Intent(Intent.ACTION_MAIN)
                         .addCategory(Intent.CATEGORY_LAUNCHER)
@@ -452,6 +498,16 @@ public final class AppDrawerActivity extends Activity {
         Candidate(String packageName, String className, String label) {
             this.packageName = packageName;
             this.className = className;
+            this.label = label;
+        }
+    }
+
+    private static final class Presentation {
+        final Drawable icon;
+        final CharSequence label;
+
+        Presentation(Drawable icon, CharSequence label) {
+            this.icon = icon;
             this.label = label;
         }
     }

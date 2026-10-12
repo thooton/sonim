@@ -9,5 +9,8 @@
         <item name="android:navigationBarColor">#FF000000</item>
         <item name="android:statusBarColor">#FF000000</item>
         <item name="android:windowLightStatusBar">false</item>
+        <!-- No zoom/fade when the PTT key opens the drawer (or when it closes):
+             on the XP3 the scaled frames look blurry and slow. -->
+        <item name="android:windowAnimationStyle">@null</item>
     </style>
 </resources>
