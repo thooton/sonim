@@ -1,6 +1,7 @@
 package com.delta.xp3;
 
 import com.delta.xp3.data.Chat;
+import com.delta.xp3.data.Folders;
 import com.delta.xp3.data.RemoteFile;
 import com.delta.xp3.data.Setup;
 import com.delta.xp3.data.Store;
@@ -12,8 +13,10 @@ import com.delta.xp3.net.Config;
 import com.delta.xp3.net.Http;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -284,6 +287,41 @@ final class Backend {
             File target = downloaded(file.name);
             target.delete();
             if (!part.renameTo(target)) throw new IOException("Couldn't save the file.");
+        } finally {
+            part.delete();
+        }
+    }
+
+    /**
+     * Moves a downloaded file into one of the phone's shared folders, under a
+     * name nothing there has yet, and returns where it went. The app's
+     * storage and shared storage are different file systems, so it is copied
+     * beside its final name, renamed into place, and only then removed from
+     * here. Worker thread.
+     */
+    File moveOut(String name, File folder) throws IOException {
+        File source = downloaded(name);
+        if (!source.isFile()) throw new IOException("The phone's copy is gone.");
+        if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't open " + folder.getName() + ".");
+        File part = new File(folder, "." + name + ".part");
+        try {
+            InputStream in = new FileInputStream(source);
+            try {
+                FileOutputStream out = new FileOutputStream(part);
+                try {
+                    byte[] buffer = new byte[64 * 1024];
+                    for (int read; (read = in.read(buffer)) != -1; ) out.write(buffer, 0, read);
+                    out.getFD().sync();
+                } finally {
+                    out.close();
+                }
+            } finally {
+                in.close();
+            }
+            File target = Folders.unused(folder, name);
+            if (!part.renameTo(target)) throw new IOException("Couldn't save the file.");
+            source.delete();
+            return target;
         } finally {
             part.delete();
         }

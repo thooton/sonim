@@ -2,9 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- The network, and handing a downloaded APK to the system installer.
          Everything the app keeps, downloads included, is in its own private
-         directory, so it needs no storage permission. -->
+         directory. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Only for "Move to" in Files, which puts a downloaded file in a shared
+         folder such as Music. Asked for the first time it is used. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <!-- Lets Delta hand an APK to the Installer helper (../installer), which
          installs without the XP3's whitelist-gated installer screen. Granted
          only because both apps carry the shared signing key. -->

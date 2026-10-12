@@ -65,7 +65,12 @@ of the text (`cursorOwns`, as in Canvas).
   newer push under the same name shows as "Changed". `ShareProvider` serves a
   downloaded file read-only to the installer or a viewer. `Apks` runs the old
   Downloader's checks (signing key, downgrade) before `ACTION_INSTALL_PACKAGE`.
-  A successful install deletes the local copy.
+  A successful install deletes the local copy. "Move to…" copies the local
+  copy into a shared folder (`Folders`: Music, Pictures, Download, …, the
+  likeliest for the extension first) under a free name (`Folders.unused`),
+  then deletes it here and tells the media scanner. A missing or Changed copy
+  is downloaded first. It is the only use of shared storage, so
+  `WRITE_EXTERNAL_STORAGE` is asked for when it is first used.
 
 ## The protocol
 
@@ -124,7 +129,7 @@ At most four per message.
 
 - `android/core`: `net/` (`Http`, `Json`, `Config`, `CloudAuth`, `Sse`,
   `Cloud`, `Center`) and `data/` (`Entry`, `Transcript`, `Store`, `Chat`,
-  `RemoteFile`, `Setup`). Tests in `src/test` run via `:core:selfTest` with
+  `RemoteFile`, `Setup`, `Folders`). Tests in `src/test` run via `:core:selfTest` with
   the tiny `Check` harness and loopback `TestServer`.
 - `android/app`: `MainActivity` (tabs, screens, keys, menus, intents),
   `Backend` (the only bridge to disk and network), `Link` (the reconnecting

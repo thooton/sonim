@@ -6,7 +6,7 @@ Left and right move between three tabs:
 
 - **Chats** lists your Claude Code sessions in the cloud, most recently active first. Sessions running on a computer through Remote Control aren't shown, and neither are archived ones. OK opens one in Session; Menu, then New session, starts a new one.
 - **Session** is one conversation. Claude's replies appear as they arrive, with a one-line `› Bash: …` record for each tool call. The session runs in **Auto** permission mode; if Claude still asks about a call, Menu lets you allow or deny it. Pictures go along with a message from **Take picture** or **Attach picture**, up to four, each shrunk to 1568px.
-- **Files** lists what agents have pushed to the command center with `delta push`. OK downloads a file. Once it's on the phone, OK installs it if it's an APK (an app already on the phone is updated in place and keeps its data) or opens it if not. A file pushed again under the same name shows as **Changed**, and OK downloads the new copy.
+- **Files** lists what agents have pushed to the command center with `delta push`. OK downloads a file. Once it's on the phone, OK installs it if it's an APK (an app already on the phone is updated in place and keeps its data) or opens it if not. A file pushed again under the same name shows as **Changed**, and OK downloads the new copy. **Menu → Move to…** puts the phone's copy in a shared folder (Music, Pictures, Download and so on, the likeliest for the file first), downloading it first if need be, so a song lands where the music player finds it. The first move asks for storage access. A name already taken there gets ` (2)`, ` (3)` and so on.
 
 The first message of every new session also tells the agent to install the `delta` CLI, connect it to your command center, and read `delta help`. That's how an agent knows to push a fixed APK back to your Files tab. It also tells the agent to call itself Delta, since the app is white-labelled: the phone never shows Claude's name. The text is hidden on the phone, but it stays visible in the session on claude.ai/code, token included.
 
@@ -32,7 +32,7 @@ The cloud environment has to be able to reach the command center's host. If the 
 | Left / Right | Change tab (inside typed text, move the cursor until it reaches an end) |
 | Up / Down | Move through a list or the transcript, or go back to the box |
 | OK | Open a session, send a message, download/install/open a file |
-| Menu or hold OK | That tab's actions: refresh, archive, copy link, new session; copy text, allow/deny, pictures, interrupt, paste; download again, remove from phone, delete from command center, command center |
+| Menu or hold OK | That tab's actions: refresh, archive, copy link, new session; copy text, allow/deny, pictures, interrupt, paste; move to, download again, remove from phone, delete from command center, command center |
 | Back | Cancel a download (on Files), or leave |
 
-The logins, transcripts, pictures and downloads are kept only in the app's private storage. A locally built APK contains live logins, so treat it like a password.
+The logins, transcripts, pictures and downloads are kept only in the app's private storage, until you move a download out with **Move to…**. A locally built APK contains live logins, so treat it like a password.
