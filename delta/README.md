@@ -4,7 +4,7 @@ The phone end of [Delta](https://github.com/thooton/delta): Claude Code agents r
 
 Left and right move between three tabs:
 
-- **Chats** lists your Claude Code sessions in the cloud, most recently active first. Sessions running on a computer through Remote Control aren't shown, and neither are archived ones. OK opens one in Session; the top row starts a new one.
+- **Chats** lists your Claude Code sessions in the cloud, most recently active first. Sessions running on a computer through Remote Control aren't shown, and neither are archived ones. OK opens one in Session; Menu, then New session, starts a new one.
 - **Session** is one conversation. Claude's replies appear as they arrive, with a one-line `› Bash: …` record for each tool call. The session runs in **Auto** permission mode; if Claude still asks about a call, Menu lets you allow or deny it. Pictures go along with a message from **Take picture** or **Attach picture**, up to four, each shrunk to 1568px.
 - **Files** lists what agents have pushed to the command center with `delta push`. OK downloads a file. Once it's on the phone, OK installs it if it's an APK (an app already on the phone is updated in place and keeps its data) or opens it if not. A file pushed again under the same name shows as **Changed**, and OK downloads the new copy.
 

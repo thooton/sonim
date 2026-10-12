@@ -61,13 +61,13 @@ public final class Http {
      */
     private static IOException friendly(IOException e) {
         if (e instanceof java.net.SocketTimeoutException) {
-            return new IOException("The connection timed out. Try again.");
+            return new IOException("The connection timed out.");
         }
         if (e instanceof java.net.UnknownHostException) {
             return new IOException("No network, or that address does not exist.");
         }
         if (e instanceof java.net.ConnectException) {
-            return new IOException("Could not connect. Check the network.");
+            return new IOException("Could not connect.");
         }
         if (e instanceof javax.net.ssl.SSLException) {
             return new IOException("The secure connection failed.");
@@ -150,7 +150,7 @@ public final class Http {
         try {
             while (true) {
                 if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-                if (System.currentTimeMillis() > deadline) throw new IOException("Request timed out; try again");
+                if (System.currentTimeMillis() > deadline) throw new IOException("Request timed out");
                 int count = in.read(buffer);
                 if (count < 0) break;
                 if (out.size() + count > MAX_BODY) throw new IOException("Response exceeds 8 MB");

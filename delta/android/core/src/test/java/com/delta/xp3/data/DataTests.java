@@ -123,7 +123,7 @@ public final class DataTests {
                 check.ok("pending", pending != null);
                 check.same("request id", "p1", pending.requestId);
                 check.same("input kept", "rm -rf build", pending.input.get("command"));
-                check.same("note", "Delta asks to use Bash: rm -rf build. Menu to allow or deny.",
+                check.same("note", "Delta asks to use Bash: rm -rf build.",
                     t.entries().get(0).text);
                 check.ok("other responses leave it", !t.apply("client_event", "3", frame(3, "worker",
                     Json.map("type", "control_response", "response", Json.map("request_id", "c1")))));
