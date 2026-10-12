@@ -1,0 +1,31 @@
+// Signs every Gradle app in this repository, debug and release alike, with
+// the shared key beside this file. Each app applies it after its android
+// block:
+//
+//     apply from: rootProject.file("../../signing/signing.gradle")
+//
+// Android only installs an update signed by the same key as the installed
+// copy, and the copies on the phone were all signed with debug.keystore. So
+// never replace or regenerate it: the apps would have to be uninstalled, and
+// would lose their data, before a build signed by any other key would
+// install. (The launcher is not a Gradle build and has its own key,
+// app-drawer.p12, for the same reason.)
+
+android {
+    signingConfigs {
+        debug {
+            storeFile new File(buildscript.sourceFile.parentFile, "debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            signingConfig signingConfigs.debug
+        }
+    }
+}

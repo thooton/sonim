@@ -28,8 +28,6 @@ reintroduce an older web implementation or assume there is a companion server.
 
 ## Repository map
 
-- `build-release.sh`: builds the optimized release APK, signs it, verifies the
-  signature, and writes the ignored `Charge-XP3.apk` at the repository root.
 - `android/app/build.gradle`: Android configuration and the
   `generateBundledSecrets` task.
 - `android/app/src/main/AndroidManifest.xml`: portrait single-activity app and
@@ -248,24 +246,13 @@ non-mutating behavior.
 
 ## Release builds
 
-Run the repository-root script only when a signed release APK is actually
-requested:
-
 ```bash
-./build-release.sh
+./gradlew :app:assembleRelease
 ```
 
-The script chooses the SDK from `CHARGE_ANDROID_SDK`, `ANDROID_SDK_ROOT`, or
-`ANDROID_HOME` (falling back to `/opt/android-sdk`), rewrites the ignored
-`android/local.properties`, builds the minified/resource-shrunk release, signs
-and verifies it, and replaces the ignored root `Charge-XP3.apk`. It uses the
-local Android debug key by default; production signing can be supplied through
-`CHARGE_KEYSTORE`, `CHARGE_KEY_ALIAS`, `CHARGE_STORE_PASSWORD`, and
-`CHARGE_KEY_PASSWORD`.
-
-Release lint-vital tasks are deliberately excluded because this toolchain's
-UAST lint crashes. Do not describe that exclusion as a successful lint run.
-Java compilation, resource processing, R8, shrinking, packaging, signature
-verification, and a final checksum still run. Never commit or distribute the
-result unless the user explicitly requests it and understands that it embeds a
-live account credential.
+This builds the minified, resource-shrunk APK, signed with the repository's
+shared key (`../signing/signing.gradle`), at
+`app/build/outputs/apk/release/app-release.apk`. That is the APK to hand to the
+user; the debug build is only for checking that the code compiles. Never commit
+it, or distribute it beyond the user's own phone, unless the user explicitly
+asks and understands that it embeds a live account credential.

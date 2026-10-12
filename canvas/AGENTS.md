@@ -60,8 +60,6 @@ consult it before altering chat focus or scrolling.
   server.
 - `android/app/build.gradle`: Android configuration and the build-time bundled
   setup generator.
-- `build-release.sh`: builds, signs, verifies, and copies the personal release
-  APK. It is a release operation, not a routine validation command.
 
 ## Architecture and invariants
 
@@ -205,10 +203,10 @@ Validation should match the change:
 - UI, focus, scrolling, or key changes: perform the hardware-oriented manual
   checks above; a successful compile is not sufficient evidence.
 
-The debug APK is generated at
-`android/app/build/outputs/apk/debug/app-debug.apk`. Do not overwrite the root
-APK copies merely to validate a change. Do not run `build-release.sh` unless the
-user explicitly asks for a signed release artifact.
+The APK to hand to the user is the release build, `:app:assembleRelease`, at
+`android/app/build/outputs/apk/release/app-release.apk`. It is signed with the
+repository's shared key (`../signing/signing.gradle`), so it installs over the
+copy on the phone. The debug APK is only for checking that the code compiles.
 
 ## Credentials and generated files
 
@@ -224,8 +222,8 @@ auth JSON, service token, keystore, `local.properties`, or generated default
 source. The root APKs and auth files are intentionally ignored. In particular,
 do not stage ignored files with `git add -f`.
 
-If a task concerns bundling or signing, refer to the Gradle properties and
-`TODO_*` environment overrides already supported by the build rather than
+If a task concerns bundling or signing, refer to the Gradle properties already
+supported by the build and to `../signing/signing.gradle` rather than
 hard-coding local paths, aliases, or passwords. Keep secrets out of command
 output and summaries.
 

@@ -8,8 +8,8 @@ The **List** tab is a checklist. The **Chat** tab is Claude Opus 4.6, which can 
 
 ```bash
 cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
 The Claude login comes only from `claude-auth.json` beside `android/` (Pi's shape, under `anthropic`), baked in at build time. The app renews it and saves each rotation. Give List its own login: a refresh token shared with another app stops working when either one renews it.

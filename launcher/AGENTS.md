@@ -26,9 +26,10 @@ a toast rather than crashing.
 - `res/values-mdpi/dimens.xml`: XP3800-specific mdpi icon-size override.
 - `build.sh`: complete command-line build, alignment, signing, and verification.
 - `AppDrawer.apk`: generated signed output; it is ignored by Git.
-- `signing/`: generated local keystore; it is ignored and must never be
-  committed or replaced casually because installs signed with a different key
-  cannot update an existing installation.
+- `signing/app-drawer.p12`: the launcher's own key, committed so every
+  checkout and CI sign with it. Never replace or regenerate it: the copy on the
+  phone was signed with it, and an APK signed with any other key cannot update
+  it.
 
 ## Build and verification
 
