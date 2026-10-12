@@ -266,7 +266,7 @@ public final class NetTests {
             }
         });
 
-        check.run("a new environment may reach the command center", new Check.Body() {
+        check.run("a new environment has full network access", new Check.Body() {
             @Override
             public void run() throws Exception {
                 TestServer server = new TestServer(new TestServer.Handler() {
@@ -289,13 +289,13 @@ public final class NetTests {
                 });
                 try {
                     Cloud cloud = new Cloud(new Http(), new ClaudeAuth(new Http(), "tok", null, 0, null),
-                        server.uri(""), "cc.example.com");
+                        server.uri(""));
                     cloud.create("t", "u", "hi");
                     Map<String, Object> made = Json.object(Json.parse(
                         find(server.seen, "/v1/environment_providers/cloud/create").body));
                     List<Object> hosts = Json.children(Json.child(Json.child(made, "config"), "network_config"),
                         "allowed_hosts");
-                    check.same("command center allowed", "cc.example.com", hosts.get(0));
+                    check.same("every host allowed", "*", hosts.get(0));
                     check.same("used", "env_new", Json.object(Json.parse(find(server.seen, "/v1/sessions").body))
                         .get("environment_id"));
                 } finally {

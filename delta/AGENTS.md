@@ -81,9 +81,11 @@ beside this repository):
   the worker restarts after it has been idle. Do not auto-allow
   `can_use_tool` requests, because that would override Auto's own decisions.
   They are shown, and the person allows or denies them from the menu.
-- A newly created environment (only when the account has none) lists the
-  command center's host in `allowed_hosts`, so the sandbox can run `delta`
-  against it.
+- A newly created environment (only when the account has none) has
+  `allowed_hosts: ["*"]`, which is "Full" network access on claude.ai/code,
+  so the sandbox can run `delta` against the command center and reach
+  anything else. An existing environment is used as it is; there is no
+  OAuth call to change it, so its network access is set on claude.ai/code.
 
 `Transcript` keeps only what a person reads: client `user` messages (echoes
 of our own matched by uuid), top-level `assistant` text and `tool_use` lines,

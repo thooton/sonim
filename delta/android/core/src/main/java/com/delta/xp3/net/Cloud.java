@@ -44,29 +44,17 @@ public final class Cloud {
     private final Http http;
     private final ClaudeAuth auth;
     private final URI base;
-    /** A host a newly made environment is allowed to reach; null for none. */
-    private final String reachable;
     private String organization;
     private String environment;
 
-    /**
-     * `reachable` is the command center's host. It is only used if this
-     * account has no cloud environment yet and one has to be made, so that
-     * the sandbox can run `delta` against it from its first session.
-     */
-    public Cloud(Http http, ClaudeAuth auth, String reachable) {
-        this(http, auth, API, reachable);
+    public Cloud(Http http, ClaudeAuth auth) {
+        this(http, auth, API);
     }
 
     Cloud(Http http, ClaudeAuth auth, URI base) {
-        this(http, auth, base, null);
-    }
-
-    Cloud(Http http, ClaudeAuth auth, URI base, String reachable) {
         this.http = http;
         this.auth = auth;
         this.base = base;
-        this.reachable = reachable;
     }
 
     /**
@@ -277,7 +265,12 @@ public final class Cloud {
         return organization;
     }
 
-    /** The first cloud environment on the account, made if there is none. */
+    /**
+     * The first cloud environment on the account, made if there is none. A
+     * made one has full network access (`*`, the "Full" setting on
+     * claude.ai/code), so the sandbox can reach the command center and
+     * anything else a task needs. One that already exists is used as it is.
+     */
     private synchronized String environment() throws IOException, InterruptedException {
         if (environment != null) return environment;
         Map<String, Object> listed = object(request("/v1/environment_providers", null, false, true), "environments");
@@ -293,7 +286,7 @@ public final class Cloud {
         Map<String, Object> made = object(post("/v1/environment_providers/cloud/create", Json.write(Json.map(
             "name", "Default",
             "kind", "anthropic_cloud",
-            "description", "Default - trusted network access",
+            "description", "Default - full network access",
             "config", Json.map(
                 "environment_type", "anthropic",
                 "cwd", "/home/user",
@@ -304,7 +297,7 @@ public final class Cloud {
                     Json.map("name", "node", "version", "20")
                 ),
                 "network_config", Json.map(
-                    "allowed_hosts", reachable == null ? Json.list() : Json.list(reachable),
+                    "allowed_hosts", Json.list("*"),
                     "allow_default_hosts", Boolean.TRUE
                 )
             )
