@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Only for "Move to" in Files, which puts a downloaded file in a shared
          folder such as Music. Asked for the first time it is used. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <!-- Lets Delta hand an APK to the Installer helper (../installer), which
          installs without the XP3's whitelist-gated installer screen. Granted

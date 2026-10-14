@@ -327,6 +327,15 @@ public final class NetTests {
                         if (request.path.equals("/cc/files/list.apk") && request.method.equals("DELETE")) {
                             return TestServer.Reply.json("{\"deleted\":\"list.apk\"}");
                         }
+                        if (request.method.equals("PUT") && request.path.equals("/cc/files/taken.txt")) {
+                            return TestServer.Reply.of(409, "application/json", "{\"error\":\"exists\"}");
+                        }
+                        if (request.method.equals("PUT") && request.path.equals("/cc/files/huge.bin")) {
+                            return TestServer.Reply.of(413, "application/json", "{\"error\":\"too big\"}");
+                        }
+                        if (request.method.equals("PUT") && request.path.startsWith("/cc/files/")) {
+                            return TestServer.Reply.of(201, "application/json", "{\"name\":\"x\"}");
+                        }
                         if (request.path.equals("/cc/files/gone.apk")) {
                             return TestServer.Reply.of(404, "application/json", "{\"error\":\"no such file\"}");
                         }
@@ -395,11 +404,74 @@ public final class NetTests {
                         }
                     });
                     check.same("segment", "a%20b%2Bc%2F%C3%A9.apk", Center.segment("a b+c/é.apk"));
+
+                    final byte[] note = "a note from the phone".getBytes("UTF-8");
+                    final long[] sent = {-1, -1};
+                    Center.Progress watch = new Center.Progress() {
+                        @Override
+                        public boolean cancelled() {
+                            return false;
+                        }
+
+                        @Override
+                        public void progress(long done, long total) {
+                            sent[0] = done;
+                            sent[1] = total;
+                        }
+                    };
+                    check.ok("uploaded", center.upload("My note.txt", new java.io.ByteArrayInputStream(note), note.length, watch));
+                    TestServer.Request put = find(server.seen, "/cc/files/My%20note.txt");
+                    check.same("upload is a PUT", "PUT", put.method);
+                    check.same("upload body", "a note from the phone", put.body);
+                    check.same("upload carries the token", "Bearer delta_t", put.header("authorization"));
+                    check.same("upload progress reached the end", Long.valueOf(note.length), Long.valueOf(sent[0]));
+                    check.same("upload total", Long.valueOf(note.length), Long.valueOf(sent[1]));
+                    check.ok("a taken name is not an error",
+                        !center.upload("taken.txt", new java.io.ByteArrayInputStream(note), note.length, watch));
+                    check.fails("too big named", "too big", new Check.Body() {
+                        @Override
+                        public void run() throws Exception {
+                            center.upload("huge.bin", new java.io.ByteArrayInputStream(note), note.length, quiet());
+                        }
+                    });
+                    check.fails("short file refused", "changed while", new Check.Body() {
+                        @Override
+                        public void run() throws Exception {
+                            center.upload("short.txt", new java.io.ByteArrayInputStream(note), note.length + 5, quiet());
+                        }
+                    });
+                    check.fails("upload cancel", "Cancelled", new Check.Body() {
+                        @Override
+                        public void run() throws Exception {
+                            center.upload("c.txt", new java.io.ByteArrayInputStream(note), note.length, new Center.Progress() {
+                                @Override
+                                public boolean cancelled() {
+                                    return true;
+                                }
+
+                                @Override
+                                public void progress(long done, long total) {}
+                            });
+                        }
+                    });
                 } finally {
                     server.close();
                 }
             }
         });
+    }
+
+    /** Progress nobody is watching. */
+    private static Center.Progress quiet() {
+        return new Center.Progress() {
+            @Override
+            public boolean cancelled() {
+                return false;
+            }
+
+            @Override
+            public void progress(long done, long total) {}
+        };
     }
 
     private static TestServer.Request find(List<TestServer.Request> seen, String path) {

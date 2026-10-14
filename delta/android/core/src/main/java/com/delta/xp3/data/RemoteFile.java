@@ -37,6 +37,18 @@ public final class RemoteFile {
         return true;
     }
 
+    /**
+     * The `n`th choice of name for a file called `name`: the name itself, then
+     * "name (2).ext", "name (3).ext" and so on, as Move to names a copy.
+     */
+    public static String numbered(String name, int n) {
+        if (n <= 1) return name;
+        int dot = name.lastIndexOf('.');
+        String stem = dot > 0 ? name.substring(0, dot) : name;
+        String tail = dot > 0 ? name.substring(dot) : "";
+        return stem + " (" + n + ")" + tail;
+    }
+
     public boolean isApk() {
         return name.toLowerCase(Locale.US).endsWith(".apk");
     }

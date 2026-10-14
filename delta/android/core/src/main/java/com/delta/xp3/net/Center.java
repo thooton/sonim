@@ -15,8 +15,8 @@ import java.util.Map;
  * the phone's side.
  *
  * An agent pushes a file with the CLI; this lists it, fetches it, and deletes
- * it. Every request carries the bearer token `delta-cc gen-token` printed,
- * and nothing is ever uploaded from here.
+ * it. The phone can push one too, for an agent to `delta pull`. Every request
+ * carries the bearer token `delta-cc gen-token` printed.
  */
 public final class Center {
 
@@ -107,6 +107,31 @@ public final class Center {
         } finally {
             stream.close();
         }
+    }
+
+    /**
+     * Sends `length` bytes from `in` as a new file called `name`, as
+     * `delta push` does. Returns false, having stored nothing, when the
+     * command center already has a file of that name: it never replaces one.
+     */
+    public boolean upload(String name, InputStream in, long length, final Progress progress)
+        throws IOException, InterruptedException {
+        Http.Request request = request("/files/" + segment(name))
+            .method("PUT")
+            .header("Content-Type", "application/octet-stream")
+            .timeout(120000);
+        Http.Response response = http.upload(request, in, length, new Http.Sending() {
+            @Override
+            public void sent(long done, long total) throws IOException {
+                if (progress.cancelled()) throw new Cancelled();
+                progress.progress(done, total);
+            }
+        });
+        if (response.status() == 409) return false;
+        if (response.status() == 413) throw new IOException("That file is too big for the command center.");
+        if (response.status() == 400) throw new IOException("The command center refused that name.");
+        require(response.status());
+        return true;
     }
 
     // ------------------------------------------------------------------

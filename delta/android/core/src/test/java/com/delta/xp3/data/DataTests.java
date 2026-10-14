@@ -6,6 +6,7 @@ import com.delta.xp3.net.Json;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -299,6 +300,33 @@ public final class DataTests {
             }
         });
 
+        check.run("attached files", new Check.Body() {
+            @Override
+            public void run() {
+                List<String> names = Arrays.asList("notes.pdf", "Song (2).mp3");
+                String wrapped = Attached.wrap("  Read these  ", names);
+                check.ok("typed first", wrapped.startsWith("Read these\n\n<delta-files>\n"));
+                check.ok("tells the agent how", wrapped.contains("`delta pull <name>`"));
+                check.ok("one name a line", wrapped.contains("\n- notes.pdf\n- Song (2).mp3\n</delta-files>"));
+                check.same("names read back", names, Attached.names(wrapped));
+                check.same("shown as one line", "Read these\n\nAttached: notes.pdf, Song (2).mp3", Attached.show(wrapped));
+                check.same("nothing attached is just the text", "hi", Attached.wrap(" hi ", new ArrayList<String>()));
+                check.same("files alone", "Attached: notes.pdf",
+                    Attached.show(Attached.wrap("", Arrays.asList("notes.pdf"))));
+                check.ok("one file is it", Attached.wrap("", Arrays.asList("a")).contains("fetch it with"));
+                check.same("ordinary text untouched", "Use <delta-files> tags", Attached.show("Use <delta-files> tags"));
+                check.same("numbered", "a (2).mp3", RemoteFile.numbered("a.mp3", 2));
+                check.same("first is the name", "a.mp3", RemoteFile.numbered("a.mp3", 1));
+                check.same("hidden-looking stem kept whole", "x (3)", RemoteFile.numbered("x", 3));
+
+                Transcript t = new Transcript();
+                String first = Setup.wrap(Attached.wrap("Fix this", Arrays.asList("log.txt")), "https://x", "t");
+                t.apply("client_event", "1", frame(1, "client", user("u-1", first)));
+                check.same("replayed message reads as typed, with its files",
+                    "Fix this\n\nAttached: log.txt", t.entries().get(0).text);
+            }
+        });
+
         check.run("config", new Check.Body() {
             @Override
             public void run() throws Exception {
@@ -372,6 +400,10 @@ public final class DataTests {
                 new File(folder, ".thumbnails").mkdir();
                 check.same("subfolders in order, files and hidden ones left out",
                     Arrays.asList("Alpha", "beta"), Folders.subfolders(folder));
+                check.same("files in order, folders and hidden ones left out",
+                    Arrays.asList("a (2).mp3", "a.mp3", "notes"), Folders.files(folder));
+                new File(folder, ".nomedia").createNewFile();
+                check.same("hidden file left out", 3, Folders.files(folder).size());
                 check.same("nothing inside a missing folder", 0,
                     Folders.subfolders(new File(folder, "missing")).size());
             }

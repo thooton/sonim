@@ -77,15 +77,25 @@ public final class Folders {
      * ever replaced.
      */
     public static File unused(File folder, String name) {
-        File plain = new File(folder, name);
-        if (!plain.exists()) return plain;
-        int dot = name.lastIndexOf('.');
-        String stem = dot > 0 ? name.substring(0, dot) : name;
-        String tail = dot > 0 ? name.substring(dot) : "";
-        for (int n = 2; ; n++) {
-            File numbered = new File(folder, stem + " (" + n + ")" + tail);
+        for (int n = 1; ; n++) {
+            File numbered = new File(folder, RemoteFile.numbered(name, n));
             if (!numbered.exists()) return numbered;
         }
+    }
+
+    /**
+     * The files directly inside `folder` that could be sent to the command
+     * center, by name and in order: no folders, and nothing hidden.
+     */
+    public static List<String> files(File folder) {
+        List<String> names = new ArrayList<String>();
+        File[] found = folder.listFiles();
+        if (found == null) return names;
+        for (File each : found) {
+            if (each.isFile() && RemoteFile.validName(each.getName())) names.add(each.getName());
+        }
+        Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
+        return names;
     }
 
     private static String extension(String name) {

@@ -71,8 +71,15 @@ of the text (`cursorOwns`, as in Canvas).
   with `Folders.subfolders`, where Back goes up a level and "New folder…"
   makes one) under a free name (`Folders.unused`), then deletes it here and
   tells the media scanner. A missing or Changed copy is downloaded first.
-  It is the only use of shared storage, so `WRITE_EXTERNAL_STORAGE` is
+  It and Upload are the only uses of shared storage, so storage access is
   asked for on first use, before the folders are listed.
+  "Upload from phone…" browses shared storage from its top (`Folders.files`
+  lists a folder's files) and `Center.upload` PUTs the pick to
+  `/files/{name}`, streamed through `Http.upload` with progress. The command
+  center never replaces a file, so `Backend.upload` takes the first name not
+  in the list (`RemoteFile.numbered`) and moves on if it is refused with 409.
+  Back on Files cancels it. "Send to agent" attaches a file to the next
+  message (see Files sent with a message).
 
 ## The protocol
 
@@ -127,11 +134,22 @@ pick from `com.android.gallery3d` with `multipick`. `Pictures` shrinks each to
 in `files/draft/` until sent. Sending moves it to `files/sent/<uuid>-<n>.jpg`.
 At most four per message.
 
+## Files sent with a message
+
+Session's "Attach file" uploads a file as above and attaches it; Files'
+"Send to agent" attaches one already there. Attached names (at most ten) are
+held in `attachedFiles` (kept across a restart of the activity), shown in a
+line above the box, and sent as a `<delta-files>` block at the end of the
+message (`Attached.wrap`) telling the agent to `delta pull` each one. The
+transcript shows the block as one "Attached: …" line (`Attached.show`),
+including in a replay. `delta help` explains the block to the agent; keep
+the two in step.
+
 ## Layout
 
 - `android/core`: `net/` (`Http`, `Json`, `Config`, `CloudAuth`, `Sse`,
   `Cloud`, `Center`) and `data/` (`Entry`, `Transcript`, `Store`, `Chat`,
-  `RemoteFile`, `Setup`, `Folders`). Tests in `src/test` run via `:core:selfTest` with
+  `RemoteFile`, `Setup`, `Attached`, `Folders`). Tests in `src/test` run via `:core:selfTest` with
   the tiny `Check` harness and loopback `TestServer`.
 - `android/app`: `MainActivity` (tabs, screens, keys, menus, intents),
   `Backend` (the only bridge to disk and network), `Link` (the reconnecting

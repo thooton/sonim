@@ -45,6 +45,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.delta.xp3.data.Attached;
 import com.delta.xp3.data.Chat;
 import com.delta.xp3.data.Entry;
 import com.delta.xp3.data.Folders;
@@ -126,6 +127,11 @@ public final class MainActivity extends Activity {
     private static final int MENU_CANCEL = 18;
     private static final int MENU_CENTER = 19;
     private static final int MENU_MOVE = 20;
+    private static final int MENU_UPLOAD = 21;
+    private static final int MENU_ATTACH = 22;
+    private static final int MENU_SEND_FILE = 23;
+    private static final int MENU_UNATTACH = 24;
+    private static final int MENU_CANCEL_UPLOAD = 25;
 
     /** Activity results. */
     private static final int TAKE_PICTURE = 1;
@@ -134,6 +140,15 @@ public final class MainActivity extends Activity {
 
     /** Permission requests. */
     private static final int STORAGE = 1;
+    private static final int STORAGE_UPLOAD = 2;
+
+    /** What a file picked from the phone is for, while the storage permission is asked. */
+    private static final int PICK_NONE = 0;
+    private static final int PICK_UPLOAD = 1;
+    private static final int PICK_ATTACH = 2;
+
+    /** Files named in one message at most. */
+    private static final int MAX_ATTACHED = 10;
 
     /**
      * The Installer helper (../installer). The XP3's own installer screen
@@ -155,6 +170,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService downloads = pool("delta-download");
     private final ExecutorService picturesWork = pool("delta-pictures");
     private final ExecutorService moves = pool("delta-move");
+    private final ExecutorService uploads = pool("delta-upload");
 
     private static ExecutorService pool(final String name) {
         return Executors.newSingleThreadExecutor(new ThreadFactory() {
@@ -226,12 +242,20 @@ public final class MainActivity extends Activity {
     private String moving;
     /** The file whose Move to is waiting on the storage permission, by name. */
     private String pendingMove;
+    /** The upload in flight, or null. */
+    private Upload uploading;
+    /** A PICK_ value while a pick from the phone waits on the storage permission. */
+    private int pendingPick;
+    /** Shows the upload's progress on whichever tab is drawn, or null. */
+    private TextView uploadView;
 
     // ------------------------------------------------------------------
     // The session screen
     // ------------------------------------------------------------------
 
     private String draft = "";
+    /** Names on the command center that go with the next message. */
+    private ArrayList<String> attachedFiles = new ArrayList<>();
     private ChatListView chatList;
     private ChatAdapter chatAdapter;
     private TextView titleView;
@@ -261,6 +285,9 @@ public final class MainActivity extends Activity {
             installLabel = state.getString("installLabel");
             installUpdate = state.getBoolean("installUpdate");
             pendingMove = state.getString("pendingMove");
+            pendingPick = state.getInt("pendingPick", PICK_NONE);
+            ArrayList<String> attached = state.getStringArrayList("attachedFiles");
+            if (attached != null) attachedFiles = attached;
         }
         openSaved(backend.openSession());
         chats = backend.savedChats();
@@ -313,6 +340,8 @@ public final class MainActivity extends Activity {
         state.putString("installLabel", installLabel);
         state.putBoolean("installUpdate", installUpdate);
         state.putString("pendingMove", pendingMove);
+        state.putInt("pendingPick", pendingPick);
+        state.putStringArrayList("attachedFiles", attachedFiles);
     }
 
     @Override
@@ -326,6 +355,7 @@ public final class MainActivity extends Activity {
         super.onDestroy();
         disconnect();
         if (running != null) running.cancelled = true;
+        if (uploading != null) uploading.cancelled = true;
         // Let the last save land; a request in flight is not worth holding
         // the process for once the screen is gone.
         saves.shutdown();
@@ -334,6 +364,7 @@ public final class MainActivity extends Activity {
         requests.shutdownNow();
         lists.shutdownNow();
         downloads.shutdownNow();
+        uploads.shutdownNow();
     }
 
     /** Forgets old transcripts, and the pictures only they showed. */
@@ -386,6 +417,7 @@ public final class MainActivity extends Activity {
         stateView = null;
         rowList = null;
         rowAdapter = null;
+        uploadView = null;
     }
 
     private void replaceContent(View view) {
@@ -673,9 +705,13 @@ public final class MainActivity extends Activity {
 
     private void send(String text) {
         final String message = text.trim();
-        if (message.length() == 0 && pictures.draft().isEmpty()) return;
+        if (message.length() == 0 && pictures.draft().isEmpty() && attachedFiles.isEmpty()) return;
         if (preparing > 0) {
             toast("Still adding the picture");
+            return;
+        }
+        if (uploading != null && uploading.attach) {
+            toast("Still sending " + uploading.file.getName());
             return;
         }
         if (!backend.ready()) {
@@ -690,17 +726,21 @@ public final class MainActivity extends Activity {
         final String uuid = UUID.randomUUID().toString();
         final int forGeneration = generation;
         final List<File> attached = pictures.commit(uuid);
-        transcript.sent(uuid, message, attached.size());
+        final List<String> sentFiles = new ArrayList<>(attachedFiles);
+        transcript.sent(uuid, Attached.line(message, sentFiles), attached.size());
         draft = "";
+        attachedFiles.clear();
         if (sessionId == null) {
             creating = true;
-            title = message.length() > 0 ? titleFor(message) : attached.size() == 1 ? "Picture" : "Pictures";
+            title = message.length() > 0 ? titleFor(message)
+                : !attached.isEmpty() ? (attached.size() == 1 ? "Picture" : "Pictures")
+                : titleFor(sentFiles.get(0));
             final String sessionTitle = title;
             requests.execute(new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        final String id = backend.create(sessionTitle, uuid, message, attached);
+                        final String id = backend.create(sessionTitle, uuid, message, attached, sentFiles);
                         main.post(new Runnable() {
                             @Override
                             public void run() {
@@ -720,7 +760,7 @@ public final class MainActivity extends Activity {
                 @Override
                 public void run() {
                     try {
-                        backend.send(session, uuid, message, attached);
+                        backend.send(session, uuid, message, attached, sentFiles);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     } catch (Exception e) {
@@ -1027,6 +1067,266 @@ public final class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------------
+    // Files sent with a message
+    // ------------------------------------------------------------------
+
+    /**
+     * The files going with the next message, and the one still being sent
+     * to the command center for it, as a line above the box. Not focusable:
+     * Menu is how they are removed.
+     */
+    private View filesStrip() {
+        boolean sending = uploading != null && uploading.attach;
+        if (attachedFiles.isEmpty() && !sending) return null;
+        LinearLayout strip = vertical();
+        strip.setPadding(dp(6), dp(4), dp(6), 0);
+        strip.setBackgroundColor(color(R.color.chat_page));
+        if (!attachedFiles.isEmpty()) {
+            TextView names = stripLine();
+            names.setText(Attached.line("", attachedFiles));
+            strip.addView(names);
+        }
+        if (sending) {
+            TextView progress = stripLine();
+            progress.setText(uploadLine());
+            strip.addView(progress);
+            uploadView = progress;
+        }
+        return strip;
+    }
+
+    private TextView stripLine() {
+        TextView line = new TextView(this);
+        line.setTextSize(11);
+        line.setTextColor(color(R.color.text_muted));
+        line.setMaxLines(2);
+        line.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        return line;
+    }
+
+    /** A file on the command center goes with the next message. */
+    private void attach(String name) {
+        if (!attachedFiles.contains(name)) {
+            if (attachedFiles.size() >= MAX_ATTACHED) {
+                toast("Only " + MAX_ATTACHED + " files fit in one message");
+                return;
+            }
+            attachedFiles.add(name);
+        }
+        toast(name + " goes with your next message");
+    }
+
+    private void removeFiles() {
+        attachedFiles.clear();
+        if (currentTab != SESSION) return;
+        saveScrollPosition();
+        render(FOCUS_INPUT);
+    }
+
+    /**
+     * Picks a file from the phone's shared storage and sends it to the
+     * command center; with PICK_ATTACH it then goes with the next message.
+     * Storage access comes first, as for Move to.
+     */
+    private void chooseUpload(int purpose) {
+        if (!backend.centerReady()) {
+            toast(Backend.NO_CENTER);
+            return;
+        }
+        if (uploading != null) {
+            toast("Wait for " + uploading.file.getName() + " first");
+            return;
+        }
+        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            pendingPick = purpose;
+            requestPermissions(new String[] {
+                Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE_UPLOAD);
+            return;
+        }
+        pickFile(purpose, "");
+    }
+
+    /**
+     * One folder of shared storage, by its path there ("" is the top): the
+     * folders inside it, then its files. Picking a file sends it. Back goes
+     * up a level, and from the top closes.
+     */
+    private void pickFile(final int purpose, final String path) {
+        File folder = path.length() == 0 ? Environment.getExternalStorageDirectory() : shared(path);
+        final List<String> inside = Folders.subfolders(folder);
+        final List<String> found = Folders.files(folder);
+        List<String> items = new ArrayList<>();
+        for (String each : inside) items.add(each + "/");
+        for (String each : found) items.add(each);
+        if (items.isEmpty()) items.add("(Nothing here)");
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(path.length() == 0 ? (purpose == PICK_ATTACH ? "Attach file" : "Upload") : path)
+            .setItems(items.toArray(new String[0]), new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    if (which < inside.size()) {
+                        String next = inside.get(which);
+                        pickFile(purpose, path.length() == 0 ? next : path + "/" + next);
+                    } else if (which - inside.size() < found.size()) {
+                        String name = found.get(which - inside.size());
+                        upload(new File(path.length() == 0 ? Environment.getExternalStorageDirectory() : shared(path), name),
+                            purpose == PICK_ATTACH);
+                    } else {
+                        pickFile(purpose, path);
+                    }
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .create();
+        dialog.setOnKeyListener(new DialogInterface.OnKeyListener() {
+            @Override
+            public boolean onKey(DialogInterface dialog, int keyCode, KeyEvent event) {
+                if (keyCode != KeyEvent.KEYCODE_BACK) return false;
+                if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
+                    dialog.dismiss();
+                    int slash = path.lastIndexOf('/');
+                    if (path.length() > 0) pickFile(purpose, slash < 0 ? "" : path.substring(0, slash));
+                }
+                return true;
+            }
+        });
+        dialog.show();
+    }
+
+    private void upload(File file, boolean attach) {
+        if (uploading != null) {
+            toast("Wait for " + uploading.file.getName() + " first");
+            return;
+        }
+        if (attach && attachedFiles.size() >= MAX_ATTACHED) {
+            toast("Only " + MAX_ATTACHED + " files fit in one message");
+            return;
+        }
+        uploading = new Upload(file, attach);
+        keepAwake();
+        uploads.execute(uploading);
+        redrawForUpload();
+    }
+
+    /** Called on the main thread once `upload` has ended, however it ended. */
+    private void uploaded(Upload upload, String name, String problem) {
+        if (upload != uploading) return;
+        uploading = null;
+        keepAwake();
+        if (problem != null) {
+            toast("Not sent: " + problem);
+        } else {
+            List<RemoteFile> next = new ArrayList<>();
+            next.add(new RemoteFile(name, upload.file.length(), System.currentTimeMillis()));
+            for (RemoteFile other : files) if (!other.name.equals(name)) next.add(other);
+            files = next;
+            filesLoaded = true;
+            if (upload.attach) {
+                attach(name);
+            } else {
+                toast(name.equals(upload.file.getName()) ? "Sent " + name : "Sent as " + name);
+            }
+            refreshFiles();
+        }
+        redrawForUpload();
+    }
+
+    private void cancelUpload() {
+        if (uploading != null) uploading.cancelled = true;
+    }
+
+    /** Draws the tab again, so an upload's line appears or goes. */
+    private void redrawForUpload() {
+        if (isFinishing()) return;
+        if (currentTab == FILES) {
+            renderFilesKeepingFocus();
+        } else if (currentTab == SESSION) {
+            boolean listFocused = chatList != null && chatList.hasFocus();
+            saveScrollPosition();
+            render(listFocused ? FOCUS_LIST : FOCUS_INPUT);
+        }
+    }
+
+    private String uploadLine() {
+        if (uploading == null) return "";
+        String said = "Sending " + uploading.file.getName() + "…";
+        if (uploading.total > 0) said += " " + (int) (uploading.done * 100 / uploading.total) + "%";
+        return said;
+    }
+
+    /** A long transfer outlasts the screen timeout; the screen stays on while one runs. */
+    private void keepAwake() {
+        if (running != null || uploading != null) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
+    /** One upload, on the uploads worker; reports back through the main handler. */
+    private final class Upload implements Runnable, Center.Progress {
+        final File file;
+        /** Whether it goes with the next message once it is there. */
+        final boolean attach;
+        volatile boolean cancelled;
+        /** Read on the main thread only. */
+        long done;
+        long total = -1;
+        private long lastUpdate;
+
+        Upload(File file, boolean attach) {
+            this.file = file;
+            this.attach = attach;
+        }
+
+        @Override
+        public void run() {
+            String name = null;
+            String problem = null;
+            try {
+                name = backend.upload(file, this);
+            } catch (Center.Cancelled e) {
+                problem = "Cancelled";
+            } catch (InterruptedException e) {
+                problem = "Cancelled";
+            } catch (IOException e) {
+                problem = reason(e);
+            } catch (RuntimeException e) {
+                problem = "The upload failed.";
+            }
+            final String sentAs = name;
+            final String said = problem;
+            main.post(new Runnable() {
+                @Override
+                public void run() {
+                    uploaded(Upload.this, sentAs, said);
+                }
+            });
+        }
+
+        @Override
+        public boolean cancelled() {
+            return cancelled;
+        }
+
+        @Override
+        public void progress(final long now, final long size) {
+            long at = SystemClock.uptimeMillis();
+            if (now > 0 && now < size && at - lastUpdate < 250) return;
+            lastUpdate = at;
+            main.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (uploading != Upload.this) return;
+                    done = now;
+                    total = size;
+                    if (uploadView != null) uploadView.setText(uploadLine());
+                }
+            });
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Saving
     // ------------------------------------------------------------------
 
@@ -1254,6 +1554,8 @@ public final class MainActivity extends Activity {
         inputParams.setMargins(dp(4), dp(2), dp(4), dp(4));
         View strip = draftStrip();
         if (strip != null) root.addView(strip);
+        View named = filesStrip();
+        if (named != null) root.addView(named);
         root.addView(input, inputParams);
 
         wireTranscript(list, adapter);
@@ -1397,10 +1699,13 @@ public final class MainActivity extends Activity {
             return;
         }
         if (files.isEmpty()) {
-            String said = filesProblem != null ? filesProblem
+            String said = uploading != null ? uploadLine()
+                : filesProblem != null ? filesProblem
                 : filesLoading || !filesLoaded ? "Loading…"
                 : "No files yet.";
-            replaceContent(emptyMessage(said));
+            View empty = emptyMessage(said);
+            if (uploading != null) uploadView = (TextView) empty;
+            replaceContent(empty);
             return;
         }
         LinearLayout root = vertical();
@@ -1408,6 +1713,13 @@ public final class MainActivity extends Activity {
         notice.setText(filesProblem);
         notice.setVisibility(filesProblem == null ? View.GONE : View.VISIBLE);
         root.addView(notice);
+        if (uploading != null) {
+            TextView progress = notice();
+            progress.setText(uploadLine());
+            progress.setVisibility(View.VISIBLE);
+            root.addView(progress);
+            uploadView = progress;
+        }
         final RowAdapter adapter = new RowAdapter(this);
         final ListView list = listView(adapter);
         root.addView(list, weighted());
@@ -1495,7 +1807,7 @@ public final class MainActivity extends Activity {
         }
         running = new Download(file, folder);
         // A large APK on a slow line outlasts the screen timeout.
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        keepAwake();
         downloads.execute(running);
         updateFileRows();
     }
@@ -1504,7 +1816,7 @@ public final class MainActivity extends Activity {
     private void downloaded(Download download, String problem) {
         if (download != running) return;
         running = null;
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        keepAwake();
         if (problem != null) {
             toast(problem);
         } else {
@@ -1532,6 +1844,14 @@ public final class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(request, permissions, results);
+        if (request == STORAGE_UPLOAD) {
+            int purpose = pendingPick;
+            pendingPick = PICK_NONE;
+            if (purpose == PICK_NONE) return;
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) pickFile(purpose, "");
+            else toast("Delta needs storage access to send files");
+            return;
+        }
         if (request != STORAGE) return;
         String name = pendingMove;
         pendingMove = null;
@@ -2204,6 +2524,10 @@ public final class MainActivity extends Activity {
             cancelDownload();
             return;
         }
+        if (currentTab == FILES && uploading != null) {
+            cancelUpload();
+            return;
+        }
         super.onBackPressed();
     }
 
@@ -2276,6 +2600,11 @@ public final class MainActivity extends Activity {
             add(MENU_PICK, "Attach picture");
         }
         if (attached > 0) add(MENU_REMOVE, attached == 1 ? "Remove picture" : "Remove pictures");
+        if (backend.centerReady() && uploading == null && attachedFiles.size() < MAX_ATTACHED) {
+            add(MENU_ATTACH, "Attach file");
+        }
+        if (uploading != null && uploading.attach) add(MENU_CANCEL_UPLOAD, "Cancel upload");
+        if (!attachedFiles.isEmpty()) add(MENU_UNATTACH, attachedFiles.size() == 1 ? "Remove file" : "Remove files");
         if (sessionId != null && transcript.working()) add(MENU_INTERRUPT, "Interrupt");
         if (clipboardText() != null) add(MENU_PASTE, "Paste");
         if (sessionId != null) add(MENU_LINK, "Copy session link");
@@ -2299,11 +2628,14 @@ public final class MainActivity extends Activity {
             if (fetching) add(MENU_CANCEL, "Cancel download");
             else if (!busy && copy == CURRENT && file.isApk()) add(MENU_INSTALL, "Install");
             else if (!busy && copy == CURRENT) add(MENU_OPEN, "Open");
+            add(MENU_SEND_FILE, "Send to agent");
             if (!busy) add(MENU_MOVE, "Move to…");
             if (!busy) add(MENU_DOWNLOAD, copy == ABSENT ? "Download" : "Download again");
             if (copy != ABSENT && !busy) add(MENU_FORGET, "Remove from phone");
             add(MENU_DELETE, "Delete from command center");
         }
+        if (uploading != null) add(MENU_CANCEL_UPLOAD, "Cancel upload");
+        else if (backend.centerReady()) add(MENU_UPLOAD, "Upload from phone…");
         if (backend.centerReady()) add(MENU_REFRESH, "Refresh");
         add(MENU_CENTER, "Command center");
     }
@@ -2387,6 +2719,24 @@ public final class MainActivity extends Activity {
                 break;
             case MENU_CENTER:
                 editCenter();
+                break;
+            case MENU_UPLOAD:
+                chooseUpload(PICK_UPLOAD);
+                break;
+            case MENU_ATTACH:
+                chooseUpload(PICK_ATTACH);
+                break;
+            case MENU_SEND_FILE:
+                if (file != null) {
+                    attach(file.name);
+                    showTab(SESSION, true);
+                }
+                break;
+            case MENU_UNATTACH:
+                removeFiles();
+                break;
+            case MENU_CANCEL_UPLOAD:
+                cancelUpload();
                 break;
             default:
                 break;
