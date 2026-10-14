@@ -100,6 +100,49 @@ public final class Http {
         }
     }
 
+    /** Told how much of an upload has gone; throwing stops it. */
+    public interface Sending {
+        void sent(long done, long total) throws IOException, InterruptedException;
+    }
+
+    /**
+     * Sends `length` bytes from `body` as the request body, a buffer at a
+     * time, rather than holding the whole file in memory as `post` would. A
+     * body that turns out longer or shorter than `length` is an error: the
+     * server has been promised exactly that many bytes.
+     */
+    public Response upload(Request request, InputStream body, long length, Sending sending)
+        throws IOException, InterruptedException {
+        HttpURLConnection connection = open(request);
+        try {
+            connection.setDoOutput(true);
+            connection.setFixedLengthStreamingMode(length);
+            OutputStream out = connection.getOutputStream();
+            byte[] buffer = new byte[64 * 1024];
+            long done = 0;
+            sending.sent(0, length);
+            for (int count; (count = body.read(buffer)) != -1; ) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                if (done + count > length) throw new IOException("The file changed while it was being sent.");
+                out.write(buffer, 0, count);
+                done += count;
+                sending.sent(done, length);
+            }
+            if (done != length) throw new IOException("The file changed while it was being sent.");
+            // Only closed once it is whole: closing a fixed-length body early
+            // throws a second error over the first.
+            out.close();
+            long deadline = System.currentTimeMillis() + request.timeoutMs;
+            int status = connection.getResponseCode();
+            String text = read(body(connection, status), connection.getContentEncoding(), deadline);
+            return new Response(status, text, headers(connection));
+        } catch (IOException e) {
+            throw friendly(e);
+        } finally {
+            connection.disconnect();
+        }
+    }
+
     private HttpURLConnection open(Request request) throws IOException, InterruptedException {
         if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
         HttpURLConnection connection = (HttpURLConnection) request.uri.toURL().openConnection();

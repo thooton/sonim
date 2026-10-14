@@ -189,8 +189,9 @@ public final class Transcript {
         if (!"client".equals(source) || Json.flag(payload, "isMeta")) return false;
         Object content = Json.child(payload, "message").get("content");
         // The first message of a session started here carries the Delta setup
-        // ahead of what was typed; only what was typed is conversation.
-        String text = Setup.strip(text(content));
+        // ahead of what was typed; only what was typed is conversation. Files
+        // sent with a message are named in a block that is shown as one line.
+        String text = Attached.show(Setup.strip(text(content)));
         int pictures = pictures(content);
         if (text.trim().length() == 0 && pictures == 0) return false;
         String uuid = Json.text(payload, "uuid");

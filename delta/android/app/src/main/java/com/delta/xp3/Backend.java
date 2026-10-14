@@ -1,5 +1,6 @@
 package com.delta.xp3;
 
+import com.delta.xp3.data.Attached;
 import com.delta.xp3.data.Chat;
 import com.delta.xp3.data.Folders;
 import com.delta.xp3.data.RemoteFile;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -184,16 +186,17 @@ final class Backend {
     // The cloud. All blocking; call from a worker.
     // ------------------------------------------------------------------
 
-    String create(String title, String uuid, String text, List<File> pictures)
+    /** `files` are names on the command center that go with the message. */
+    String create(String title, String uuid, String text, List<File> pictures, List<String> files)
         throws IOException, InterruptedException {
         Cloud cloud = cloud();
-        return cloud.create(title, uuid, firstMessage(text), read(pictures));
+        return cloud.create(title, uuid, firstMessage(Attached.wrap(text, files)), read(pictures));
     }
 
-    void send(String session, String uuid, String text, List<File> pictures)
+    void send(String session, String uuid, String text, List<File> pictures, List<String> files)
         throws IOException, InterruptedException {
         Cloud cloud = cloud();
-        cloud.send(session, uuid, text, read(pictures));
+        cloud.send(session, uuid, Attached.wrap(text, files), read(pictures));
     }
 
     private static List<byte[]> read(List<File> pictures) throws IOException {
@@ -290,6 +293,32 @@ final class Backend {
         } finally {
             part.delete();
         }
+    }
+
+    /**
+     * Sends a file from the phone to the command center and returns the name
+     * it has there: its own, or, when that is taken, the first free
+     * "name (2).ext" and so on, since the command center never replaces a
+     * file. Worker thread.
+     */
+    String upload(File source, Center.Progress progress) throws IOException, InterruptedException {
+        Center center = center();
+        if (!source.isFile()) throw new IOException("That file is gone.");
+        Set<String> taken = new HashSet<String>();
+        for (RemoteFile file : center.list()) taken.add(file.name);
+        for (int n = 1; n <= 100; n++) {
+            String name = RemoteFile.numbered(source.getName(), n);
+            // Someone else may take a name between the list and the upload;
+            // the command center refuses it then, and the next one is tried.
+            if (taken.contains(name)) continue;
+            InputStream in = new FileInputStream(source);
+            try {
+                if (center.upload(name, in, source.length(), progress)) return name;
+            } finally {
+                in.close();
+            }
+        }
+        throw new IOException("The command center has too many files called " + source.getName() + ".");
     }
 
     /**

@@ -155,8 +155,8 @@ android {
         applicationId "com.delta.xp3"
         minSdk 27
         targetSdk 27
-        versionCode 4
-        versionName "1.0.3"
+        versionCode 5
+        versionName "1.0.4"
     }
 
     compileOptions {
