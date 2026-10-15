@@ -1,0 +1,3609 @@
+From 897c5de9c2d38f654a4219c5fb0631f29af8d64b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 15 Oct 2026 04:41:37 +0000
+Subject: [PATCH] Delta 1.1.0: Claude accounts on the command center
+
+The phone no longer holds a Claude login. It fetches short-lived access
+tokens from the command center, which keeps every account and renews
+them; an older install hands its own login over on first use.
+
+- Chats lists the sessions of every account. New sessions start on the
+  first account whose usage report shows room.
+- When a session's account runs out, the foot of the transcript says
+  until when and offers "Move to a new session". Moving stores the old
+  session's whole history (every message, tool call and result) on the
+  command center and starts a session on another account that is told
+  to fetch it with delta resume. A message sent instead waits on the
+  phone until the limit lifts.
+- New Accounts tab: each account's 5-hour and weekly usage and resets.
+- The APK bakes in only the command center login.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011uFtbcVnLGZ5q3jJCocSgk
+---
+ delta/AGENTS.md                               | 105 +++-
+ delta/README.md                               |  16 +-
+ delta/android/app/build.gradle                |  67 +-
+ .../src/main/java/com/delta/xp3/Backend.java  | 576 +++++++++++++++---
+ .../main/java/com/delta/xp3/ChatAdapter.java  |  45 +-
+ .../app/src/main/java/com/delta/xp3/Link.java |  10 +-
+ .../main/java/com/delta/xp3/MainActivity.java | 437 ++++++++++++-
+ .../main/java/com/delta/xp3/RowAdapter.java   |  14 +-
+ .../src/main/res/drawable/action_button.xml   |   9 +
+ .../app/src/main/res/layout/activity_main.xml |   1 +
+ .../src/main/res/layout/row_chat_action.xml   |  33 +
+ .../app/src/main/res/layout/row_item.xml      |  22 +-
+ .../app/src/main/res/values/strings.xml       |   1 +
+ .../main/java/com/delta/xp3/data/Carry.java   | 217 +++++++
+ .../main/java/com/delta/xp3/data/Chat.java    |  13 +-
+ .../main/java/com/delta/xp3/data/Queued.java  |  46 ++
+ .../main/java/com/delta/xp3/data/Store.java   | 107 +++-
+ .../java/com/delta/xp3/data/Transcript.java   |  74 ++-
+ .../main/java/com/delta/xp3/net/Center.java   | 199 +++++-
+ .../main/java/com/delta/xp3/net/Cloud.java    |  32 +
+ .../java/com/delta/xp3/net/CloudAuth.java     | 136 ++---
+ .../main/java/com/delta/xp3/net/Config.java   |  31 +-
+ .../java/com/delta/xp3/data/DataTests.java    | 159 ++++-
+ .../test/java/com/delta/xp3/net/NetTests.java | 154 ++++-
+ 24 files changed, 2181 insertions(+), 323 deletions(-)
+ create mode 100644 delta/android/app/src/main/res/drawable/action_button.xml
+ create mode 100644 delta/android/app/src/main/res/layout/row_chat_action.xml
+ create mode 100644 delta/android/core/src/main/java/com/delta/xp3/data/Carry.java
+ create mode 100644 delta/android/core/src/main/java/com/delta/xp3/data/Queued.java
+
+diff --git a/delta/AGENTS.md b/delta/AGENTS.md
+index c1330af..eb9e517 100644
+--- a/delta/AGENTS.md
++++ b/delta/AGENTS.md
+@@ -20,7 +20,7 @@ code (HTTP, JSON, cloud OAuth, chat views, Markdown, tabs).
+ - Platform Android only: no AndroidX, Material, Compose, or third-party
+   libraries. `:core` is plain Java, `--release 8`, and must run on API 27.
+ - No repository picker, no model or environment settings: the first
+-  `anthropic_cloud` environment on the account is used, with an empty
++  `anthropic_cloud` environment on each account is used, with an empty
+   sandbox.
+ 
+ ## How it fits into Delta
+@@ -41,12 +41,15 @@ example the tabs, or what happens to a pushed file), update `delta help` in
+ 
+ ## Tabs
+ 
+-`MainActivity` has three tabs, laid out like Charge's and Canvas's: a
++`MainActivity` has four tabs, laid out like Charge's and Canvas's: a
+ non-focusable tab bar, with left and right switching tabs on their first press
+ only. In the composer, left and right move the cursor until it reaches an end
+ of the text (`cursorOwns`, as in Canvas).
+ 
+-- **Chats**: `Cloud.sessions()` (`GET /v1/code/sessions`, unscoped, as
++- **Chats**: `Backend.sessions()`: `Cloud.sessions()` for every cloud
++  account (see Cloud accounts), merged newest first, each `Chat` tagged with
++  its account. An account whose list fails is left out and named above the
++  list. `Cloud.sessions()` is `GET /v1/code/sessions` (unscoped, as
+   the provider's CLI lists them), keeping only `anthropic_cloud` sessions
+   (or ones with no kind) that are not archived. `bridge` sessions are Remote
+   Control sessions on someone's own computer and are left out on purpose.
+@@ -80,6 +83,74 @@ of the text (`cursorOwns`, as in Canvas).
+   in the list (`RemoteFile.numbered`) and moves on if it is refused with 409.
+   Back on Files cancels it. "Send to agent" attaches a file to the next
+   message (see Files sent with a message).
++- **Accounts**: `Backend.usage()`: every account (`Center.accounts`, in
++  the order new sessions try them) with its usage report
++  (`Center.usage`: `five_hour` and `seven_day` utilization and
++  `resets_at`), in `RowAdapter` rows with a second line (`Row.extra`): the
++  address, "5-hour: 42% · resets 3:05 PM", "Weekly: …", and on the right
++  the plan, or "Out" while either window is full or a limit is known. A
++  full window it finds is written to `limits.json`, so rotation skips that
++  account at once. Fetched each time the tab is shown and from Menu →
++  Refresh.
++
++## Cloud accounts
++
++The phone holds no cloud login. The command center keeps one or more
++(`delta accounts` in the delta repo adds and removes them; see its
++AGENTS.md) and renews them, because a subscription login's refresh token
++changes on every renewal and two parties renewing it would kill it.
++
++- `Center.accounts()` lists them (`GET /cloud-accounts`), in the order new
++  sessions try them. `CloudAuth.of(center, id)` fetches an account's access
++  token (`POST /cloud-accounts/{id}/token`) and keeps it until five minutes
++  before it expires; after a 401 the next fetch sends the refused token, so
++  the command center renews the login. `Backend` keeps one `Cloud` per
++  account.
++- A session belongs to the account it was started on. `Backend` learns which
++  from the session lists and keeps it in `chats.json` and in each saved
++  transcript (`account`); a session it can't place is looked up again.
++- **Rotation.** `Backend.create` starts a session on the first account not
++  known to be out (`limits.json`, account id to epoch ms) whose usage report
++  (`GET /cloud-accounts/{id}/usage`, via `Center.limitedUntil`) shows room
++  in both the 5-hour and weekly windows. A full one is written down until it
++  resets. If none has room, the error says when the first is free again.
++- **Running out mid-conversation.** The stream's `rate_limit_event` with
++  `status: rejected` and `resetsAt` (seconds) sets
++  `Transcript.limitedUntil()`, and `MainActivity.received` records it for
++  the session's account. While the open session's account is out, the foot
++  of the transcript (`ChatAdapter.replace`'s note and button, neither of
++  them entries or saved) says until when. If another account isn't known
++  to be out (`Backend.canMove`), a **Move to a new session** row follows,
++  which the d-pad reaches like a message and OK presses. The header is
++  unchanged.
++- **Moving** (`MainActivity.moveSession`, `Backend.move`) reads the old
++  session's whole event history (`Cloud.history`: `GET
++  /v1/code/sessions/{cse}/events?sort_order=asc&cursor=<last sequence>`,
++  page by page) and writes it out as text (`Carry.build`): every
++  main-thread message, thinking block, tool call (full input) and tool
++  result (full output), nothing shortened; subagents' inner turns are left
++  out (their results are in). That goes to the command center
++  (`Center.putConversation`, `POST /conversations`), which stores it under
++  a random id. Then a session starts on another account, titled the same,
++  whose first message opens with a `<delta-continued>` block
++  (`Carry.block`) telling the agent to run `delta resume <id>
++  conversation.md` and read the whole file. Pictures the user sent ride
++  along as images on that message, and messages waiting for the limit
++  follow the block. A failed move reopens the old session with its
++  messages still waiting.
++  `Transcript` shows the block as one note (`Carry.NOTE`). `delta help`
++  explains the block; keep the two in step.
++- **Waiting messages.** A message sent while the session's account is out
++  is shown (`Transcript.queued`, no turn starts) and kept in `queue.json`
++  (`Queued`: session, uuid, text, files, picture count, when, tries) until a
++  minute after the limit lifts. A tick (`MainActivity.sendDue`, on a
++  `Handler`, also run at every start) sends what is due; a limit found to
++  last longer pushes it back, and a failed send is tried again each minute,
++  up to ten times. Moving the conversation takes its waiting messages along.
++- **Older installs** kept the cloud login in `settings.json`. The first
++  account listing hands it to the command center (`POST /cloud-accounts`,
++  which keeps its place if the account is already there) and drops it from
++  the phone; a login the provider no longer takes is dropped too.
+ 
+ ## The protocol
+ 
+@@ -116,10 +187,11 @@ Subagent output, tool results, logs and control chatter are dropped. Extend
+ 
+ ## Storage
+ 
+-`Store` writes `settings.json` (both logins, owner-only), the
+-`bundled-cloud.txt` / `bundled-center.txt` revision markers (an older
+-`bundled-claude.txt`, and a `claude` key in `settings.json`, are still read), `open.txt`,
+-`chats.json`, `sessions/<session id>.json` and `downloads.json`. Session ids
++`Store` writes `settings.json` (the command center login, owner-only; an
++older install's cloud login under `cloud` or `claude` is read once to hand
++it over), the `bundled-center.txt` revision marker, `open.txt`,
++`chats.json`, `sessions/<session id>.json`, `limits.json`, `queue.json` and
++`downloads.json`. Session ids
+ and file names are validated (`Chat.validId`, `RemoteFile.validName`) before
+ they become file names. `prune` keeps the 20 most recent transcripts plus the
+ open one, and sent pictures that no kept transcript refers to are deleted
+@@ -149,7 +221,7 @@ the two in step.
+ 
+ - `android/core`: `net/` (`Http`, `Json`, `Config`, `CloudAuth`, `Sse`,
+   `Cloud`, `Center`) and `data/` (`Entry`, `Transcript`, `Store`, `Chat`,
+-  `RemoteFile`, `Setup`, `Attached`, `Folders`). Tests in `src/test` run via `:core:selfTest` with
++  `RemoteFile`, `Setup`, `Attached`, `Carry`, `Queued`, `Folders`). Tests in `src/test` run via `:core:selfTest` with
+   the tiny `Check` harness and loopback `TestServer`.
+ - `android/app`: `MainActivity` (tabs, screens, keys, menus, intents),
+   `Backend` (the only bridge to disk and network), `Link` (the reconnecting
+@@ -186,12 +258,11 @@ checks on the handset.
+ 
+ ## Credentials
+ 
+-There is no in-app cloud sign-in, by design. `android/app/build.gradle` bakes
+-in the cloud login (`-Pdelta.cloudAuth`, `../cloud-auth.json`, or the cloud
+-demo's `auth.json` beside this repository) and the command center (`-Pdelta.center`,
+-`../delta-center.json`, the CLI's `~/.config/delta/config.json`). It writes
+-them into a generated `Defaults.java` under `android/app/build/`, with one
+-revision marker per login, so a new command center doesn't replace a rotated
+-cloud login. A build with neither, such as a CI build or one made in an
+-agent's sandbox, installs over a configured copy and keeps its logins. Never
+-print, commit, or attach the auth files, the generated source, or any APK.
++There is no in-app cloud sign-in, by design: the cloud logins are on the
++command center (see Cloud accounts). `android/app/build.gradle` bakes in
++only the command center (`-Pdelta.center`, `../delta-center.json`, the CLI's
++`~/.config/delta/config.json`), into a generated `Defaults.java` under
++`android/app/build/` with a revision marker. A build without one, such as a
++CI build or one made in an agent's sandbox, installs over a configured copy
++and keeps its login. Never print, commit, or attach the config files, the
++generated source, or any APK.
+diff --git a/delta/README.md b/delta/README.md
+index 7b39d99..bce834f 100644
+--- a/delta/README.md
++++ b/delta/README.md
+@@ -2,11 +2,16 @@
+ 
+ The phone end of [Delta](https://github.com/thooton/delta): Claude Code agents running in Anthropic's cloud, and the files they send back, driven from the XP3's 240x320 screen, d-pad and keypad. It replaces the old Cloud and Downloader apps.
+ 
+-Left and right move between three tabs:
++Left and right move between four tabs:
+ 
+-- **Chats** lists your Claude Code sessions in the cloud, most recently active first. Sessions running on a computer through Remote Control aren't shown, and neither are archived ones. OK opens one in Session; Menu, then New session, starts a new one.
++- **Chats** lists your Claude Code sessions in the cloud, on every account the command center keeps, most recently active first. Sessions running on a computer through Remote Control aren't shown, and neither are archived ones. OK opens one in Session; Menu, then New session, starts a new one.
+ - **Session** is one conversation. Claude's replies appear as they arrive, with a one-line `› Bash: …` record for each tool call. The session runs in **Auto** permission mode; if Claude still asks about a call, Menu lets you allow or deny it. Pictures go along with a message from **Take picture** or **Attach picture**, up to four, each shrunk to 1568px. **Attach file** sends any other file: pick it from the phone's storage, it is uploaded to the command center, and the next message names it so Claude fetches it with `delta pull`. The message shows it as an `Attached:` line.
+ - **Files** lists what agents have pushed to the command center with `delta push`. OK downloads a file. Once it's on the phone, OK installs it if it's an APK (an app already on the phone is updated in place and keeps its data) or opens it if not. A file pushed again under the same name shows as **Changed**, and OK downloads the new copy. **Menu → Move to…** puts the phone's copy in a shared folder (Music, Pictures, Download and so on, the likeliest for the file first), downloading it first if need be, so a song lands where the music player finds it. Each folder offers **Move here**, **New folder…** and the folders inside it, so a song can go in `Music/Some Album`; Back goes up a level. The first move asks for storage access. A name already taken there gets ` (2)`, ` (3)` and so on. **Menu → Upload from phone…** goes the other way: browse the phone's storage and pick a file to put on the command center (a name already taken there also gets ` (2)` and so on). **Menu → Send to agent** on any file attaches it to your next message in the Session tab.
++- **Accounts** lists your Claude accounts, in the order new sessions try them. Each row shows the account's address, how much of its 5-hour limit and its weekly limit is used, and when each resets; on the right is its plan, or **Out** while it has no room left. **Menu → Refresh** checks again.
++
++## Several accounts
++
++The Claude logins live on the command center, not on the phone: add each account with `delta accounts login` (or `delta accounts add <credentials file>`) and the phone fetches short-lived tokens as it needs them. `delta accounts` shows each one's 5-hour and weekly usage. A new session starts on the first account that still has room. When a session's account runs out mid-conversation, a note at the foot of the conversation says until when, with a **Move to a new session** button under it (move down onto it and press OK). Moving stores the whole conversation so far, tool calls and their output included, on the command center, and starts a new session on another account that is told to fetch it (`delta resume`) and read all of it. The old session stays in Chats, and its sandbox doesn't come along, so the agent clones again what it needs. If you send a message instead, it waits on the phone and goes out by itself once the limit lifts. An install from before this hands its own Claude login to the command center the first time it lists the accounts.
+ 
+ The first message of every new session also tells the agent to install the `delta` CLI, connect it to your command center, and read `delta help`. That's how an agent knows to push a fixed APK back to your Files tab. It also tells the agent to call itself Delta, since the app is white-labelled: the phone never shows Claude's name. The text is hidden on the phone, but it stays visible in the session on claude.ai/code, token included.
+ 
+@@ -18,9 +23,8 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRel
+ adb install -r app/build/outputs/apk/release/app-release.apk
+ ```
+ 
+-Both logins are baked in at build time, and a build without them keeps whatever an installed copy already has:
++The command center login is baked in at build time, and a build without it keeps whatever an installed copy already has. The Claude logins are on the command center (see above).
+ 
+-- **Claude**: `-Pdelta.cloudAuth=<file>`, else `cloud-auth.json` beside `android/`, else `claude_cloud/auth.json` beside this repository, all in Pi's shape under `anthropic`. The app renews the login and saves each rotation, so once the phone has renewed it, the refresh token in the file stops working. Give Delta its own login if you can.
+ - **Command center**: `-Pdelta.center=<file>`, else `delta-center.json` beside `android/`, else the CLI's own `~/.config/delta/config.json` (written by `delta set-auth`). The format is `{"server": "https://…", "token": "delta_…"}`. Without one, use **Menu → Command center** on the Files tab. The app only connects over https.
+ 
+ The cloud environment has to be able to reach the command center's host. If the app has to create your first cloud environment, it gives it full network access. Otherwise, set the environment's network access to **Full** (or add the host) on claude.ai/code.
+@@ -32,7 +36,7 @@ The cloud environment has to be able to reach the command center's host. If the
+ | Left / Right | Change tab (inside typed text, move the cursor until it reaches an end) |
+ | Up / Down | Move through a list or the transcript, or go back to the box |
+ | OK | Open a session, send a message, download/install/open a file |
+-| Menu or hold OK | That tab's actions: refresh, archive, copy link, new session; copy text, allow/deny, pictures, attach file, interrupt, paste; send to agent, move to, upload from phone, download again, remove from phone, delete from command center, command center |
++| Menu or hold OK | That tab's actions: refresh, archive, copy link, new session; copy text, allow/deny, pictures, attach file, interrupt, paste; send to agent, move to, upload from phone, download again, remove from phone, delete from command center, command center; refresh accounts |
+ | Back | Cancel a download or upload (on Files), or leave |
+ 
+-The logins, transcripts, pictures and downloads are kept only in the app's private storage, until you move a download out with **Move to…**. A locally built APK contains live logins, so treat it like a password.
++The command center login, transcripts, pictures and downloads are kept only in the app's private storage, until you move a download out with **Move to…**. A locally built APK contains a live login, so treat it like a password.
+diff --git a/delta/android/app/build.gradle b/delta/android/app/build.gradle
+index 2d140d1..65dbc7f 100644
+--- a/delta/android/app/build.gradle
++++ b/delta/android/app/build.gradle
+@@ -6,20 +6,18 @@ plugins {
+ }
+ 
+ /*
+- * The bundled logins, for a personal deployment.
++ * The bundled login, for a personal deployment.
+  *
+- * This is one person's phone, so the app ships already signed in rather than
+- * asking somebody to complete an OAuth flow or type a 49-character token on a
+- * T9 keypad. Both logins are read at build time and written into a generated
+- * source file under build/. Nothing secret is ever committed, and a checkout
+- * on any other machine (or CI) simply builds an app with no login. Installed
+- * over a copy that has one, such a build keeps it: a bundled login is adopted
+- * once per revision, and an absent one changes nothing.
++ * This is one person's phone, so the app ships already signed in to the
++ * command center rather than asking somebody to type a 49-character token on
++ * a T9 keypad. It is read at build time and written into a generated source
++ * file under build/. Nothing secret is ever committed, and a checkout on any
++ * other machine (or CI) simply builds an app with no login. Installed over a
++ * copy that has one, such a build keeps it: a bundled login is adopted once
++ * per revision, and an absent one changes nothing.
+  *
+- * The cloud login is the complete rotating OAuth entry, from, in order:
+- * -Pdelta.cloudAuth=<file>, cloud-auth.json beside the android directory,
+- * or the auth.json in the cloud demo directory that sits beside this
+- * repository (all the same shape Pi writes, under the provider's key).
++ * The cloud logins are not in the APK at all. The command center keeps them
++ * (`delta accounts`) and the app fetches access tokens from it.
+  *
+  * The command center is the address and token `delta set-auth` saves, from:
+  * -Pdelta.center=<file>, delta-center.json beside the android directory, or
+@@ -27,9 +25,9 @@ plugins {
+  * ~/.config/delta/config.json). All are {"server": "...", "token": "..."}.
+  * The app only talks to a command center over https.
+  *
+- * The APK that comes out of this contains live credentials. It is gitignored,
+- * and it should be treated as a password: anything with the file can spend the
+- * configured cloud subscription and run code on the command center.
++ * The APK that comes out of this contains a live credential. It is gitignored,
++ * and it should be treated as a password: anything with the file can run code
++ * on the command center and, through it, spend the cloud subscriptions.
+  */
+ def bundledSource = layout.buildDirectory.dir("generated/bundled")
+ 
+@@ -44,42 +42,22 @@ static String sha256(File source) {
+ }
+ 
+ tasks.register("generateDefaults") {
+-    description = "Bakes this deployment's cloud login and command center into the APK."
++    description = "Bakes this deployment's command center into the APK."
+     def configHome = System.getenv("XDG_CONFIG_HOME") ?: "${System.getProperty("user.home")}/.config"
+-    def localCloudAuth = firstFile("delta.cloudAuth", [
+-        "${rootDir}/../cloud-auth.json",
+-        "${rootDir}/../../../claude_cloud/auth.json",
+-    ])
+     def localCenter = firstFile("delta.center", [
+         "${rootDir}/../delta-center.json",
+         "${configHome}/delta/config.json",
+     ])
+ 
+-    inputs.files(localCloudAuth, localCenter)
++    inputs.files(localCenter)
+         .withPropertyName("sources")
+         .ignoreEmptyDirectories().optional(true)
+     outputs.dir(bundledSource)
+ 
+     doLast {
+         def settings = [:]
+-        def cloudRevision = ""
+         def centerRevision = ""
+ 
+-        def cloud = localCloudAuth.isFile() ? (new JsonSlurper().parse(localCloudAuth).anthropic ?: [:]) : [:]
+-        if (cloud.access || cloud.refresh) {
+-            // Keep the complete pair together, with its expiry: the provider
+-            // rotates the refresh token, and the app persists each rotation.
+-            def entry = [:]
+-            if (cloud.access) entry.accessToken = cloud.access
+-            if (cloud.refresh) entry.refreshToken = cloud.refresh
+-            if (cloud.expires) entry.expiresAt = cloud.expires
+-            settings.cloud = entry
+-            cloudRevision = sha256(localCloudAuth)
+-            logger.lifecycle("Bundled setup: cloud login from ${localCloudAuth}")
+-        } else {
+-            logger.lifecycle("Bundled setup: no cloud login found; the app will have none")
+-        }
+-
+         def center = localCenter.isFile() ? new JsonSlurper().parse(localCenter) : [:]
+         if (center.server && center.token) {
+             if (center.server.toString().toLowerCase().startsWith("https://")) {
+@@ -104,7 +82,7 @@ import com.delta.xp3.data.Store;
+ import com.delta.xp3.net.Config;
+ 
+ /**
+- * The logins baked in at build time. GENERATED - do not edit, do not commit.
++ * The command center baked in at build time. GENERATED - do not edit, do not commit.
+  *
+  * Empty when the build had no credentials to hand, which is what a checkout on
+  * another machine gets: the app then keeps whatever it already has.
+@@ -114,15 +92,14 @@ final class Defaults {
+     private Defaults() {}
+ 
+     private static final String SETTINGS = "${quoted}";
+-    private static final String CLOUD_REVISION = "${cloudRevision}";
+     private static final String CENTER_REVISION = "${centerRevision}";
+ 
+-    /** Identifies one bundled login without exposing it; empty when there is none. */
++    /** Identifies the bundled login without exposing it; empty when there is none. */
+     static String revision(String part) {
+-        return Store.CLOUD.equals(part) ? CLOUD_REVISION : Store.CENTER.equals(part) ? CENTER_REVISION : "";
++        return Store.CENTER.equals(part) ? CENTER_REVISION : "";
+     }
+ 
+-    /** The bundled logins, validated the same way stored ones are. */
++    /** The bundled login, validated the same way the stored one is. */
+     static Config config() {
+         return SETTINGS.length() == 0 ? Config.blank() : Config.parse(SETTINGS);
+     }
+@@ -139,7 +116,7 @@ tasks.named("preBuild") { dependsOn "generateDefaults" }
+ // everything it fetches goes through java.net, which is what keeps a debug APK
+ // for a 240x320 phone in the low hundreds of kilobytes.
+ //
+-// :core is the Android-free half: the logins, the cloud session protocol, the
++// :core is the Android-free half: the login, the cloud session protocol, the
+ // command center's routes and the transcript built from it, all plain Java so
+ // they can be tested on a desktop JVM.
+ dependencies {
+@@ -155,8 +132,8 @@ android {
+         applicationId "com.delta.xp3"
+         minSdk 27
+         targetSdk 27
+-        versionCode 5
+-        versionName "1.0.4"
++        versionCode 6
++        versionName "1.1.0"
+     }
+ 
+     compileOptions {
+diff --git a/delta/android/app/src/main/java/com/delta/xp3/Backend.java b/delta/android/app/src/main/java/com/delta/xp3/Backend.java
+index a146151..8d432b6 100644
+--- a/delta/android/app/src/main/java/com/delta/xp3/Backend.java
++++ b/delta/android/app/src/main/java/com/delta/xp3/Backend.java
+@@ -1,8 +1,10 @@
+ package com.delta.xp3;
+ 
+ import com.delta.xp3.data.Attached;
++import com.delta.xp3.data.Carry;
+ import com.delta.xp3.data.Chat;
+ import com.delta.xp3.data.Folders;
++import com.delta.xp3.data.Queued;
+ import com.delta.xp3.data.RemoteFile;
+ import com.delta.xp3.data.Setup;
+ import com.delta.xp3.data.Store;
+@@ -19,24 +21,43 @@ import java.io.FileOutputStream;
+ import java.io.IOException;
+ import java.io.InputStream;
+ import java.io.OutputStream;
++import java.text.SimpleDateFormat;
+ import java.util.ArrayList;
++import java.util.Collections;
++import java.util.Comparator;
++import java.util.Date;
++import java.util.HashMap;
+ import java.util.HashSet;
++import java.util.LinkedHashMap;
+ import java.util.List;
++import java.util.Locale;
+ import java.util.Map;
+ import java.util.Set;
+ 
+ /**
+  * Everything with a network or a disk behind it, in one place.
+  *
+- * The cloud client is built once, from the cloud login; a rotated login is
+- * written back so the next launch starts from the live pair. The command
+- * center client is rebuilt whenever its address or token is changed from the
+- * Files tab.
++ * The command center client is rebuilt whenever its address or token is
++ * changed from the Files tab. The cloud accounts come from it too: their
++ * logins stay there, and each account gets a cloud client of its own that
++ * fetches its tokens from there. A session belongs to the account it was
++ * started on. Which one that is comes from the session lists, is kept with
++ * the saved chats and transcripts, and is looked up again when it is not
++ * known.
++ *
++ * New sessions go to the first account, in the command center's order, that
++ * is not known to be out of usage, after its usage report confirms it has
++ * room. An account found to be out, here or by a session's stream, is skipped
++ * until its limit lifts. A session on it can move to another (`canMove`,
++ * `move`), and a message written to it meanwhile waits on the phone until
++ * the limit lifts (`enqueue`, `due`).
+  */
+ final class Backend {
+ 
+-    static final String NO_LOGIN = "This build has no cloud login.";
++    static final String NO_LOGIN = "No command center set. Add one from the Files tab's menu.";
+     static final String NO_CENTER = "No command center set.";
++    static final String NO_ACCOUNTS =
++        "No cloud accounts on the command center yet. Add one with delta accounts login on a computer.";
+ 
+     /** Transcripts kept on the phone besides the open one. */
+     private static final int KEEP_SESSIONS = 20;
+@@ -44,38 +65,41 @@ final class Backend {
+     private final Store store;
+     private final File downloads;
+     private final Http http = new Http();
+-    /** Null when this build has no cloud login. */
+-    private final Cloud cloud;
+     /** Guarded by this: both halves are rewritten from different threads. */
+     private Config config;
+     /** Guarded by this. Null without a command center. */
+     private Center center;
++    /** The accounts as last listed, in order; null before the first listing. Guarded by this. */
++    private List<Center.Account> accounts;
++    /** A cloud client per account id, all for the current command center. Guarded by this. */
++    private final Map<String, Cloud> clouds = new HashMap<String, Cloud>();
++    /** The account each known session runs on. Guarded by this. */
++    private final Map<String, String> owners = new HashMap<String, String>();
++    /** Until when accounts are known to be out of usage, in epoch milliseconds, by id. Guarded by this. */
++    private final Map<String, Long> limits;
++    /** Which account's sessions could not be listed last time, and why; null if all could. Guarded by this. */
++    private String listProblem;
++    /** Held while an old login is handed over, so it is handed over once. */
++    private final Object handing = new Object();
++    /** Messages waiting for their account's limit to lift. Guarded by this. */
++    private final List<Queued> queue;
+ 
+     Backend(File directory, File downloads) {
+         store = new Store(directory);
+         this.downloads = downloads;
+         config = login();
+         center = config.centerReady() ? new Center(http, config.server(), config.token()) : null;
+-        if (!config.ready()) {
+-            cloud = null;
+-            return;
+-        }
+-        CloudAuth credentials = new CloudAuth(http, config.accessToken(),
+-            config.refreshToken(), config.expiresAt(), new CloudAuth.Rotated() {
+-                @Override
+-                public void store(String access, String refresh, long expiresAt) {
+-                    rotated(access, refresh, expiresAt);
+-                }
+-            });
+-        cloud = new Cloud(http, credentials);
++        limits = store.limits();
++        queue = store.queue();
++        for (Chat chat : store.chats()) {
++            if (chat.account != null) owners.put(chat.id, chat.account);
++        }
+     }
+ 
+     /**
+-     * The logins to use: the saved ones, except where this APK carries a
+-     * bundled login it has not adopted yet. Each is adopted on its own, by its
+-     * own revision marker, which is what stops the stale copy of the cloud
+-     * login in the APK replacing one that has rotated since it was installed,
+-     * just because the command center changed.
++     * The saved login, except where this APK carries a bundled command center
++     * it has not adopted yet. The revision marker is what stops the same APK
++     * putting it back after it has been changed from the Files tab.
+      */
+     private Config login() {
+         Config saved = store.settings();
+@@ -85,47 +109,21 @@ final class Backend {
+         } catch (RuntimeException e) {
+             return saved;
+         }
+-        Config next = saved;
+-        String cloudRevision = Defaults.revision(Store.CLOUD);
+-        boolean adoptCloud = bundled.ready() && !cloudRevision.equals(store.bundledRevision(Store.CLOUD));
+-        if (adoptCloud) next = next.withCloudOf(bundled);
+-        String centerRevision = Defaults.revision(Store.CENTER);
+-        boolean adoptCenter = bundled.centerReady() && !centerRevision.equals(store.bundledRevision(Store.CENTER));
+-        if (adoptCenter) next = next.withCenterOf(bundled);
+-        if (adoptCloud || adoptCenter) {
+-            try {
+-                store.saveSettings(next);
+-                if (adoptCloud) store.saveBundledRevision(Store.CLOUD, cloudRevision);
+-                if (adoptCenter) store.saveBundledRevision(Store.CENTER, centerRevision);
+-            } catch (IOException e) {
+-                // Still good for this run; the next launch adopts it again.
+-            }
+-        }
+-        return next;
+-    }
+-
+-    /**
+-     * Writes down a rotated login. Called on a network worker in the middle of
+-     * a request; the old refresh token no longer works, so losing this copy
+-     * would leave the next launch with a dead login.
+-     */
+-    private void rotated(String access, String refresh, long expiresAt) {
++        String revision = Defaults.revision(Store.CENTER);
++        if (!bundled.centerReady() || revision.equals(store.bundledRevision(Store.CENTER))) return saved;
++        Config next = saved.withCenterOf(bundled);
+         try {
+-            Config next;
+-            synchronized (this) {
+-                config = config.withCloud(access, refresh, expiresAt);
+-                next = config;
+-            }
+             store.saveSettings(next);
++            store.saveBundledRevision(Store.CENTER, revision);
+         } catch (IOException e) {
+-            // The renewed login remains usable in memory for this run.
+-        } catch (RuntimeException e) {
+-            // Bookkeeping must not break a request.
++            // Still good for this run; the next launch adopts it again.
+         }
++        return next;
+     }
+ 
++    /** Whether there is somewhere to get the cloud accounts from. */
+     boolean ready() {
+-        return cloud != null;
++        return centerReady();
+     }
+ 
+     synchronized boolean centerReady() {
+@@ -151,7 +149,13 @@ final class Backend {
+     }
+ 
+     Store.Saved session(String id) {
+-        return store.session(id);
++        Store.Saved saved = store.session(id);
++        if (saved.account != null) {
++            synchronized (this) {
++                if (!owners.containsKey(id)) owners.put(id, saved.account);
++            }
++        }
++        return saved;
+     }
+ 
+     List<Chat> savedChats() {
+@@ -161,7 +165,7 @@ final class Backend {
+     /** Worker thread; callers pass a snapshot, never the live transcript. */
+     void save(String id, String title, Transcript snapshot) {
+         try {
+-            store.saveSession(id, title, snapshot);
++            store.saveSession(id, title, owner(id), snapshot);
+             store.saveOpenSession(id);
+         } catch (IOException e) {
+             // Still on screen and in memory; the next change tries again.
+@@ -170,8 +174,13 @@ final class Backend {
+ 
+     /** Worker thread. */
+     void saveChats(List<Chat> chats) {
++        List<Chat> known = new ArrayList<Chat>();
++        for (Chat chat : chats) {
++            String account = chat.account == null ? owner(chat.id) : chat.account;
++            known.add(account == null ? chat : chat.on(account));
++        }
+         try {
+-            store.saveChats(chats);
++            store.saveChats(known);
+         } catch (IOException e) {
+             // Only a cache; the next refresh writes it again.
+         }
+@@ -182,21 +191,394 @@ final class Backend {
+         return store.prune(KEEP_SESSIONS, open);
+     }
+ 
++    // ------------------------------------------------------------------
++    // The cloud accounts
++    // ------------------------------------------------------------------
++
++    /**
++     * The accounts, listed afresh, after handing the command center any
++     * login this phone kept from before it held them. Worker thread.
++     */
++    List<Center.Account> accounts() throws IOException, InterruptedException {
++        Center center = center();
++        handOver(center);
++        List<Center.Account> listed = center.accounts();
++        synchronized (this) {
++            if (center == this.center) accounts = listed;
++        }
++        return listed;
++    }
++
++    /** Lists the accounts once in the background, so `canMove` knows them. Worker thread. */
++    void warm() {
++        try {
++            synchronized (this) {
++                if (accounts != null || center == null) return;
++            }
++            accounts();
++        } catch (InterruptedException e) {
++            Thread.currentThread().interrupt();
++        } catch (IOException e) {
++            // The next listing tries again.
++        }
++    }
++
++    /**
++     * Versions before the command center kept the logins held the cloud login
++     * here. It is handed over once; the command center checks it, and from
++     * then on renews it. One the provider no longer takes is dropped too.
++     */
++    private void handOver(Center center) throws InterruptedException {
++        synchronized (handing) {
++            handOverOnce(center);
++        }
++    }
++
++    private void handOverOnce(Center center) throws InterruptedException {
++        Config held;
++        synchronized (this) {
++            held = config;
++        }
++        if (!held.hasCloud()) return;
++        try {
++            center.addAccount(held.accessToken(), held.refreshToken(), held.expiresAt());
++        } catch (Center.Refused e) {
++            // Dead already; there is nothing to keep.
++        } catch (IOException e) {
++            return; // Kept for the next try.
++        }
++        synchronized (this) {
++            config = config.withoutCloud();
++            held = config;
++        }
++        try {
++            store.saveSettings(held);
++        } catch (IOException e) {
++            // Handed over again next launch, which replaces it in place.
++        }
++    }
++
++    private synchronized Cloud cloud(String account) throws IOException {
++        if (center == null) throw new IOException(NO_CENTER);
++        Cloud cloud = clouds.get(account);
++        if (cloud == null) {
++            cloud = new Cloud(http, CloudAuth.of(center, account));
++            clouds.put(account, cloud);
++        }
++        return cloud;
++    }
++
++    private synchronized String owner(String session) {
++        return session == null ? null : owners.get(session);
++    }
++
++    /** The client for the account a session runs on, finding out which that is if need be. */
++    private Cloud cloudFor(String session) throws IOException, InterruptedException {
++        String account = owner(session);
++        if (account == null) {
++            List<Center.Account> listed = accounts();
++            if (listed.size() == 1) {
++                account = listed.get(0).id;
++            } else {
++                sessions();
++                account = owner(session);
++            }
++            if (account == null) throw new IOException("None of the cloud accounts has this session any more.");
++            synchronized (this) {
++                owners.put(session, account);
++            }
++        }
++        return cloud(account);
++    }
++
++    /**
++     * Picks the account a new session starts on: the first in order that is
++     * not known to be out, once its usage report says it has room. A report
++     * that can't be had doesn't rule an account out; a login that no longer
++     * works does.
++     */
++    private String pick() throws IOException, InterruptedException {
++        List<Center.Account> listed = accounts();
++        if (listed.isEmpty()) throw new IOException(NO_ACCOUNTS);
++        long now = System.currentTimeMillis();
++        long soonest = Long.MAX_VALUE;
++        IOException refused = null;
++        for (Center.Account account : listed) {
++            long known = limitOf(account.id);
++            if (known > now) {
++                soonest = Math.min(soonest, known);
++                continue;
++            }
++            long until;
++            try {
++                until = center().limitedUntil(account.id);
++            } catch (Center.Refused e) {
++                refused = e;
++                continue;
++            } catch (IOException e) {
++                until = 0;
++            }
++            if (until > now) {
++                if (limit(account.id, until)) saveLimits();
++                soonest = Math.min(soonest, until);
++                continue;
++            }
++            return account.id;
++        }
++        if (soonest == Long.MAX_VALUE && refused != null) throw refused;
++        throw new IOException((listed.size() == 1 ? "The cloud account has" : "Every cloud account has")
++            + " reached its usage limit. " + (listed.size() == 1 ? "It is" : "The first is")
++            + " free again " + when(soonest) + ".");
++    }
++
++    private synchronized long limitOf(String account) {
++        Long until = limits.get(account);
++        return until == null ? 0 : until.longValue();
++    }
++
++    private synchronized boolean limit(String account, long until) {
++        if (limitOf(account) >= until) return false;
++        limits.put(account, Long.valueOf(until));
++        return true;
++    }
++
++    /**
++     * A session's stream said its account is out until `until`. Returns
++     * whether that is news, in which case the caller saves the limits.
++     */
++    synchronized boolean limited(String session, long until) {
++        String account = owners.get(session);
++        if (account == null || until <= System.currentTimeMillis()) return false;
++        return limit(account, until);
++    }
++
++    /** Worker thread. */
++    void saveLimits() {
++        Map<String, Long> snapshot = new LinkedHashMap<String, Long>();
++        long now = System.currentTimeMillis();
++        synchronized (this) {
++            for (Map.Entry<String, Long> entry : limits.entrySet()) {
++                if (entry.getValue().longValue() > now) snapshot.put(entry.getKey(), entry.getValue());
++            }
++        }
++        try {
++            store.saveLimits(snapshot);
++        } catch (IOException e) {
++            // Known for this run; a usage check finds it again otherwise.
++        }
++    }
++
++    /**
++     * Whether a session's account is out of usage while another account is
++     * not known to be, so the conversation can go on there. Main thread; it
++     * only looks at what is already known.
++     */
++    synchronized boolean canMove(String session) {
++        String account = owners.get(session);
++        long now = System.currentTimeMillis();
++        if (account == null || limitOf(account) <= now || accounts == null) return false;
++        for (Center.Account other : accounts) {
++            if (!other.id.equals(account) && limitOf(other.id) <= now) return true;
++        }
++        return false;
++    }
++
++    /** When a session's account is free again, or 0 if it is not known to be out. */
++    synchronized long limitedUntil(String session) {
++        String account = owners.get(session);
++        long until = account == null ? 0 : limitOf(account);
++        return until > System.currentTimeMillis() ? until : 0;
++    }
++
++    // ------------------------------------------------------------------
++    // Messages waiting for a limit to lift
++    // ------------------------------------------------------------------
++
++    /** How long after a limit lifts a waiting message goes, so it doesn't arrive a moment early. */
++    static final long QUEUE_GRACE_MS = 60L * 1000L;
++
++    /**
++     * Holds a message for a session whose account is out of usage, to go out
++     * once the limit has lifted. Main thread; the caller saves the queue.
++     */
++    synchronized void enqueue(String session, String uuid, String text, List<String> files, int pictures) {
++        long at = Math.max(limitedUntil(session), System.currentTimeMillis()) + QUEUE_GRACE_MS;
++        queue.add(new Queued(session, uuid, text, files, pictures, at, 0));
++    }
++
++    /** Puts back a message whose send failed, to try again in a minute. */
++    synchronized void retry(Queued message) {
++        queue.add(message.failed(System.currentTimeMillis() + QUEUE_GRACE_MS));
++    }
++
++    /**
++     * Takes out the messages that are due, oldest first. One whose account
++     * turns out to be out for longer (a weekly limit after a 5-hour one, say)
++     * waits on for the new time instead.
++     */
++    synchronized List<Queued> due() {
++        long now = System.currentTimeMillis();
++        List<Queued> ready = new ArrayList<Queued>();
++        for (int i = 0; i < queue.size(); i++) {
++            Queued message = queue.get(i);
++            if (message.at > now) continue;
++            long until = limitedUntil(message.session);
++            if (until > 0) {
++                queue.set(i, message.at(until + QUEUE_GRACE_MS));
++                continue;
++            }
++            ready.add(message);
++        }
++        queue.removeAll(ready);
++        return ready;
++    }
++
++    /** Takes out every message waiting for a session, for it to go with the conversation elsewhere. */
++    synchronized List<Queued> takeQueued(String session) {
++        List<Queued> taken = new ArrayList<Queued>();
++        for (Queued message : queue) if (message.session.equals(session)) taken.add(message);
++        queue.removeAll(taken);
++        return taken;
++    }
++
++    /** Puts messages taken out by `takeQueued` back, after a move that didn't happen. */
++    synchronized void requeue(List<Queued> messages) {
++        queue.addAll(0, messages);
++    }
++
++    /** How many messages wait for a session. */
++    synchronized int queuedFor(String session) {
++        int count = 0;
++        for (Queued message : queue) if (message.session.equals(session)) count++;
++        return count;
++    }
++
++    /** When the next waiting message is due, or 0 if none waits. */
++    synchronized long nextDue() {
++        long next = 0;
++        for (Queued message : queue) if (next == 0 || message.at < next) next = message.at;
++        return next;
++    }
++
++    /** Worker thread. */
++    void saveQueue() {
++        List<Queued> snapshot;
++        synchronized (this) {
++            snapshot = new ArrayList<Queued>(queue);
++        }
++        try {
++            store.saveQueue(snapshot);
++        } catch (IOException e) {
++            // Still waiting in memory; the next change writes it again.
++        }
++    }
++
++    /** "at 3:05 PM", or "on Tue at 3:05 PM" when that is not within the day. */
++    static String when(long at) {
++        String time = new SimpleDateFormat("h:mm a", Locale.US).format(new Date(at));
++        if (at - System.currentTimeMillis() < 20L * 3600L * 1000L) return "at " + time;
++        return "on " + new SimpleDateFormat("EEE", Locale.US).format(new Date(at)) + " at " + time;
++    }
++
++    /** "3:05 PM", or "Tue 3:05 PM" when that is not within the day. */
++    static String clock(long at) {
++        String pattern = at - System.currentTimeMillis() < 20L * 3600L * 1000L ? "h:mm a" : "EEE h:mm a";
++        return new SimpleDateFormat(pattern, Locale.US).format(new Date(at));
++    }
++
++    /** One account on the Accounts tab: its usage, or why that couldn't be had. */
++    static final class AccountUsage {
++        final Center.Account account;
++        /** Null when `problem` says why. */
++        final Center.Usage usage;
++        final String problem;
++
++        AccountUsage(Center.Account account, Center.Usage usage, String problem) {
++            this.account = account;
++            this.usage = usage;
++            this.problem = problem;
++        }
++    }
++
++    /**
++     * Every account with its usage, in the order new sessions try them. An
++     * account found to be full is written down, so the next new session
++     * skips it straight away. Worker thread.
++     */
++    List<AccountUsage> usage() throws IOException, InterruptedException {
++        List<Center.Account> listed = accounts();
++        Center center = center();
++        List<AccountUsage> all = new ArrayList<AccountUsage>();
++        boolean changed = false;
++        long now = System.currentTimeMillis();
++        for (Center.Account account : listed) {
++            try {
++                Center.Usage usage = center.usage(account.id);
++                long until = usage.limitedUntil();
++                if (until > now && limit(account.id, until)) changed = true;
++                all.add(new AccountUsage(account, usage, null));
++            } catch (IOException e) {
++                all.add(new AccountUsage(account, null, e.getMessage()));
++            }
++        }
++        if (changed) saveLimits();
++        return all;
++    }
++
++    /** Until when an account is known to be out of usage, or 0. */
++    synchronized long accountLimit(String account) {
++        long until = limitOf(account);
++        return until > System.currentTimeMillis() ? until : 0;
++    }
++
+     // ------------------------------------------------------------------
+     // The cloud. All blocking; call from a worker.
+     // ------------------------------------------------------------------
+ 
+-    /** `files` are names on the command center that go with the message. */
++    /**
++     * Starts a session on the account `pick` chooses. `files` are names on the
++     * command center that go with the message.
++     */
+     String create(String title, String uuid, String text, List<File> pictures, List<String> files)
+         throws IOException, InterruptedException {
+-        Cloud cloud = cloud();
+-        return cloud.create(title, uuid, firstMessage(Attached.wrap(text, files)), read(pictures));
++        String account = pick();
++        String id = cloud(account).create(title, uuid, firstMessage(Attached.wrap(text, files)), read(pictures));
++        synchronized (this) {
++            owners.put(id, account);
++        }
++        return id;
++    }
++
++    /**
++     * Carries the conversation of `from`, whose account is out of usage, to a
++     * new session on an account with room, and returns the new session's id.
++     * The whole conversation is written out (Carry) and stored on the command
++     * center; the new session's first message names it for `delta resume`
++     * (which saves it to a file for the agent to read),
++     * carries the pictures it mentions, and then whatever the person wrote
++     * that had not gone out yet.
++     */
++    String move(String from, String title, String uuid, String text, List<File> pictures, List<String> files)
++        throws IOException, InterruptedException {
++        List<Map<String, Object>> history = cloudFor(from).history(from);
++        String account = pick();
++        Carry.Built carried = Carry.build(title, history);
++        String stored = center().putConversation(carried.text);
++        String block = Carry.block(title, stored);
++        String typed = Attached.wrap(text, files);
++        String message = typed.length() == 0 ? block : block + "\n\n" + typed;
++        List<byte[]> jpegs = new ArrayList<byte[]>(carried.pictures);
++        jpegs.addAll(read(pictures));
++        String id = cloud(account).create(title, uuid, firstMessage(message), jpegs);
++        synchronized (this) {
++            owners.put(id, account);
++        }
++        return id;
+     }
+ 
+     void send(String session, String uuid, String text, List<File> pictures, List<String> files)
+         throws IOException, InterruptedException {
+-        Cloud cloud = cloud();
+-        cloud.send(session, uuid, Attached.wrap(text, files), read(pictures));
++        cloudFor(session).send(session, uuid, Attached.wrap(text, files), read(pictures));
+     }
+ 
+     private static List<byte[]> read(List<File> pictures) throws IOException {
+@@ -212,30 +594,67 @@ final class Backend {
+     }
+ 
+     void interrupt(String session) throws IOException, InterruptedException {
+-        cloud().interrupt(session);
++        cloudFor(session).interrupt(session);
+     }
+ 
+     void answer(String session, String requestId, boolean allow, Map<String, Object> input)
+         throws IOException, InterruptedException {
+-        cloud().answer(session, requestId, allow, input);
++        cloudFor(session).answer(session, requestId, allow, input);
+     }
+ 
++    /**
++     * Every account's sessions, most recently active first. An account whose
++     * sessions can't be listed is left out (see `listProblem`) unless none
++     * can be, which is an error.
++     */
+     List<Chat> sessions() throws IOException, InterruptedException {
+-        return cloud().sessions();
++        List<Center.Account> listed = accounts();
++        if (listed.isEmpty()) throw new IOException(NO_ACCOUNTS);
++        List<Chat> all = new ArrayList<Chat>();
++        IOException failure = null;
++        String problem = null;
++        boolean any = false;
++        for (Center.Account account : listed) {
++            try {
++                for (Chat chat : cloud(account.id).sessions()) all.add(chat.on(account.id));
++                any = true;
++            } catch (IOException e) {
++                if (failure == null) failure = e;
++                if (problem == null) problem = account.email + ": " + e.getMessage();
++            }
++        }
++        synchronized (this) {
++            listProblem = problem;
++            for (Chat chat : all) owners.put(chat.id, chat.account);
++        }
++        if (!any) throw failure;
++        Collections.sort(all, new Comparator<Chat>() {
++            @Override
++            public int compare(Chat a, Chat b) {
++                return a.updated == b.updated ? 0 : a.updated > b.updated ? -1 : 1;
++            }
++        });
++        return all;
+     }
+ 
+-    void archive(String session) throws IOException, InterruptedException {
+-        cloud().archive(session);
++    /** Which account's sessions the last listing had to leave out, and why; null if none. */
++    synchronized String listProblem() {
++        return listProblem;
+     }
+ 
+-    /** A link for the session, not yet started. Null without a login. */
+-    Link link(String session, long after, Link.Listener listener) {
+-        return cloud == null ? null : new Link(cloud, session, after, listener);
++    void archive(String session) throws IOException, InterruptedException {
++        cloudFor(session).archive(session);
+     }
+ 
+-    private Cloud cloud() throws IOException {
+-        if (cloud == null) throw new IOException(NO_LOGIN);
+-        return cloud;
++    /** A link for the session, not yet started. Null without a command center. */
++    Link link(String session, long after, Link.Listener listener) {
++        if (!ready()) return null;
++        return new Link(new Link.Opener() {
++            @Override
++            public Http.Stream open(String session, long after) throws IOException, InterruptedException {
++                return cloudFor(session).open(session, after);
++            }
++        }, session, after, listener);
+     }
+ 
+     // ------------------------------------------------------------------
+@@ -258,6 +677,9 @@ final class Backend {
+             config = config.withCenterOf(next);
+             next = config;
+             center = new Center(http, next.server(), next.token());
++            // The accounts and their clients belonged to the old one.
++            accounts = null;
++            clouds.clear();
+         }
+         store.saveSettings(next);
+     }
+diff --git a/delta/android/app/src/main/java/com/delta/xp3/ChatAdapter.java b/delta/android/app/src/main/java/com/delta/xp3/ChatAdapter.java
+index 28c3537..f176b9b 100644
+--- a/delta/android/app/src/main/java/com/delta/xp3/ChatAdapter.java
++++ b/delta/android/app/src/main/java/com/delta/xp3/ChatAdapter.java
+@@ -24,7 +24,9 @@ import java.util.List;
+  * and what the copy menu opens on.
+  *
+  * While a turn runs, one extra note row at the end says so; it is not an
+- * entry and is never saved.
++ * entry and is never saved. Neither are the rows after it: a note about the
++ * session (its account being out of usage, say) and a button, which is a
++ * row the d-pad reaches like any other and OK presses.
+  *
+  * A message's pictures are drawn from the files saved when it was sent from
+  * this phone. One sent from somewhere else, or from before a reinstall, has
+@@ -36,8 +38,13 @@ final class ChatAdapter extends SelectableAdapter {
+     private final LayoutInflater inflater;
+     private final Markdown markdown;
+     private final Pictures pictures;
++    /** The view type of the button row, past the entry kinds. */
++    private static final int ACTION = Entry.NOTE + 1;
++
+     private final List<Entry> entries = new ArrayList<>();
+     private int saved;
++    /** The button's label, or null for none; it is always the last row. */
++    private String action;
+ 
+     ChatAdapter(Context context, Pictures pictures) {
+         this.context = context;
+@@ -48,26 +55,52 @@ final class ChatAdapter extends SelectableAdapter {
+ 
+     /** The entries, plus a working line when `working` is not null. */
+     void replace(List<Entry> next, String working) {
++        replace(next, working, null, null);
++    }
++
++    /**
++     * The entries, then a working line, a note and a button, each left out
++     * when it is null.
++     */
++    void replace(List<Entry> next, String working, String note, String button) {
+         entries.clear();
+         if (next != null) entries.addAll(next);
+         saved = entries.size();
+         if (working != null) entries.add(new Entry(Entry.NOTE, working, null));
++        if (note != null) entries.add(new Entry(Entry.NOTE, note, null));
++        action = button;
+         notifyDataSetChanged();
+     }
+ 
+-    /** Whether the row is a real entry rather than the working line. */
++    /** Whether the row is a real entry rather than the working line, a note or the button. */
+     boolean isEntry(int position) {
+         return position >= 0 && position < saved;
+     }
+ 
+-    @Override public int getCount() { return entries.size(); }
+-    @Override public Entry getItem(int position) { return entries.get(position); }
++    /** Whether the row is the button. */
++    boolean isAction(int position) {
++        return action != null && position == entries.size();
++    }
++
++    @Override public int getCount() { return entries.size() + (action == null ? 0 : 1); }
++    @Override public Entry getItem(int position) {
++        return isAction(position) ? new Entry(Entry.NOTE, action, null) : entries.get(position);
++    }
+     @Override public long getItemId(int position) { return position; }
+     @Override public boolean hasStableIds() { return true; }
+-    @Override public int getViewTypeCount() { return 4; }
+-    @Override public int getItemViewType(int position) { return entries.get(position).kind; }
++    @Override public int getViewTypeCount() { return ACTION + 1; }
++    @Override public int getItemViewType(int position) {
++        return isAction(position) ? ACTION : entries.get(position).kind;
++    }
+ 
+     @Override public View getView(int position, View convertView, ViewGroup parent) {
++        if (isAction(position)) {
++            View view = convertView;
++            if (view == null) view = inflater.inflate(R.layout.row_chat_action, parent, false);
++            view.setSelected(isSelected(position));
++            ((TextView) view.findViewById(R.id.action_text)).setText(action);
++            return view;
++        }
+         Entry entry = entries.get(position);
+         View view = convertView;
+         if (view == null) view = inflater.inflate(layout(entry.kind), parent, false);
+diff --git a/delta/android/app/src/main/java/com/delta/xp3/Link.java b/delta/android/app/src/main/java/com/delta/xp3/Link.java
+index c261066..394068c 100644
+--- a/delta/android/app/src/main/java/com/delta/xp3/Link.java
++++ b/delta/android/app/src/main/java/com/delta/xp3/Link.java
+@@ -1,6 +1,5 @@
+ package com.delta.xp3;
+ 
+-import com.delta.xp3.net.Cloud;
+ import com.delta.xp3.net.Http;
+ import com.delta.xp3.net.Sse;
+ 
+@@ -17,6 +16,11 @@ import java.io.IOException;
+  */
+ final class Link implements Runnable {
+ 
++    /** Opens the session's stream; Backend's, which finds the session's account first. */
++    interface Opener {
++        Http.Stream open(String session, long after) throws IOException, InterruptedException;
++    }
++
+     interface Listener {
+         void frame(Sse.Frame frame);
+ 
+@@ -27,7 +31,7 @@ final class Link implements Runnable {
+     private static final long FIRST_RETRY_MS = 2000;
+     private static final long LAST_RETRY_MS = 30000;
+ 
+-    private final Cloud cloud;
++    private final Opener cloud;
+     private final String session;
+     private final Listener listener;
+     private final Thread thread;
+@@ -35,7 +39,7 @@ final class Link implements Runnable {
+     private volatile boolean stopped;
+     private volatile Http.Stream current;
+ 
+-    Link(Cloud cloud, String session, long after, Listener listener) {
++    Link(Opener cloud, String session, long after, Listener listener) {
+         this.cloud = cloud;
+         this.session = session;
+         this.after = after;
+diff --git a/delta/android/app/src/main/java/com/delta/xp3/MainActivity.java b/delta/android/app/src/main/java/com/delta/xp3/MainActivity.java
+index d5241bb..a5e65cb 100644
+--- a/delta/android/app/src/main/java/com/delta/xp3/MainActivity.java
++++ b/delta/android/app/src/main/java/com/delta/xp3/MainActivity.java
+@@ -46,6 +46,7 @@ import android.widget.TextView;
+ import android.widget.Toast;
+ 
+ import com.delta.xp3.data.Attached;
++import com.delta.xp3.data.Queued;
+ import com.delta.xp3.data.Chat;
+ import com.delta.xp3.data.Entry;
+ import com.delta.xp3.data.Folders;
+@@ -71,18 +72,24 @@ import java.util.concurrent.Executors;
+ import java.util.concurrent.ThreadFactory;
+ 
+ /**
+- * Delta on the phone: three tabs over the cloud sessions and the command
++ * Delta on the phone: four tabs over the cloud sessions and the command
+  * center.
+  *
+- * - Chats lists the account's agent sessions in the cloud. OK opens
+- *   one in Session; the first row starts a new one.
++ * - Chats lists the agent sessions of every cloud account the command
++ *   center keeps. OK opens one in Session; the first row starts a new one.
+  * - Session is one conversation, and a box to add to it. The first message
+  *   of a new session creates it, carrying the Delta setup ahead of what was
+  *   typed. What is on screen is built from the session's event stream, which
+- *   stays open while the app is visible, whichever tab is showing.
++ *   stays open while the app is visible, whichever tab is showing. When the
++ *   session's account runs out of usage, a note and a button at the foot of
++ *   the transcript offer to move the conversation to a new session on
++ *   another account; a message sent instead waits until the limit lifts.
+  * - Files lists what agents have pushed to the command center. OK downloads a
+  *   file, then installs it if it is an APK or opens it if not. "Move to"
+  *   puts the phone's copy in a shared folder such as Music.
++ * - Accounts lists the cloud accounts the command center keeps, in the order
++ *   new sessions try them, with how much of each one's 5-hour and weekly
++ *   limits is used and when each resets.
+  *
+  * Nothing on this side of the app touches a network. Session requests run in
+  * order on one worker, list fetches on another, downloads on a third, the
+@@ -100,7 +107,8 @@ public final class MainActivity extends Activity {
+     private static final int CHATS = 0;
+     private static final int SESSION = 1;
+     private static final int FILES = 2;
+-    private static final int TABS = 3;
++    private static final int ACCOUNTS = 3;
++    private static final int TABS = 4;
+ 
+     private static final int FOCUS_NONE = 0;
+     private static final int FOCUS_LIST = 1;
+@@ -201,6 +209,13 @@ public final class MainActivity extends Activity {
+     private Transcript transcript;
+     /** The first message is on its way and the session does not exist yet. */
+     private boolean creating;
++    /** Sends the waiting messages that are due, and redraws the foot of the transcript when a limit lifts. */
++    private final Runnable tick = new Runnable() {
++        @Override
++        public void run() {
++            sendDue();
++        }
++    };
+     private Link link;
+     private boolean online;
+     /** Bumped whenever a different session is opened; anything older that comes back is dropped. */
+@@ -249,6 +264,17 @@ public final class MainActivity extends Activity {
+     /** Shows the upload's progress on whichever tab is drawn, or null. */
+     private TextView uploadView;
+ 
++    // ------------------------------------------------------------------
++    // Accounts
++    // ------------------------------------------------------------------
++
++    private List<Backend.AccountUsage> accountUsage = new ArrayList<>();
++    private boolean accountsLoaded;
++    private boolean accountsLoading;
++    private String accountsProblem;
++    private int accountsGeneration;
++    private String accountsKey;
++
+     // ------------------------------------------------------------------
+     // The session screen
+     // ------------------------------------------------------------------
+@@ -298,6 +324,7 @@ public final class MainActivity extends Activity {
+             findViewById(R.id.tab_chats),
+             findViewById(R.id.tab_session),
+             findViewById(R.id.tab_files),
++            findViewById(R.id.tab_accounts),
+         };
+         for (int i = 0; i < tabs.length; i++) {
+             final int which = i;
+@@ -318,10 +345,28 @@ public final class MainActivity extends Activity {
+     protected void onStart() {
+         super.onStart();
+         connect();
++        // Whether a session can move to another account is decided on the
++        // main thread, from the accounts already listed.
++        if (backend.ready()) {
++            lists.execute(new Runnable() {
++                @Override
++                public void run() {
++                    backend.warm();
++                    main.post(new Runnable() {
++                        @Override
++                        public void run() {
++                            updateChat();
++                        }
++                    });
++                }
++            });
++        }
++        sendDue();
+         // Coming back is the moment to ask again: a phone like this is put
+         // away, not quit, and the agent has usually been busy meanwhile.
+         if (currentTab == CHATS) refreshChats();
+         else if (currentTab == FILES) refreshFiles();
++        else if (currentTab == ACCOUNTS) refreshAccounts();
+     }
+ 
+     @Override
+@@ -353,6 +398,7 @@ public final class MainActivity extends Activity {
+     @Override
+     protected void onDestroy() {
+         super.onDestroy();
++        main.removeCallbacks(tick);
+         disconnect();
+         if (running != null) running.cancelled = true;
+         if (uploading != null) uploading.cancelled = true;
+@@ -398,9 +444,12 @@ public final class MainActivity extends Activity {
+             refreshChats();
+         } else if (tab == SESSION) {
+             render(focusContent ? FOCUS_INPUT : FOCUS_NONE);
+-        } else {
++        } else if (tab == FILES) {
+             renderFiles(focusContent);
+             if (!filesLoaded) refreshFiles();
++        } else {
++            renderAccounts(focusContent);
++            refreshAccounts();
+         }
+     }
+ 
+@@ -410,6 +459,7 @@ public final class MainActivity extends Activity {
+             RowAdapter.Row row = rowAdapter.selected();
+             if (row != null && currentTab == CHATS) chatsKey = row.key;
+             if (row != null && currentTab == FILES) filesKey = row.key;
++            if (row != null && currentTab == ACCOUNTS) accountsKey = row.key;
+         }
+         chatList = null;
+         chatAdapter = null;
+@@ -442,6 +492,8 @@ public final class MainActivity extends Activity {
+                 String problem = null;
+                 try {
+                     fetched = backend.sessions();
++                    String left = backend.listProblem();
++                    if (left != null) problem = "Some sessions are missing. " + left;
+                 } catch (InterruptedException e) {
+                     Thread.currentThread().interrupt();
+                     return;
+@@ -623,6 +675,127 @@ public final class MainActivity extends Activity {
+         return null;
+     }
+ 
++    // ------------------------------------------------------------------
++    // Accounts
++    // ------------------------------------------------------------------
++
++    /** Asks the command center for every account's usage again. */
++    private void refreshAccounts() {
++        if (!backend.ready() || accountsLoading) return;
++        accountsLoading = true;
++        final int forGeneration = ++accountsGeneration;
++        if (currentTab == ACCOUNTS) updateAccountRows();
++        lists.execute(new Runnable() {
++            @Override
++            public void run() {
++                List<Backend.AccountUsage> fetched = null;
++                String problem = null;
++                try {
++                    fetched = backend.usage();
++                } catch (InterruptedException e) {
++                    Thread.currentThread().interrupt();
++                    return;
++                } catch (Exception e) {
++                    problem = "Couldn't refresh: " + reason(e);
++                }
++                final List<Backend.AccountUsage> result = fetched;
++                final String said = problem;
++                main.post(new Runnable() {
++                    @Override
++                    public void run() {
++                        if (forGeneration != accountsGeneration || isFinishing()) return;
++                        accountsLoading = false;
++                        accountsProblem = said;
++                        if (result != null) {
++                            accountUsage = result;
++                            accountsLoaded = true;
++                        }
++                        if (currentTab == ACCOUNTS) updateAccountRows();
++                        // What was learnt may change what a session can do.
++                        updateChat();
++                        scheduleTick();
++                    }
++                });
++            }
++        });
++    }
++
++    private void renderAccounts(boolean focusContent) {
++        if (!backend.ready()) {
++            replaceContent(emptyMessage(Backend.NO_LOGIN));
++            return;
++        }
++        LinearLayout root = vertical();
++        root.addView(notice());
++        final RowAdapter adapter = new RowAdapter(this);
++        final ListView list = listView(adapter);
++        root.addView(list, weighted());
++        rowList = list;
++        rowAdapter = adapter;
++        wireRows(list, adapter);
++        replaceContent(root);
++        updateAccountRows();
++        int position = adapter.positionOf(accountsKey);
++        select(list, adapter, position < 0 ? 0 : position);
++        if (focusContent) list.requestFocus();
++    }
++
++    /**
++     * One row per account, in the order new sessions try them: its address,
++     * its 5-hour and weekly use with when each resets, and on the right its
++     * plan, or "Out" while it has no room.
++     */
++    private void updateAccountRows() {
++        if (currentTab != ACCOUNTS || rowAdapter == null) return;
++        RowAdapter.Row was = rowAdapter.selected();
++        List<RowAdapter.Row> rows = new ArrayList<>();
++        for (Backend.AccountUsage entry : accountUsage) {
++            Center.Account account = entry.account;
++            String sub;
++            String extra;
++            if (entry.usage == null) {
++                sub = "Usage unavailable";
++                extra = entry.problem;
++            } else {
++                sub = window("5-hour", entry.usage.fiveHour, entry.usage.fiveHourResets);
++                extra = window("Weekly", entry.usage.weekly, entry.usage.weeklyResets);
++            }
++            boolean out = backend.accountLimit(account.id) > 0
++                || (entry.usage != null && entry.usage.limitedUntil() > System.currentTimeMillis());
++            rows.add(new RowAdapter.Row(account.id, account.email, sub, out ? "Out" : plan(account.plan), extra));
++        }
++        rowAdapter.replace(rows);
++        if (was != null) {
++            int position = rowAdapter.positionOf(was.key);
++            if (position >= 0 && position != rowAdapter.getSelectedPosition()) select(rowList, rowAdapter, position);
++        }
++        View parent = (View) rowList.getParent();
++        TextView notice = parent == null ? null : (TextView) ((ViewGroup) parent).getChildAt(0);
++        if (notice != null) {
++            String said = accountsProblem != null ? accountsProblem
++                : accountsLoading && !accountsLoaded ? "Loading…"
++                : accountsLoaded && accountUsage.isEmpty() ? Backend.NO_ACCOUNTS : null;
++            notice.setText(said);
++            notice.setVisibility(said == null ? View.GONE : View.VISIBLE);
++        }
++    }
++
++    /** "5-hour: 42% · resets 3:05 PM". */
++    private static String window(String name, Double used, long resets) {
++        if (used == null) return name + ": no data";
++        String said = name + ": " + Math.round(used.doubleValue()) + "%";
++        if (resets > 0) said += " · resets " + Backend.clock(resets);
++        return said;
++    }
++
++    /** "claude_pro" as "Pro". */
++    private static String plan(String plan) {
++        if (plan == null) return "";
++        String name = plan.startsWith("claude_") ? plan.substring("claude_".length()) : plan;
++        if (name.length() == 0) return "";
++        return Character.toUpperCase(name.charAt(0)) + name.substring(1);
++    }
++
+     // ------------------------------------------------------------------
+     // Switching sessions
+     // ------------------------------------------------------------------
+@@ -677,6 +850,7 @@ public final class MainActivity extends Activity {
+         });
+         if (link != null) link.start();
+         updateHeader();
++        scheduleTick();
+     }
+ 
+     private void disconnect() {
+@@ -691,7 +865,19 @@ public final class MainActivity extends Activity {
+         if (forGeneration != generation || isFinishing()) return;
+         long before = transcript.sequence();
+         boolean wasWorking = transcript.working();
+-        if (transcript.apply(frame.event, frame.id, frame.data)) {
++        boolean changed = transcript.apply(frame.event, frame.id, frame.data);
++        if (backend.limited(sessionId, transcript.limitedUntil())) {
++            saves.execute(new Runnable() {
++                @Override
++                public void run() {
++                    backend.saveLimits();
++                }
++            });
++            // The foot of the transcript now says so, and offers the move.
++            changed = true;
++            scheduleTick();
++        }
++        if (changed) {
+             updateChat();
+             updateHeader();
+             if (wasWorking != transcript.working()) updateChatRows();
+@@ -727,9 +913,25 @@ public final class MainActivity extends Activity {
+         final int forGeneration = generation;
+         final List<File> attached = pictures.commit(uuid);
+         final List<String> sentFiles = new ArrayList<>(attachedFiles);
+-        transcript.sent(uuid, Attached.line(message, sentFiles), attached.size());
+         draft = "";
+         attachedFiles.clear();
++        // Sent to a session whose account is out of usage, it would only run
++        // into the same limit; it waits on the phone until the limit lifts.
++        if (sessionId != null && backend.limitedUntil(sessionId) > 0) {
++            transcript.queued(uuid, Attached.line(message, sentFiles), attached.size());
++            backend.enqueue(sessionId, uuid, message, sentFiles, attached.size());
++            saves.execute(new Runnable() {
++                @Override
++                public void run() {
++                    backend.saveQueue();
++                }
++            });
++            scheduleTick();
++            saveNow();
++            render(FOCUS_INPUT);
++            return;
++        }
++        transcript.sent(uuid, Attached.line(message, sentFiles), attached.size());
+         if (sessionId == null) {
+             creating = true;
+             title = message.length() > 0 ? titleFor(message)
+@@ -806,6 +1008,198 @@ public final class MainActivity extends Activity {
+         });
+     }
+ 
++    // ------------------------------------------------------------------
++    // Usage limits
++    // ------------------------------------------------------------------
++
++    /**
++     * Moves the open session's conversation, whose account is out of usage,
++     * to a new session on an account with room: the whole conversation, from
++     * the cloud's own history of it, and any messages that were waiting for
++     * the limit to lift. The old session stays in Chats. If the move fails,
++     * the old session comes back with its messages still waiting.
++     */
++    private void moveSession() {
++        if (sessionId == null || creating) return;
++        if (!backend.canMove(sessionId)) {
++            toast("No other account has room right now");
++            return;
++        }
++        final String from = sessionId;
++        final String was = title;
++        final List<Queued> waiting = backend.takeQueued(from);
++        saves.execute(new Runnable() {
++            @Override
++            public void run() {
++                backend.saveQueue();
++            }
++        });
++        StringBuilder typed = new StringBuilder();
++        final List<String> names = new ArrayList<>();
++        final List<File> sentPictures = new ArrayList<>();
++        for (Queued message : waiting) {
++            if (message.text.trim().length() > 0) {
++                if (typed.length() > 0) typed.append("\n\n");
++                typed.append(message.text.trim());
++            }
++            names.addAll(message.files);
++            for (int i = 0; i < message.pictures; i++) {
++                File picture = pictures.sent(message.uuid, i);
++                if (picture.isFile()) sentPictures.add(picture);
++            }
++        }
++        final String text = typed.toString();
++        saveNow();
++        switchTo(null);
++        title = was;
++        creating = true;
++        final String uuid = UUID.randomUUID().toString();
++        final int forGeneration = generation;
++        transcript.carried(uuid);
++        if (text.length() > 0 || !names.isEmpty()) transcript.queued(uuid, Attached.line(text, names), 0);
++        render(FOCUS_INPUT);
++        requests.execute(new Runnable() {
++            @Override
++            public void run() {
++                try {
++                    final String id = backend.move(from, was, uuid, text, sentPictures, names);
++                    main.post(new Runnable() {
++                        @Override
++                        public void run() {
++                            created(id, forGeneration);
++                        }
++                    });
++                } catch (InterruptedException e) {
++                    Thread.currentThread().interrupt();
++                } catch (Exception e) {
++                    final String problem = reason(e);
++                    main.post(new Runnable() {
++                        @Override
++                        public void run() {
++                            notMoved(from, waiting, problem, forGeneration);
++                        }
++                    });
++                }
++            }
++        });
++    }
++
++    private void notMoved(String from, List<Queued> waiting, String problem, int forGeneration) {
++        backend.requeue(waiting);
++        saves.execute(new Runnable() {
++            @Override
++            public void run() {
++                backend.saveQueue();
++            }
++        });
++        if (forGeneration != generation || isFinishing()) return;
++        switchTo(from);
++        connect();
++        toast("Not moved: " + problem);
++        if (currentTab == SESSION) render(FOCUS_LIST);
++    }
++
++    /**
++     * Sends the waiting messages that are due and arranges the next tick. A
++     * send that fails is tried again a minute later, up to ten times.
++     */
++    private void sendDue() {
++        main.removeCallbacks(tick);
++        if (isFinishing()) return;
++        final List<Queued> ready = backend.due();
++        if (!ready.isEmpty()) {
++            saves.execute(new Runnable() {
++                @Override
++                public void run() {
++                    backend.saveQueue();
++                }
++            });
++        }
++        for (final Queued message : ready) {
++            if (message.session.equals(sessionId)) transcript.resumed();
++            requests.execute(new Runnable() {
++                @Override
++                public void run() {
++                    List<File> attached = new ArrayList<>();
++                    for (int i = 0; i < message.pictures; i++) {
++                        File picture = pictures.sent(message.uuid, i);
++                        if (picture.isFile()) attached.add(picture);
++                    }
++                    String problem = null;
++                    try {
++                        backend.send(message.session, message.uuid, message.text, attached, message.files);
++                    } catch (InterruptedException e) {
++                        Thread.currentThread().interrupt();
++                        return;
++                    } catch (Exception e) {
++                        problem = reason(e);
++                    }
++                    final String said = problem;
++                    main.post(new Runnable() {
++                        @Override
++                        public void run() {
++                            if (said == null) return;
++                            boolean again = message.tries < 9;
++                            if (again) {
++                                backend.retry(message);
++                                saves.execute(new Runnable() {
++                                    @Override
++                                    public void run() {
++                                        backend.saveQueue();
++                                    }
++                                });
++                                scheduleTick();
++                            }
++                            if (message.session.equals(sessionId)) {
++                                transcript.idle();
++                                transcript.note((again ? "Not sent yet, trying again in a minute: " : "Not sent: ") + said);
++                                scheduleSave();
++                                updateChat();
++                                updateHeader();
++                            }
++                        }
++                    });
++                }
++            });
++        }
++        updateChat();
++        updateHeader();
++        scheduleTick();
++    }
++
++    /** Wakes up for the next waiting message, or when the open session's limit lifts, whichever is first. */
++    private void scheduleTick() {
++        main.removeCallbacks(tick);
++        long next = backend.nextDue();
++        long lifts = sessionId == null ? 0 : backend.limitedUntil(sessionId);
++        if (lifts > 0 && (next == 0 || lifts < next)) next = lifts;
++        if (next == 0) return;
++        main.postDelayed(tick, Math.max(1000L, next - System.currentTimeMillis() + 500L));
++    }
++
++    /** What the foot of the transcript says about the open session's limit, or null. */
++    private String limitNote() {
++        if (sessionId == null) return null;
++        long until = backend.limitedUntil(sessionId);
++        if (until <= 0) return null;
++        String when = Backend.when(until).replaceFirst("^at ", "until ").replaceFirst("^on ", "until ");
++        String said = "This account is out of usage " + when + ".";
++        int waiting = backend.queuedFor(sessionId);
++        if (waiting > 0) {
++            said += waiting == 1 ? " Your message will be sent then." : " Your messages will be sent then.";
++        } else {
++            said += " A message sent now waits until then.";
++        }
++        if (backend.canMove(sessionId)) said += " Or move the conversation to another account:";
++        return said;
++    }
++
++    /** The button at the foot of the transcript, or null. */
++    private String limitAction() {
++        if (sessionId == null || creating || !backend.canMove(sessionId)) return null;
++        return "Move to a new session";
++    }
++
+     /** The first line of the first message, which is what the cloud titles a session with too. */
+     private static String titleFor(String message) {
+         String line = message.split("\n", 2)[0].trim();
+@@ -1389,7 +1783,7 @@ public final class MainActivity extends Activity {
+     private void updateChat() {
+         if (currentTab != SESSION || chatAdapter == null || chatList == null) return;
+         boolean follow = chatList.isPinnedToBottom() || isAtBottom(chatList, chatAdapter);
+-        chatAdapter.replace(transcript.entries(), workingLine());
++        chatAdapter.replace(transcript.entries(), workingLine(), limitNote(), limitAction());
+         if (follow) chatList.pinToBottomOnce();
+     }
+ 
+@@ -1431,7 +1825,7 @@ public final class MainActivity extends Activity {
+         updateHeader();
+ 
+         final ChatAdapter adapter = new ChatAdapter(this, pictures);
+-        adapter.replace(transcript.entries(), workingLine());
++        adapter.replace(transcript.entries(), workingLine(), limitNote(), limitAction());
+         final ChatListView list = new ChatListView(this);
+         list.setAdapter(adapter);
+         // Rows paint their own focus state edge to edge; a transparent
+@@ -1606,9 +2000,10 @@ public final class MainActivity extends Activity {
+         list.setOnKeyListener(new View.OnKeyListener() {
+             @Override
+             public boolean onKey(View view, int keyCode, KeyEvent event) {
+-                // OK on a row does nothing; holding it opens the menu.
++                // OK on a message does nothing and holding it opens the menu;
++                // OK on the button at the foot presses it.
+                 if (!isOk(keyCode)) return false;
+-                okOnRow(event, null);
++                if (okOnRow(event, null) && adapter.isAction(adapter.getSelectedPosition())) moveSession();
+                 return true;
+             }
+         });
+@@ -2415,12 +2810,12 @@ public final class MainActivity extends Activity {
+ 
+     /**
+      * OK on a row. Holding it opens the menu; releasing it without having
+-     * held it acts on `row`, if there is one. Every OK press is claimed, so
++     * held it acts on `row`, if there is one, and returns true. Every OK press is claimed, so
+      * ListView's own long press, which would open a menu as a centred dialog,
+      * never runs. A release whose press began somewhere else (a dialog, the
+      * previous tab) does nothing.
+      */
+-    private void okOnRow(KeyEvent event, RowAdapter.Row row) {
++    private boolean okOnRow(KeyEvent event, RowAdapter.Row row) {
+         if (event.getAction() == KeyEvent.ACTION_DOWN) {
+             if (event.getRepeatCount() == 0) {
+                 okHeld = false;
+@@ -2429,12 +2824,13 @@ public final class MainActivity extends Activity {
+                 okHeld = true;
+                 showMenu();
+             }
+-            return;
++            return false;
+         }
+         boolean act = okDown && !okHeld && !event.isCanceled();
+         okHeld = false;
+         okDown = false;
+         if (act) activateRow(row);
++        return act;
+     }
+ 
+     private static boolean isOk(int keyCode) {
+@@ -2566,12 +2962,14 @@ public final class MainActivity extends Activity {
+                 if (row != null) y = Math.max(0, Math.min(row.getBottom(), rowList.getHeight()));
+             }
+             if (currentTab == CHATS) chatsMenu();
+-            else filesMenu();
++            else if (currentTab == FILES) filesMenu();
++            else accountsMenu();
+         } else {
+             anchor = content.getChildCount() > 0 ? content.getChildAt(0) : content;
+             y = anchor.getHeight() / 2f;
+             if (currentTab == FILES) filesMenu();
+             else if (currentTab == CHATS && backend.ready()) chatsMenu();
++            else if (currentTab == ACCOUNTS && backend.ready()) accountsMenu();
+         }
+         if (menuIds.isEmpty()) return;
+         anchor.showContextMenu(Math.min(dp(32), anchor.getWidth() / 2f), y);
+@@ -2612,6 +3010,10 @@ public final class MainActivity extends Activity {
+         return y;
+     }
+ 
++    private void accountsMenu() {
++        add(MENU_REFRESH, "Refresh");
++    }
++
+     private void chatsMenu() {
+         Chat chat = chatFor(menuRow);
+         add(MENU_REFRESH, "Refresh");
+@@ -2691,7 +3093,8 @@ public final class MainActivity extends Activity {
+                 break;
+             case MENU_REFRESH:
+                 if (currentTab == CHATS) refreshChats();
+-                else refreshFiles();
++                else if (currentTab == FILES) refreshFiles();
++                else refreshAccounts();
+                 break;
+             case MENU_ARCHIVE:
+                 if (chat != null) confirmArchive(chat);
+diff --git a/delta/android/app/src/main/java/com/delta/xp3/RowAdapter.java b/delta/android/app/src/main/java/com/delta/xp3/RowAdapter.java
+index 2fbf8ae..2f8bb20 100644
+--- a/delta/android/app/src/main/java/com/delta/xp3/RowAdapter.java
++++ b/delta/android/app/src/main/java/com/delta/xp3/RowAdapter.java
+@@ -10,8 +10,8 @@ import java.util.ArrayList;
+ import java.util.List;
+ 
+ /**
+- * The Chats and Files lists: a name, a quiet line under it, and a short value
+- * on the right ("Working", "On phone"). Rows are named by a key rather than
++ * The Chats, Files and Accounts lists: a name, a quiet line under it (two on
++ * Accounts), and a short value on the right ("Working", "On phone"). Rows are named by a key rather than
+  * found by position, so a refresh that reorders the list can put the
+  * highlight back on the row someone was on.
+  */
+@@ -22,12 +22,19 @@ final class RowAdapter extends SelectableAdapter {
+         final String title;
+         final String sub;
+         final String value;
++        /** A second quiet line, or empty for none. */
++        final String extra;
+ 
+         Row(String key, String title, String sub, String value) {
++            this(key, title, sub, value, null);
++        }
++
++        Row(String key, String title, String sub, String value, String extra) {
+             this.key = key;
+             this.title = title;
+             this.sub = sub == null ? "" : sub;
+             this.value = value == null ? "" : value;
++            this.extra = extra == null ? "" : extra;
+         }
+     }
+ 
+@@ -73,6 +80,9 @@ final class RowAdapter extends SelectableAdapter {
+         TextView sub = view.findViewById(R.id.row_sub);
+         sub.setText(row.sub);
+         sub.setVisibility(row.sub.length() == 0 ? View.GONE : View.VISIBLE);
++        TextView extra = view.findViewById(R.id.row_extra);
++        extra.setText(row.extra);
++        extra.setVisibility(row.extra.length() == 0 ? View.GONE : View.VISIBLE);
+         TextView value = view.findViewById(R.id.row_value);
+         value.setText(row.value);
+         value.setVisibility(row.value.length() == 0 ? View.GONE : View.VISIBLE);
+diff --git a/delta/android/app/src/main/res/drawable/action_button.xml b/delta/android/app/src/main/res/drawable/action_button.xml
+new file mode 100644
+index 0000000..6f674ab
+--- /dev/null
++++ b/delta/android/app/src/main/res/drawable/action_button.xml
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- A button in the transcript: the teal of the chrome, outlined, so it
++     reads as something to press rather than something said. The row's own
++     focus wash shows around it when it is the selected row. -->
++<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
++    <solid android:color="@color/row" />
++    <stroke android:width="1dp" android:color="@color/accent_text" />
++    <corners android:radius="3dp" />
++</shape>
+diff --git a/delta/android/app/src/main/res/layout/activity_main.xml b/delta/android/app/src/main/res/layout/activity_main.xml
+index 5856faa..34745d5 100644
+--- a/delta/android/app/src/main/res/layout/activity_main.xml
++++ b/delta/android/app/src/main/res/layout/activity_main.xml
+@@ -18,6 +18,7 @@
+         <Button android:id="@+id/tab_chats" style="@style/TabButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:focusable="false" android:focusableInTouchMode="false" android:text="@string/chats" />
+         <Button android:id="@+id/tab_session" style="@style/TabButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:focusable="false" android:focusableInTouchMode="false" android:text="@string/session" />
+         <Button android:id="@+id/tab_files" style="@style/TabButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:focusable="false" android:focusableInTouchMode="false" android:text="@string/files" />
++        <Button android:id="@+id/tab_accounts" style="@style/TabButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:focusable="false" android:focusableInTouchMode="false" android:text="@string/accounts" />
+     </LinearLayout>
+ 
+     <FrameLayout android:id="@+id/content" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:background="@color/page" />
+diff --git a/delta/android/app/src/main/res/layout/row_chat_action.xml b/delta/android/app/src/main/res/layout/row_chat_action.xml
+new file mode 100644
+index 0000000..e616ccb
+--- /dev/null
++++ b/delta/android/app/src/main/res/layout/row_chat_action.xml
+@@ -0,0 +1,33 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- A button at the foot of the transcript, such as moving a conversation
++     whose account is out of usage to a new session. It is a row like any
++     other: the d-pad reaches it, and OK presses it. -->
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:background="@drawable/chat_row_selector"
++    android:clickable="false"
++    android:descendantFocusability="blocksDescendants"
++    android:focusable="false"
++    android:focusableInTouchMode="false"
++    android:gravity="center"
++    android:orientation="vertical"
++    android:paddingLeft="@dimen/bubble_pad_h"
++    android:paddingRight="@dimen/bubble_pad_h"
++    android:paddingTop="4dp"
++    android:paddingBottom="4dp">
++
++    <TextView
++        android:id="@+id/action_text"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:background="@drawable/action_button"
++        android:gravity="center"
++        android:paddingTop="6dp"
++        android:paddingBottom="6dp"
++        android:paddingLeft="8dp"
++        android:paddingRight="8dp"
++        android:textColor="@color/accent_text"
++        android:textSize="@dimen/text_bubble"
++        android:textStyle="bold" />
++</LinearLayout>
+diff --git a/delta/android/app/src/main/res/layout/row_item.xml b/delta/android/app/src/main/res/layout/row_item.xml
+index 4234f54..6b11901 100644
+--- a/delta/android/app/src/main/res/layout/row_item.xml
++++ b/delta/android/app/src/main/res/layout/row_item.xml
+@@ -1,9 +1,14 @@
+ <?xml version="1.0" encoding="utf-8"?>
+-<!-- A session in Chats or a file in Files: its name, a muted line under it,
+-     and a short value on the right that says what is happening to it. -->
++<!-- A session in Chats, a file in Files or an account in Accounts: its name,
++     a muted line under it (two for an account), and a short value on the
++     right that says what is happening to it. Rows are at least row_height
++     tall and grow for the second line. -->
+ <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     android:layout_width="match_parent"
+-    android:layout_height="@dimen/row_height"
++    android:layout_height="wrap_content"
++    android:minHeight="@dimen/row_height"
++    android:paddingTop="4dp"
++    android:paddingBottom="4dp"
+     android:background="@drawable/focus_selector"
+     android:descendantFocusability="blocksDescendants"
+     android:gravity="center_vertical"
+@@ -35,6 +40,17 @@
+             android:singleLine="true"
+             android:textColor="@color/text_muted"
+             android:textSize="@dimen/text_sub" />
++        <TextView
++            android:id="@+id/row_extra"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="2dp"
++            android:ellipsize="end"
++            android:includeFontPadding="false"
++            android:singleLine="true"
++            android:textColor="@color/text_muted"
++            android:textSize="@dimen/text_sub"
++            android:visibility="gone" />
+     </LinearLayout>
+ 
+     <TextView
+diff --git a/delta/android/app/src/main/res/values/strings.xml b/delta/android/app/src/main/res/values/strings.xml
+index 3c1349c..0aa9546 100644
+--- a/delta/android/app/src/main/res/values/strings.xml
++++ b/delta/android/app/src/main/res/values/strings.xml
+@@ -4,6 +4,7 @@
+     <string name="chats">Chats</string>
+     <string name="session">Session</string>
+     <string name="files">Files</string>
++    <string name="accounts">Accounts</string>
+     <string name="new_session">New session</string>
+     <string name="chat_hint">Type message</string>
+ </resources>
+diff --git a/delta/android/core/src/main/java/com/delta/xp3/data/Carry.java b/delta/android/core/src/main/java/com/delta/xp3/data/Carry.java
+new file mode 100644
+index 0000000..daad6c1
+--- /dev/null
++++ b/delta/android/core/src/main/java/com/delta/xp3/data/Carry.java
+@@ -0,0 +1,217 @@
++package com.delta.xp3.data;
++
++import com.delta.xp3.net.Json;
++
++import java.util.ArrayList;
++import java.util.Base64;
++import java.util.HashMap;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Map;
++import java.util.Set;
++
++/**
++ * A conversation carried over to a new session on another cloud account.
++ *
++ * A session runs on one account, and when that account reaches its usage
++ * limit the session can't go on until the limit lifts. The phone can then
++ * start a new session on an account that still has room. The whole
++ * conversation so far, as the agent had it, is written out (`build`) from
++ * the old session's full event history: every message, every tool call with
++ * its complete input, every tool result in full. Nothing is shortened. It is
++ * stored on the command center, and the new session's first message opens
++ * with a block (`block`) naming it for `delta resume <id> <file>`, with the
++ * pictures that were sent attached. Like the setup block it is fenced in a
++ * tag, so the transcript shows it as one note instead.
++ */
++public final class Carry {
++
++    static final String OPEN = "<delta-continued>";
++    static final String CLOSE = "</delta-continued>";
++
++    /** How the block reads on the phone, here and in a replay. */
++    public static final String NOTE = "Continued from an earlier session whose account reached its usage limit.";
++
++    /** The written-out conversation, and the pictures it refers to, in order, to go with it. */
++    public static final class Built {
++        public final String text;
++        public final List<byte[]> pictures;
++
++        Built(String text, List<byte[]> pictures) {
++            this.text = text;
++            this.pictures = pictures;
++        }
++    }
++
++    private Carry() {}
++
++    /**
++     * The whole conversation of the session titled `title`, whose event
++     * payloads, oldest first, are `events` (Cloud.history), as the text
++     * `delta resume` saves. Its first line is "# " and the title.
++     */
++    public static Built build(String title, List<Map<String, Object>> events) {
++        StringBuilder out = new StringBuilder();
++        List<byte[]> pictures = new ArrayList<byte[]>();
++        String name = title == null || title.trim().length() == 0 ? "Untitled" : title.trim();
++        out.append("# ").append(name.replace('\n', ' ')).append("\n\n");
++        out.append("The complete conversation of an earlier Delta session, which stopped because the account it ");
++        out.append("ran on reached its usage limit: every message, every tool call with its full input, and every ");
++        out.append("tool result in full, oldest first. \"You\" is the agent. Pictures the user sent are attached to ");
++        out.append("the first message of the session that continues it, in the order they are mentioned.\n\n");
++        out.append(conversation(events, pictures));
++        out.append("[End of the conversation. Carry on from here.]\n");
++        return new Built(out.toString(), pictures);
++    }
++
++    /**
++     * The block that opens the first message of the new session: why, and
++     * the id the conversation is stored under on the command center.
++     */
++    public static String block(String title, String id) {
++        StringBuilder out = new StringBuilder();
++        out.append(OPEN).append('\n');
++        out.append("This conversation continues an earlier session");
++        if (title != null && title.trim().length() > 0) out.append(" (\"").append(clean(title.trim())).append("\")");
++        out.append(" that stopped because the account it ran on reached its usage limit; this session runs on ");
++        out.append("another account. The whole conversation so far, every message, tool call and tool result in ");
++        out.append("full, is on the command center. Once the Delta CLI is set up, and before anything else, run\n\n");
++        out.append("    delta resume ").append(id).append(" conversation.md\n\n");
++        out.append("which saves it to conversation.md, and read ALL of that file, from the first line to the last, ");
++        out.append("in parts if need be. ");
++        out.append("Pictures the user sent earlier are attached to this message, in the order the conversation ");
++        out.append("mentions them. The old session's sandbox did not come along: clone repositories again and redo ");
++        out.append("any work that was not pushed or saved elsewhere. Then pick up exactly where it left off. ");
++        out.append("If the user wrote anything new, it follows this block.\n");
++        out.append(CLOSE);
++        return out.toString();
++    }
++
++    /** The main thread of the conversation, as text, collecting the user's pictures into `pictures`. */
++    static String conversation(List<Map<String, Object>> events, List<byte[]> pictures) {
++        StringBuilder out = new StringBuilder();
++        Map<String, String> tools = new HashMap<String, String>();
++        Set<String> seen = new HashSet<String>();
++        for (Map<String, Object> payload : events) {
++            String type = Json.text(payload, "type");
++            // A subagent's own turns are its working; what it found comes
++            // back as the result of the call that started it.
++            if (payload.get("parent_tool_use_id") != null) continue;
++            String uuid = Json.text(payload, "uuid");
++            if (uuid != null && !seen.add(uuid)) continue;
++            if ("user".equals(type)) {
++                if (Json.flag(payload, "isMeta")) continue;
++                user(out, Json.child(payload, "message").get("content"), tools, pictures);
++            } else if ("assistant".equals(type)) {
++                assistant(out, Json.children(Json.child(payload, "message"), "content"), tools);
++            }
++        }
++        return out.toString();
++    }
++
++    private static void user(StringBuilder out, Object content, Map<String, String> tools, List<byte[]> pictures) {
++        if (content instanceof String) {
++            said(out, "User", Setup.strip((String) content));
++            return;
++        }
++        StringBuilder words = new StringBuilder();
++        for (Object value : Json.array(content == null ? new ArrayList<Object>() : content)) {
++            if (!(value instanceof Map)) continue;
++            Map<String, Object> block = Json.object(value);
++            String type = Json.text(block, "type");
++            if ("tool_result".equals(type)) {
++                String name = tools.get(Json.text(block, "tool_use_id"));
++                String heading = "Result of " + (name == null ? "a tool call" : name)
++                    + (Json.flag(block, "is_error") ? " (error)" : "");
++                said(out, heading, result(block.get("content")));
++            } else if ("text".equals(type)) {
++                String text = Json.text(block, "text");
++                if (text == null) continue;
++                if (words.length() > 0) words.append("\n\n");
++                // The setup sits at the start of the text, after any pictures.
++                words.append(Setup.strip(text));
++            } else if ("image".equals(type)) {
++                if (words.length() > 0) words.append("\n\n");
++                words.append(picture(Json.child(block, "source"), pictures));
++            }
++        }
++        if (words.length() > 0) said(out, "User", words.toString());
++    }
++
++    private static void assistant(StringBuilder out, List<Object> content, Map<String, String> tools) {
++        for (Object value : content) {
++            if (!(value instanceof Map)) continue;
++            Map<String, Object> block = Json.object(value);
++            String type = Json.text(block, "type");
++            if ("text".equals(type)) {
++                said(out, "You", Json.text(block, "text"));
++            } else if ("thinking".equals(type)) {
++                said(out, "You (thinking)", Json.text(block, "thinking"));
++            } else if ("tool_use".equals(type)) {
++                String name = Json.text(block, "name");
++                String id = Json.text(block, "id");
++                if (id != null && name != null) tools.put(id, name);
++                said(out, "You called " + (name == null ? "a tool" : name), Json.write(Json.child(block, "input")));
++            }
++        }
++    }
++
++    /** A tool result's content: a string, or blocks of text and images. */
++    private static String result(Object content) {
++        if (content == null) return "(no output)";
++        if (content instanceof String) return ((String) content).length() == 0 ? "(no output)" : (String) content;
++        if (!(content instanceof List)) return Json.write(content);
++        StringBuilder out = new StringBuilder();
++        for (Object value : Json.array(content)) {
++            if (!(value instanceof Map)) continue;
++            Map<String, Object> block = Json.object(value);
++            if (out.length() > 0) out.append('\n');
++            if ("text".equals(Json.text(block, "type"))) {
++                String text = Json.text(block, "text");
++                out.append(text == null ? "" : text);
++            } else if ("image".equals(Json.text(block, "type"))) {
++                out.append("[an image, which can't be carried over; produce it again if you need it]");
++            } else {
++                out.append(Json.write(block));
++            }
++        }
++        return out.length() == 0 ? "(no output)" : out.toString();
++    }
++
++    /** A picture the user sent: attached to the new message when it is a JPEG, as phone pictures are. */
++    private static String picture(Map<String, Object> source, List<byte[]> pictures) {
++        String data = Json.text(source, "data");
++        if (!"base64".equals(Json.text(source, "type")) || data == null
++            || !"image/jpeg".equals(Json.text(source, "media_type"))) {
++            return "[a picture, which can't be carried over]";
++        }
++        try {
++            pictures.add(Base64.getDecoder().decode(data));
++        } catch (IllegalArgumentException e) {
++            return "[a picture, which can't be carried over]";
++        }
++        return "[picture " + pictures.size() + ", attached to the first message]";
++    }
++
++    private static void said(StringBuilder out, String who, String text) {
++        if (text == null || text.trim().length() == 0) return;
++        out.append("[").append(who).append("]\n").append(clean(text.trim())).append("\n\n");
++    }
++
++    /** Nothing quoted may close the block early. */
++    private static String clean(String text) {
++        return text.replace(CLOSE, "</delta-continued >");
++    }
++
++    /** Whether a message (with any setup block already taken out) opens with the block. */
++    public static boolean present(String text) {
++        return text != null && text.trim().startsWith(OPEN) && text.contains(CLOSE);
++    }
++
++    /** A message with any leading block taken back out. */
++    public static String strip(String text) {
++        if (!present(text)) return text == null ? "" : text;
++        String trimmed = text.trim();
++        return trimmed.substring(trimmed.indexOf(CLOSE) + CLOSE.length()).trim();
++    }
++}
+diff --git a/delta/android/core/src/main/java/com/delta/xp3/data/Chat.java b/delta/android/core/src/main/java/com/delta/xp3/data/Chat.java
+index e909b04..bca772c 100644
+--- a/delta/android/core/src/main/java/com/delta/xp3/data/Chat.java
++++ b/delta/android/core/src/main/java/com/delta/xp3/data/Chat.java
+@@ -19,13 +19,20 @@ public final class Chat {
+     public final String status;
+     /** When anything last happened in it, in epoch milliseconds; 0 if unknown. */
+     public final long updated;
++    /** The cloud account it runs on, by the command center's id; null if not known yet. */
++    public final String account;
+ 
+     public Chat(String id, String title, String status, long updated) {
++        this(id, title, status, updated, null);
++    }
++
++    public Chat(String id, String title, String status, long updated, String account) {
+         if (!validId(id)) throw new IllegalArgumentException("Not a session id");
+         this.id = id;
+         this.title = title == null || title.trim().length() == 0 ? "Untitled" : title.trim();
+         this.status = status == null ? IDLE : status;
+         this.updated = updated;
++        this.account = account == null || account.length() == 0 ? null : account;
+     }
+ 
+     /**
+@@ -51,6 +58,10 @@ public final class Chat {
+     }
+ 
+     public Chat titled(String next) {
+-        return new Chat(id, next, status, updated);
++        return new Chat(id, next, status, updated, account);
++    }
++
++    public Chat on(String next) {
++        return new Chat(id, title, status, updated, next);
+     }
+ }
+diff --git a/delta/android/core/src/main/java/com/delta/xp3/data/Queued.java b/delta/android/core/src/main/java/com/delta/xp3/data/Queued.java
+new file mode 100644
+index 0000000..6caeba8
+--- /dev/null
++++ b/delta/android/core/src/main/java/com/delta/xp3/data/Queued.java
+@@ -0,0 +1,46 @@
++package com.delta.xp3.data;
++
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.List;
++
++/**
++ * A message held on the phone because its session's account is out of usage.
++ *
++ * Sent now, it would only run into the same limit, so it waits and goes out
++ * once the limit has lifted. Its pictures are the ones saved when it was
++ * written, under its uuid; the files it names are already on the command
++ * center.
++ */
++public final class Queued {
++
++    public final String session;
++    public final String uuid;
++    public final String text;
++    public final List<String> files;
++    public final int pictures;
++    /** When to send it, in epoch milliseconds. */
++    public final long at;
++    /** Sends that have failed so far. */
++    public final int tries;
++
++    public Queued(String session, String uuid, String text, List<String> files, int pictures, long at, int tries) {
++        if (!Chat.validId(session)) throw new IllegalArgumentException("Not a session id");
++        if (uuid == null || uuid.length() == 0) throw new IllegalArgumentException("No uuid");
++        this.session = session;
++        this.uuid = uuid;
++        this.text = text == null ? "" : text;
++        this.files = Collections.unmodifiableList(new ArrayList<String>(files == null ? new ArrayList<String>() : files));
++        this.pictures = Math.max(0, pictures);
++        this.at = at;
++        this.tries = Math.max(0, tries);
++    }
++
++    public Queued at(long next) {
++        return new Queued(session, uuid, text, files, pictures, next, tries);
++    }
++
++    public Queued failed(long next) {
++        return new Queued(session, uuid, text, files, pictures, next, tries + 1);
++    }
++}
+diff --git a/delta/android/core/src/main/java/com/delta/xp3/data/Store.java b/delta/android/core/src/main/java/com/delta/xp3/data/Store.java
+index cf02d63..656035e 100644
+--- a/delta/android/core/src/main/java/com/delta/xp3/data/Store.java
++++ b/delta/android/core/src/main/java/com/delta/xp3/data/Store.java
+@@ -20,9 +20,10 @@ import java.util.Map;
+ import java.util.Set;
+ 
+ /**
+- * What the app writes down, in its own private directory: the logins, which
+- * session is open, the last list of sessions, a transcript per session, and
+- * which command-center files have been downloaded.
++ * What the app writes down, in its own private directory: the command center
++ * login, which session is open, the last list of sessions, a transcript per
++ * session, which cloud accounts are out until when, the messages waiting for
++ * a limit to lift, and which command-center files have been downloaded.
+  *
+  * A transcript could be rebuilt by replaying the session's whole event stream,
+  * but on a phone that is a lot of sandbox logs to download every time a
+@@ -38,10 +39,11 @@ import java.util.Set;
+ public final class Store {
+ 
+     /** Which login a bundled revision marker belongs to. */
+-    public static final String CLOUD = "cloud";
+     public static final String CENTER = "center";
+ 
+     private static final String SETTINGS = "settings.json";
++    private static final String LIMITS = "limits.json";
++    private static final String QUEUE = "queue.json";
+     private static final String OPEN = "open.txt";
+     private static final String CHATS = "chats.json";
+     private static final String DOWNLOADS = "downloads.json";
+@@ -53,11 +55,18 @@ public final class Store {
+     public static final class Saved {
+         public final String id;
+         public final String title;
++        /** The cloud account it runs on, or null if that was not known when it was saved. */
++        public final String account;
+         public final Transcript transcript;
+ 
+         public Saved(String id, String title, Transcript transcript) {
++            this(id, title, null, transcript);
++        }
++
++        public Saved(String id, String title, String account, Transcript transcript) {
+             this.id = id;
+             this.title = title;
++            this.account = account;
+             this.transcript = transcript;
+         }
+     }
+@@ -89,8 +98,6 @@ public final class Store {
+     /** The bundled login of kind `part` already adopted by this installation, if any. */
+     public String bundledRevision(String part) {
+         String revision = read(revisionFile(part));
+-        // Installs from before the white-label rename have the old marker name.
+-        if (revision == null && CLOUD.equals(part)) revision = read("bundled-claude.txt");
+         return revision == null ? "" : revision.trim();
+     }
+ 
+@@ -99,7 +106,7 @@ public final class Store {
+     }
+ 
+     private static String revisionFile(String part) {
+-        if (!CLOUD.equals(part) && !CENTER.equals(part)) throw new IllegalArgumentException("Unknown login");
++        if (!CENTER.equals(part)) throw new IllegalArgumentException("Unknown login");
+         return "bundled-" + part + ".txt";
+     }
+ 
+@@ -131,7 +138,7 @@ public final class Store {
+                 if (!Chat.validId(id)) continue;
+                 Double updated = Json.number(saved, "updated");
+                 chats.add(new Chat(id, Json.text(saved, "title"), Json.text(saved, "status"),
+-                    updated == null ? 0 : updated.longValue()));
++                    updated == null ? 0 : updated.longValue(), Json.text(saved, "account")));
+             }
+         } catch (RuntimeException e) {
+             chats.clear();
+@@ -142,8 +149,10 @@ public final class Store {
+     public void saveChats(List<Chat> chats) throws IOException {
+         List<Object> saved = new ArrayList<Object>();
+         for (Chat chat : chats) {
+-            saved.add(Json.map("id", chat.id, "title", chat.title, "status", chat.status,
+-                "updated", Long.valueOf(chat.updated)));
++            Map<String, Object> entry = Json.map("id", chat.id, "title", chat.title, "status", chat.status,
++                "updated", Long.valueOf(chat.updated));
++            if (chat.account != null) entry.put("account", chat.account);
++            saved.add(entry);
+         }
+         write(CHATS, Json.write(saved), false);
+     }
+@@ -176,7 +185,7 @@ public final class Store {
+                 sequence == null ? 0 : sequence.longValue(),
+                 Json.flag(saved, "working")
+             );
+-            return new Saved(id, Json.text(saved, "title"), transcript);
++            return new Saved(id, Json.text(saved, "title"), Json.text(saved, "account"), transcript);
+         } catch (RuntimeException e) {
+             return new Saved(id, null, new Transcript());
+         }
+@@ -184,6 +193,10 @@ public final class Store {
+ 
+     /** Saves a session's transcript. A null id (a session not yet created) saves nothing. */
+     public void saveSession(String id, String title, Transcript transcript) throws IOException {
++        saveSession(id, title, null, transcript);
++    }
++
++    public void saveSession(String id, String title, String account, Transcript transcript) throws IOException {
+         if (!Chat.validId(id)) return;
+         List<Object> entries = new ArrayList<Object>();
+         for (Entry entry : transcript.entries()) {
+@@ -194,6 +207,7 @@ public final class Store {
+         write(SESSIONS + "/" + id + ".json", Json.write(Json.map(
+             "id", id,
+             "title", title,
++            "account", account,
+             "sequence", Long.valueOf(transcript.sequence()),
+             "working", Boolean.valueOf(transcript.working()),
+             "entries", entries
+@@ -238,6 +252,71 @@ public final class Store {
+         return pictured;
+     }
+ 
++    // ------------------------------------------------------------------
++    // Usage limits
++    // ------------------------------------------------------------------
++
++    /** Until when each cloud account is known to be out, in epoch milliseconds, by id. */
++    public Map<String, Long> limits() {
++        Map<String, Long> limits = new LinkedHashMap<String, Long>();
++        String json = read(LIMITS);
++        if (json == null) return limits;
++        try {
++            Map<String, Object> saved = Json.object(Json.parse(json));
++            for (String account : saved.keySet()) {
++                Double until = Json.number(saved, account);
++                if (until != null) limits.put(account, Long.valueOf(until.longValue()));
++            }
++        } catch (RuntimeException e) {
++            limits.clear();
++        }
++        return limits;
++    }
++
++    public void saveLimits(Map<String, Long> limits) throws IOException {
++        write(LIMITS, Json.write(new LinkedHashMap<String, Object>(limits)), false);
++    }
++
++    /** The messages waiting for their account's limit to lift, in the order they were written. */
++    public List<Queued> queue() {
++        List<Queued> queue = new ArrayList<Queued>();
++        String json = read(QUEUE);
++        if (json == null) return queue;
++        try {
++            for (Object value : Json.array(Json.parse(json))) {
++                if (!(value instanceof Map)) continue;
++                Map<String, Object> saved = Json.object(value);
++                Double at = Json.number(saved, "at");
++                Double pictures = Json.number(saved, "pictures");
++                Double tries = Json.number(saved, "tries");
++                List<String> files = new ArrayList<String>();
++                for (Object name : Json.children(saved, "files")) {
++                    if (name instanceof String && RemoteFile.validName((String) name)) files.add((String) name);
++                }
++                try {
++                    queue.add(new Queued(Json.text(saved, "session"), Json.text(saved, "uuid"),
++                        Json.text(saved, "text"), files, pictures == null ? 0 : pictures.intValue(),
++                        at == null ? 0 : at.longValue(), tries == null ? 0 : tries.intValue()));
++                } catch (IllegalArgumentException skipped) {
++                    // Not one this version can send.
++                }
++            }
++        } catch (RuntimeException e) {
++            queue.clear();
++        }
++        return queue;
++    }
++
++    public void saveQueue(List<Queued> queue) throws IOException {
++        List<Object> saved = new ArrayList<Object>();
++        for (Queued message : queue) {
++            saved.add(Json.map("session", message.session, "uuid", message.uuid, "text", message.text,
++                "files", new ArrayList<Object>(message.files), "pictures", Integer.valueOf(message.pictures),
++                "at", Long.valueOf(message.at), "tries", Integer.valueOf(message.tries)));
++        }
++        write(QUEUE, Json.write(saved), false);
++    }
++
+     // ------------------------------------------------------------------
+     // Downloads
+     // ------------------------------------------------------------------
+@@ -277,9 +356,9 @@ public final class Store {
+     // ------------------------------------------------------------------
+ 
+     /*
+-     * Synchronized because more than one thread writes here: a rotated login
+-     * is saved from a network worker while a session is saved from the save
+-     * worker. They do not share a temporary file, but the directory check and
++     * Synchronized because more than one thread writes here: the settings
++     * are saved from a network worker once an old login has been handed over,
++     * while a session is saved from the save worker. They do not share a temporary file, but the directory check and
+      * rename are simpler to reason about one at a time.
+      */
+ 
+diff --git a/delta/android/core/src/main/java/com/delta/xp3/data/Transcript.java b/delta/android/core/src/main/java/com/delta/xp3/data/Transcript.java
+index cc7943d..4978fd0 100644
+--- a/delta/android/core/src/main/java/com/delta/xp3/data/Transcript.java
++++ b/delta/android/core/src/main/java/com/delta/xp3/data/Transcript.java
+@@ -47,6 +47,11 @@ public final class Transcript {
+     /** The latest sandbox start-up line, shown while a turn is getting going. */
+     private String status;
+     private Permission pending;
++    /**
++     * Until when the session's account is out of usage, in epoch
++     * milliseconds, as the latest rate-limit event said; 0 when it has room.
++     */
++    private long limitedUntil;
+ 
+     public Transcript() {}
+ 
+@@ -84,6 +89,15 @@ public final class Transcript {
+         return pending;
+     }
+ 
++    /**
++     * When the session's account reaches its usage limit lifts, in epoch
++     * milliseconds, if the stream has said so since this was built; 0
++     * otherwise. A replayed rejection from long ago is in the past by then.
++     */
++    public long limitedUntil() {
++        return limitedUntil;
++    }
++
+     // ------------------------------------------------------------------
+     // Local changes
+     // ------------------------------------------------------------------
+@@ -103,6 +117,31 @@ public final class Transcript {
+         add(new Entry(Entry.NOTE, text, null));
+     }
+ 
++    /**
++     * A message written here that waits on the phone for a usage limit to
++     * lift: shown, but no turn starts until it is actually sent.
++     */
++    public void queued(String uuid, String text, int pictures) {
++        add(new Entry(Entry.YOU, text, uuid, pictures));
++    }
++
++    /** A message held back earlier has gone out, so a turn is coming. */
++    public void resumed() {
++        working = true;
++        status = null;
++    }
++
++    /**
++     * The start of a session that carries an earlier conversation over: its
++     * note, under the uuid of the message that carries it, so the echo of
++     * that message adds nothing.
++     */
++    public void carried(String uuid) {
++        add(new Entry(Entry.NOTE, Carry.NOTE, uuid));
++        working = true;
++        status = null;
++    }
++
+     /** A send failed, so no turn is coming. */
+     public void idle() {
+         working = false;
+@@ -171,6 +210,7 @@ public final class Transcript {
+         if ("control_request".equals(type)) return controlRequest(payload, source);
+         if ("control_response".equals(type)) return settled(Json.text(Json.child(payload, "response"), "request_id"));
+         if ("control_cancel_request".equals(type)) return settled(Json.text(payload, "request_id"));
++        if ("rate_limit_event".equals(type)) return rateLimit(Json.child(payload, "rate_limit_info"));
+         if ("env_manager_log".equals(type)) {
+             String line = Json.text(Json.child(payload, "data"), "content");
+             if (line == null || line.trim().length() == 0) return false;
+@@ -189,18 +229,24 @@ public final class Transcript {
+         if (!"client".equals(source) || Json.flag(payload, "isMeta")) return false;
+         Object content = Json.child(payload, "message").get("content");
+         // The first message of a session started here carries the Delta setup
+-        // ahead of what was typed; only what was typed is conversation. Files
+-        // sent with a message are named in a block that is shown as one line.
+-        String text = Attached.show(Setup.strip(text(content)));
+-        int pictures = pictures(content);
+-        if (text.trim().length() == 0 && pictures == 0) return false;
++        // ahead of what was typed; only what was typed is conversation. A
++        // conversation carried over from another account is one note, and
++        // files sent with a message are named in a block shown as one line.
++        String typed = Setup.strip(text(content));
++        boolean carried = Carry.present(typed);
++        String text = Attached.show(Carry.strip(typed));
++        // A carried conversation's pictures ride in the message that carries
++        // it; they were shown with the messages they came with.
++        int pictures = carried ? 0 : pictures(content);
++        if (text.trim().length() == 0 && pictures == 0 && !carried) return false;
+         String uuid = Json.text(payload, "uuid");
+         if (uuid != null) {
+             for (Entry entry : entries) {
+                 if (uuid.equals(entry.id)) return false;
+             }
+         }
+-        add(new Entry(Entry.YOU, text.trim(), uuid, pictures));
++        if (carried) add(new Entry(Entry.NOTE, Carry.NOTE, uuid));
++        if (text.trim().length() > 0 || pictures > 0) add(new Entry(Entry.YOU, text.trim(), uuid, pictures));
+         working = true;
+         status = null;
+         return true;
+@@ -269,6 +315,22 @@ public final class Transcript {
+         return true;
+     }
+ 
++    /**
++     * The worker passing on what the account's usage limits say. Only a
++     * rejection with a reset time counts: the agent's own reply already says
++     * the limit was hit, so nothing new goes on screen.
++     */
++    private boolean rateLimit(Map<String, Object> info) {
++        String status = Json.text(info, "status");
++        if ("rejected".equals(status)) {
++            Double resets = Json.number(info, "resetsAt");
++            if (resets != null && resets.doubleValue() > 0) limitedUntil = (long) (resets.doubleValue() * 1000);
++        } else if (status != null) {
++            limitedUntil = 0;
++        }
++        return false;
++    }
++
+     /** A request answered or withdrawn elsewhere: the web app, the CLI, or a timeout. */
+     private boolean settled(String requestId) {
+         if (pending == null || requestId == null || !requestId.equals(pending.requestId)) return false;
+diff --git a/delta/android/core/src/main/java/com/delta/xp3/net/Center.java b/delta/android/core/src/main/java/com/delta/xp3/net/Center.java
+index 3104e4d..2509048 100644
+--- a/delta/android/core/src/main/java/com/delta/xp3/net/Center.java
++++ b/delta/android/core/src/main/java/com/delta/xp3/net/Center.java
+@@ -15,8 +15,9 @@ import java.util.Map;
+  * the phone's side.
+  *
+  * An agent pushes a file with the CLI; this lists it, fetches it, and deletes
+- * it. The phone can push one too, for an agent to `delta pull`. Every request
+- * carries the bearer token `delta-cc gen-token` printed.
++ * it. The phone can push one too, for an agent to `delta pull`. It also keeps
++ * the cloud accounts the sessions run on, and hands out their access tokens.
++ * Every request carries the bearer token `delta-cc gen-token` printed.
+  */
+ public final class Center {
+ 
+@@ -35,7 +36,75 @@ public final class Center {
+         }
+     }
+ 
++    /** A cloud account, as the command center lists it; it keeps the login itself. */
++    public static final class Account {
++        /** The provider's id for the account, which goes in a route. */
++        public final String id;
++        public final String email;
++        /** The subscription, as the provider names it ("claude_pro"), or null. */
++        public final String plan;
++
++        public Account(String id, String email) {
++            this(id, email, null);
++        }
++
++        public Account(String id, String email, String plan) {
++            this.id = id;
++            this.email = email == null || email.length() == 0 ? id : email;
++            this.plan = plan == null || plan.length() == 0 ? null : plan;
++        }
++    }
++
++    /**
++     * How much of an account's 5-hour and weekly limits is used, in percent
++     * (null when the report doesn't say), and when each resets, in epoch
++     * milliseconds (0 when it doesn't say).
++     */
++    public static final class Usage {
++        public final Double fiveHour;
++        public final long fiveHourResets;
++        public final Double weekly;
++        public final long weeklyResets;
++
++        Usage(Double fiveHour, long fiveHourResets, Double weekly, long weeklyResets) {
++            this.fiveHour = fiveHour;
++            this.fiveHourResets = fiveHourResets;
++            this.weekly = weekly;
++            this.weeklyResets = weeklyResets;
++        }
++
++        static Usage of(Map<String, Object> report) {
++            Map<String, Object> five = Json.child(report, "five_hour");
++            Map<String, Object> week = Json.child(report, "seven_day");
++            return new Usage(Json.number(five, "utilization"), Json.instant(five, "resets_at"),
++                Json.number(week, "utilization"), Json.instant(week, "resets_at"));
++        }
++
++        /**
++         * When the account has room again, if either window is used up; 0
++         * when it has room. A full window with no reset time still rules
++         * the account out for now: an hour is a guess the next check corrects.
++         */
++        public long limitedUntil() {
++            return Math.max(full(fiveHour, fiveHourResets), full(weekly, weeklyResets));
++        }
++
++        private static long full(Double used, long resets) {
++            if (used == null || used.doubleValue() < 100) return 0;
++            return resets > 0 ? resets : System.currentTimeMillis() + 3600000L;
++        }
++    }
++
++    /** The command center has the account, but its login no longer works. */
++    public static final class Refused extends IOException {
++        Refused(String message) {
++            super(message);
++        }
++    }
++
+     private static final String SERVICE = "Command center";
++    private static final String OLD =
++        "The command center needs updating to keep the cloud accounts (delta update-cc).";
+ 
+     private final Http http;
+     private final String server;
+@@ -134,6 +203,132 @@ public final class Center {
+         return true;
+     }
+ 
++    // ------------------------------------------------------------------
++    // Cloud accounts
++    // ------------------------------------------------------------------
++
++    /** The cloud accounts, in the order new sessions try them. */
++    public List<Account> accounts() throws IOException, InterruptedException {
++        Http.Response response = http.send(request("/cloud-accounts"));
++        if (response.status() == 404 || response.status() == 405) throw new IOException(OLD);
++        require(response.status());
++        List<Account> accounts = new ArrayList<Account>();
++        try {
++            for (Object value : Json.array(Json.parse(response.body()))) {
++                if (!(value instanceof Map)) continue;
++                Map<String, Object> entry = Json.object(value);
++                String id = Json.text(entry, "id");
++                if (!validAccount(id)) continue;
++                accounts.add(new Account(id, Json.text(entry, "email"), Json.text(entry, "plan")));
++            }
++        } catch (RuntimeException e) {
++            throw new IOException("The command center sent an unreadable account list");
++        }
++        return accounts;
++    }
++
++    /**
++     * An access token for an account. `refused` is a token the cloud turned
++     * down, or null; the command center renews the login if it is still the
++     * current one.
++     */
++    public CloudAuth.Grant token(String account, String refused) throws IOException, InterruptedException {
++        String body = refused == null ? "{}" : Json.write(Json.map("refused", refused));
++        Http.Response response = http.send(request(accountPath(account) + "/token")
++            .header("Content-Type", "application/json")
++            .post(body));
++        requireAccount(response.status());
++        try {
++            Map<String, Object> grant = Json.object(Json.parse(response.body()));
++            Double expires = Json.number(grant, "expires_at");
++            return new CloudAuth.Grant(Json.string(grant, "access_token"),
++                expires == null ? 0 : expires.longValue());
++        } catch (RuntimeException e) {
++            throw new IOException("The command center sent an unreadable token");
++        }
++    }
++
++    /** How much of the account's 5-hour and weekly limits is used. */
++    public Usage usage(String account) throws IOException, InterruptedException {
++        Http.Response response = http.send(request(accountPath(account) + "/usage"));
++        requireAccount(response.status());
++        try {
++            return Usage.of(Json.object(Json.parse(response.body())));
++        } catch (RuntimeException e) {
++            throw new IOException("The command center sent an unreadable usage report");
++        }
++    }
++
++    /**
++     * When the account's usage limit lifts, in epoch milliseconds, if its
++     * 5-hour or weekly window is used up; 0 when it has room.
++     */
++    public long limitedUntil(String account) throws IOException, InterruptedException {
++        return usage(account).limitedUntil();
++    }
++
++    /**
++     * Stores a conversation carried over to another session, and returns the
++     * id `delta resume` prints it by.
++     */
++    public String putConversation(String text) throws IOException, InterruptedException {
++        Http.Response response = http.send(request("/conversations")
++            .header("Content-Type", "text/plain; charset=utf-8")
++            .timeout(300000)
++            .post(text));
++        if (response.status() == 404 || response.status() == 405) throw new IOException(OLD);
++        if (response.status() == 413) throw new IOException("The conversation is too big for the command center.");
++        require(response.status());
++        try {
++            String id = Json.string(Json.object(Json.parse(response.body())), "id");
++            if (!validAccount(id)) throw new IllegalArgumentException();
++            return id;
++        } catch (RuntimeException e) {
++            throw new IOException("The command center sent an unreadable conversation id");
++        }
++    }
++
++    /**
++     * Hands an old-style login, kept on the phone by earlier versions, to the
++     * command center, which keeps it from then on.
++     */
++    public void addAccount(String access, String refresh, long expiresAt) throws IOException, InterruptedException {
++        Map<String, Object> login = Json.map("refresh_token", refresh);
++        if (access != null) login.put("access_token", access);
++        if (expiresAt > 0) login.put("expires_at", Long.valueOf(expiresAt));
++        Http.Response response = http.send(request("/cloud-accounts")
++            .header("Content-Type", "application/json")
++            .post(Json.write(login)));
++        if (response.status() == 404 || response.status() == 405) throw new IOException(OLD);
++        if (response.status() == 403) throw new Refused("The cloud login on this phone no longer works.");
++        require(response.status());
++    }
++
++    private static String accountPath(String account) {
++        if (!validAccount(account)) throw new IllegalArgumentException("Not an account id");
++        return "/cloud-accounts/" + account;
++    }
++
++    /** Account ids go in a route as they are, so only the characters UUIDs use get in. */
++    static boolean validAccount(String id) {
++        if (id == null || id.length() == 0 || id.length() > 64) return false;
++        for (int i = 0; i < id.length(); i++) {
++            char c = id.charAt(i);
++            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
++            if (!ok) return false;
++        }
++        return true;
++    }
++
++    private static void requireAccount(int status) throws IOException {
++        if (status == 403) {
++            throw new Refused("A cloud account's login stopped working. Sign it in again with delta accounts login.");
++        }
++        if (status == 404) throw new IOException("That cloud account is no longer on the command center.");
++        if (status == 405) throw new IOException(OLD);
++        require(status);
++    }
++
+     // ------------------------------------------------------------------
+     // Transport
+     // ------------------------------------------------------------------
+diff --git a/delta/android/core/src/main/java/com/delta/xp3/net/Cloud.java b/delta/android/core/src/main/java/com/delta/xp3/net/Cloud.java
+index 312f7d1..d0bd988 100644
+--- a/delta/android/core/src/main/java/com/delta/xp3/net/Cloud.java
++++ b/delta/android/core/src/main/java/com/delta/xp3/net/Cloud.java
+@@ -193,6 +193,38 @@ public final class Cloud {
+         }
+     }
+ 
++    /**
++     * Every event of a session, oldest first, as the event list pages them
++     * (the payloads only). This is the whole conversation as the agent had
++     * it, tool calls and results included, which the phone's own transcript
++     * leaves out; it is what a conversation carried to another account is
++     * built from.
++     */
++    public List<Map<String, Object>> history(String session) throws IOException, InterruptedException {
++        List<Map<String, Object>> payloads = new ArrayList<Map<String, Object>>();
++        String cursor = null;
++        for (int page = 0; page < 10000; page++) {
++            String path = "/v1/code/sessions/" + cse(session) + "/events?sort_order=asc";
++            if (cursor != null) path += "&cursor=" + java.net.URLEncoder.encode(cursor, "UTF-8");
++            Map<String, Object> listed = object(request(path, null, false, true), "event list");
++            List<Object> data = Json.children(listed, "data");
++            for (Object value : data) {
++                if (!(value instanceof Map)) continue;
++                Map<String, Object> event = Json.object(value);
++                // The next page starts after the last sequence number seen,
++                // as the provider's own client pages it.
++                Object sequence = event.get("sequence_num");
++                if (sequence instanceof Number) cursor = String.valueOf(((Number) sequence).longValue());
++                else if (sequence instanceof String) cursor = (String) sequence;
++                Map<String, Object> payload = Json.child(event, "payload");
++                if (!payload.isEmpty()) payloads.add(payload);
++            }
++            Object next = listed.get("next_cursor");
++            if (data.isEmpty() || next == null || "".equals(next)) return payloads;
++        }
++        throw new IOException("The session's history is too long to read");
++    }
++
+     public static String link(String session) {
+         return WEB + session;
+     }
+diff --git a/delta/android/core/src/main/java/com/delta/xp3/net/CloudAuth.java b/delta/android/core/src/main/java/com/delta/xp3/net/CloudAuth.java
+index 0d01b02..63a4772 100644
+--- a/delta/android/core/src/main/java/com/delta/xp3/net/CloudAuth.java
++++ b/delta/android/core/src/main/java/com/delta/xp3/net/CloudAuth.java
+@@ -1,106 +1,82 @@
+ package com.delta.xp3.net;
+ 
+ import java.io.IOException;
+-import java.net.URI;
+-import java.util.Map;
+ 
+ /**
+- * The bundled subscription OAuth login, renewed as it expires.
++ * One cloud account's access token, fetched from the command center.
+  *
+- * The access token is short-lived and is renewed from the refresh token. Each
+- * renewal also replaces the refresh token, so the new pair is reported to
+- * `Rotated` to be written down: the old refresh token stops working.
++ * The phone holds no login of its own. A subscription login's refresh token
++ * is replaced every time it is used, so only one party may renew it, and that
++ * is the command center: this asks it for a token, keeps it until shortly
++ * before it expires, and asks again. After the cloud refuses a token, the
++ * next request names it, so the command center renews the login rather than
++ * handing the same token back (unless someone else has renewed it already).
+  */
+ public final class CloudAuth {
+ 
+-    private static final String CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+-    private static final URI TOKEN_URL = URI.create("https://platform.claude.com/v1/oauth/token");
+-    /**
+-     * Asked for again on every renewal, as the provider's own CLI does: the
+-     * sessions scope is what lets this login drive cloud sessions at all.
+-     */
+-    private static final String SCOPES =
+-        "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
+-    private static final long SKEW_MS = 5L * 60L * 1000L;
++    /** Where tokens come from: the command center, or a fixed one in tests. */
++    public interface Source {
++        /** A token, renewed first if `refused` (or null) is still the current one. */
++        Grant fetch(String refused) throws IOException, InterruptedException;
++    }
+ 
+-    public interface Rotated {
+-        void store(String access, String refresh, long expiresAt);
++    /** An access token and when it expires, in epoch milliseconds (0 if unknown). */
++    public static final class Grant {
++        public final String access;
++        public final long expiresAt;
++
++        public Grant(String access, long expiresAt) {
++            this.access = access;
++            this.expiresAt = expiresAt;
++        }
+     }
+ 
+-    private final Http http;
+-    private final URI endpoint;
+-    private final Rotated listener;
++    private static final long SKEW_MS = 5L * 60L * 1000L;
++
++    private final Source source;
+     private String access;
+-    private String refresh;
+     private long expiresAt;
++    /** The token the cloud turned down, until a new one has been fetched. */
++    private String refused;
++
++    public CloudAuth(Source source) {
++        this.source = source;
++    }
+ 
+-    public CloudAuth(Http http, String access, String refresh, long expiresAt, Rotated listener) {
+-        this(http, TOKEN_URL, access, refresh, expiresAt, listener);
++    /** The tokens of the account `account`, from the command center. */
++    public static CloudAuth of(final Center center, final String account) {
++        return new CloudAuth(new Source() {
++            @Override
++            public Grant fetch(String refused) throws IOException, InterruptedException {
++                return center.token(account, refused);
++            }
++        });
+     }
+ 
+-    CloudAuth(Http http, URI endpoint, String access, String refresh, long expiresAt, Rotated listener) {
+-        this.http = http;
+-        this.endpoint = endpoint;
+-        this.access = empty(access) ? null : access;
+-        this.refresh = empty(refresh) ? null : refresh;
+-        this.expiresAt = expiresAt;
+-        this.listener = listener;
++    /** Always the same token, which never expires. */
++    public static CloudAuth fixed(final String token) {
++        return new CloudAuth(new Source() {
++            @Override
++            public Grant fetch(String refused) {
++                return new Grant(token, 0);
++            }
++        });
+     }
+ 
+-    /** The bearer token, renewing it first if it is due to expire. */
++    /** The bearer token, fetching a new one first if it is due to expire or was refused. */
+     public synchronized String token() throws IOException, InterruptedException {
+-        if (access != null && (expiresAt <= 0 || System.currentTimeMillis() < expiresAt - SKEW_MS)) {
+-            return access;
+-        }
+-        if (refresh == null) {
+-            if (access != null) return access;
+-            throw new IOException("This build has no cloud login");
+-        }
+-        renew();
++        boolean good = access != null && refused == null
++            && (expiresAt <= 0 || System.currentTimeMillis() < expiresAt - SKEW_MS);
++        if (good) return access;
++        Grant grant = source.fetch(refused);
++        access = grant.access;
++        expiresAt = grant.expiresAt;
++        refused = null;
+         return access;
+     }
+ 
+-    /** Called after a 401, so the retry renews rather than repeating a refused token. */
++    /** Called after a 401, so the retry asks for a renewed token rather than repeating a refused one. */
+     public synchronized void invalidate() {
+-        // Zero means an access token with unknown lifetime. One is an
+-        // unambiguously expired instant and forces the refresh on the retry.
+-        if (refresh != null) expiresAt = 1;
+-    }
+-
+-    private void renew() throws IOException, InterruptedException {
+-        Http.Response response = http.send(Http.Request.to(endpoint)
+-            .timeout(60000)
+-            .header("Content-Type", "application/json")
+-            .header("Accept", "application/json")
+-            .post(Json.write(Json.map(
+-                "grant_type", "refresh_token",
+-                "client_id", CLIENT_ID,
+-                "refresh_token", refresh,
+-                "scope", SCOPES
+-            ))));
+-        if (response.status() == 400 || response.status() == 401 || response.status() == 403) {
+-            throw new IOException("The cloud login was rejected");
+-        }
+-        Http.requireSuccess(response.status(), "Cloud login");
+-        try {
+-            Map<String, Object> json = Json.object(Json.parse(response.body()));
+-            String nextAccess = Json.string(json, "access_token");
+-            // Rotation is the norm, but a renewal that leaves the refresh
+-            // token out means the current one stays good.
+-            String nextRefresh = Json.text(json, "refresh_token");
+-            if (empty(nextRefresh)) nextRefresh = refresh;
+-            Double seconds = Json.number(json, "expires_in");
+-            if (seconds == null || seconds.doubleValue() <= 0) throw new IllegalArgumentException();
+-            access = nextAccess;
+-            refresh = nextRefresh;
+-            expiresAt = System.currentTimeMillis() + (long) (seconds.doubleValue() * 1000);
+-        } catch (RuntimeException e) {
+-            throw new IOException("The cloud login endpoint returned something unreadable");
+-        }
+-        if (listener != null) listener.store(access, refresh, expiresAt);
+-    }
+-
+-    private static boolean empty(String value) {
+-        return value == null || value.trim().length() == 0;
++        if (access != null) refused = access;
+     }
+ }
+diff --git a/delta/android/core/src/main/java/com/delta/xp3/net/Config.java b/delta/android/core/src/main/java/com/delta/xp3/net/Config.java
+index 304a763..5cbad01 100644
+--- a/delta/android/core/src/main/java/com/delta/xp3/net/Config.java
++++ b/delta/android/core/src/main/java/com/delta/xp3/net/Config.java
+@@ -6,11 +6,12 @@ import java.util.Locale;
+ import java.util.Map;
+ 
+ /**
+- * The two logins the app holds, and nothing else.
++ * The one login the app holds: the command center, an address and a bearer
++ * token, the same pair `delta set-auth` saves for the CLI.
+  *
+- * The cloud login is the rotating OAuth pair, written back here every time
+- * it is renewed. The command center is an address and a bearer token,
+- * the same pair `delta set-auth` saves for the CLI; it never rotates.
++ * The cloud logins live on the command center, which renews them. Versions
++ * before that kept one here, as a rotating OAuth pair; it is still read, so
++ * the app can hand it over to the command center, and then dropped.
+  *
+  * There is no model, environment or repository to configure: the cloud session
+  * picks its own model, the first cloud environment on the account is used, and
+@@ -40,9 +41,9 @@ public final class Config {
+         return new Config(null, null, 0, null, null);
+     }
+ 
+-    /** A cloud login alone. */
++    /** An old-style cloud login alone. */
+     public static Config of(String accessToken, String refreshToken, long expiresAt) {
+-        return blank().withCloud(accessToken, refreshToken, expiresAt);
++        return new Config(credential(accessToken), credential(refreshToken), Math.max(0, expiresAt), null, null);
+     }
+ 
+     public static Config parse(String json) {
+@@ -69,13 +70,9 @@ public final class Config {
+         }
+     }
+ 
+-    public Config withCloud(String accessToken, String refreshToken, long expiresAt) {
+-        return new Config(credential(accessToken), credential(refreshToken), Math.max(0, expiresAt), server, token);
+-    }
+-
+-    /** The cloud half of `other`, with this config's command center. */
+-    public Config withCloudOf(Config other) {
+-        return new Config(other.accessToken, other.refreshToken, other.expiresAt, server, token);
++    /** This config once its old-style cloud login has been handed to the command center. */
++    public Config withoutCloud() {
++        return new Config(null, null, 0, server, token);
+     }
+ 
+     /**
+@@ -91,7 +88,7 @@ public final class Config {
+         return new Config(accessToken, refreshToken, expiresAt, address, bearer);
+     }
+ 
+-    /** The command center of `other`, with this config's cloud login. */
++    /** The command center of `other`, with this config's old cloud login. */
+     public Config withCenterOf(Config other) {
+         return new Config(accessToken, refreshToken, expiresAt, other.server, other.token);
+     }
+@@ -154,9 +151,9 @@ public final class Config {
+         return Json.write(root);
+     }
+ 
+-    /** Whether there is a login to reach the cloud with. */
+-    public boolean ready() {
+-        return refreshToken != null || accessToken != null;
++    /** Whether an old-style cloud login is still waiting to be handed to the command center. */
++    public boolean hasCloud() {
++        return refreshToken != null;
+     }
+ 
+     /** Whether there is a command center to reach. */
+diff --git a/delta/android/core/src/test/java/com/delta/xp3/data/DataTests.java b/delta/android/core/src/test/java/com/delta/xp3/data/DataTests.java
+index df4f944..7cd181a 100644
+--- a/delta/android/core/src/test/java/com/delta/xp3/data/DataTests.java
++++ b/delta/android/core/src/test/java/com/delta/xp3/data/DataTests.java
+@@ -171,11 +171,12 @@ public final class DataTests {
+                 t.sent("u-1", "Hi", 2);
+                 t.apply("client_event", "12", frame(12, "worker", assistant(null,
+                     Json.map("type", "text", "text", "Hello **there**"))));
+-                store.saveSession("session_01abc", "Hi", t);
++                store.saveSession("session_01abc", "Hi", "acct-2", t);
+                 store.saveOpenSession("session_01abc");
+ 
+                 Store.Saved back = store.session("session_01abc");
+                 check.same("id", "session_01abc", back.id);
++                check.same("account", "acct-2", back.account);
+                 check.same("title", "Hi", back.title);
+                 check.same("sequence", 12L, back.transcript.sequence());
+                 check.ok("working", back.transcript.working());
+@@ -233,7 +234,7 @@ public final class DataTests {
+                 Store store = new Store(directory);
+                 check.same("no chats yet", 0, store.chats().size());
+                 store.saveChats(java.util.Arrays.asList(
+-                    new Chat("session_01", "Fix the list app", Chat.WORKING, 1700000000000L),
++                    new Chat("session_01", "Fix the list app", Chat.WORKING, 1700000000000L, "acct-1"),
+                     new Chat("session_02", " ", null, 0)));
+                 List<Chat> chats = store.chats();
+                 check.same("two", 2, chats.size());
+@@ -242,6 +243,15 @@ public final class DataTests {
+                 check.same("time", 1700000000000L, chats.get(0).updated);
+                 check.same("blank title named", "Untitled", chats.get(1).title);
+                 check.same("missing status is idle", Chat.IDLE, chats.get(1).status);
++                check.same("account kept", "acct-1", chats.get(0).account);
++                check.ok("unknown account stays unknown", chats.get(1).account == null);
++                check.same("retitling keeps the account", "acct-1", chats.get(0).titled("x").account);
++
++                check.same("no limits yet", 0, store.limits().size());
++                Map<String, Long> limits = new java.util.LinkedHashMap<String, Long>();
++                limits.put("acct-1", Long.valueOf(1900000000000L));
++                store.saveLimits(limits);
++                check.same("limit round trip", Long.valueOf(1900000000000L), store.limits().get("acct-1"));
+ 
+                 Map<String, RemoteFile> downloads = new java.util.LinkedHashMap<String, RemoteFile>();
+                 downloads.put("list.apk", new RemoteFile("list.apk", 1234, 1700000000123L));
+@@ -327,6 +337,131 @@ public final class DataTests {
+             }
+         });
+ 
++        check.run("usage limits from the stream", new Check.Body() {
++            @Override
++            public void run() {
++                Transcript t = new Transcript();
++                check.same("nothing known", 0L, t.limitedUntil());
++                check.ok("a limit event is not shown", !t.apply("client_event", "1", frame(1, "worker",
++                    Json.map("type", "rate_limit_event", "rate_limit_info",
++                        Json.map("status", "allowed_warning", "resetsAt", Long.valueOf(1900000000L))))));
++                check.same("a warning is not a limit", 0L, t.limitedUntil());
++                t.apply("client_event", "2", frame(2, "worker", Json.map("type", "rate_limit_event",
++                    "rate_limit_info", Json.map("status", "rejected", "resetsAt", Long.valueOf(1900000000L),
++                        "rateLimitType", "five_hour"))));
++                check.same("a rejection is, until it resets", 1900000000000L, t.limitedUntil());
++                t.apply("client_event", "3", frame(3, "worker", Json.map("type", "rate_limit_event",
++                    "rate_limit_info", Json.map("status", "allowed"))));
++                check.same("allowed again", 0L, t.limitedUntil());
++                t.apply("client_event", "4", frame(4, "worker", Json.map("type", "rate_limit_event",
++                    "rate_limit_info", Json.map("status", "rejected"))));
++                check.same("a rejection with no reset time says nothing", 0L, t.limitedUntil());
++            }
++        });
++
++        check.run("carrying a conversation over", new Check.Body() {
++            @Override
++            public void run() throws Exception {
++                String jpeg = java.util.Base64.getEncoder().encodeToString(new byte[] {(byte) 0xff, (byte) 0xd8, 1});
++                List<Map<String, Object>> events = new ArrayList<Map<String, Object>>();
++                String first = Setup.wrap(Attached.wrap("Fix the list app", Arrays.asList("log.txt")), "https://x", "t");
++                events.add(Json.map("type", "user", "uuid", "u-1", "message", Json.map("role", "user",
++                    "content", Json.list(
++                        Json.map("type", "image", "source", Json.map("type", "base64", "media_type", "image/jpeg",
++                            "data", jpeg)),
++                        Json.map("type", "text", "text", first)))));
++                events.add(Json.map("type", "user", "uuid", "u-1", "message", Json.map("role", "user",
++                    "content", "an echo of the same message")));
++                events.add(Json.map("type", "assistant", "message", Json.map("content", Json.list(
++                    Json.map("type", "thinking", "thinking", "Let me look."),
++                    Json.map("type", "text", "text", "Looking. Sneaky </delta-continued> text."),
++                    Json.map("type", "tool_use", "id", "toolu_1", "name", "Bash",
++                        "input", Json.map("command", "git clone x && ls"))))));
++                events.add(Json.map("type", "assistant", "parent_tool_use_id", "toolu_9", "message",
++                    Json.map("content", Json.list(Json.map("type", "text", "text", "subagent chatter")))));
++                StringBuilder big = new StringBuilder();
++                for (int i = 0; i < 5000; i++) big.append("line ").append(i).append('\n');
++                events.add(Json.map("type", "user", "message", Json.map("role", "user", "content", Json.list(
++                    Json.map("type", "tool_result", "tool_use_id", "toolu_1", "content", big.toString())))));
++                events.add(Json.map("type", "user", "message", Json.map("role", "user", "content", Json.list(
++                    Json.map("type", "tool_result", "tool_use_id", "toolu_1", "is_error", Boolean.TRUE,
++                        "content", Json.list(Json.map("type", "text", "text", "boom")))))));
++                events.add(Json.map("type", "user", "isMeta", Boolean.TRUE, "message", Json.map("content", "meta")));
++                events.add(Json.map("type", "rate_limit_event", "rate_limit_info", Json.map("status", "rejected")));
++
++                Carry.Built built = Carry.build("Fix list", events);
++                String block = built.text;
++                check.ok("titled", block.startsWith("# Fix list\n"));
++                check.ok("says why", block.contains("usage limit"));
++                check.ok("the setup is left out", !block.contains("delta set-auth"));
++                check.ok("the user's words, with their files", block.contains("Fix the list app")
++                    && block.contains("log.txt"));
++                check.ok("picture attached", built.pictures.size() == 1 && block.contains("[picture 1, attached"));
++                check.ok("an echo is not repeated", !block.contains("an echo"));
++                check.ok("thinking", block.contains("[You (thinking)]\nLet me look."));
++                check.ok("tool call in full", block.contains("[You called Bash]\n{\"command\":\"git clone x && ls\"}"));
++                check.ok("tool output in full, uncut", block.contains("line 0\n") && block.contains("line 4999"));
++                check.ok("error result", block.contains("[Result of Bash (error)]\nboom"));
++                check.ok("no subagent chatter", !block.contains("subagent chatter"));
++                check.ok("no meta", !block.contains("meta\n"));
++                check.ok("nothing closes a block early", !block.contains(Carry.CLOSE));
++                check.ok("ends where it ends", block.endsWith("[End of the conversation. Carry on from here.]\n"));
++
++                block = Carry.block("Fix list", "abcdefgh23456789");
++                check.ok("the block names the conversation", block.startsWith(Carry.OPEN) && block.endsWith(Carry.CLOSE)
++                    && block.contains("delta resume abcdefgh23456789 conversation.md") && block.contains("\"Fix list\""));
++
++                String message = Setup.wrap(block + "\n\n" + Attached.wrap("Keep going", Arrays.asList("b.txt")),
++                    "https://x", "t");
++                Transcript t = new Transcript();
++                t.apply("client_event", "1", frame(1, "client", user("u-9", message)));
++                List<Entry> entries = t.entries();
++                check.same("a note, then the message", 2, entries.size());
++                check.same("note", Carry.NOTE, entries.get(0).text);
++                check.same("message reads as typed", "Keep going\n\nAttached: b.txt", entries.get(1).text);
++
++                Transcript bare = new Transcript();
++                bare.apply("client_event", "1", frame(1, "client", user("u-8", Setup.wrap(block, "https://x", "t"))));
++                check.same("a carry with nothing typed is just the note", 1, bare.size());
++
++                Transcript local = new Transcript();
++                local.carried("u-9");
++                check.ok("a move starts a turn", local.working());
++                local.queued("u-9", "Keep going\n\nAttached: b.txt", 0);
++                local.apply("client_event", "1", frame(1, "client", user("u-9", message)));
++                check.same("the echo of a move made here adds nothing", 2, local.size());
++            }
++        });
++
++        check.run("messages waiting for a limit", new Check.Body() {
++            @Override
++            public void run() throws Exception {
++                Transcript t = new Transcript();
++                t.queued("u-1", "later", 1);
++                check.ok("a waiting message starts no turn", !t.working());
++                check.same("but is shown", "later", t.entries().get(0).text);
++                t.resumed();
++                check.ok("sending it does", t.working());
++
++                File directory = Files.createTempDirectory("delta-queue").toFile();
++                Store store = new Store(directory);
++                check.same("nothing waiting", 0, store.queue().size());
++                List<Queued> queue = new ArrayList<Queued>();
++                queue.add(new Queued("session_01", "u-1", "later", Arrays.asList("a.txt"), 2, 1900000000000L, 0));
++                queue.add(new Queued("session_02", "u-2", "", null, 0, 5, 3).failed(9));
++                store.saveQueue(queue);
++                List<Queued> back = store.queue();
++                check.same("two", 2, back.size());
++                check.same("session", "session_01", back.get(0).session);
++                check.same("text", "later", back.get(0).text);
++                check.same("files", Arrays.asList("a.txt"), back.get(0).files);
++                check.same("pictures", 2, back.get(0).pictures);
++                check.same("when", 1900000000000L, back.get(0).at);
++                check.same("a failed send counts", 4, back.get(1).tries);
++                check.same("and goes again later", 9L, back.get(1).at);
++            }
++        });
++
+         check.run("config", new Check.Body() {
+             @Override
+             public void run() throws Exception {
+@@ -335,7 +470,7 @@ public final class DataTests {
+                 Config back = Config.parse(both.toJson());
+                 check.same("server", "https://cc.example.com", back.server());
+                 check.same("token", "delta_t", back.token());
+-                check.same("cloud kept", "r", back.refreshToken());
++                check.same("old cloud login kept until handed over", "r", back.refreshToken());
+                 check.ok("center ready", back.centerReady());
+                 check.ok("cloud only", !Config.of("a", null, 0).centerReady());
+                 check.same("prefix kept", "https://example.com/delta",
+@@ -360,14 +495,16 @@ public final class DataTests {
+                 });
+                 Config bad = Config.parse("{\"claude\":{\"refreshToken\":\"r\"},"
+                     + "\"center\":{\"server\":\"http://x\",\"token\":\"t\"}}");
+-                check.ok("a refused center keeps the cloud login", bad.ready() && !bad.centerReady());
+-                Config rotated = both.withCloud("a2", "r2", 9);
+-                check.same("rotation keeps the center", "delta_t", rotated.token());
++                check.ok("a refused center keeps the cloud login", bad.hasCloud() && !bad.centerReady());
++                Config handed = both.withoutCloud();
++                check.ok("handed over", !handed.hasCloud() && handed.refreshToken() == null);
++                check.same("handing over keeps the center", "delta_t", handed.token());
++                check.ok("nothing of it written", !handed.toJson().contains("\"r\""));
++                check.ok("and not read back", !Config.parse(handed.toJson()).hasCloud());
+                 check.same("center of another", "delta_t", Config.of("x", "y", 1).withCenterOf(both).token());
+-                check.same("cloud of another", "r", Config.blank().withCloudOf(both).refreshToken());
+                 check.same("legacy login key still read", "r",
+                     Config.parse("{\"claude\":{\"refreshToken\":\"r\"}}").refreshToken());
+-                check.ok("written under the new key", both.toJson().contains("\"cloud\""));
++                check.ok("an access token alone is nothing to hand over", !Config.of("a", null, 0).hasCloud());
+             }
+         });
+ 
+@@ -416,6 +553,12 @@ public final class DataTests {
+         return t.sequence();
+     }
+ 
++    private static String pad(int length) {
++        StringBuilder out = new StringBuilder();
++        while (out.length() < length) out.append('x');
++        return out.toString();
++    }
++
+     static String frame(int sequence, String source, Map<String, Object> payload) {
+         return Json.write(Json.map(
+             "event_id", "e" + sequence,
+diff --git a/delta/android/core/src/test/java/com/delta/xp3/net/NetTests.java b/delta/android/core/src/test/java/com/delta/xp3/net/NetTests.java
+index 9621cc2..f7f5cec 100644
+--- a/delta/android/core/src/test/java/com/delta/xp3/net/NetTests.java
++++ b/delta/android/core/src/test/java/com/delta/xp3/net/NetTests.java
+@@ -63,7 +63,7 @@ public final class NetTests {
+                     }
+                 });
+                 try {
+-                    CloudAuth auth = new CloudAuth(new Http(), "tok-1", null, 0, null);
++                    CloudAuth auth = CloudAuth.fixed("tok-1");
+                     Cloud cloud = new Cloud(new Http(), auth, server.uri(""));
+ 
+                     String id = cloud.create("Hello", "uuid-1", "Hello there");
+@@ -141,18 +141,23 @@ public final class NetTests {
+             }
+         });
+ 
+-        check.run("an expired login is renewed once", new Check.Body() {
++        check.run("a refused token is renewed through the command center", new Check.Body() {
+             @Override
+             public void run() throws Exception {
+                 final AtomicInteger renewals = new AtomicInteger();
+                 TestServer server = new TestServer(new TestServer.Handler() {
+                     @Override
+                     public TestServer.Reply handle(TestServer.Request request) {
+-                        if (request.path.equals("/token")) {
+-                            renewals.incrementAndGet();
+-                            check.ok("scope asked for", request.body.contains("user:sessions:claude_code"));
+-                            return TestServer.Reply.json(
+-                                "{\"access_token\":\"new\",\"refresh_token\":\"r2\",\"expires_in\":3600}");
++                        if (request.path.equals("/cc/cloud-accounts/acct-1/token")) {
++                            check.same("token asked with the delta token", "Bearer delta_t",
++                                request.header("authorization"));
++                            if (request.body.contains("\"refused\":\"old\"")) {
++                                renewals.incrementAndGet();
++                                return TestServer.Reply.json("{\"access_token\":\"new\",\"expires_at\":"
++                                    + (System.currentTimeMillis() + 3600000L) + "}");
++                            }
++                            return TestServer.Reply.json("{\"access_token\":\"old\",\"expires_at\":"
++                                + (System.currentTimeMillis() + 3600000L) + "}");
+                         }
+                         if (!request.header("authorization").equals("Bearer new")) {
+                             return TestServer.Reply.of(401, "application/json", "{}");
+@@ -164,18 +169,129 @@ public final class NetTests {
+                     }
+                 });
+                 try {
+-                    final String[] stored = new String[1];
+-                    CloudAuth auth = new CloudAuth(new Http(), server.uri("/token"), "old", "r1",
+-                        System.currentTimeMillis() + 3600000L, new CloudAuth.Rotated() {
+-                            @Override
+-                            public void store(String access, String refresh, long expiresAt) {
+-                                stored[0] = refresh;
+-                            }
+-                        });
++                    Center center = new Center(new Http(), server.uri("/cc").toString(), "delta_t");
++                    CloudAuth auth = CloudAuth.of(center, "acct-1");
+                     Cloud cloud = new Cloud(new Http(), auth, server.uri(""));
+                     cloud.interrupt("session_01X");
+                     check.same("renewed once", 1, renewals.get());
+-                    check.same("rotation stored", "r2", stored[0]);
++                    check.same("the renewed token is kept", "new", auth.token());
++                    check.same("and not asked for again", 1, renewals.get());
++                } finally {
++                    server.close();
++                }
++            }
++        });
++
++        check.run("a session's whole history, page by page", new Check.Body() {
++            @Override
++            public void run() throws Exception {
++                TestServer server = new TestServer(new TestServer.Handler() {
++                    @Override
++                    public TestServer.Reply handle(TestServer.Request request) {
++                        if (request.path.equals("/api/oauth/profile")) {
++                            return TestServer.Reply.json("{\"organization\":{\"uuid\":\"org-1\"}}");
++                        }
++                        if (request.path.equals("/v1/code/sessions/cse_01X/events?sort_order=asc")) {
++                            return TestServer.Reply.json("{\"data\":[{\"sequence_num\":1,\"payload\":{\"type\":\"user\"}},"
++                                + "{\"sequence_num\":2,\"payload\":{\"type\":\"assistant\"}}],\"next_cursor\":\"x\"}");
++                        }
++                        if (request.path.equals("/v1/code/sessions/cse_01X/events?sort_order=asc&cursor=2")) {
++                            return TestServer.Reply.json("{\"data\":[{\"sequence_num\":\"3\",\"payload\":{\"type\":\"result\"}}],"
++                                + "\"next_cursor\":null}");
++                        }
++                        return TestServer.Reply.of(404, "application/json", "{}");
++                    }
++                });
++                try {
++                    Cloud cloud = new Cloud(new Http(), CloudAuth.fixed("tok"), server.uri(""));
++                    List<Map<String, Object>> history = cloud.history("session_01X");
++                    check.same("every page", 3, history.size());
++                    check.same("in order", "result", history.get(2).get("type"));
++                    check.same("scoped to the organization", "org-1",
++                        find(server.seen, "/v1/code/sessions/cse_01X/events?sort_order=asc").header("x-organization-uuid"));
++                } finally {
++                    server.close();
++                }
++            }
++        });
++
++        check.run("cloud accounts on the command center", new Check.Body() {
++            @Override
++            public void run() throws Exception {
++                TestServer server = new TestServer(new TestServer.Handler() {
++                    @Override
++                    public TestServer.Reply handle(TestServer.Request request) {
++                        if (request.path.equals("/cc/cloud-accounts") && request.method.equals("GET")) {
++                            return TestServer.Reply.json("[{\"id\":\"acct-1\",\"email\":\"a@x.com\",\"plan\":\"claude_pro\"},"
++                                + "{\"id\":\"../bad\",\"email\":\"b@x.com\"},{\"id\":\"acct-2\"}]");
++                        }
++                        if (request.path.equals("/cc/cloud-accounts") && request.method.equals("POST")) {
++                            if (request.body.contains("dead")) return TestServer.Reply.of(403, "application/json", "{}");
++                            return TestServer.Reply.of(201, "application/json", "{\"id\":\"acct-3\"}");
++                        }
++                        if (request.path.equals("/cc/conversations") && request.method.equals("POST")) {
++                            return TestServer.Reply.of(201, "application/json", "{\"id\":\"abcdefgh23456789\"}");
++                        }
++                        if (request.path.equals("/cc/cloud-accounts/acct-1/usage")) {
++                            return TestServer.Reply.json("{\"five_hour\":{\"utilization\":100.0,"
++                                + "\"resets_at\":\"2030-01-01T05:00:00Z\"},\"seven_day\":{\"utilization\":40}}");
++                        }
++                        if (request.path.equals("/cc/cloud-accounts/acct-2/usage")) {
++                            return TestServer.Reply.json("{\"five_hour\":{\"utilization\":12,"
++                                + "\"resets_at\":\"2030-01-01T05:00:00Z\"},\"seven_day\":null}");
++                        }
++                        if (request.path.equals("/cc/cloud-accounts/acct-9/token")) {
++                            return TestServer.Reply.of(403, "application/json", "{\"error\":\"rejected\"}");
++                        }
++                        return TestServer.Reply.of(404, "application/json", "{}");
++                    }
++                });
++                try {
++                    final Center center = new Center(new Http(), server.uri("/cc").toString(), "delta_t");
++                    List<Center.Account> accounts = center.accounts();
++                    check.same("ids that can't go in a route are skipped", 2, accounts.size());
++                    check.same("email", "a@x.com", accounts.get(0).email);
++                    check.same("no email shows the id", "acct-2", accounts.get(1).email);
++                    check.same("plan", "claude_pro", accounts.get(0).plan);
++                    check.ok("no plan", accounts.get(1).plan == null);
++                    Center.Usage usage = center.usage("acct-2");
++                    check.same("5-hour use", Double.valueOf(12), usage.fiveHour);
++                    check.same("5-hour reset", 1893474000000L, usage.fiveHourResets);
++                    check.ok("no weekly window", usage.weekly == null && usage.weeklyResets == 0);
++                    check.same("a full window rules an account out until it resets", 1893474000000L,
++                        center.limitedUntil("acct-1"));
++                    check.same("room left", 0L, center.limitedUntil("acct-2"));
++                    check.same("a conversation is stored by id", "abcdefgh23456789",
++                        center.putConversation("# Fix\n\nall of it"));
++                    check.same("as text", "# Fix\n\nall of it", find(server.seen, "/cc/conversations").body);
++                    center.addAccount("a", "r", 5);
++                    String handed = null;
++                    synchronized (server.seen) {
++                        for (TestServer.Request request : server.seen) {
++                            if (request.method.equals("POST") && request.path.equals("/cc/cloud-accounts")) handed = request.body;
++                        }
++                    }
++                    Map<String, Object> added = Json.object(Json.parse(handed));
++                    check.same("login handed over", "r", added.get("refresh_token"));
++                    check.fails("a dead login is named", "no longer works", new Check.Body() {
++                        @Override
++                        public void run() throws Exception {
++                            center.addAccount(null, "dead", 0);
++                        }
++                    });
++                    try {
++                        center.token("acct-9", null);
++                        check.ok("a rejected login fails", false);
++                    } catch (Center.Refused e) {
++                        check.ok("a rejected login is Refused", e.getMessage().contains("delta accounts login"));
++                    }
++                    final Center old = new Center(new Http(), server.uri("/old").toString(), "delta_t");
++                    check.fails("an old command center says so", "needs updating", new Check.Body() {
++                        @Override
++                        public void run() throws Exception {
++                            old.accounts();
++                        }
++                    });
+                 } finally {
+                     server.close();
+                 }
+@@ -195,7 +311,7 @@ public final class NetTests {
+                     }
+                 });
+                 try {
+-                    final Cloud cloud = new Cloud(new Http(), new CloudAuth(new Http(), "t", null, 0, null),
++                    final Cloud cloud = new Cloud(new Http(), CloudAuth.fixed("t"),
+                         server.uri(""));
+                     check.fails("rate limit", "usage limit", new Check.Body() {
+                         @Override
+@@ -244,7 +360,7 @@ public final class NetTests {
+                     }
+                 });
+                 try {
+-                    Cloud cloud = new Cloud(new Http(), new CloudAuth(new Http(), "tok", null, 0, null), server.uri(""));
++                    Cloud cloud = new Cloud(new Http(), CloudAuth.fixed("tok"), server.uri(""));
+                     List<com.delta.xp3.data.Chat> chats = cloud.sessions();
+                     check.same("cloud sessions only, archived and odd ids left out", 2, chats.size());
+                     check.same("newest first", "session_new", chats.get(0).id);
+@@ -288,7 +404,7 @@ public final class NetTests {
+                     }
+                 });
+                 try {
+-                    Cloud cloud = new Cloud(new Http(), new CloudAuth(new Http(), "tok", null, 0, null),
++                    Cloud cloud = new Cloud(new Http(), CloudAuth.fixed("tok"),
+                         server.uri(""));
+                     cloud.create("t", "u", "hi");
+                     Map<String, Object> made = Json.object(Json.parse(
+-- 
+2.43.0
+
