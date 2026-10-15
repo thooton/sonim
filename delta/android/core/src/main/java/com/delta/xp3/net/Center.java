@@ -1,5 +1,6 @@
 package com.delta.xp3.net;
 
+import com.delta.xp3.data.Chat;
 import com.delta.xp3.data.RemoteFile;
 
 import java.io.IOException;
@@ -7,6 +8,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -15,10 +19,12 @@ import java.util.Map;
  * the phone's side.
  *
  * An agent pushes a file with the CLI; this lists it, fetches it, and deletes
- * it. The phone can push one too, for an agent to `delta pull`. Every request
- * carries the bearer token `delta-cc gen-token` printed.
+ * it. The phone can push one too, for an agent to `delta pull`. It also runs
+ * the backup sessions the command center keeps itself (▲ in Chats), whose
+ * event streams read like the cloud's. Every request carries the bearer token
+ * `delta-cc gen-token` printed.
  */
-public final class Center {
+public final class Center implements EventSource {
 
     /** Reported while a download runs, and asked whether to stop. */
     public interface Progress {
@@ -132,6 +138,120 @@ public final class Center {
         if (response.status() == 400) throw new IOException("The command center refused that name.");
         require(response.status());
         return true;
+    }
+
+    // ------------------------------------------------------------------
+    // Backup sessions
+    // ------------------------------------------------------------------
+
+    /** The backup sessions, most recently active first. */
+    public List<Chat> sessions() throws IOException, InterruptedException {
+        String body = session(request("/agent-sessions"));
+        List<Chat> chats = new ArrayList<Chat>();
+        try {
+            for (Object value : Json.children(Json.object(Json.parse(body)), "data")) {
+                if (!(value instanceof Map)) continue;
+                Map<String, Object> session = Json.object(value);
+                String id = Json.text(session, "id");
+                if (!Chat.validId(id) || !Chat.backup(id)) continue;
+                chats.add(new Chat(id, Json.text(session, "title"), Json.text(session, "status"),
+                    Json.instant(session, "updated")));
+            }
+        } catch (RuntimeException e) {
+            throw new IOException("The command center sent an unreadable session list");
+        }
+        Collections.sort(chats, new Comparator<Chat>() {
+            @Override
+            public int compare(Chat a, Chat b) {
+                return a.updated == b.updated ? 0 : a.updated > b.updated ? -1 : 1;
+            }
+        });
+        return chats;
+    }
+
+    /**
+     * Starts a backup session with its first message, and returns its id.
+     * The command center writes the session's setup itself.
+     */
+    public String create(String title, String uuid, String text, List<byte[]> jpegs)
+        throws IOException, InterruptedException {
+        String body = session(request("/agent-sessions").post(message(title, uuid, text, jpegs)));
+        String id;
+        try {
+            id = Json.string(Json.object(Json.parse(body)), "id");
+        } catch (RuntimeException e) {
+            id = null;
+        }
+        if (!Chat.validId(id) || !Chat.backup(id)) throw new IOException("The command center returned an unexpected session id");
+        return id;
+    }
+
+    /** Sends a follow-up message; one sent mid-turn reaches the agent between its steps. */
+    public void send(String session, String uuid, String text, List<byte[]> jpegs)
+        throws IOException, InterruptedException {
+        session(request(sessionPath(session) + "/messages").post(message(null, uuid, text, jpegs)));
+    }
+
+    public void interrupt(String session) throws IOException, InterruptedException {
+        session(request(sessionPath(session) + "/interrupt").post("{}"));
+    }
+
+    /** Deletes a backup session with its computer. One already gone counts as deleted. */
+    public void deleteSession(String session) throws IOException, InterruptedException {
+        Http.Response response = http.send(request(sessionPath(session)).method("DELETE"));
+        if (response.status() == 404) return;
+        sessionStatus(response.status(), response.body());
+    }
+
+    /** The session's event stream after `afterSequence`, as Cloud.open. */
+    @Override
+    public Http.Stream open(String session, long afterSequence) throws IOException, InterruptedException {
+        String path = sessionPath(session) + "/events";
+        if (afterSequence > 0) path += "?from_sequence_num=" + afterSequence;
+        Http.Request request = request(path).header("Accept", "text/event-stream").identity();
+        if (afterSequence > 0) request.header("Last-Event-ID", String.valueOf(afterSequence));
+        Http.Stream stream = http.stream(request);
+        if (stream.status() < 200 || stream.status() >= 300) {
+            int status = stream.status();
+            stream.close();
+            sessionStatus(status, null);
+        }
+        return stream;
+    }
+
+    private static String sessionPath(String session) {
+        if (!Chat.validId(session) || !Chat.backup(session)) throw new IllegalArgumentException("Not a backup session");
+        return "/agent-sessions/" + session;
+    }
+
+    private static String message(String title, String uuid, String text, List<byte[]> jpegs) {
+        List<Object> images = new ArrayList<Object>();
+        if (jpegs != null) for (byte[] jpeg : jpegs) images.add(Base64.getEncoder().encodeToString(jpeg));
+        Map<String, Object> body = Json.map("uuid", uuid, "text", text, "images", images);
+        if (title != null) body.put("title", title);
+        return Json.write(body);
+    }
+
+    private String session(Http.Request request) throws IOException, InterruptedException {
+        Http.Response response = http.send(request);
+        sessionStatus(response.status(), response.body());
+        return response.body();
+    }
+
+    /** The command center explains its refusals, and they are worth showing. */
+    private static void sessionStatus(int status, String body) throws IOException {
+        if (status >= 200 && status < 300) return;
+        if (status == 401) throw new IOException("The command center refused the token.");
+        if (status == 404) throw new IOException("That session is no longer on the command center.");
+        if (body != null) {
+            try {
+                String said = Json.text(Json.object(Json.parse(body)), "error");
+                if (said != null && said.trim().length() > 0) throw new IOException(said.trim());
+            } catch (RuntimeException e) {
+                // Not the command center's JSON; say it generically below.
+            }
+        }
+        Http.requireSuccess(status, SERVICE);
     }
 
     // ------------------------------------------------------------------

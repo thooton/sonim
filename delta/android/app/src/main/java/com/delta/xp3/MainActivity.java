@@ -132,6 +132,7 @@ public final class MainActivity extends Activity {
     private static final int MENU_SEND_FILE = 23;
     private static final int MENU_UNATTACH = 24;
     private static final int MENU_CANCEL_UPLOAD = 25;
+    private static final int MENU_NEW_BACKUP = 26;
 
     /** Activity results. */
     private static final int TAKE_PICTURE = 1;
@@ -201,6 +202,8 @@ public final class MainActivity extends Activity {
     private Transcript transcript;
     /** The first message is on its way and the session does not exist yet. */
     private boolean creating;
+    /** Whether the new, unsent session is to be a backup one (▲) rather than a cloud one (●). */
+    private boolean newBackup;
     private Link link;
     private boolean online;
     /** Bumped whenever a different session is opened; anything older that comes back is dropped. */
@@ -274,6 +277,7 @@ public final class MainActivity extends Activity {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
         backend = new Backend(getFilesDir(), ShareProvider.folder(this));
+        newBackup = defaultBackup();
         pictures = new Pictures(getFilesDir());
         int tab = CHATS;
         // The camera and the installer can cost this activity its life on a
@@ -431,7 +435,7 @@ public final class MainActivity extends Activity {
     // ------------------------------------------------------------------
 
     private void refreshChats() {
-        if (!backend.ready() || chatsLoading) return;
+        if (!anySessions() || chatsLoading) return;
         chatsLoading = true;
         final int forGeneration = ++chatsGeneration;
         if (currentTab == CHATS) updateChatRows();
@@ -487,7 +491,7 @@ public final class MainActivity extends Activity {
     }
 
     private void renderChats(boolean focusContent) {
-        if (!backend.ready()) {
+        if (!anySessions()) {
             replaceContent(emptyMessage(Backend.NO_LOGIN));
             return;
         }
@@ -516,7 +520,7 @@ public final class MainActivity extends Activity {
             String when = when(chat.updated);
             boolean open = chat.id.equals(sessionId);
             String sub = open ? (when.length() == 0 ? "Open" : "Open · " + when) : when;
-            rows.add(new RowAdapter.Row(chat.id, chat.title, sub, chatState(chat)));
+            rows.add(new RowAdapter.Row(chat.id, chat.label(), sub, chatState(chat)));
         }
         rowAdapter.replace(rows);
         if (was != null) {
@@ -527,7 +531,7 @@ public final class MainActivity extends Activity {
         TextView notice = parent == null ? null : (TextView) ((ViewGroup) parent).getChildAt(0);
         if (notice != null) {
             String said = chatsProblem != null ? chatsProblem : chatsLoading && chats.isEmpty() ? "Loading…"
-                : chats.isEmpty() ? "No cloud sessions yet." : null;
+                : chats.isEmpty() ? "No sessions yet." : null;
             notice.setText(said);
             notice.setVisibility(said == null ? View.GONE : View.VISIBLE);
         }
@@ -569,11 +573,17 @@ public final class MainActivity extends Activity {
         showTab(SESSION, true);
     }
 
+    /** A cloud session is archived; a backup one is deleted, with its computer and files. */
     private void confirmArchive(final Chat chat) {
+        boolean backup = Chat.backup(chat.id);
+        String verb = backup ? "Delete" : "Archive";
+        String message = backup
+            ? "Delete \"" + chat.title + "\"? Its computer and everything on it go too."
+            : "Archive \"" + chat.title + "\"?";
         new AlertDialog.Builder(this)
-            .setTitle("Archive")
-            .setMessage("Archive \"" + chat.title + "\"?")
-            .setPositiveButton("Archive", new DialogInterface.OnClickListener() {
+            .setTitle(verb)
+            .setMessage(message)
+            .setPositiveButton(verb, new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     archive(chat);
@@ -601,15 +611,16 @@ public final class MainActivity extends Activity {
                     @Override
                     public void run() {
                         if (isFinishing()) return;
+                        boolean backup = Chat.backup(chat.id);
                         if (said != null) {
-                            toast("Not archived: " + said);
+                            toast((backup ? "Not deleted: " : "Not archived: ") + said);
                             return;
                         }
-                        toast("Archived");
+                        toast(backup ? "Deleted" : "Archived");
                         List<Chat> left = new ArrayList<>();
                         for (Chat other : chats) if (!other.id.equals(chat.id)) left.add(other);
                         chats = left;
-                        if (chat.id.equals(sessionId)) newSession();
+                        if (chat.id.equals(sessionId)) newSession(defaultBackup());
                         if (currentTab == CHATS) updateChatRows();
                     }
                 });
@@ -714,8 +725,9 @@ public final class MainActivity extends Activity {
             toast("Still sending " + uploading.file.getName());
             return;
         }
-        if (!backend.ready()) {
-            transcript.note(Backend.NO_LOGIN);
+        final boolean backup = backupNow();
+        if (backup ? !backend.centerReady() : !backend.ready()) {
+            transcript.note(backup ? Backend.NO_CENTER : Backend.NO_LOGIN);
             render(FOCUS_INPUT);
             return;
         }
@@ -740,7 +752,7 @@ public final class MainActivity extends Activity {
                 @Override
                 public void run() {
                     try {
-                        final String id = backend.create(sessionTitle, uuid, message, attached, sentFiles);
+                        final String id = backend.create(backup, sessionTitle, uuid, message, attached, sentFiles);
                         main.post(new Runnable() {
                             @Override
                             public void run() {
@@ -866,13 +878,43 @@ public final class MainActivity extends Activity {
         });
     }
 
-    /** A new session, not yet started. The one left stays in Chats. */
-    private void newSession() {
-        if (sessionId == null && !creating) return;
+    /**
+     * A new session, not yet started, of the kind asked for: a backup one
+     * (▲) or a cloud one (●). The one left stays in Chats.
+     */
+    private void newSession(boolean backup) {
+        if (sessionId == null && !creating) {
+            newBackup = backup;
+            updateHeader();
+            return;
+        }
         saveNow();
         switchTo(null);
+        newBackup = backup;
         saveNow();
         if (currentTab == SESSION) render(FOCUS_INPUT);
+    }
+
+    /** Whether there are sessions to list: cloud ones, backup ones, or both. */
+    private boolean anySessions() {
+        return backend.ready() || backend.centerReady();
+    }
+
+    /** A new session is a cloud one, unless this build can only start backup ones. */
+    private boolean defaultBackup() {
+        return !backend.ready() && backend.centerReady();
+    }
+
+    /** Whether the open session (or the new one about to start) is a backup one. */
+    private boolean backupNow() {
+        return sessionId != null ? Chat.backup(sessionId) : newBackup;
+    }
+
+    /** The menu's "New session" items, for each kind this build can start. */
+    private void addNewSessionItems() {
+        boolean fresh = sessionId == null && !creating;
+        if (backend.ready() && !(fresh && !newBackup)) add(MENU_NEW, "New session " + Chat.MARK);
+        if (backend.centerReady() && !(fresh && newBackup)) add(MENU_NEW_BACKUP, "New session " + Chat.BACKUP_MARK);
     }
 
     // ------------------------------------------------------------------
@@ -1365,7 +1407,7 @@ public final class MainActivity extends Activity {
 
     private void updateHeader() {
         if (titleView == null || stateView == null) return;
-        titleView.setText(title != null ? title : getString(R.string.new_session));
+        titleView.setText(Chat.label(backupNow(), title != null ? title : getString(R.string.new_session)));
         String state;
         if (sessionId == null) state = creating ? "Starting" : "";
         else if (!online) state = "Offline";
@@ -2571,7 +2613,7 @@ public final class MainActivity extends Activity {
             anchor = content.getChildCount() > 0 ? content.getChildAt(0) : content;
             y = anchor.getHeight() / 2f;
             if (currentTab == FILES) filesMenu();
-            else if (currentTab == CHATS && backend.ready()) chatsMenu();
+            else if (currentTab == CHATS && anySessions()) chatsMenu();
         }
         if (menuIds.isEmpty()) return;
         anchor.showContextMenu(Math.min(dp(32), anchor.getWidth() / 2f), y);
@@ -2607,16 +2649,17 @@ public final class MainActivity extends Activity {
         if (!attachedFiles.isEmpty()) add(MENU_UNATTACH, attachedFiles.size() == 1 ? "Remove file" : "Remove files");
         if (sessionId != null && transcript.working()) add(MENU_INTERRUPT, "Interrupt");
         if (clipboardText() != null) add(MENU_PASTE, "Paste");
-        if (sessionId != null) add(MENU_LINK, "Copy session link");
-        if (sessionId != null) add(MENU_NEW, "New session");
+        // A backup session has no page on the web to link to.
+        if (sessionId != null && !Chat.backup(sessionId)) add(MENU_LINK, "Copy session link");
+        addNewSessionItems();
         return y;
     }
 
     private void chatsMenu() {
         Chat chat = chatFor(menuRow);
         add(MENU_REFRESH, "Refresh");
-        add(MENU_NEW, "New session");
-        if (chat != null) add(MENU_ARCHIVE, "Archive");
+        addNewSessionItems();
+        if (chat != null) add(MENU_ARCHIVE, Chat.backup(chat.id) ? "Delete" : "Archive");
     }
 
     private void filesMenu() {
@@ -2677,7 +2720,8 @@ public final class MainActivity extends Activity {
                 if (id != null) copy(Cloud.link(id), "Link copied");
                 break;
             case MENU_NEW:
-                newSession();
+            case MENU_NEW_BACKUP:
+                newSession(item.getItemId() == MENU_NEW_BACKUP);
                 if (currentTab != SESSION) showTab(SESSION, true);
                 break;
             case MENU_TAKE:

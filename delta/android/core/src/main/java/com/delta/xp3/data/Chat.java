@@ -1,10 +1,21 @@
 package com.delta.xp3.data;
 
 /**
- * One cloud session as the Chats tab lists it: enough to name it and say
- * whether anything is happening in it, not its conversation.
+ * One session as the Chats tab lists it: enough to name it and say whether
+ * anything is happening in it, not its conversation.
+ *
+ * Sessions come in two kinds: the cloud's, and the backup ones the command
+ * center runs itself. Their ids tell them apart, and each kind's titles carry
+ * its mark (MARK, BACKUP_MARK) wherever they are shown.
  */
 public final class Chat {
+
+    /** The mark of a cloud session. */
+    public static final String MARK = "\u25CF";
+    /** The mark of a backup session. */
+    public static final String BACKUP_MARK = "\u25B2";
+    /** How the command center's backup session ids start. */
+    private static final String BACKUP_PREFIX = "session_delta_";
 
     /** The worker is running a turn. */
     public static final String WORKING = "running";
@@ -48,6 +59,20 @@ public final class Chat {
     public static String sessionId(String id) {
         if (id == null) return null;
         return id.startsWith("cse_") ? "session_" + id.substring("cse_".length()) : id;
+    }
+
+    /** Whether a session id is one of the command center's backup sessions. */
+    public static boolean backup(String id) {
+        return id != null && id.startsWith(BACKUP_PREFIX);
+    }
+
+    /** A title with its kind's mark ahead of it. */
+    public static String label(boolean backup, String title) {
+        return (backup ? BACKUP_MARK : MARK) + " " + title;
+    }
+
+    public String label() {
+        return label(backup(id), title);
     }
 
     public Chat titled(String next) {

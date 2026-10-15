@@ -53,6 +53,20 @@ of the text (`cursorOwns`, as in Canvas).
   Ids may arrive as `cse_…`; they are always stored as `session_…`
   (`Chat.sessionId`). The list is cached in `chats.json`. Archive is
   `POST /v1/code/sessions/{cse}/archive`, where 409 means already archived.
+  Beside them are the command center's backup sessions (`Center.sessions()`,
+  `GET /agent-sessions`; ids `session_delta_…`, told apart by `Chat.backup`),
+  merged newest first by `Backend.sessions()`, which keeps a side's last list
+  when only that side can't be reached. Every title is shown with its kind's
+  mark (`Chat.label`): ● for a cloud session, ▲ for a backup one. The menu
+  offers "New session ●" and "New session ▲" (each only when this build can
+  start that kind); a backup session has **Delete** (`DELETE
+  /agent-sessions/{id}`, which removes its computer too) in place of Archive,
+  and no session link. Backup sessions are created with what was typed
+  (`POST /agent-sessions`): the command center writes their setup itself.
+  Their stream (`Center.open`, `GET /agent-sessions/{id}/events`) is in the
+  cloud's frame format, so `Link` takes either through `EventSource` and
+  `Transcript` reads both. They never ask permission. Never name the agent or
+  the model behind either kind anywhere in the app.
 - **Session**: the old Cloud screen for whichever session is open, under a
   slim title/state strip. The stream (`Link`) stays connected while the
   activity is started, whichever tab is showing. Opening another session bumps
@@ -148,7 +162,7 @@ the two in step.
 ## Layout
 
 - `android/core`: `net/` (`Http`, `Json`, `Config`, `CloudAuth`, `Sse`,
-  `Cloud`, `Center`) and `data/` (`Entry`, `Transcript`, `Store`, `Chat`,
+  `EventSource`, `Cloud`, `Center`) and `data/` (`Entry`, `Transcript`, `Store`, `Chat`,
   `RemoteFile`, `Setup`, `Attached`, `Folders`). Tests in `src/test` run via `:core:selfTest` with
   the tiny `Check` harness and loopback `TestServer`.
 - `android/app`: `MainActivity` (tabs, screens, keys, menus, intents),
