@@ -3,8 +3,8 @@ plugins {
 }
 
 // No dependencies block, and none is coming: this module is the half of the app
-// that has to be plain Java, so that the list rules and the tool gate the
-// assistant writes through can be run and checked on a desktop JVM.
+// that has to be plain Java, so that the list rules and storage can be run and
+// checked on a desktop JVM.
 //
 // `release = 8` is the guard that makes that promise mean something. Everything
 // here also has to run unchanged on Android at API 27, and the compiler is the

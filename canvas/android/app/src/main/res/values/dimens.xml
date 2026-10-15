@@ -26,17 +26,4 @@
     <dimen name="text_when_sub">10sp</dimen>
     <dimen name="text_caret">9sp</dimen>
     <dimen name="text_detail_title">16sp</dimen>
-
-    <!-- Full-width chat areas keep only readable inner padding and a small
-         separator between turns. -->
-    <dimen name="text_bubble">14sp</dimen>
-    <dimen name="text_bubble_time">10sp</dimen>
-    <!-- Their bubble is not padded evenly: 17px above the cap of the first
-         line once the font's own padding is counted, and 6px under the time,
-         which is what stops the time from looking like a line of the message. -->
-    <dimen name="bubble_pad_h">10dp</dimen>
-    <dimen name="bubble_pad_top">13dp</dimen>
-    <dimen name="bubble_pad_bottom">4dp</dimen>
-    <dimen name="bubble_time_gap">5dp</dimen>
-    <dimen name="chat_area_gap">1dp</dimen>
 </resources>

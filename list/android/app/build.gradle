@@ -1,96 +1,6 @@
-import groovy.json.JsonOutput
-import groovy.json.JsonSlurper
-
 plugins {
     id "com.android.application"
 }
-
-/*
- * The bundled login, for a personal deployment.
- *
- * This is one person's phone, so the app ships already signed in to Claude
- * rather than asking somebody to complete an OAuth flow and paste a callback
- * URL on a T9 keypad. The complete rotating OAuth entry is read at build time
- * from claude-auth.json beside the android directory (the same shape Pi writes,
- * under `anthropic`) and written into a generated source file under build/.
- * Nothing secret is ever committed, and a checkout on any other machine simply
- * builds an app whose chat has no login.
- *
- * The APK that comes out of this contains a live credential. It is gitignored,
- * and it should be treated as a password: anything with the file can spend the
- * configured Claude subscription.
- */
-def bundledSource = layout.buildDirectory.dir("generated/bundled")
-
-tasks.register("generateDefaults") {
-    description = "Bakes this deployment's Claude login into the APK."
-    def localClaudeAuth = file(project.findProperty("list.claudeAuth") ?: "${rootDir}/../claude-auth.json")
-
-    inputs.files(localClaudeAuth)
-        .withPropertyName("sources")
-        .ignoreEmptyDirectories().optional(true)
-    outputs.dir(bundledSource)
-
-    doLast {
-        def claude = localClaudeAuth.isFile() ? (new JsonSlurper().parse(localClaudeAuth).anthropic ?: [:]) : [:]
-        def revision = ""
-        def settings = ""
-        if (claude.access || claude.refresh) {
-            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
-                .digest(localClaudeAuth.bytes)
-            revision = digest.collect { String.format("%02x", it & 0xff) }.join()
-            // Keep the complete pair together, with its expiry: Claude rotates
-            // the refresh token, and the app persists each rotation.
-            def entry = [:]
-            if (claude.access) entry.accessToken = claude.access
-            if (claude.refresh) entry.refreshToken = claude.refresh
-            if (claude.expires) entry.expiresAt = claude.expires
-            settings = JsonOutput.toJson([claude: entry])
-        }
-        def quoted = settings.replace("\\", "\\\\").replace('"', '\\"')
-
-        def target = new File(bundledSource.get().asFile, "com/list/xp3")
-        target.mkdirs()
-        new File(target, "Defaults.java").text = """package com.list.xp3;
-
-import com.list.xp3.net.Config;
-
-/**
- * The login baked in at build time. GENERATED - do not edit, do not commit.
- *
- * Empty when the build had no credentials to hand, which is what a checkout on
- * another machine gets: the chat then says it has no login.
- */
-final class Defaults {
-
-    private Defaults() {}
-
-    private static final String SETTINGS = "${quoted}";
-    private static final String REVISION = "${revision}";
-
-    /** Whether this build came with a login in it. */
-    static boolean available() {
-        return SETTINGS.length() > 0;
-    }
-
-    /** Identifies the bundled OAuth entry without exposing it. */
-    static String revision() {
-        return REVISION;
-    }
-
-    /** The bundled login, validated the same way a stored one is. */
-    static Config config() {
-        return Config.parse(SETTINGS);
-    }
-}
-"""
-        logger.lifecycle(settings
-            ? "Bundled setup: Claude login, model claude-opus-4-6"
-            : "Bundled setup: none found; the chat will have no login")
-    }
-}
-
-tasks.named("preBuild") { dependsOn "generateDefaults" }
 
 // One dependency, and it is the other half of this repository. Nothing third
 // party: no AndroidX, no Material components, no Markdown, JSON or HTTP
@@ -98,8 +8,8 @@ tasks.named("preBuild") { dependsOn "generateDefaults" }
 // everything it fetches goes through java.net, which is what keeps a debug APK
 // for a 240x320 phone in the low hundreds of kilobytes.
 //
-// :core is the Android-free half: the list, the tools and the agent, all plain
-// Java so they can be tested on a desktop JVM.
+// :core is the Android-free half: the list and its storage, plain Java so it
+// can be tested on a desktop JVM.
 dependencies {
     implementation project(":core")
 }
@@ -122,10 +32,9 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    sourceSets {
-        main {
-            java.srcDir bundledSource
-        }
+    // API 27 is the phone's own version; this app is never going to Play.
+    lint {
+        disable "ExpiredTargetSdkVersion"
     }
 }
 

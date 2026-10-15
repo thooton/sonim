@@ -193,10 +193,10 @@ public final class Http {
     public static void requireSuccess(int status, String service) throws IOException {
         if (status >= 200 && status < 300) return;
         String hint;
-        if (status == 400) hint = "request rejected; check the configured model and provider";
+        if (status == 400) hint = "request rejected";
         else if (status == 401) hint = "credentials expired or invalid; renew them in Settings and retry";
         else if (status == 403) hint = "this account is not permitted to read the requested data";
-        else if (status == 404) hint = "resource or configured model was not found";
+        else if (status == 404) hint = "resource was not found";
         else if (status == 429) hint = "rate or usage limit reached; wait before retrying";
         else if (status >= 300 && status < 400) hint = "redirect refused; check the configured Canvas address";
         else hint = "service request failed";

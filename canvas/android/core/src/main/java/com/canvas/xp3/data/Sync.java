@@ -3,7 +3,6 @@ package com.canvas.xp3.data;
 import com.canvas.xp3.net.Canvas;
 import com.canvas.xp3.net.Json;
 import com.canvas.xp3.net.Submissions;
-import com.canvas.xp3.net.Tools;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -60,7 +59,7 @@ public final class Sync {
             String name = courseName(course);
             String id;
             try {
-                id = Tools.id(course, "id");
+                id = Canvas.id(course, "id");
             } catch (RuntimeException e) {
                 unavailable.add(name);
                 continue;
@@ -109,7 +108,7 @@ public final class Sync {
         if (record.containsKey("published") && !Json.flag(record, "published")) return null;
         String id;
         try {
-            id = Tools.id(record, "id");
+            id = Canvas.id(record, "id");
         } catch (RuntimeException e) {
             return null;
         }

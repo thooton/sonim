@@ -1,6 +1,7 @@
 package com.canvas.xp3.net;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -21,12 +22,12 @@ import java.util.regex.Pattern;
  * Every route is written out here rather than assembled from anything the model
  * or the network says, which is what makes "this app cannot post, submit or
  * change a grade" a fact about the code instead of a promise in a prompt. The
- * only thing that varies is an id, and an id has been through Tools.id.
+ * only thing that varies is an id, and an id has been through Canvas.id.
  *
  * Responses are filtered down to named fields on the way through. That is
  * partly to keep a course's worth of JSON inside a phone's memory, and partly
  * because a submission body or an attachment blob has no bearing on when
- * something is due and no business being carried into a model request.
+ * something is due and no business being kept on a phone.
  */
 public final class Canvas {
 
@@ -137,7 +138,7 @@ public final class Canvas {
         List<Object> failures = new ArrayList<Object>();
         for (Object c : courses(true)) {
             Map<String, Object> course = Json.object(c);
-            String id = Tools.id(course, "id");
+            String id = id(course, "id");
             try {
                 for (Object a : assignments(id)) {
                     Map<String, Object> assignment = new LinkedHashMap<String, Object>(Json.object(a));
@@ -312,4 +313,37 @@ public final class Canvas {
         "created_at", "updated_at", "deleted", "has_more_replies" };
     private static final String[] PAGE_FIELDS = { "page_id", "url", "title", "body", "html_url",
         "created_at", "updated_at", "published", "front_page", "locked_for_user", "lock_explanation" };
+
+    /**
+     * Accepts a positive whole number. This is the only value that is
+     * interpolated into a Canvas path; all other route components are fixed
+     * literals defined above.
+     */
+    public static String id(Map<String, Object> args, String key) {
+        Object value = args.get(key);
+
+        if (!(value instanceof Number)) {
+            throw new IllegalArgumentException(
+                "The '" + key + "' field needs to be a number."
+            );
+        }
+
+        long parsed;
+
+        try {
+            parsed = new BigDecimal(value.toString()).longValueExact();
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException(
+                "The '" + key + "' field needs to be a whole number."
+            );
+        }
+
+        if (parsed <= 0) {
+            throw new IllegalArgumentException(
+                "The '" + key + "' field needs to be a positive number."
+            );
+        }
+
+        return Long.toString(parsed);
+    }
 }

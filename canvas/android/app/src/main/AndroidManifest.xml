@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- One permission. The app reads Canvas over HTTPS and sends chat
-         questions to the configured model provider; it needs nothing else, and
+    <!-- One permission. The app reads Canvas over HTTPS; it needs nothing else, and
          in particular no storage permission, because everything it keeps is in
          its own private directory. -->
     <uses-permission android:name="android.permission.INTERNET" />
