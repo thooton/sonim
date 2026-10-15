@@ -27,7 +27,7 @@ The command center login is baked in at build time, and a build without it keeps
 
 - **Command center**: `-Pdelta.center=<file>`, else `delta-center.json` beside `android/`, else the CLI's own `~/.config/delta/config.json` (written by `delta set-auth`). The format is `{"server": "https://…", "token": "delta_…"}`. Without one, use **Menu → Command center** on the Files tab. The app only connects over https.
 
-The cloud environment has to be able to reach the command center's host. If the app has to create your first cloud environment, it gives it full network access. Otherwise, set the environment's network access to **Full** (or add the host) on claude.ai/code.
+The app makes a cloud environment of its own on each account, named "Delta" and a short code, with full network access and a setup script that installs and signs in the delta CLI. It makes a new one whenever the command center's address or token changes; archive the old one on claude.ai/code if you like.
 
 ## Controls
 

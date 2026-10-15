@@ -1,6 +1,7 @@
 package com.delta.xp3.net;
 
 import com.delta.xp3.data.Chat;
+import com.delta.xp3.data.Setup;
 
 import java.io.IOException;
 import java.net.URI;
@@ -44,16 +45,25 @@ public final class Cloud implements EventSource {
     private final Http http;
     private final CloudAuth auth;
     private final URI base;
+    /** The command center the sandbox's `delta` CLI signs in to; null without one. */
+    private final String server;
+    private final String token;
     private String organization;
     private String environment;
 
-    public Cloud(Http http, CloudAuth auth) {
-        this(http, auth, API);
+    public Cloud(Http http, CloudAuth auth, String server, String token) {
+        this(http, auth, server, token, API);
     }
 
     Cloud(Http http, CloudAuth auth, URI base) {
+        this(http, auth, null, null, base);
+    }
+
+    Cloud(Http http, CloudAuth auth, String server, String token, URI base) {
         this.http = http;
         this.auth = auth;
+        this.server = server;
+        this.token = token;
         this.base = base;
     }
 
@@ -299,32 +309,39 @@ public final class Cloud implements EventSource {
     }
 
     /**
-     * The first cloud environment on the account, made if there is none. A
-     * made one has full network access (`*`, the "Full" setting in
-     * the web app), so the sandbox can reach the command center and
-     * anything else a task needs. One that already exists is used as it is.
+     * The account's cloud environment for Delta, made if there is none: its
+     * setup script installs the `delta` CLI and its variables sign it in to
+     * the command center (see `Setup`). There is no call here to change an
+     * environment, so one is found by name (`Setup.environmentName`), which
+     * changes with the script, the address and the token; a change makes a
+     * new one, and the old one is left for the person to archive.
+     *
+     * A made one has full network access (`*`, the "Full" setting in the
+     * web app), so the sandbox can reach the command center and anything
+     * else a task needs.
      */
     private synchronized String environment() throws IOException, InterruptedException {
         if (environment != null) return environment;
+        String name = Setup.environmentName(server, token);
         Map<String, Object> listed = object(request("/v1/environment_providers", null, false, true), "environments");
         List<Object> all = Json.children(listed, "environments");
         for (Object entry : all) {
             if (!(entry instanceof Map)) continue;
             Map<String, Object> candidate = Json.object(entry);
-            if (CLOUD_KIND.equals(Json.text(candidate, "kind"))) {
+            if (CLOUD_KIND.equals(Json.text(candidate, "kind")) && name.equals(Json.text(candidate, "name"))) {
                 environment = Json.string(candidate, "environment_id");
                 return environment;
             }
         }
         Map<String, Object> made = object(post("/v1/environment_providers/cloud/create", Json.write(Json.map(
-            "name", "Default",
+            "name", name,
             "kind", CLOUD_KIND,
-            "description", "Default - full network access",
+            "description", "Delta - full network access",
             "config", Json.map(
                 "environment_type", "anthropic",
                 "cwd", "/home/user",
-                "init_script", null,
-                "environment", Json.map(),
+                "init_script", Setup.SCRIPT,
+                "environment", Setup.variables(server, token),
                 "languages", Json.list(
                     Json.map("name", "python", "version", "3.11"),
                     Json.map("name", "node", "version", "20")

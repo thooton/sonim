@@ -290,16 +290,23 @@ public final class DataTests {
         check.run("the setup block", new Check.Body() {
             @Override
             public void run() {
-                String wrapped = Setup.wrap("  Fix the list app  ", "https://cc.example.com", "delta_tok");
-                check.ok("set-auth line", wrapped.contains("delta set-auth https://cc.example.com delta_tok\n"));
-                check.ok("install script", wrapped.contains("curl -fsSL " + Setup.INSTALL_URL + " | sh"));
+                String wrapped = Setup.wrap("  Fix the list app  ");
                 check.ok("agent is Delta", wrapped.toLowerCase().contains("you are delta"));
-                check.ok("help", wrapped.contains("delta help"));
+                check.ok("help", wrapped.contains("run `delta help`"));
+                check.ok("no setup commands", !wrapped.contains("set-auth") && !wrapped.contains("curl"));
                 check.ok("message last", wrapped.endsWith("\n\nFix the list app"));
                 check.same("stripped", "Fix the list app", Setup.strip(wrapped));
-                String bare = Setup.wrap("hi", null, null);
-                check.ok("no set-auth without a command center", !bare.contains("set-auth"));
-                check.same("picture-only first message", "", Setup.strip(Setup.wrap("", "https://x", "t")));
+                check.same("picture-only first message", "", Setup.strip(Setup.wrap("")));
+                check.ok("script installs the CLI", Setup.SCRIPT.contains("curl -fsSL " + Setup.INSTALL_URL + " | sh"));
+                check.ok("script fails if the download does", Setup.SCRIPT.contains("set -eo pipefail"));
+                check.same("variables sign the CLI in", "https://cc.example.com",
+                    Setup.variables("https://cc.example.com", "delta_tok").get("DELTA_SERVER"));
+                check.same("token variable", "delta_tok", Setup.variables("https://cc.example.com", "delta_tok").get("DELTA_TOKEN"));
+                check.ok("no variables without a command center", Setup.variables(null, null).isEmpty());
+                String name = Setup.environmentName("https://cc.example.com", "delta_tok");
+                check.ok("environment named for Delta", name.matches("Delta [0-9a-f]{8}"));
+                check.same("same login, same environment", name, Setup.environmentName("https://cc.example.com", "delta_tok"));
+                check.ok("new token, new environment", !name.equals(Setup.environmentName("https://cc.example.com", "delta_new")));
                 check.same("ordinary text untouched", "Use <delta-setup> tags", Setup.strip("Use <delta-setup> tags"));
 
                 Transcript t = new Transcript();
@@ -308,7 +315,7 @@ public final class DataTests {
                 t.apply("client_event", "2", frame(2, "client", Json.map("type", "user", "uuid", "u-2",
                     "message", Json.map("role", "user", "content", Json.list(
                         Json.map("type", "image"),
-                        Json.map("type", "text", "text", Setup.wrap("", "https://x", "t")))))));
+                        Json.map("type", "text", "text", Setup.wrap("")))))));
                 check.same("picture-only first message", 1, t.entries().get(1).pictures);
                 check.same("its token is not shown", "", t.entries().get(1).text);
             }
@@ -334,7 +341,7 @@ public final class DataTests {
                 check.same("hidden-looking stem kept whole", "x (3)", RemoteFile.numbered("x", 3));
 
                 Transcript t = new Transcript();
-                String first = Setup.wrap(Attached.wrap("Fix this", Arrays.asList("log.txt")), "https://x", "t");
+                String first = Setup.wrap(Attached.wrap("Fix this", Arrays.asList("log.txt")));
                 t.apply("client_event", "1", frame(1, "client", user("u-1", first)));
                 check.same("replayed message reads as typed, with its files",
                     "Fix this\n\nAttached: log.txt", t.entries().get(0).text);
@@ -368,7 +375,7 @@ public final class DataTests {
             public void run() throws Exception {
                 String jpeg = java.util.Base64.getEncoder().encodeToString(new byte[] {(byte) 0xff, (byte) 0xd8, 1});
                 List<Map<String, Object>> events = new ArrayList<Map<String, Object>>();
-                String first = Setup.wrap(Attached.wrap("Fix the list app", Arrays.asList("log.txt")), "https://x", "t");
+                String first = Setup.wrap(Attached.wrap("Fix the list app", Arrays.asList("log.txt")));
                 events.add(Json.map("type", "user", "uuid", "u-1", "message", Json.map("role", "user",
                     "content", Json.list(
                         Json.map("type", "image", "source", Json.map("type", "base64", "media_type", "image/jpeg",
@@ -415,8 +422,7 @@ public final class DataTests {
                 check.ok("the block names the conversation", block.startsWith(Carry.OPEN) && block.endsWith(Carry.CLOSE)
                     && block.contains("delta resume abcdefgh23456789 conversation.md") && block.contains("\"Fix list\""));
 
-                String message = Setup.wrap(block + "\n\n" + Attached.wrap("Keep going", Arrays.asList("b.txt")),
-                    "https://x", "t");
+                String message = Setup.wrap(block + "\n\n" + Attached.wrap("Keep going", Arrays.asList("b.txt")));
                 Transcript t = new Transcript();
                 t.apply("client_event", "1", frame(1, "client", user("u-9", message)));
                 List<Entry> entries = t.entries();
@@ -425,7 +431,7 @@ public final class DataTests {
                 check.same("message reads as typed", "Keep going\n\nAttached: b.txt", entries.get(1).text);
 
                 Transcript bare = new Transcript();
-                bare.apply("client_event", "1", frame(1, "client", user("u-8", Setup.wrap(block, "https://x", "t"))));
+                bare.apply("client_event", "1", frame(1, "client", user("u-8", Setup.wrap(block))));
                 check.same("a carry with nothing typed is just the note", 1, bare.size());
 
                 Transcript local = new Transcript();

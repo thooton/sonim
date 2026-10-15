@@ -139,8 +139,8 @@ final class Backend {
     }
 
     /** The first message of a new session: the Delta setup, then what was typed. */
-    synchronized String firstMessage(String typed) {
-        return center == null ? Setup.wrap(typed, null, null) : Setup.wrap(typed, config.server(), config.token());
+    String firstMessage(String typed) {
+        return Setup.wrap(typed);
     }
 
     // ------------------------------------------------------------------
@@ -265,7 +265,7 @@ final class Backend {
         if (center == null) throw new IOException(NO_CENTER);
         Cloud cloud = clouds.get(account);
         if (cloud == null) {
-            cloud = new Cloud(http, CloudAuth.of(center, account));
+            cloud = new Cloud(http, CloudAuth.of(center, account), config.server(), config.token());
             clouds.put(account, cloud);
         }
         return cloud;

@@ -2,6 +2,7 @@ package com.delta.xp3.net;
 
 import com.delta.xp3.Check;
 import com.delta.xp3.TestServer;
+import com.delta.xp3.data.Setup;
 
 import java.io.ByteArrayInputStream;
 import java.util.List;
@@ -9,6 +10,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class NetTests {
+
+    private static final String DELTA_ENV = Setup.environmentName("https://cc.example.com", "delta_tok");
 
     private NetTests() {}
 
@@ -46,8 +49,9 @@ public final class NetTests {
                         }
                         if (request.path.equals("/v1/environment_providers")) {
                             return TestServer.Reply.json("{\"environments\":["
-                                + "{\"kind\":\"byoc\",\"environment_id\":\"env_byoc\"},"
-                                + "{\"kind\":\"anthropic_cloud\",\"environment_id\":\"env_cloud\"}]}");
+                                + "{\"kind\":\"byoc\",\"environment_id\":\"env_byoc\",\"name\":\"" + DELTA_ENV + "\"},"
+                                + "{\"kind\":\"anthropic_cloud\",\"environment_id\":\"env_default\",\"name\":\"Default\"},"
+                                + "{\"kind\":\"anthropic_cloud\",\"environment_id\":\"env_cloud\",\"name\":\"" + DELTA_ENV + "\"}]}");
                         }
                         if (request.path.equals("/v1/sessions")) {
                             return TestServer.Reply.json("{\"id\":\"session_01X\",\"title\":\"t\"}");
@@ -64,7 +68,7 @@ public final class NetTests {
                 });
                 try {
                     CloudAuth auth = CloudAuth.fixed("tok-1");
-                    Cloud cloud = new Cloud(new Http(), auth, server.uri(""));
+                    Cloud cloud = new Cloud(new Http(), auth, "https://cc.example.com", "delta_tok", server.uri(""));
 
                     String id = cloud.create("Hello", "uuid-1", "Hello there");
                     check.same("session id", "session_01X", id);
@@ -73,7 +77,7 @@ public final class NetTests {
                     check.same("organization", "org-1", create.header("x-organization-uuid"));
                     check.same("beta on create", "ccr-byoc-2025-07-29", create.header("anthropic-beta"));
                     Map<String, Object> body = Json.object(Json.parse(create.body));
-                    check.same("cloud environment chosen", "env_cloud", body.get("environment_id"));
+                    check.same("Delta's cloud environment chosen", "env_cloud", body.get("environment_id"));
                     List<Object> events = Json.children(body, "events");
                     Map<String, Object> mode = Json.child(Json.object(events.get(0)), "data");
                     check.same("auto mode first", "auto", Json.child(mode, "request").get("mode"));
@@ -382,7 +386,7 @@ public final class NetTests {
             }
         });
 
-        check.run("a new environment has full network access", new Check.Body() {
+        check.run("a new environment sets up Delta, with full network access", new Check.Body() {
             @Override
             public void run() throws Exception {
                 TestServer server = new TestServer(new TestServer.Handler() {
@@ -404,14 +408,19 @@ public final class NetTests {
                     }
                 });
                 try {
-                    Cloud cloud = new Cloud(new Http(), CloudAuth.fixed("tok"),
+                    Cloud cloud = new Cloud(new Http(), CloudAuth.fixed("tok"), "https://cc.example.com", "delta_tok",
                         server.uri(""));
                     cloud.create("t", "u", "hi");
                     Map<String, Object> made = Json.object(Json.parse(
                         find(server.seen, "/v1/environment_providers/cloud/create").body));
-                    List<Object> hosts = Json.children(Json.child(Json.child(made, "config"), "network_config"),
-                        "allowed_hosts");
+                    Map<String, Object> config = Json.child(made, "config");
+                    List<Object> hosts = Json.children(Json.child(config, "network_config"), "allowed_hosts");
                     check.same("every host allowed", "*", hosts.get(0));
+                    check.same("named for the login", DELTA_ENV, made.get("name"));
+                    check.same("setup script", Setup.SCRIPT, config.get("init_script"));
+                    Map<String, Object> vars = Json.child(config, "environment");
+                    check.same("server variable", "https://cc.example.com", vars.get("DELTA_SERVER"));
+                    check.same("token variable", "delta_tok", vars.get("DELTA_TOKEN"));
                     check.same("used", "env_new", Json.object(Json.parse(find(server.seen, "/v1/sessions").body))
                         .get("environment_id"));
                 } finally {
