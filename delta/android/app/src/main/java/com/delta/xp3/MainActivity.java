@@ -1306,9 +1306,8 @@ public final class MainActivity extends Activity {
 
     /** The menu's "New session" items, for each kind this build can start. */
     private void addNewSessionItems() {
-        boolean fresh = sessionId == null && !creating;
-        if (backend.ready() && !(fresh && !newBackup)) add(MENU_NEW, "New session " + Chat.MARK);
-        if (backend.centerReady() && !(fresh && newBackup)) add(MENU_NEW_BACKUP, "New session " + Chat.BACKUP_MARK);
+        if (backend.ready()) add(MENU_NEW, "New session " + Chat.MARK);
+        if (backend.centerReady()) add(MENU_NEW_BACKUP, "New session " + Chat.BACKUP_MARK);
     }
 
     // ------------------------------------------------------------------
