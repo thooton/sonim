@@ -265,6 +265,10 @@ public final class DataTests {
                 check.ok("no slash", !Chat.validId("session_01/../x"));
                 check.ok("no empty", !Chat.validId("session_"));
                 check.same("cse converted", "session_01", Chat.sessionId("cse_01"));
+                check.ok("backup session", Chat.backup("session_delta_abc"));
+                check.ok("cloud session", !Chat.backup("session_01AbC"));
+                check.same("cloud mark", "\u25CF Fix it", new Chat("session_01", "Fix it", null, 0).label());
+                check.same("backup mark", "\u25B2 Fix it", new Chat("session_delta_x", "Fix it", null, 0).label());
                 check.ok("file name", RemoteFile.validName("Flashcards debug.apk"));
                 check.ok("no hidden", !RemoteFile.validName(".upload-1"));
                 check.ok("no path", !RemoteFile.validName("a/b"));

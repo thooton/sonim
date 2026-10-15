@@ -459,6 +459,99 @@ public final class NetTests {
                 }
             }
         });
+
+        backupSessions(check);
+    }
+
+    private static void backupSessions(final Check check) {
+        check.run("backup sessions on the command center", new Check.Body() {
+            @Override
+            public void run() throws Exception {
+                TestServer server = new TestServer(new TestServer.Handler() {
+                    @Override
+                    public TestServer.Reply handle(TestServer.Request request) {
+                        String path = request.path;
+                        if (path.equals("/cc/agent-sessions") && request.method.equals("GET")) {
+                            return TestServer.Reply.json("{\"data\":[{\"id\":\"session_delta_new\",\"title\":\"New\","
+                                + "\"status\":\"running\",\"updated\":\"2026-10-11T01:26:00Z\"},"
+                                + "{\"id\":\"session_01cloud\",\"title\":\"Not ours\"},"
+                                + "{\"id\":\"session_delta_old\",\"title\":\"Old\",\"status\":\"idle\","
+                                + "\"updated\":\"2026-10-10T01:26:00Z\"}]}");
+                        }
+                        if (path.equals("/cc/agent-sessions") && request.method.equals("POST")) {
+                            if (request.body.contains("\"text\":\"no key\"")) {
+                                return TestServer.Reply.of(503, "application/json", "{\"error\":\"no API key is set\"}");
+                            }
+                            return TestServer.Reply.json("{\"id\":\"session_delta_made\"}");
+                        }
+                        if (path.equals("/cc/agent-sessions/session_delta_made/messages")) return TestServer.Reply.json("{\"ok\":true}");
+                        if (path.equals("/cc/agent-sessions/session_delta_made/interrupt")) return TestServer.Reply.json("{\"ok\":true}");
+                        if (path.equals("/cc/agent-sessions/session_delta_made") && request.method.equals("DELETE")) {
+                            return TestServer.Reply.json("{\"deleted\":\"session_delta_made\"}");
+                        }
+                        if (path.equals("/cc/agent-sessions/session_delta_made/events?from_sequence_num=4")) {
+                            return TestServer.Reply.of(200, "text/event-stream",
+                                "event: client_event\nid: 5\ndata: {\"sequence_num\":5}\n\n");
+                        }
+                        return TestServer.Reply.of(404, "application/json", "{\"error\":\"no such session\"}");
+                    }
+                });
+                try {
+                    final Center center = new Center(new Http(), server.uri("/cc").toString(), "delta_t");
+                    List<com.delta.xp3.data.Chat> chats = center.sessions();
+                    check.same("only backup sessions", 2, chats.size());
+                    check.same("newest first", "session_delta_new", chats.get(0).id);
+                    check.same("status", "running", chats.get(0).status);
+
+                    List<byte[]> jpegs = new java.util.ArrayList<byte[]>();
+                    jpegs.add(new byte[] {1, 2, 3});
+                    check.same("created", "session_delta_made", center.create("T", "u1", "hi", jpegs));
+                    String createBody = null;
+                    synchronized (server.seen) {
+                        for (TestServer.Request seen : server.seen) {
+                            if (seen.method.equals("POST") && seen.path.equals("/cc/agent-sessions")) createBody = seen.body;
+                        }
+                    }
+                    Map<String, Object> made = Json.object(Json.parse(createBody));
+                    check.same("title sent", "T", made.get("title"));
+                    check.same("text sent as typed", "hi", made.get("text"));
+                    check.same("picture as base64", "AQID", Json.children(made, "images").get(0));
+
+                    center.send("session_delta_made", "u2", "more", null);
+                    check.same("message", "u2", Json.object(Json.parse(
+                        find(server.seen, "/cc/agent-sessions/session_delta_made/messages").body)).get("uuid"));
+                    center.interrupt("session_delta_made");
+                    center.deleteSession("session_delta_made");
+                    center.deleteSession("session_delta_gone");
+                    check.ok("already gone is deleted", true);
+
+                    Http.Stream stream = center.open("session_delta_made", 4);
+                    try {
+                        Sse.Frame frame = new Sse(stream.stream()).next();
+                        check.same("stream frame", "5", frame.id);
+                    } finally {
+                        stream.close();
+                    }
+                    check.same("resumes", "4", find(server.seen,
+                        "/cc/agent-sessions/session_delta_made/events?from_sequence_num=4").header("last-event-id"));
+
+                    check.fails("the command center's reason is shown", "no API key is set", new Check.Body() {
+                        @Override
+                        public void run() throws Exception {
+                            center.create("T", "u3", "no key", null);
+                        }
+                    });
+                    check.fails("a cloud id never reaches the command center", "Not a backup session", new Check.Body() {
+                        @Override
+                        public void run() throws Exception {
+                            center.send("session_01cloud", "u4", "x", null);
+                        }
+                    });
+                } finally {
+                    server.close();
+                }
+            }
+        });
     }
 
     /** Progress nobody is watching. */

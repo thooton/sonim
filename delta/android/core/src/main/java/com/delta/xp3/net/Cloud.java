@@ -27,7 +27,7 @@ import java.util.UUID;
  * ask. Sent each time rather than once, because the worker behind a session is
  * started afresh after it has been idle.
  */
-public final class Cloud {
+public final class Cloud implements EventSource {
 
     public static final URI API = URI.create("https://api.anthropic.com");
     /** Where the same session opens on a computer. */
@@ -170,6 +170,7 @@ public final class Cloud {
      * whole session. The caller reads it with Sse and closes it, which is also
      * how it is cancelled from another thread.
      */
+    @Override
     public Http.Stream open(String session, long afterSequence) throws IOException, InterruptedException {
         String path = "/v1/code/sessions/" + cse(session) + "/events/stream";
         if (afterSequence > 0) path += "?from_sequence_num=" + afterSequence;

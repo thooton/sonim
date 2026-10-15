@@ -1,6 +1,6 @@
 package com.delta.xp3;
 
-import com.delta.xp3.net.Cloud;
+import com.delta.xp3.net.EventSource;
 import com.delta.xp3.net.Http;
 import com.delta.xp3.net.Sse;
 
@@ -11,7 +11,8 @@ import java.io.IOException;
  *
  * The stream is long-lived and the phone's network is not, so a drop is
  * normal rather than an error: the link waits a little, longer each time, and
- * reopens from the last sequence number it saw, which the cloud replays from.
+ * reopens from the last sequence number it saw, which the cloud (or, for a
+ * backup session, the command center) replays from.
  * Frames are handed over on this link's own thread; the listener hops to the
  * main thread itself.
  */
@@ -27,7 +28,7 @@ final class Link implements Runnable {
     private static final long FIRST_RETRY_MS = 2000;
     private static final long LAST_RETRY_MS = 30000;
 
-    private final Cloud cloud;
+    private final EventSource source;
     private final String session;
     private final Listener listener;
     private final Thread thread;
@@ -35,8 +36,8 @@ final class Link implements Runnable {
     private volatile boolean stopped;
     private volatile Http.Stream current;
 
-    Link(Cloud cloud, String session, long after, Listener listener) {
-        this.cloud = cloud;
+    Link(EventSource source, String session, long after, Listener listener) {
+        this.source = source;
         this.session = session;
         this.after = after;
         this.listener = listener;
@@ -73,7 +74,7 @@ final class Link implements Runnable {
         long wait = FIRST_RETRY_MS;
         while (!stopped) {
             try {
-                Http.Stream stream = cloud.open(session, after);
+                Http.Stream stream = source.open(session, after);
                 current = stream;
                 if (stopped) break;
                 listener.online(true);

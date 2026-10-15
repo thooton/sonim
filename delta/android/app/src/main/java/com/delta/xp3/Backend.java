@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,9 @@ final class Backend {
     private Config config;
     /** Guarded by this. Null without a command center. */
     private Center center;
+    /** Each side's sessions as last fetched, for when it can't be reached. Lists thread only. */
+    private List<Chat> lastCloud = new ArrayList<Chat>();
+    private List<Chat> lastBackup = new ArrayList<Chat>();
 
     Backend(File directory, File downloads) {
         store = new Store(directory);
@@ -186,15 +191,24 @@ final class Backend {
     // The cloud. All blocking; call from a worker.
     // ------------------------------------------------------------------
 
-    /** `files` are names on the command center that go with the message. */
-    String create(String title, String uuid, String text, List<File> pictures, List<String> files)
-        throws IOException, InterruptedException {
+    /**
+     * Starts a session, in the cloud or (`backup`) on the command center,
+     * which writes a backup session's setup itself. `files` are names on the
+     * command center that go with the message.
+     */
+    String create(boolean backup, String title, String uuid, String text, List<File> pictures,
+        List<String> files) throws IOException, InterruptedException {
+        if (backup) return center().create(title, uuid, Attached.wrap(text, files), read(pictures));
         Cloud cloud = cloud();
         return cloud.create(title, uuid, firstMessage(Attached.wrap(text, files)), read(pictures));
     }
 
     void send(String session, String uuid, String text, List<File> pictures, List<String> files)
         throws IOException, InterruptedException {
+        if (Chat.backup(session)) {
+            center().send(session, uuid, Attached.wrap(text, files), read(pictures));
+            return;
+        }
         Cloud cloud = cloud();
         cloud.send(session, uuid, Attached.wrap(text, files), read(pictures));
     }
@@ -212,7 +226,8 @@ final class Backend {
     }
 
     void interrupt(String session) throws IOException, InterruptedException {
-        cloud().interrupt(session);
+        if (Chat.backup(session)) center().interrupt(session);
+        else cloud().interrupt(session);
     }
 
     void answer(String session, String requestId, boolean allow, Map<String, Object> input)
@@ -220,16 +235,63 @@ final class Backend {
         cloud().answer(session, requestId, allow, input);
     }
 
+    /**
+     * Every session, cloud and backup, most recently active first. When one
+     * side can't be reached its sessions from the last refresh stand in, and
+     * only when neither can is it an error.
+     */
     List<Chat> sessions() throws IOException, InterruptedException {
-        return cloud().sessions();
+        Center center;
+        synchronized (this) {
+            center = this.center;
+        }
+        IOException problem = null;
+        boolean fetched = false;
+        if (cloud != null) {
+            try {
+                lastCloud = cloud.sessions();
+                fetched = true;
+            } catch (IOException e) {
+                problem = e;
+            }
+        }
+        if (center != null) {
+            try {
+                lastBackup = center.sessions();
+                fetched = true;
+            } catch (IOException e) {
+                if (problem == null) problem = e;
+            }
+        } else {
+            lastBackup = new ArrayList<Chat>();
+        }
+        if (!fetched && problem != null) throw problem;
+        List<Chat> all = new ArrayList<Chat>(lastCloud);
+        all.addAll(lastBackup);
+        Collections.sort(all, new Comparator<Chat>() {
+            @Override
+            public int compare(Chat a, Chat b) {
+                return a.updated == b.updated ? 0 : a.updated > b.updated ? -1 : 1;
+            }
+        });
+        return all;
     }
 
+    /** Archives a cloud session; a backup session is deleted, with its computer. */
     void archive(String session) throws IOException, InterruptedException {
-        cloud().archive(session);
+        if (Chat.backup(session)) center().deleteSession(session);
+        else cloud().archive(session);
     }
 
-    /** A link for the session, not yet started. Null without a login. */
+    /** A link for the session, not yet started. Null without the login it needs. */
     Link link(String session, long after, Link.Listener listener) {
+        if (Chat.backup(session)) {
+            Center center;
+            synchronized (this) {
+                center = this.center;
+            }
+            return center == null ? null : new Link(center, session, after, listener);
+        }
         return cloud == null ? null : new Link(cloud, session, after, listener);
     }
 
