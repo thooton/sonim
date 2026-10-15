@@ -1,0 +1,10 @@
+# An assembled APK has the command center's delta token baked into it by
+# :app:generateDefaults, so it is built locally and never committed.
+*.apk
+delta-center.json
+
+*.class
+bin/
+build/
+.gradle/
+android/local.properties
