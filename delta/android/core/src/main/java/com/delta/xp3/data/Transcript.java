@@ -47,6 +47,11 @@ public final class Transcript {
     /** The latest sandbox start-up line, shown while a turn is getting going. */
     private String status;
     private Permission pending;
+    /**
+     * Until when the session's account is out of usage, in epoch
+     * milliseconds, as the latest rate-limit event said; 0 when it has room.
+     */
+    private long limitedUntil;
 
     public Transcript() {}
 
@@ -84,6 +89,15 @@ public final class Transcript {
         return pending;
     }
 
+    /**
+     * When the session's account reaches its usage limit lifts, in epoch
+     * milliseconds, if the stream has said so since this was built; 0
+     * otherwise. A replayed rejection from long ago is in the past by then.
+     */
+    public long limitedUntil() {
+        return limitedUntil;
+    }
+
     // ------------------------------------------------------------------
     // Local changes
     // ------------------------------------------------------------------
@@ -101,6 +115,31 @@ public final class Transcript {
 
     public void note(String text) {
         add(new Entry(Entry.NOTE, text, null));
+    }
+
+    /**
+     * A message written here that waits on the phone for a usage limit to
+     * lift: shown, but no turn starts until it is actually sent.
+     */
+    public void queued(String uuid, String text, int pictures) {
+        add(new Entry(Entry.YOU, text, uuid, pictures));
+    }
+
+    /** A message held back earlier has gone out, so a turn is coming. */
+    public void resumed() {
+        working = true;
+        status = null;
+    }
+
+    /**
+     * The start of a session that carries an earlier conversation over: its
+     * note, under the uuid of the message that carries it, so the echo of
+     * that message adds nothing.
+     */
+    public void carried(String uuid) {
+        add(new Entry(Entry.NOTE, Carry.NOTE, uuid));
+        working = true;
+        status = null;
     }
 
     /** A send failed, so no turn is coming. */
@@ -171,6 +210,7 @@ public final class Transcript {
         if ("control_request".equals(type)) return controlRequest(payload, source);
         if ("control_response".equals(type)) return settled(Json.text(Json.child(payload, "response"), "request_id"));
         if ("control_cancel_request".equals(type)) return settled(Json.text(payload, "request_id"));
+        if ("rate_limit_event".equals(type)) return rateLimit(Json.child(payload, "rate_limit_info"));
         if ("env_manager_log".equals(type)) {
             String line = Json.text(Json.child(payload, "data"), "content");
             if (line == null || line.trim().length() == 0) return false;
@@ -189,18 +229,24 @@ public final class Transcript {
         if (!"client".equals(source) || Json.flag(payload, "isMeta")) return false;
         Object content = Json.child(payload, "message").get("content");
         // The first message of a session started here carries the Delta setup
-        // ahead of what was typed; only what was typed is conversation. Files
-        // sent with a message are named in a block that is shown as one line.
-        String text = Attached.show(Setup.strip(text(content)));
-        int pictures = pictures(content);
-        if (text.trim().length() == 0 && pictures == 0) return false;
+        // ahead of what was typed; only what was typed is conversation. A
+        // conversation carried over from another account is one note, and
+        // files sent with a message are named in a block shown as one line.
+        String typed = Setup.strip(text(content));
+        boolean carried = Carry.present(typed);
+        String text = Attached.show(Carry.strip(typed));
+        // A carried conversation's pictures ride in the message that carries
+        // it; they were shown with the messages they came with.
+        int pictures = carried ? 0 : pictures(content);
+        if (text.trim().length() == 0 && pictures == 0 && !carried) return false;
         String uuid = Json.text(payload, "uuid");
         if (uuid != null) {
             for (Entry entry : entries) {
                 if (uuid.equals(entry.id)) return false;
             }
         }
-        add(new Entry(Entry.YOU, text.trim(), uuid, pictures));
+        if (carried) add(new Entry(Entry.NOTE, Carry.NOTE, uuid));
+        if (text.trim().length() > 0 || pictures > 0) add(new Entry(Entry.YOU, text.trim(), uuid, pictures));
         working = true;
         status = null;
         return true;
@@ -267,6 +313,22 @@ public final class Transcript {
         pending = new Permission(requestId, name, summary, new LinkedHashMap<String, Object>(input));
         note("Delta asks to use " + tool(name, input) + ".");
         return true;
+    }
+
+    /**
+     * The worker passing on what the account's usage limits say. Only a
+     * rejection with a reset time counts: the agent's own reply already says
+     * the limit was hit, so nothing new goes on screen.
+     */
+    private boolean rateLimit(Map<String, Object> info) {
+        String status = Json.text(info, "status");
+        if ("rejected".equals(status)) {
+            Double resets = Json.number(info, "resetsAt");
+            if (resets != null && resets.doubleValue() > 0) limitedUntil = (long) (resets.doubleValue() * 1000);
+        } else if (status != null) {
+            limitedUntil = 0;
+        }
+        return false;
     }
 
     /** A request answered or withdrawn elsewhere: the web app, the CLI, or a timeout. */

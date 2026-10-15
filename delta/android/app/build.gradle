@@ -6,20 +6,18 @@ plugins {
 }
 
 /*
- * The bundled logins, for a personal deployment.
+ * The bundled login, for a personal deployment.
  *
- * This is one person's phone, so the app ships already signed in rather than
- * asking somebody to complete an OAuth flow or type a 49-character token on a
- * T9 keypad. Both logins are read at build time and written into a generated
- * source file under build/. Nothing secret is ever committed, and a checkout
- * on any other machine (or CI) simply builds an app with no login. Installed
- * over a copy that has one, such a build keeps it: a bundled login is adopted
- * once per revision, and an absent one changes nothing.
+ * This is one person's phone, so the app ships already signed in to the
+ * command center rather than asking somebody to type a 49-character token on
+ * a T9 keypad. It is read at build time and written into a generated source
+ * file under build/. Nothing secret is ever committed, and a checkout on any
+ * other machine (or CI) simply builds an app with no login. Installed over a
+ * copy that has one, such a build keeps it: a bundled login is adopted once
+ * per revision, and an absent one changes nothing.
  *
- * The cloud login is the complete rotating OAuth entry, from, in order:
- * -Pdelta.cloudAuth=<file>, cloud-auth.json beside the android directory,
- * or the auth.json in the cloud demo directory that sits beside this
- * repository (all the same shape Pi writes, under the provider's key).
+ * The cloud logins are not in the APK at all. The command center keeps them
+ * (`delta accounts`) and the app fetches access tokens from it.
  *
  * The command center is the address and token `delta set-auth` saves, from:
  * -Pdelta.center=<file>, delta-center.json beside the android directory, or
@@ -27,9 +25,9 @@ plugins {
  * ~/.config/delta/config.json). All are {"server": "...", "token": "..."}.
  * The app only talks to a command center over https.
  *
- * The APK that comes out of this contains live credentials. It is gitignored,
- * and it should be treated as a password: anything with the file can spend the
- * configured cloud subscription and run code on the command center.
+ * The APK that comes out of this contains a live credential. It is gitignored,
+ * and it should be treated as a password: anything with the file can run code
+ * on the command center and, through it, spend the cloud subscriptions.
  */
 def bundledSource = layout.buildDirectory.dir("generated/bundled")
 
@@ -44,41 +42,21 @@ static String sha256(File source) {
 }
 
 tasks.register("generateDefaults") {
-    description = "Bakes this deployment's cloud login and command center into the APK."
+    description = "Bakes this deployment's command center into the APK."
     def configHome = System.getenv("XDG_CONFIG_HOME") ?: "${System.getProperty("user.home")}/.config"
-    def localCloudAuth = firstFile("delta.cloudAuth", [
-        "${rootDir}/../cloud-auth.json",
-        "${rootDir}/../../../claude_cloud/auth.json",
-    ])
     def localCenter = firstFile("delta.center", [
         "${rootDir}/../delta-center.json",
         "${configHome}/delta/config.json",
     ])
 
-    inputs.files(localCloudAuth, localCenter)
+    inputs.files(localCenter)
         .withPropertyName("sources")
         .ignoreEmptyDirectories().optional(true)
     outputs.dir(bundledSource)
 
     doLast {
         def settings = [:]
-        def cloudRevision = ""
         def centerRevision = ""
-
-        def cloud = localCloudAuth.isFile() ? (new JsonSlurper().parse(localCloudAuth).anthropic ?: [:]) : [:]
-        if (cloud.access || cloud.refresh) {
-            // Keep the complete pair together, with its expiry: the provider
-            // rotates the refresh token, and the app persists each rotation.
-            def entry = [:]
-            if (cloud.access) entry.accessToken = cloud.access
-            if (cloud.refresh) entry.refreshToken = cloud.refresh
-            if (cloud.expires) entry.expiresAt = cloud.expires
-            settings.cloud = entry
-            cloudRevision = sha256(localCloudAuth)
-            logger.lifecycle("Bundled setup: cloud login from ${localCloudAuth}")
-        } else {
-            logger.lifecycle("Bundled setup: no cloud login found; the app will have none")
-        }
 
         def center = localCenter.isFile() ? new JsonSlurper().parse(localCenter) : [:]
         if (center.server && center.token) {
@@ -104,7 +82,7 @@ import com.delta.xp3.data.Store;
 import com.delta.xp3.net.Config;
 
 /**
- * The logins baked in at build time. GENERATED - do not edit, do not commit.
+ * The command center baked in at build time. GENERATED - do not edit, do not commit.
  *
  * Empty when the build had no credentials to hand, which is what a checkout on
  * another machine gets: the app then keeps whatever it already has.
@@ -114,15 +92,14 @@ final class Defaults {
     private Defaults() {}
 
     private static final String SETTINGS = "${quoted}";
-    private static final String CLOUD_REVISION = "${cloudRevision}";
     private static final String CENTER_REVISION = "${centerRevision}";
 
-    /** Identifies one bundled login without exposing it; empty when there is none. */
+    /** Identifies the bundled login without exposing it; empty when there is none. */
     static String revision(String part) {
-        return Store.CLOUD.equals(part) ? CLOUD_REVISION : Store.CENTER.equals(part) ? CENTER_REVISION : "";
+        return Store.CENTER.equals(part) ? CENTER_REVISION : "";
     }
 
-    /** The bundled logins, validated the same way stored ones are. */
+    /** The bundled login, validated the same way the stored one is. */
     static Config config() {
         return SETTINGS.length() == 0 ? Config.blank() : Config.parse(SETTINGS);
     }
@@ -139,7 +116,7 @@ tasks.named("preBuild") { dependsOn "generateDefaults" }
 // everything it fetches goes through java.net, which is what keeps a debug APK
 // for a 240x320 phone in the low hundreds of kilobytes.
 //
-// :core is the Android-free half: the logins, the cloud session protocol, the
+// :core is the Android-free half: the login, the cloud session protocol, the
 // command center's routes and the transcript built from it, all plain Java so
 // they can be tested on a desktop JVM.
 dependencies {

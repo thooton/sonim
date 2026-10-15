@@ -63,7 +63,7 @@ public final class NetTests {
                     }
                 });
                 try {
-                    CloudAuth auth = new CloudAuth(new Http(), "tok-1", null, 0, null);
+                    CloudAuth auth = CloudAuth.fixed("tok-1");
                     Cloud cloud = new Cloud(new Http(), auth, server.uri(""));
 
                     String id = cloud.create("Hello", "uuid-1", "Hello there");
@@ -141,18 +141,23 @@ public final class NetTests {
             }
         });
 
-        check.run("an expired login is renewed once", new Check.Body() {
+        check.run("a refused token is renewed through the command center", new Check.Body() {
             @Override
             public void run() throws Exception {
                 final AtomicInteger renewals = new AtomicInteger();
                 TestServer server = new TestServer(new TestServer.Handler() {
                     @Override
                     public TestServer.Reply handle(TestServer.Request request) {
-                        if (request.path.equals("/token")) {
-                            renewals.incrementAndGet();
-                            check.ok("scope asked for", request.body.contains("user:sessions:claude_code"));
-                            return TestServer.Reply.json(
-                                "{\"access_token\":\"new\",\"refresh_token\":\"r2\",\"expires_in\":3600}");
+                        if (request.path.equals("/cc/cloud-accounts/acct-1/token")) {
+                            check.same("token asked with the delta token", "Bearer delta_t",
+                                request.header("authorization"));
+                            if (request.body.contains("\"refused\":\"old\"")) {
+                                renewals.incrementAndGet();
+                                return TestServer.Reply.json("{\"access_token\":\"new\",\"expires_at\":"
+                                    + (System.currentTimeMillis() + 3600000L) + "}");
+                            }
+                            return TestServer.Reply.json("{\"access_token\":\"old\",\"expires_at\":"
+                                + (System.currentTimeMillis() + 3600000L) + "}");
                         }
                         if (!request.header("authorization").equals("Bearer new")) {
                             return TestServer.Reply.of(401, "application/json", "{}");
@@ -164,18 +169,129 @@ public final class NetTests {
                     }
                 });
                 try {
-                    final String[] stored = new String[1];
-                    CloudAuth auth = new CloudAuth(new Http(), server.uri("/token"), "old", "r1",
-                        System.currentTimeMillis() + 3600000L, new CloudAuth.Rotated() {
-                            @Override
-                            public void store(String access, String refresh, long expiresAt) {
-                                stored[0] = refresh;
-                            }
-                        });
+                    Center center = new Center(new Http(), server.uri("/cc").toString(), "delta_t");
+                    CloudAuth auth = CloudAuth.of(center, "acct-1");
                     Cloud cloud = new Cloud(new Http(), auth, server.uri(""));
                     cloud.interrupt("session_01X");
                     check.same("renewed once", 1, renewals.get());
-                    check.same("rotation stored", "r2", stored[0]);
+                    check.same("the renewed token is kept", "new", auth.token());
+                    check.same("and not asked for again", 1, renewals.get());
+                } finally {
+                    server.close();
+                }
+            }
+        });
+
+        check.run("a session's whole history, page by page", new Check.Body() {
+            @Override
+            public void run() throws Exception {
+                TestServer server = new TestServer(new TestServer.Handler() {
+                    @Override
+                    public TestServer.Reply handle(TestServer.Request request) {
+                        if (request.path.equals("/api/oauth/profile")) {
+                            return TestServer.Reply.json("{\"organization\":{\"uuid\":\"org-1\"}}");
+                        }
+                        if (request.path.equals("/v1/code/sessions/cse_01X/events?sort_order=asc")) {
+                            return TestServer.Reply.json("{\"data\":[{\"sequence_num\":1,\"payload\":{\"type\":\"user\"}},"
+                                + "{\"sequence_num\":2,\"payload\":{\"type\":\"assistant\"}}],\"next_cursor\":\"x\"}");
+                        }
+                        if (request.path.equals("/v1/code/sessions/cse_01X/events?sort_order=asc&cursor=2")) {
+                            return TestServer.Reply.json("{\"data\":[{\"sequence_num\":\"3\",\"payload\":{\"type\":\"result\"}}],"
+                                + "\"next_cursor\":null}");
+                        }
+                        return TestServer.Reply.of(404, "application/json", "{}");
+                    }
+                });
+                try {
+                    Cloud cloud = new Cloud(new Http(), CloudAuth.fixed("tok"), server.uri(""));
+                    List<Map<String, Object>> history = cloud.history("session_01X");
+                    check.same("every page", 3, history.size());
+                    check.same("in order", "result", history.get(2).get("type"));
+                    check.same("scoped to the organization", "org-1",
+                        find(server.seen, "/v1/code/sessions/cse_01X/events?sort_order=asc").header("x-organization-uuid"));
+                } finally {
+                    server.close();
+                }
+            }
+        });
+
+        check.run("cloud accounts on the command center", new Check.Body() {
+            @Override
+            public void run() throws Exception {
+                TestServer server = new TestServer(new TestServer.Handler() {
+                    @Override
+                    public TestServer.Reply handle(TestServer.Request request) {
+                        if (request.path.equals("/cc/cloud-accounts") && request.method.equals("GET")) {
+                            return TestServer.Reply.json("[{\"id\":\"acct-1\",\"email\":\"a@x.com\",\"plan\":\"claude_pro\"},"
+                                + "{\"id\":\"../bad\",\"email\":\"b@x.com\"},{\"id\":\"acct-2\"}]");
+                        }
+                        if (request.path.equals("/cc/cloud-accounts") && request.method.equals("POST")) {
+                            if (request.body.contains("dead")) return TestServer.Reply.of(403, "application/json", "{}");
+                            return TestServer.Reply.of(201, "application/json", "{\"id\":\"acct-3\"}");
+                        }
+                        if (request.path.equals("/cc/conversations") && request.method.equals("POST")) {
+                            return TestServer.Reply.of(201, "application/json", "{\"id\":\"abcdefgh23456789\"}");
+                        }
+                        if (request.path.equals("/cc/cloud-accounts/acct-1/usage")) {
+                            return TestServer.Reply.json("{\"five_hour\":{\"utilization\":100.0,"
+                                + "\"resets_at\":\"2030-01-01T05:00:00Z\"},\"seven_day\":{\"utilization\":40}}");
+                        }
+                        if (request.path.equals("/cc/cloud-accounts/acct-2/usage")) {
+                            return TestServer.Reply.json("{\"five_hour\":{\"utilization\":12,"
+                                + "\"resets_at\":\"2030-01-01T05:00:00Z\"},\"seven_day\":null}");
+                        }
+                        if (request.path.equals("/cc/cloud-accounts/acct-9/token")) {
+                            return TestServer.Reply.of(403, "application/json", "{\"error\":\"rejected\"}");
+                        }
+                        return TestServer.Reply.of(404, "application/json", "{}");
+                    }
+                });
+                try {
+                    final Center center = new Center(new Http(), server.uri("/cc").toString(), "delta_t");
+                    List<Center.Account> accounts = center.accounts();
+                    check.same("ids that can't go in a route are skipped", 2, accounts.size());
+                    check.same("email", "a@x.com", accounts.get(0).email);
+                    check.same("no email shows the id", "acct-2", accounts.get(1).email);
+                    check.same("plan", "claude_pro", accounts.get(0).plan);
+                    check.ok("no plan", accounts.get(1).plan == null);
+                    Center.Usage usage = center.usage("acct-2");
+                    check.same("5-hour use", Double.valueOf(12), usage.fiveHour);
+                    check.same("5-hour reset", 1893474000000L, usage.fiveHourResets);
+                    check.ok("no weekly window", usage.weekly == null && usage.weeklyResets == 0);
+                    check.same("a full window rules an account out until it resets", 1893474000000L,
+                        center.limitedUntil("acct-1"));
+                    check.same("room left", 0L, center.limitedUntil("acct-2"));
+                    check.same("a conversation is stored by id", "abcdefgh23456789",
+                        center.putConversation("# Fix\n\nall of it"));
+                    check.same("as text", "# Fix\n\nall of it", find(server.seen, "/cc/conversations").body);
+                    center.addAccount("a", "r", 5);
+                    String handed = null;
+                    synchronized (server.seen) {
+                        for (TestServer.Request request : server.seen) {
+                            if (request.method.equals("POST") && request.path.equals("/cc/cloud-accounts")) handed = request.body;
+                        }
+                    }
+                    Map<String, Object> added = Json.object(Json.parse(handed));
+                    check.same("login handed over", "r", added.get("refresh_token"));
+                    check.fails("a dead login is named", "no longer works", new Check.Body() {
+                        @Override
+                        public void run() throws Exception {
+                            center.addAccount(null, "dead", 0);
+                        }
+                    });
+                    try {
+                        center.token("acct-9", null);
+                        check.ok("a rejected login fails", false);
+                    } catch (Center.Refused e) {
+                        check.ok("a rejected login is Refused", e.getMessage().contains("delta accounts login"));
+                    }
+                    final Center old = new Center(new Http(), server.uri("/old").toString(), "delta_t");
+                    check.fails("an old command center says so", "needs updating", new Check.Body() {
+                        @Override
+                        public void run() throws Exception {
+                            old.accounts();
+                        }
+                    });
                 } finally {
                     server.close();
                 }
@@ -195,7 +311,7 @@ public final class NetTests {
                     }
                 });
                 try {
-                    final Cloud cloud = new Cloud(new Http(), new CloudAuth(new Http(), "t", null, 0, null),
+                    final Cloud cloud = new Cloud(new Http(), CloudAuth.fixed("t"),
                         server.uri(""));
                     check.fails("rate limit", "usage limit", new Check.Body() {
                         @Override
@@ -244,7 +360,7 @@ public final class NetTests {
                     }
                 });
                 try {
-                    Cloud cloud = new Cloud(new Http(), new CloudAuth(new Http(), "tok", null, 0, null), server.uri(""));
+                    Cloud cloud = new Cloud(new Http(), CloudAuth.fixed("tok"), server.uri(""));
                     List<com.delta.xp3.data.Chat> chats = cloud.sessions();
                     check.same("cloud sessions only, archived and odd ids left out", 2, chats.size());
                     check.same("newest first", "session_new", chats.get(0).id);
@@ -288,7 +404,7 @@ public final class NetTests {
                     }
                 });
                 try {
-                    Cloud cloud = new Cloud(new Http(), new CloudAuth(new Http(), "tok", null, 0, null),
+                    Cloud cloud = new Cloud(new Http(), CloudAuth.fixed("tok"),
                         server.uri(""));
                     cloud.create("t", "u", "hi");
                     Map<String, Object> made = Json.object(Json.parse(

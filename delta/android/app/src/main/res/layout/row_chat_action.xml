@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A button at the foot of the transcript, such as moving a conversation
+     whose account is out of usage to a new session. It is a row like any
+     other: the d-pad reaches it, and OK presses it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/chat_row_selector"
+    android:clickable="false"
+    android:descendantFocusability="blocksDescendants"
+    android:focusable="false"
+    android:focusableInTouchMode="false"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:paddingLeft="@dimen/bubble_pad_h"
+    android:paddingRight="@dimen/bubble_pad_h"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <TextView
+        android:id="@+id/action_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/action_button"
+        android:gravity="center"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
+        android:textColor="@color/accent_text"
+        android:textSize="@dimen/text_bubble"
+        android:textStyle="bold" />
+</LinearLayout>

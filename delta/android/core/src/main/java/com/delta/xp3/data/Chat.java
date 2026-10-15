@@ -30,13 +30,20 @@ public final class Chat {
     public final String status;
     /** When anything last happened in it, in epoch milliseconds; 0 if unknown. */
     public final long updated;
+    /** The cloud account it runs on, by the command center's id; null if not known yet. */
+    public final String account;
 
     public Chat(String id, String title, String status, long updated) {
+        this(id, title, status, updated, null);
+    }
+
+    public Chat(String id, String title, String status, long updated, String account) {
         if (!validId(id)) throw new IllegalArgumentException("Not a session id");
         this.id = id;
         this.title = title == null || title.trim().length() == 0 ? "Untitled" : title.trim();
         this.status = status == null ? IDLE : status;
         this.updated = updated;
+        this.account = account == null || account.length() == 0 ? null : account;
     }
 
     /**
@@ -76,6 +83,10 @@ public final class Chat {
     }
 
     public Chat titled(String next) {
-        return new Chat(id, next, status, updated);
+        return new Chat(id, next, status, updated, account);
+    }
+
+    public Chat on(String next) {
+        return new Chat(id, title, status, updated, next);
     }
 }

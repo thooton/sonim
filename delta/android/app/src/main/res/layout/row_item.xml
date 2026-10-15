@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A session in Chats or a file in Files: its name, a muted line under it,
-     and a short value on the right that says what is happening to it. -->
+<!-- A session in Chats, a file in Files or an account in Accounts: its name,
+     a muted line under it (two for an account), and a short value on the
+     right that says what is happening to it. Rows are at least row_height
+     tall and grow for the second line. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/row_height"
+    android:layout_height="wrap_content"
+    android:minHeight="@dimen/row_height"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp"
     android:background="@drawable/focus_selector"
     android:descendantFocusability="blocksDescendants"
     android:gravity="center_vertical"
@@ -35,6 +40,17 @@
             android:singleLine="true"
             android:textColor="@color/text_muted"
             android:textSize="@dimen/text_sub" />
+        <TextView
+            android:id="@+id/row_extra"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:singleLine="true"
+            android:textColor="@color/text_muted"
+            android:textSize="@dimen/text_sub"
+            android:visibility="gone" />
     </LinearLayout>
 
     <TextView

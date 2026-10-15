@@ -194,6 +194,38 @@ public final class Cloud implements EventSource {
         }
     }
 
+    /**
+     * Every event of a session, oldest first, as the event list pages them
+     * (the payloads only). This is the whole conversation as the agent had
+     * it, tool calls and results included, which the phone's own transcript
+     * leaves out; it is what a conversation carried to another account is
+     * built from.
+     */
+    public List<Map<String, Object>> history(String session) throws IOException, InterruptedException {
+        List<Map<String, Object>> payloads = new ArrayList<Map<String, Object>>();
+        String cursor = null;
+        for (int page = 0; page < 10000; page++) {
+            String path = "/v1/code/sessions/" + cse(session) + "/events?sort_order=asc";
+            if (cursor != null) path += "&cursor=" + java.net.URLEncoder.encode(cursor, "UTF-8");
+            Map<String, Object> listed = object(request(path, null, false, true), "event list");
+            List<Object> data = Json.children(listed, "data");
+            for (Object value : data) {
+                if (!(value instanceof Map)) continue;
+                Map<String, Object> event = Json.object(value);
+                // The next page starts after the last sequence number seen,
+                // as the provider's own client pages it.
+                Object sequence = event.get("sequence_num");
+                if (sequence instanceof Number) cursor = String.valueOf(((Number) sequence).longValue());
+                else if (sequence instanceof String) cursor = (String) sequence;
+                Map<String, Object> payload = Json.child(event, "payload");
+                if (!payload.isEmpty()) payloads.add(payload);
+            }
+            Object next = listed.get("next_cursor");
+            if (data.isEmpty() || next == null || "".equals(next)) return payloads;
+        }
+        throw new IOException("The session's history is too long to read");
+    }
+
     public static String link(String session) {
         return WEB + session;
     }

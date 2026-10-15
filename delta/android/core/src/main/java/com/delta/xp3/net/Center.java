@@ -19,9 +19,10 @@ import java.util.Map;
  * the phone's side.
  *
  * An agent pushes a file with the CLI; this lists it, fetches it, and deletes
- * it. The phone can push one too, for an agent to `delta pull`. It also runs
- * the backup sessions the command center keeps itself (▲ in Chats), whose
- * event streams read like the cloud's. Every request carries the bearer token
+ * it. The phone can push one too, for an agent to `delta pull`. It also keeps
+ * the cloud accounts the sessions run on, and hands out their access tokens,
+ * and runs the backup sessions it keeps itself (▲ in Chats), whose event
+ * streams read like the cloud's. Every request carries the bearer token
  * `delta-cc gen-token` printed.
  */
 public final class Center implements EventSource {
@@ -41,7 +42,75 @@ public final class Center implements EventSource {
         }
     }
 
+    /** A cloud account, as the command center lists it; it keeps the login itself. */
+    public static final class Account {
+        /** The provider's id for the account, which goes in a route. */
+        public final String id;
+        public final String email;
+        /** The subscription, as the provider names it ("claude_pro"), or null. */
+        public final String plan;
+
+        public Account(String id, String email) {
+            this(id, email, null);
+        }
+
+        public Account(String id, String email, String plan) {
+            this.id = id;
+            this.email = email == null || email.length() == 0 ? id : email;
+            this.plan = plan == null || plan.length() == 0 ? null : plan;
+        }
+    }
+
+    /**
+     * How much of an account's 5-hour and weekly limits is used, in percent
+     * (null when the report doesn't say), and when each resets, in epoch
+     * milliseconds (0 when it doesn't say).
+     */
+    public static final class Usage {
+        public final Double fiveHour;
+        public final long fiveHourResets;
+        public final Double weekly;
+        public final long weeklyResets;
+
+        Usage(Double fiveHour, long fiveHourResets, Double weekly, long weeklyResets) {
+            this.fiveHour = fiveHour;
+            this.fiveHourResets = fiveHourResets;
+            this.weekly = weekly;
+            this.weeklyResets = weeklyResets;
+        }
+
+        static Usage of(Map<String, Object> report) {
+            Map<String, Object> five = Json.child(report, "five_hour");
+            Map<String, Object> week = Json.child(report, "seven_day");
+            return new Usage(Json.number(five, "utilization"), Json.instant(five, "resets_at"),
+                Json.number(week, "utilization"), Json.instant(week, "resets_at"));
+        }
+
+        /**
+         * When the account has room again, if either window is used up; 0
+         * when it has room. A full window with no reset time still rules
+         * the account out for now: an hour is a guess the next check corrects.
+         */
+        public long limitedUntil() {
+            return Math.max(full(fiveHour, fiveHourResets), full(weekly, weeklyResets));
+        }
+
+        private static long full(Double used, long resets) {
+            if (used == null || used.doubleValue() < 100) return 0;
+            return resets > 0 ? resets : System.currentTimeMillis() + 3600000L;
+        }
+    }
+
+    /** The command center has the account, but its login no longer works. */
+    public static final class Refused extends IOException {
+        Refused(String message) {
+            super(message);
+        }
+    }
+
     private static final String SERVICE = "Command center";
+    private static final String OLD =
+        "The command center needs updating to keep the cloud accounts (delta update-cc).";
 
     private final Http http;
     private final String server;
@@ -252,6 +321,132 @@ public final class Center implements EventSource {
             }
         }
         Http.requireSuccess(status, SERVICE);
+    }
+
+    // ------------------------------------------------------------------
+    // Cloud accounts
+    // ------------------------------------------------------------------
+
+    /** The cloud accounts, in the order new sessions try them. */
+    public List<Account> accounts() throws IOException, InterruptedException {
+        Http.Response response = http.send(request("/cloud-accounts"));
+        if (response.status() == 404 || response.status() == 405) throw new IOException(OLD);
+        require(response.status());
+        List<Account> accounts = new ArrayList<Account>();
+        try {
+            for (Object value : Json.array(Json.parse(response.body()))) {
+                if (!(value instanceof Map)) continue;
+                Map<String, Object> entry = Json.object(value);
+                String id = Json.text(entry, "id");
+                if (!validAccount(id)) continue;
+                accounts.add(new Account(id, Json.text(entry, "email"), Json.text(entry, "plan")));
+            }
+        } catch (RuntimeException e) {
+            throw new IOException("The command center sent an unreadable account list");
+        }
+        return accounts;
+    }
+
+    /**
+     * An access token for an account. `refused` is a token the cloud turned
+     * down, or null; the command center renews the login if it is still the
+     * current one.
+     */
+    public CloudAuth.Grant token(String account, String refused) throws IOException, InterruptedException {
+        String body = refused == null ? "{}" : Json.write(Json.map("refused", refused));
+        Http.Response response = http.send(request(accountPath(account) + "/token")
+            .header("Content-Type", "application/json")
+            .post(body));
+        requireAccount(response.status());
+        try {
+            Map<String, Object> grant = Json.object(Json.parse(response.body()));
+            Double expires = Json.number(grant, "expires_at");
+            return new CloudAuth.Grant(Json.string(grant, "access_token"),
+                expires == null ? 0 : expires.longValue());
+        } catch (RuntimeException e) {
+            throw new IOException("The command center sent an unreadable token");
+        }
+    }
+
+    /** How much of the account's 5-hour and weekly limits is used. */
+    public Usage usage(String account) throws IOException, InterruptedException {
+        Http.Response response = http.send(request(accountPath(account) + "/usage"));
+        requireAccount(response.status());
+        try {
+            return Usage.of(Json.object(Json.parse(response.body())));
+        } catch (RuntimeException e) {
+            throw new IOException("The command center sent an unreadable usage report");
+        }
+    }
+
+    /**
+     * When the account's usage limit lifts, in epoch milliseconds, if its
+     * 5-hour or weekly window is used up; 0 when it has room.
+     */
+    public long limitedUntil(String account) throws IOException, InterruptedException {
+        return usage(account).limitedUntil();
+    }
+
+    /**
+     * Stores a conversation carried over to another session, and returns the
+     * id `delta resume` prints it by.
+     */
+    public String putConversation(String text) throws IOException, InterruptedException {
+        Http.Response response = http.send(request("/conversations")
+            .header("Content-Type", "text/plain; charset=utf-8")
+            .timeout(300000)
+            .post(text));
+        if (response.status() == 404 || response.status() == 405) throw new IOException(OLD);
+        if (response.status() == 413) throw new IOException("The conversation is too big for the command center.");
+        require(response.status());
+        try {
+            String id = Json.string(Json.object(Json.parse(response.body())), "id");
+            if (!validAccount(id)) throw new IllegalArgumentException();
+            return id;
+        } catch (RuntimeException e) {
+            throw new IOException("The command center sent an unreadable conversation id");
+        }
+    }
+
+    /**
+     * Hands an old-style login, kept on the phone by earlier versions, to the
+     * command center, which keeps it from then on.
+     */
+    public void addAccount(String access, String refresh, long expiresAt) throws IOException, InterruptedException {
+        Map<String, Object> login = Json.map("refresh_token", refresh);
+        if (access != null) login.put("access_token", access);
+        if (expiresAt > 0) login.put("expires_at", Long.valueOf(expiresAt));
+        Http.Response response = http.send(request("/cloud-accounts")
+            .header("Content-Type", "application/json")
+            .post(Json.write(login)));
+        if (response.status() == 404 || response.status() == 405) throw new IOException(OLD);
+        if (response.status() == 403) throw new Refused("The cloud login on this phone no longer works.");
+        require(response.status());
+    }
+
+    private static String accountPath(String account) {
+        if (!validAccount(account)) throw new IllegalArgumentException("Not an account id");
+        return "/cloud-accounts/" + account;
+    }
+
+    /** Account ids go in a route as they are, so only the characters UUIDs use get in. */
+    static boolean validAccount(String id) {
+        if (id == null || id.length() == 0 || id.length() > 64) return false;
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
+            if (!ok) return false;
+        }
+        return true;
+    }
+
+    private static void requireAccount(int status) throws IOException {
+        if (status == 403) {
+            throw new Refused("A cloud account's login stopped working. Sign it in again with delta accounts login.");
+        }
+        if (status == 404) throw new IOException("That cloud account is no longer on the command center.");
+        if (status == 405) throw new IOException(OLD);
+        require(status);
     }
 
     // ------------------------------------------------------------------

@@ -4,6 +4,7 @@
     <string name="chats">Chats</string>
     <string name="session">Session</string>
     <string name="files">Files</string>
+    <string name="accounts">Accounts</string>
     <string name="new_session">New session</string>
     <string name="chat_hint">Type message</string>
 </resources>

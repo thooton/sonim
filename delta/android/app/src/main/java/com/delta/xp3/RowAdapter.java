@@ -10,8 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The Chats and Files lists: a name, a quiet line under it, and a short value
- * on the right ("Working", "On phone"). Rows are named by a key rather than
+ * The Chats, Files and Accounts lists: a name, a quiet line under it (two on
+ * Accounts), and a short value on the right ("Working", "On phone"). Rows are named by a key rather than
  * found by position, so a refresh that reorders the list can put the
  * highlight back on the row someone was on.
  */
@@ -22,12 +22,19 @@ final class RowAdapter extends SelectableAdapter {
         final String title;
         final String sub;
         final String value;
+        /** A second quiet line, or empty for none. */
+        final String extra;
 
         Row(String key, String title, String sub, String value) {
+            this(key, title, sub, value, null);
+        }
+
+        Row(String key, String title, String sub, String value, String extra) {
             this.key = key;
             this.title = title;
             this.sub = sub == null ? "" : sub;
             this.value = value == null ? "" : value;
+            this.extra = extra == null ? "" : extra;
         }
     }
 
@@ -73,6 +80,9 @@ final class RowAdapter extends SelectableAdapter {
         TextView sub = view.findViewById(R.id.row_sub);
         sub.setText(row.sub);
         sub.setVisibility(row.sub.length() == 0 ? View.GONE : View.VISIBLE);
+        TextView extra = view.findViewById(R.id.row_extra);
+        extra.setText(row.extra);
+        extra.setVisibility(row.extra.length() == 0 ? View.GONE : View.VISIBLE);
         TextView value = view.findViewById(R.id.row_value);
         value.setText(row.value);
         value.setVisibility(row.value.length() == 0 ? View.GONE : View.VISIBLE);
