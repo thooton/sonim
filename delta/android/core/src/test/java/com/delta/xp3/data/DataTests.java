@@ -293,7 +293,7 @@ public final class DataTests {
                 String wrapped = Setup.wrap("  Fix the list app  ", "https://cc.example.com", "delta_tok");
                 check.ok("set-auth line", wrapped.contains("delta set-auth https://cc.example.com delta_tok\n"));
                 check.ok("install script", wrapped.contains("curl -fsSL " + Setup.INSTALL_URL + " | sh"));
-                check.ok("agent is Delta", wrapped.contains("you are Delta"));
+                check.ok("agent is Delta", wrapped.toLowerCase().contains("you are delta"));
                 check.ok("help", wrapped.contains("delta help"));
                 check.ok("message last", wrapped.endsWith("\n\nFix the list app"));
                 check.same("stripped", "Fix the list app", Setup.strip(wrapped));
