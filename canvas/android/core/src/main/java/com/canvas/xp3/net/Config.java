@@ -14,61 +14,31 @@ import java.util.Map;
  * document in the app's private storage, written by the Settings screen and
  * read back here.
  *
- * A half-filled configuration is a normal state rather than an error. Canvas
- * and the model are configured separately and are useful separately: with the
- * cookie service set the three work lists are live and the Chat tab says it
- * needs a model, which is a better first launch than one screen refusing to do
- * anything until every field is populated.
+ * A half-filled configuration is a normal state rather than an error: the
+ * Settings screen fills it in one field at a time.
  */
 public final class Config {
-
-    public static final String PROVIDER_API = "api";
-    public static final String PROVIDER_CODEX = "codex";
-    public static final String PROVIDER_CLAUDE = "claude";
 
     /** Field names as the Settings screen addresses them. */
     public static final String CANVAS_URL = "canvas.baseUrl";
     public static final String COOKIE_URL = "canvas.cookieService.url";
     public static final String COOKIE_TOKEN = "canvas.cookieService.token";
-    public static final String PROVIDER = "openai.provider";
-    public static final String MODEL = "openai.model";
-    public static final String API_KEY = "openai.apiKey";
-    public static final String ACCESS_TOKEN = "openai.accessToken";
-    public static final String REFRESH_TOKEN = "openai.refreshToken";
-    public static final String ACCOUNT_ID = "openai.accountId";
-    public static final String EXPIRES_AT = "openai.expiresAt";
     public static final String TIMEZONE = "timezone";
 
     private final URI canvasBase;
     private final URI cookieService;
     private final String cookieToken;
-    private final String provider;
-    private final String model;
-    private final String apiKey;
-    private final String accessToken;
-    private final String refreshToken;
-    private final String accountId;
-    private final long expiresAt;
     private final String zone;
 
-    private Config(URI canvasBase, URI cookieService, String cookieToken, String provider,
-                   String model, String apiKey, String accessToken, String refreshToken,
-                   String accountId, long expiresAt, String zone) {
+    private Config(URI canvasBase, URI cookieService, String cookieToken, String zone) {
         this.canvasBase = canvasBase;
         this.cookieService = cookieService;
         this.cookieToken = cookieToken;
-        this.provider = provider;
-        this.model = model;
-        this.apiKey = apiKey;
-        this.accessToken = accessToken;
-        this.refreshToken = refreshToken;
-        this.accountId = accountId;
-        this.expiresAt = expiresAt;
         this.zone = zone;
     }
 
     public static Config blank() {
-        return new Config(null, null, null, PROVIDER_API, null, null, null, null, null, 0, null);
+        return new Config(null, null, null, null);
     }
 
     public static Config parse(String json) {
@@ -82,11 +52,12 @@ public final class Config {
      * An absent or empty field is "not set". Only a field that is present and
      * malformed is an error, because the only thing that writes this document
      * is the Settings screen, which validates through here before saving.
+     * Fields this version does not know, such as an older version's model
+     * login, are ignored.
      */
     public static Config from(Map<String, Object> root) {
         Map<String, Object> canvas = Json.child(root, "canvas");
         Map<String, Object> service = Json.child(canvas, "cookieService");
-        Map<String, Object> openai = Json.child(root, "openai");
 
         URI base = null;
         String baseUrl = value(canvas, "baseUrl");
@@ -101,28 +72,6 @@ public final class Config {
             throw new IllegalArgumentException("The service token must be 32 to 128 letters, digits, - or _");
         }
 
-        String provider = value(openai, "provider");
-        if (provider == null) provider = PROVIDER_API;
-        if (!PROVIDER_API.equals(provider) && !PROVIDER_CODEX.equals(provider)
-            && !PROVIDER_CLAUDE.equals(provider)) {
-            throw new IllegalArgumentException("Provider must be api, codex or claude");
-        }
-
-        long expiresAt = 0;
-        Double storedExpiry = Json.number(openai, "expiresAt");
-        if (storedExpiry != null && storedExpiry.doubleValue() > 0) {
-            expiresAt = (long) storedExpiry.doubleValue();
-        } else {
-            String expiryText = value(openai, "expiresAt");
-            if (expiryText != null) {
-                try {
-                    expiresAt = Long.parseLong(expiryText);
-                } catch (NumberFormatException e) {
-                    throw new IllegalArgumentException("The login expiry is not valid");
-                }
-            }
-        }
-
         String zone = value(root, "timezone");
         if (zone != null) {
             try {
@@ -132,9 +81,7 @@ public final class Config {
             }
         }
 
-        return new Config(base, cookies, token, provider, value(openai, "model"),
-            credential(openai, "apiKey"), credential(openai, "accessToken"),
-            credential(openai, "refreshToken"), credential(openai, "accountId"), expiresAt, zone);
+        return new Config(base, cookies, token, zone);
     }
 
     private static String value(Map<String, Object> source, String key) {
@@ -142,23 +89,6 @@ public final class Config {
         if (found == null) return null;
         String trimmed = found.trim();
         return trimmed.length() == 0 ? null : trimmed;
-    }
-
-    /**
-     * A credential goes into an HTTP header, so anything that could not sit in
-     * one is refused here rather than at the point where it would split the
-     * request in half.
-     */
-    private static String credential(Map<String, Object> source, String key) {
-        String found = value(source, key);
-        if (found == null) return null;
-        for (int i = 0; i < found.length(); i++) {
-            char c = found.charAt(i);
-            if (c < 33 || c > 126) {
-                throw new IllegalArgumentException("The key must be visible characters with no spaces");
-            }
-        }
-        return found;
     }
 
     static URI origin(String value) {
@@ -201,18 +131,8 @@ public final class Config {
         put(canvas, "baseUrl", canvasBase == null ? null : trimSlash(canvasBase.toString()));
         if (!service.isEmpty()) canvas.put("cookieService", service);
 
-        Map<String, Object> openai = new LinkedHashMap<String, Object>();
-        openai.put("provider", provider);
-        put(openai, "model", model);
-        put(openai, "apiKey", apiKey);
-        put(openai, "accessToken", accessToken);
-        put(openai, "refreshToken", refreshToken);
-        put(openai, "accountId", accountId);
-        if (expiresAt > 0) openai.put("expiresAt", Long.valueOf(expiresAt));
-
         Map<String, Object> root = new LinkedHashMap<String, Object>();
         if (!canvas.isEmpty()) root.put("canvas", canvas);
-        root.put("openai", openai);
         put(root, "timezone", zone);
         return root;
     }
@@ -232,7 +152,7 @@ public final class Config {
     /**
      * One field changed, validated, and returned as a new configuration.
      *
-     * Editing goes through the settings tree rather than through nine setters
+     * Editing goes through the settings tree rather than through setters
      * so that there is exactly one place that decides whether a value is
      * acceptable, and it is the same place that reads the file at startup.
      */
@@ -265,20 +185,6 @@ public final class Config {
         return canvasBase != null && cookieService != null && cookieToken != null;
     }
 
-    /**
-     * Whether the Chat tab has a model to talk to.
-     *
-     * A ChatGPT login needs either a refresh token, which can produce an access
-     * token and carries the account id inside it, or an access token and
-     * account id already in hand.
-     */
-    public boolean chatReady() {
-        if (!canvasReady() || model == null) return false;
-        if (PROVIDER_API.equals(provider)) return apiKey != null;
-        if (PROVIDER_CLAUDE.equals(provider)) return refreshToken != null || accessToken != null;
-        return refreshToken != null || (accessToken != null && accountId != null);
-    }
-
     public URI canvasBase() {
         return canvasBase;
     }
@@ -291,18 +197,6 @@ public final class Config {
         return cookieToken;
     }
 
-    public String model() {
-        return model;
-    }
-
-    public boolean codex() {
-        return PROVIDER_CODEX.equals(provider);
-    }
-
-    public boolean claude() {
-        return PROVIDER_CLAUDE.equals(provider);
-    }
-
     public ZoneId zone() {
         if (zone == null) return ZoneId.systemDefault();
         try {
@@ -310,38 +204,5 @@ public final class Config {
         } catch (RuntimeException e) {
             return ZoneId.systemDefault();
         }
-    }
-
-    public String apiKey() {
-        return apiKey;
-    }
-
-    public String accessToken() {
-        return accessToken;
-    }
-
-    public String refreshToken() {
-        return refreshToken;
-    }
-
-    public String accountId() {
-        return accountId;
-    }
-
-    public long expiresAt() {
-        return expiresAt;
-    }
-
-    /**
-     * The credentials for a model request.
-     *
-     * A ChatGPT login gets one that can renew itself and reports the rotated
-     * tokens to `rotated` so they can be written down; an API key gets a
-     * constant. Config decides which because it is what knows the provider,
-     * but it holds neither the network nor the storage.
-     */
-    public Credentials credentials(Http http, CodexAuth.Rotated rotated) {
-        if (!codex()) return new Credentials.ApiKey(apiKey);
-        return new CodexAuth(http, accessToken, refreshToken, accountId, rotated);
     }
 }

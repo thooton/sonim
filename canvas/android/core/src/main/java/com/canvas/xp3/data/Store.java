@@ -16,7 +16,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The three things the app writes down, in its own private directory.
+ * The two things the app writes down, in its own private directory: the
+ * settings and the last sync.
  *
  * A phone that has been in a pocket all morning should open on the work it knew
  * about this morning, not on a spinner: the network on a handset like this is
@@ -35,12 +36,15 @@ import java.util.Map;
 public final class Store {
 
     private static final String SETTINGS = "settings.json";
-    private static final String BUNDLED_REVISION = "bundled-setup.txt";
     private static final String CACHE = "assignments.json";
-    private static final String TRANSCRIPT = "chat.json";
 
-    /** Enough conversation to be worth keeping, little enough to load instantly. */
-    private static final int MAX_TURNS = 200;
+    /**
+     * What older versions kept for the chat: the conversation, and the marker
+     * for a bundled Claude login. Nothing reads them now.
+     */
+    private static final String[] RETIRED = {
+        "chat.json", "chat.json.tmp", "bundled-setup.txt", "bundled-setup.txt.tmp",
+    };
     private static final long MAX_FILE = 4000000;
 
     private final File directory;
@@ -80,14 +84,28 @@ public final class Store {
         write(SETTINGS, config.toJson(), true);
     }
 
-    /** The local OAuth bundle already adopted by this installation, if any. */
-    public String bundledRevision() {
-        String revision = read(BUNDLED_REVISION);
-        return revision == null ? "" : revision.trim();
-    }
-
-    public void saveBundledRevision(String revision) throws IOException {
-        write(BUNDLED_REVISION, revision == null ? "" : revision.trim(), false);
+    /**
+     * Removes what older versions kept for the chat: the conversation, and the
+     * model provider's login inside the settings file. The login is a live
+     * credential that nothing uses any more, so it should not stay on the
+     * phone. The rest of the settings file is written back untouched, and a
+     * file that cannot be read is left alone rather than replaced.
+     */
+    public void forgetChat() {
+        for (String name : RETIRED) new File(directory, name).delete();
+        String json = read(SETTINGS);
+        if (json == null) return;
+        try {
+            Map<String, Object> root = Json.object(Json.parse(json));
+            if (!root.containsKey("openai")) return;
+            root.remove("openai");
+            write(SETTINGS, Json.write(root), true);
+        } catch (IOException e) {
+            // Tried again on the next launch.
+        } catch (RuntimeException e) {
+            // Not a settings file this version can read; settings() already
+            // treats it as blank.
+        }
     }
 
     // ------------------------------------------------------------------
@@ -162,54 +180,10 @@ public final class Store {
         return item;
     }
 
-    // ------------------------------------------------------------------
-    // The transcript
-    // ------------------------------------------------------------------
-
-    public List<ChatTurn> transcript() {
-        List<ChatTurn> turns = new ArrayList<>();
-        String json = read(TRANSCRIPT);
-        if (json == null) return turns;
-        try {
-            for (Object entry : Json.children(Json.object(Json.parse(json)), "turns")) {
-                Map<String, Object> turn = Json.object(entry);
-                String text = Json.text(turn, "text");
-                Double at = Json.number(turn, "at");
-                if (text == null || at == null) continue;
-                turns.add(
-                    Json.flag(turn, "compacted")
-                        ? ChatTurn.compaction(text, (long) at.doubleValue())
-                        : new ChatTurn(Json.flag(turn, "me"), text, (long) at.doubleValue())
-                );
-            }
-        } catch (RuntimeException e) {
-            return new ArrayList<>();
-        }
-        return turns;
-    }
-
-    public void saveTranscript(List<ChatTurn> turns) throws IOException {
-        List<Object> saved = new ArrayList<>();
-        int from = Math.max(0, turns.size() - MAX_TURNS);
-        for (int i = from; i < turns.size(); i++) {
-            ChatTurn turn = turns.get(i);
-            saved.add(Json.map(
-                "me", Boolean.valueOf(turn.fromUser),
-                "text", turn.text,
-                "at", Long.valueOf(turn.when),
-                "compacted", Boolean.valueOf(turn.isCompaction())
-            ));
-        }
-        write(TRANSCRIPT, Json.write(Json.map("turns", saved)), false);
-    }
-
     /** Everything written about this account, for Settings' sign-out. */
     public void clear() {
         new File(directory, SETTINGS).delete();
         new File(directory, CACHE).delete();
-        new File(directory, TRANSCRIPT).delete();
-        // Keep BUNDLED_REVISION: signing out must not silently restore the
-        // credentials from this same APK on the next launch.
     }
 
     // ------------------------------------------------------------------

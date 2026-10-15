@@ -4,8 +4,10 @@
 
 This file applies to the whole repository. This is a deliberately small,
 dependency-free Android homework client for the Sonim XP3. It reads Canvas,
-caches assignments for offline use, and offers a model-backed chat agent with a
-fixed set of read-only Canvas and local tools.
+caches assignments for offline use. It used to have a model-backed chat tab;
+that was removed, and `Store.forgetChat` deletes the conversation and model
+login older versions left on the phone. Do not bring a model back
+incidentally.
 
 Preserve the product's defining constraints:
 
@@ -23,9 +25,7 @@ Preserve the product's defining constraints:
 `README.md` is the human quick-start; keep it at or below 30 lines and update
 its concise overview when setup, controls, build/install steps, or the user-
 visible privacy boundary changes. Detailed behavior lives in tests and the
-rationale comments beside the implementation. `docs/bmms-scroll-analysis.md`
-records the framework behavior behind the chat list's scrolling decisions;
-consult it before altering chat focus or scrolling.
+rationale comments beside the implementation.
 
 ## Repository map
 
@@ -34,24 +34,18 @@ consult it before altering chat focus or scrolling.
     assignment state, grouping, display dates, and Canvas-to-domain mapping.
   - `data/Html.java` converts untrusted Canvas editor HTML to the app's small
     Markdown dialect.
-  - `data/Store.java` owns settings, assignment cache, and chat transcript
-    persistence. `ChatTurn.java` and `ChatHistory.java` define transcript state.
+  - `data/Store.java` owns settings and assignment cache persistence.
   - `net/Config.java` is the single validation and serialization boundary for
     settings.
   - `net/Http.java`, `Canvas.java`, `RemoteCookies.java`, and `Cookies.java`
     implement bounded HTTP, fixed Canvas routes, and short-lived cookie access.
-  - `net/Tools.java` is the complete capability surface exposed to the model.
-  - `net/Agent.java` owns the bounded tool loop and provider-neutral history;
-    `Model.java` and `ClaudeModel.java` are the OpenAI/ChatGPT and Anthropic
-    streaming transports.
-  - `net/CodexAuth.java`, `ClaudeAuth.java`, and `Credentials.java` own model
-    credential renewal.
+    Some `Canvas` routes (posts, pages, grading, `due`) were the chat's and
+    are now unused by the app; they remain read-only and tested.
 - `android/app`: Android UI and orchestration.
   - `MainActivity.java` owns screens, focus, key handling, and main-thread UI
     state.
   - `Backend.java` is the only bridge from the UI to disk and network work.
-  - The adapters own painted selection state; `ChatListView.java` adds the
-    oversized-message scrolling behavior.
+  - The adapters own painted selection state.
   - Repeated row shapes are XML layouts. Screens whose contents are dynamic are
     assembled in `MainActivity`.
   - `Markdown.java` renders the dialect emitted by core `Html.java`; changes to
@@ -76,13 +70,11 @@ records, streams added after Java 8, and newer convenience methods. Follow the
 existing explicit collections, loops, anonymous classes, and null-based
 absence conventions.
 
-The application uses two worker threads for assignment work and a separate
-single chat worker so a slow model turn cannot block a sync. Network work must
+The application uses two worker threads for assignment work. Network work must
 not run on the main thread. Worker results return through the main `Handler`.
 When mutable state crosses threads, take a snapshot or use the same deliberate
 visibility mechanism already used nearby (`volatile`, synchronization, or a
-generation/version check). In-flight chat results must never land in a chat
-that was cleared, rewound, signed out, or replaced.
+generation/version check).
 
 ### Assignment and cache semantics
 
@@ -111,9 +103,7 @@ failures, and persistence round trips.
 Treat these as code-level guarantees, not prompt suggestions:
 
 - Canvas routes are fixed in `Canvas.java`, use GET, and interpolate only
-  positive numeric IDs validated by `Tools.id`.
-- The model must not choose a URL, path, command, or arbitrary code to execute.
-  Keep `Tools.DEFINITIONS` and tool dispatch synchronized and narrowly typed.
+  positive numeric IDs validated by `Canvas.id`.
 - Validate Canvas pagination against the configured origin and `/api/v1/`
   path. Do not follow redirects carrying credentials.
 - Both user-configured endpoints remain HTTPS-only; the manifest also disables
@@ -121,12 +111,9 @@ Treat these as code-level guarantees, not prompt suggestions:
 - Bound response sizes and request duration. Preserve interrupt handling and
   close streams/connections in all paths.
 - Never include response bodies, cookies, tokens, private Canvas data, or auth
-  payloads in exceptions, logs, toasts, test failure text, or model-facing
-  errors. Errors shown on the small screen should be short and actionable.
+  payloads in exceptions, logs, toasts, or test failure text. Errors shown on the small screen should be short and actionable.
 - A Canvas session cookie lives only in memory, expires after fifteen minutes
   on a monotonic clock, and is invalidated before authentication retries.
-- Model transports may POST to their fixed provider endpoints, but requests
-  keep provider-specific auth behavior and `store: false` where applicable.
 
 When adding or changing a network route, test the actual `HttpURLConnection`
 path with `TestServer`: request method, path, headers, body, pagination,
@@ -145,21 +132,15 @@ d-pad reachability and visible selection for every action.
   at 240px width and every screen at 320px height; one extra row is material.
 - Lists act on OK key release. Sonim firmware may report OK as either
   `KEYCODE_DPAD_CENTER` or `KEYCODE_ENTER`.
-- The chat compose field is the exception: it sends on key down because the T9
-  keyboard consumes the first ENTER release while committing a word.
 - Let `ListView` own ordinary up/down selection and scrolling. Do not broadly
-  intercept arrow keys. `ChatListView` only specializes movement through rows
-  taller than the viewport.
-- Left/right belongs to the caret while it can move inside the draft; at a text
-  edge it returns to tab navigation. Preserve this escape path.
-- A redraw must preserve the relevant selection, scroll anchor, draft, caret,
-  keyboard composition, and focus. Streaming updates adapter rows in place so
-  they do not repeatedly rebuild the compose field.
+  intercept arrow keys.
+- Left/right switches tabs, except inside a text field while the caret can
+  still move; at a text edge it returns to tab navigation.
+- A redraw must preserve the relevant selection, scroll anchor and focus.
 - Detail and settings screens hide or restore navigation deliberately. Back and
-  Clear behavior, and focus transfer between transcript and composer, require
-  manual verification after related changes.
+  Clear behavior require manual verification after related changes.
 - Use the phone's 12/24-hour preference for displayed times and the configured
-  IANA zone (falling back to the device zone) for Canvas/model date semantics.
+  IANA zone (falling back to the device zone) for Canvas date semantics.
 
 There are no Android UI automation tests in this repository. For UI changes,
 compile the APK and manually exercise d-pad entry/exit, both OK key codes when
@@ -186,19 +167,19 @@ nonzero on failure. `:core:check` also depends on `selfTest`.
 Tests use `Check` directly. Add a named `check.run(...)` group or extend the
 nearest existing group, use `check.ok`, `check.same`, and `check.fails`, and
 keep fixtures deterministic. Use injected clocks, local loopback
-`TestServer`, and temporary directories rather than live Canvas/model calls or
+`TestServer`, and temporary directories rather than live Canvas calls or
 real credentials. Tests may use package-private seams in the package under
 test.
 
 Validation should match the change:
 
-- Core/domain/parser/store/network/agent changes: run `:core:selfTest`.
+- Core/domain/parser/store/network changes: run `:core:selfTest`.
 - App Java, resources, manifest, or Gradle changes: also run
   `:app:assembleDebug`.
 - HTML/Markdown changes: cover conversion in `DataTests`, compile the renderer,
   and manually inspect representative headings, lists, links, code, and tables
   on the narrow layout.
-- Auth, transport, tool, or Canvas route changes: add refusal and leakage tests
+- Auth, transport, or Canvas route changes: add refusal and leakage tests
   as well as happy paths.
 - UI, focus, scrolling, or key changes: perform the hardware-oriented manual
   checks above; a successful compile is not sufficient evidence.
@@ -211,12 +192,11 @@ copy on the phone. The debug APK is only for checking that the code compiles.
 ## Credentials and generated files
 
 `android/app/build.gradle` may read deployment credentials from the sibling
-Canvas project, `~/.codex/auth.json`, `~/.pi/agent/auth.json`,
-`claude-auth.json`, or explicitly supplied Gradle properties. It writes a
+Canvas project or explicitly supplied Gradle properties. It writes a
 generated `Defaults.java` under `android/app/build/`; never edit or commit that
 file.
 
-An assembled personal APK can contain live Canvas and model credentials and
+An assembled personal APK can contain live Canvas credentials and
 must be treated like a password. Never print, decode, attach, or commit any APK,
 auth JSON, service token, keystore, `local.properties`, or generated default
 source. The root APKs and auth files are intentionally ignored. In particular,
@@ -232,7 +212,7 @@ output and summaries.
 - Follow the surrounding four-space Java/XML style. There is no formatter or
   style task; avoid unrelated reformatting, especially in `MainActivity.java`.
 - Prefer small, final classes and explicit data flow. Keep Android-free helpers
-  in core and provider-specific translation at the transport boundary.
+  in core.
 - Preserve the hand-written JSON and HTTP layers unless the user explicitly
   changes the no-dependency requirement.
 - Comments in this project explain *why* a constraint exists—phone geometry,
@@ -241,12 +221,10 @@ output and summaries.
 - Keep user-facing copy concise enough for the device and consistent between
   code, resources, and `README.md`.
 - Avoid broad exception catches unless the boundary is intentionally fail-soft
-  (cache loading, credential persistence after an in-memory rotation, or a
-  background result converted to a user-safe message). Preserve interrupt
+  (cache loading, or a background result converted to a user-safe message). Preserve interrupt
   status when catching `InterruptedException`.
-- Do not change persistence fields, tool schemas, auth payloads, or transcript
-  reconstruction in isolation. Update readers/writers or provider adapters
-  together and test round trips and old/malformed input.
+- Do not change persistence fields or auth payloads in isolation. Update
+  readers and writers together and test round trips and old/malformed input.
 
 Before finishing, inspect `git status` and the diff, preserve unrelated user
 changes, run the applicable validations, and report both automated results and

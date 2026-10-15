@@ -2,22 +2,16 @@ package com.canvas.xp3;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.DialogInterface;
-import android.content.Intent;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.Editable;
 import android.text.InputType;
-import android.text.Layout;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
-import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -35,14 +29,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.canvas.xp3.data.Assignment;
-import com.canvas.xp3.data.ChatHistory;
-import com.canvas.xp3.data.ChatTurn;
 import com.canvas.xp3.data.Dates;
 import com.canvas.xp3.data.Section;
 import com.canvas.xp3.data.Sync;
 import com.canvas.xp3.data.Todos;
-import com.canvas.xp3.net.Agent;
-import com.canvas.xp3.net.ClaudeAuth;
 import com.canvas.xp3.net.Config;
 
 import java.util.ArrayList;
@@ -56,20 +46,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Four lists, a detail page, a settings page, and the keys that move between
+ * Three lists, a detail page, a settings page, and the keys that move between
  * them.
  *
  * Views are built in code rather than inflated per screen because each screen
  * is a handful of rows whose shape depends on what is in it, and a layout file
  * per state would be more XML than the states are worth. The things that
- * repeat, an assignment row, a section band, a bubble and a setting, are the
+ * repeat, an assignment row, a section band and a setting, are the
  * things that do have layouts.
  *
  * Nothing on this side of the app touches a network. Everything that does is
- * behind Backend, runs on one of the two executors below, and comes back
- * through the main thread's handler. There are two executors rather than one
- * because a chat turn can legitimately take half a minute of tool calls, and a
- * list refresh queued behind it would be a list that does not refresh.
+ * behind Backend, runs on the work executor below, and comes back through the
+ * main thread's handler.
  */
 public final class MainActivity extends Activity {
 
@@ -82,21 +70,11 @@ public final class MainActivity extends Activity {
     private static final int ASSIGNED = 0;
     private static final int MISSING = 1;
     private static final int DONE = 2;
-    private static final int CHAT = 3;
-    private static final int TABS = 4;
+    private static final int TABS = 3;
 
-    /** Where a redraw of the Chat tab should leave the cursor. */
-    private static final int CHAT_FOCUS_NONE = 0;
-    private static final int CHAT_FOCUS_LIST = 1;
-    private static final int CHAT_FOCUS_INPUT = 2;
-
-    private static final String PASTE = "Paste into the box";
-    private static final String COMPACT = "Compact this chat";
-    private static final String CLEAR = "Clear this chat";
     private static final String REFRESH = "Refresh from Canvas";
     private static final String SETTINGS = "Settings";
     private static final String ABOUT = "About";
-    private static final String CLAUDE_LOGIN = "Sign in to Claude";
 
     /**
      * How stale the list has to be before opening the app fetches a new one.
@@ -121,7 +99,7 @@ public final class MainActivity extends Activity {
     private int currentTab = ASSIGNED;
 
     /**
-     * Two threads for work, one for chat.
+     * Two threads for work.
      *
      * Two rather than one because opening an assignment fetches its
      * instructions, and a sync across a term's courses can easily run for
@@ -130,7 +108,6 @@ public final class MainActivity extends Activity {
      * other than the shape of the queue.
      */
     private final ExecutorService work = pool("canvas-work", 2);
-    private final ExecutorService chatWork = pool("canvas-chat", 1);
 
     private static ExecutorService pool(final String name, int threads) {
         return Executors.newFixedThreadPool(threads, new ThreadFactory() {
@@ -174,31 +151,6 @@ public final class MainActivity extends Activity {
      *  decision taken on arrival rather than one re-imposed on every draw. */
     private final Set<Integer> defaulted = new HashSet<>();
 
-    private final List<ChatTurn> transcript = new ArrayList<>();
-    private String chatDraft = "";
-    private boolean agentThinking;
-    /** True when the in-flight model turn is producing a hidden context summary. */
-    private boolean compacting;
-    /** The assistant turn currently arriving; it becomes a saved turn on completion. */
-    private final StringBuilder streamingAnswer = new StringBuilder();
-    private long streamingAnswerWhen;
-
-    /**
-     * Which conversation a turn belongs to.
-     *
-     * Clearing the chat or signing out while an answer is on its way has to
-     * stop that answer landing in the transcript that replaced it. The turn
-     * cannot be cancelled mid-flight, so it is allowed to finish and then
-     * discarded on arrival by comparing this.
-     */
-    private int chatGeneration;
-
-    /** The live chat views, so a streamed word can redraw rows without rebuilding the screen. */
-    private ChatListView chatList;
-    private ChatAdapter chatAdapter;
-    /** -1 means no restore; MAX_VALUE means the transcript was at its end. */
-    private int savedChatScrollPosition = AdapterView.INVALID_POSITION;
-
     /** The live work list, so a sync landing underneath can keep the highlight. */
     private ListView listView;
     private AssignmentAdapter listAdapter;
@@ -223,8 +175,6 @@ public final class MainActivity extends Activity {
         // blank screen with a spinner. A refresh then replaces it underneath.
         snapshot = backend.cached();
         if (snapshot != null) todos.replace(snapshot.work);
-        transcript.addAll(backend.transcript());
-        backend.restore(transcript);
 
         content = findViewById(R.id.content);
         tabBar = findViewById(R.id.tab_bar);
@@ -232,7 +182,6 @@ public final class MainActivity extends Activity {
             findViewById(R.id.tab_assigned),
             findViewById(R.id.tab_missing),
             findViewById(R.id.tab_done),
-            findViewById(R.id.tab_chat),
         };
         for (int i = 0; i < tabs.length; i++) {
             final int tab = i;
@@ -268,45 +217,15 @@ public final class MainActivity extends Activity {
         refreshIfStale();
     }
 
-    @Override
-    protected void onPause() {
-        if (currentTab == CHAT && openWork == null && !settingsOpen) {
-            saveChatScrollPosition();
-        }
-        super.onPause();
-    }
-
     private boolean started;
 
-    private String greeting() {
-        if (!backend.canvasReady()) {
-            return "Add your Canvas details in Menu, Settings, and I can answer questions about your work.";
-        }
-        if (!backend.chatReady()) {
-            return "Your work is syncing, but I have no model to think with yet. Open Menu, Settings, then choose a model provider and model.";
-        }
-        return "Ask me about your courses, deadlines or grades. I read them from Canvas when you ask.";
-    }
-
     private void showTab(int tab, boolean focusContent) {
-        if (currentTab == CHAT && tab != CHAT) saveChatScrollPosition();
         currentTab = tab;
         openWork = null;
         settingsOpen = false;
         tabBar.setVisibility(View.VISIBLE);
         for (int i = 0; i < tabs.length; i++) tabs[i].setSelected(i == tab);
-        // The first time Chat is drawn, leave it neutral just like the opening
-        // screen: the first down press then enters the transcript at its end.
-        // On later visits, keep the ordinary tab-to-tab focus behaviour.
-        if (tab == CHAT) {
-            boolean firstChat = chatList == null;
-            renderChat(
-                firstChat
-                    ? CHAT_FOCUS_NONE
-                    : focusContent ? CHAT_FOCUS_LIST : CHAT_FOCUS_NONE
-            );
-        }
-        else renderList(tab, focusContent, null);
+        renderList(tab, focusContent, null);
     }
 
     // ------------------------------------------------------------------
@@ -545,16 +464,9 @@ public final class MainActivity extends Activity {
         );
     }
 
-    /**
-     * Redraws a work list, and only a work list.
-     *
-     * A sync finishing changes nothing on the Chat tab, and redrawing that tab
-     * rebuilds its compose field: doing it because a background fetch happened
-     * to land would take the cursor and the keyboard's half-finished word away
-     * from somebody in the middle of typing a question.
-     */
+    /** Redraws a work list, and only a work list. */
     private void redrawIfListing() {
-        if (openWork != null || settingsOpen || currentTab == CHAT) return;
+        if (openWork != null || settingsOpen) return;
         renderList(currentTab, listView != null && listView.hasFocus(), selectedKey());
     }
 
@@ -570,17 +482,9 @@ public final class MainActivity extends Activity {
             renderDetail();
         } else if (settingsOpen) {
             renderSettings(settingsAdapter == null ? 0 : settingsAdapter.getSelectedPosition());
-        } else if (currentTab == CHAT) {
-            renderChat(chatFocus());
         } else {
             renderList(currentTab, listView != null && listView.hasFocus(), selectedKey());
         }
-    }
-
-    private int chatFocus() {
-        if (chatList == null) return CHAT_FOCUS_NONE;
-        if (getCurrentFocus() instanceof EditText) return CHAT_FOCUS_INPUT;
-        return chatList.hasFocus() ? CHAT_FOCUS_LIST : CHAT_FOCUS_NONE;
     }
 
     private List<AssignmentAdapter.Row> rows(int state, List<Section> sections) {
@@ -933,453 +837,6 @@ public final class MainActivity extends Activity {
         showTab(currentTab, true);
     }
 
-    // ------------------------------------------------------------------
-    // Chat
-    // ------------------------------------------------------------------
-
-    /**
-     * The transcript, plus the answer being composed.
-     *
-     * The pause while an answer is worked out is a turn like any other, so it
-     * queues at the bottom and scrolls with the rest instead of being a
-     * separate thing pinned somewhere. The assistant gets one area for its
-     * whole response. It begins as an ellipsis, then fills with streamed text
-     * as soon as any arrives.
-     *
-     * It is built rather than stored: this bubble is not a turn yet. It must
-     * not be saved, must not be copied from, and is thrown away whole if the
-     * turn fails.
-     */
-    private List<ChatTurn> chatTurns() {
-        List<ChatTurn> turns = new ArrayList<>(transcript);
-        if (!agentThinking) return turns;
-        if (compacting) {
-            turns.add(ChatTurn.compacting(streamingAnswerWhen));
-            return turns;
-        }
-        turns.add(new ChatTurn(
-            false,
-            streamingAnswer.length() == 0 ? "…" : streamingAnswer.toString(),
-            streamingAnswerWhen
-        ));
-        return turns;
-    }
-
-    /**
-     * Repaints the rows without rebuilding the screen.
-     *
-     * Rebuilding the screen for every streamed fragment would take the cursor,
-     * the draft and the T9 keyboard's half-finished word away. Only the adapter
-     * changes here, so the field below the list is untouched.
-     */
-    private void updateChat() {
-        if (chatAdapter == null || chatList == null) return;
-        if (currentTab != CHAT || openWork != null || settingsOpen) return;
-        // Composer focus is an unconditional bottom pin. Otherwise, preserve
-        // scrollback unless the final row was fully visible before this change.
-        boolean follow =
-            chatList.isPinnedToBottom() || chatIsAtBottom(chatList, chatAdapter);
-        chatAdapter.replace(chatTurns());
-        if (follow) chatList.pinToBottomOnce();
-    }
-
-    private void renderChat(int focus) {
-        LinearLayout root = vertical();
-
-        final ChatAdapter adapter = new ChatAdapter(this);
-        adapter.replace(chatTurns());
-        final ChatListView list = chatListView(adapter);
-        chatAdapter = adapter;
-        chatList = list;
-        list.setBackgroundColor(color(R.color.chat_page));
-        // Bubbles carry their own spacing. A rule between them would be a
-        // second way of saying where one message ends.
-        list.setDivider(null);
-        list.setDividerHeight(0);
-        list.setStackFromBottom(true);
-        list.setTranscriptMode(ListView.TRANSCRIPT_MODE_DISABLED);
-        list.setSmoothScrollbarEnabled(false);
-        list.setVerticalFadingEdgeEnabled(false);
-        list.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
-        list.setPadding(0, 0, 0, dp(8));
-        list.setClipToPadding(false);
-        root.addView(list, weighted());
-
-        /* A compact three-line compose field leaves the transcript most of the
-         * screen. OK sends, so the 240px-wide layout needs no separate button. */
-        final EditText input = new EditText(this);
-        input.setTextSize(16);
-        input.setTextColor(color(R.color.input_text));
-        input.setHintTextColor(color(R.color.input_hint));
-        input.setBackgroundResource(R.drawable.edittext_border);
-        input.setPadding(dp(8), dp(8), dp(8), dp(8));
-        input.setHint(getString(R.string.chat_hint));
-        input.setText(chatDraft);
-        input.setSelection(chatDraft.length());
-        input.setMaxLines(3);
-        /*
-         * The T9 candidate strip along the bottom of the screen is not
-         * automatic: the keyboard decides whether to predict from what the
-         * field asks for, and without AUTO_CORRECT it drops back to multitap
-         * with no suggestions at all. SHORT_MESSAGE says what is being written
-         * here, and MULTI_LINE lets a long question wrap over three lines
-         * instead of scrolling sideways through a 240px slot.
-         */
-        input.setInputType(
-            InputType.TYPE_CLASS_TEXT |
-            InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE |
-            InputType.TYPE_TEXT_FLAG_CAP_SENTENCES |
-            InputType.TYPE_TEXT_FLAG_AUTO_CORRECT |
-            InputType.TYPE_TEXT_FLAG_MULTI_LINE
-        );
-        input.setImeOptions(
-            EditorInfo.IME_ACTION_SEND | EditorInfo.IME_FLAG_NO_ENTER_ACTION
-        );
-        // The draft is kept here rather than read off the view, because every
-        // reply rebuilds this screen and the view holding it goes with it.
-        input.addTextChangedListener(
-            new TextWatcher() {
-                @Override
-                public void beforeTextChanged(
-                    CharSequence text,
-                    int start,
-                    int count,
-                    int after
-                ) {}
-
-                @Override
-                public void onTextChanged(
-                    CharSequence text,
-                    int start,
-                    int before,
-                    int count
-                ) {}
-
-                @Override
-                public void afterTextChanged(Editable text) {
-                    chatDraft = text.toString();
-                    if (input.hasFocus()) list.pinToBottomOnce();
-                }
-            }
-        );
-        input.setOnEditorActionListener(
-            new TextView.OnEditorActionListener() {
-                @Override
-                public boolean onEditorAction(
-                    TextView view,
-                    int actionId,
-                    KeyEvent event
-                ) {
-                    if (
-                        actionId == EditorInfo.IME_ACTION_SEND ||
-                        actionId == EditorInfo.IME_ACTION_DONE ||
-                        (event != null &&
-                            event.getKeyCode() == KeyEvent.KEYCODE_ENTER &&
-                            event.getAction() == KeyEvent.ACTION_DOWN)
-                    ) {
-                        send(view.getText().toString());
-                        return true;
-                    }
-                    return false;
-                }
-            }
-        );
-        /*
-         * OK sends. This handset's keypad maps OK to ENTER (`key 352 ENTER` in
-         * its key layout), not to DPAD_CENTER, so both are handled.
-         *
-         * It sends on the press rather than the release, which is not the
-         * usual way round and is load bearing here. With the T9 keyboard up,
-         * the first ENTER release never reaches the app at all: the keyboard
-         * takes it to finish the word it is composing, and only the press
-         * arrives. Sending on the release therefore cost two presses, or three
-         * with a word still in the air. The press is delivered every time.
-         *
-         * Both halves are swallowed regardless, so that ENTER cannot also drop
-         * a newline into a field that is set to accept them.
-         */
-        final ListView transcript = list;
-        int transcriptId = View.generateViewId();
-        int inputId = View.generateViewId();
-        list.setId(transcriptId);
-        input.setId(inputId);
-        list.setNextFocusDownId(inputId);
-        input.setNextFocusUpId(transcriptId);
-        input.setOnFocusChangeListener(
-            new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View view, boolean hasFocus) {
-                    // Reaching the composer proves the transcript was read to
-                    // its end. Keep the last row's bottom fixed while typing,
-                    // including keyboard, line-wrap and streaming relayouts.
-                    list.setPinnedToBottom(hasFocus);
-                }
-            }
-        );
-        input.setOnKeyListener(
-            new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View view, int keyCode, KeyEvent event) {
-                    /*
-                     * Up out of the box, once there is no line of your own
-                     * above the cursor to go to.
-                     *
-                     * The field holds three lines, and the platform spends a
-                     * press on each of them plus one more that does nothing at
-                     * all: on the first line it answers up by moving the cursor
-                     * to the start of the text, silently, and only the press
-                     * after that gives up the focus. Reaching the transcript
-                     * over a two line question therefore took three presses,
-                     * one of which changed nothing on screen. Handled here, it
-                     * takes one press per line of what you have written and no
-                     * dead ones.
-                     */
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                        if (event.getAction() != KeyEvent.ACTION_DOWN) {
-                            return false;
-                        }
-                        if (!onFirstLine((EditText) view)) return false;
-                        transcript.requestFocus();
-                        return true;
-                    }
-
-                    if (
-                        keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
-                        keyCode != KeyEvent.KEYCODE_ENTER &&
-                        keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER
-                    ) return false;
-                    if (
-                        event.getAction() == KeyEvent.ACTION_DOWN &&
-                        event.getRepeatCount() == 0
-                    ) {
-                        send(((EditText) view).getText().toString());
-                    }
-                    return true;
-                }
-            }
-        );
-
-        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        inputParams.setMargins(dp(4), dp(2), dp(4), dp(4));
-        root.addView(input, inputParams);
-
-        wireChatList(list, adapter);
-        replaceContent(root);
-        restoreChatScrollPosition(list, adapter);
-        if (focus == CHAT_FOCUS_INPUT) input.requestFocus();
-        else if (focus == CHAT_FOCUS_LIST) list.requestFocus();
-    }
-
-    /**
-     * Records intent rather than a pixel offset. MAX_VALUE means "the end", so
-     * returning after the transcript grows resolves against its new count.
-     */
-    private void saveChatScrollPosition() {
-        if (chatList == null || chatAdapter == null || chatAdapter.getCount() == 0) {
-            return;
-        }
-        savedChatScrollPosition =
-            chatList.getLastVisiblePosition() >= chatAdapter.getCount() - 1
-                ? Integer.MAX_VALUE
-                : chatList.getFirstVisiblePosition();
-    }
-
-    /** Applies a saved position immediately after the adapter has its data. */
-    private void restoreChatScrollPosition(ChatListView list, ChatAdapter adapter) {
-        int count = adapter.getCount();
-        if (count == 0) {
-            savedChatScrollPosition = AdapterView.INVALID_POSITION;
-            return;
-        }
-        int saved = savedChatScrollPosition;
-        savedChatScrollPosition = AdapterView.INVALID_POSITION;
-        int position = saved == Integer.MAX_VALUE
-            ? count - 1
-            : saved >= 0 ? Math.min(saved, count - 1) : count - 1;
-        list.setSelection(position);
-        if (saved == Integer.MAX_VALUE || saved == AdapterView.INVALID_POSITION) {
-            list.pinToBottomOnce();
-        }
-    }
-
-    /** Whether the final row is fully visible inside the padded viewport. */
-    private boolean chatIsAtBottom(ListView list, ChatAdapter adapter) {
-        int target = adapter.getCount() - 1;
-        int last = list.getLastVisiblePosition();
-        if (target < 0 || last != target) return false;
-        View row = list.getChildAt(last - list.getFirstVisiblePosition());
-        return row != null &&
-            row.getBottom() <= list.getHeight() - list.getPaddingBottom();
-    }
-
-    /**
-     * Stepping through the transcript.
-     *
-     * Up out of the box puts the highlight on the newest message and walks
-     * back from there; down off the newest one puts it back in the box. The
-     * highlight is dropped whenever the list loses focus, because a message
-     * left looking current while you are typing is claiming a keypress it
-     * would not get.
-     */
-    private void wireChatList(
-        final ChatListView list,
-        final ChatAdapter adapter
-    ) {
-        list.setFocusable(true);
-        list.setFocusableInTouchMode(true);
-        list.setOnFocusChangeListener(
-            new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View view, boolean hasFocus) {
-                    if (adapter.getCount() == 0) return;
-                    if (hasFocus) {
-                        list.setPinnedToBottom(false);
-                        if (
-                            adapter.getSelectedPosition() ==
-                            AdapterView.INVALID_POSITION
-                        ) {
-                            int selected = ((ListView) view).getSelectedItemPosition();
-                            if (selected == AdapterView.INVALID_POSITION) {
-                                selected = ((ListView) view).getLastVisiblePosition();
-                            }
-                            adapter.trackSelectedPosition(selected);
-                            View selectedView = ((ListView) view).getSelectedView();
-                            if (selectedView != null) selectedView.setSelected(true);
-                        }
-                    } else {
-                        View selectedView = ((ListView) view).getSelectedView();
-                        if (selectedView != null) selectedView.setSelected(false);
-                        adapter.trackSelectedPosition(AdapterView.INVALID_POSITION);
-                    }
-                }
-            }
-        );
-        list.setOnItemSelectedListener(
-            new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(
-                    AdapterView<?> parent,
-                    View view,
-                    int position,
-                    long id
-                ) {
-                    if (parent.hasFocus()) adapter.trackSelectedPosition(position);
-                }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
-            }
-        );
-        list.setOnItemClickListener(
-            new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(
-                    AdapterView<?> parent,
-                    View view,
-                    int position,
-                    long id
-                ) {
-                    showMessageMenu(adapter.getItem(position), position);
-                }
-            }
-        );
-        list.setOnKeyListener(
-            new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View view, int keyCode, KeyEvent event) {
-                    if (
-                        event.getAction() != KeyEvent.ACTION_UP ||
-                        (keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
-                            keyCode != KeyEvent.KEYCODE_ENTER &&
-                            keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER)
-                    ) return false;
-
-                    int position = adapter.getSelectedPosition();
-                    if (position >= 0 && position < adapter.getCount()) {
-                        showMessageMenu(adapter.getItem(position), position);
-                        return true;
-                    }
-                    return false;
-                }
-            }
-        );
-    }
-
-    /**
-     * What can be done with one saved message.
-     *
-     * A press of OK opens the action for the selected area, which is the only
-     * way to get at the text of an answer without typing it out again. The
-     * temporary streaming row can be copied, but it is not yet a point the
-     * saved conversation can rewind to.
-     */
-    private void showMessageMenu(final ChatTurn turn, final int position) {
-        if (turn == null || !turn.isMessage()) return;
-        List<String> items = new ArrayList<>();
-        items.add("Copy text");
-        if (
-            position >= 0 &&
-            position < transcript.size() &&
-            transcript.get(position) == turn
-        ) items.add("Rewind to here");
-        final String[] labels = items.toArray(new String[items.size()]);
-        new AlertDialog.Builder(this)
-            .setTitle(turn.fromUser ? "Your message" : "Message")
-            .setItems(
-                labels,
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        if (labels[which].equals("Copy text")) {
-                            copyToClipboard(turn.text);
-                        } else {
-                            rewindChat(position);
-                        }
-                    }
-                }
-            )
-            .show();
-    }
-
-    /**
-     * Makes the selected saved message the end of the conversation.
-     *
-     * Rebuilding the agent from the shortened transcript is what removes a
-     * compact summary when its boundary was in the discarded tail. A user
-     * message is removed too and moved back into the composer; an assistant
-     * message remains selected at the new end of the transcript.
-     */
-    private void rewindChat(int position) {
-        if (
-            position < 0 ||
-            position >= transcript.size() ||
-            !transcript.get(position).isMessage()
-        ) return;
-
-        chatGeneration++;
-        agentThinking = false;
-        compacting = false;
-        streamingAnswer.setLength(0);
-        streamingAnswerWhen = 0L;
-        String draft = ChatHistory.rewind(transcript, position);
-        if (draft != null) chatDraft = draft;
-        backend.restore(transcript);
-        backend.saveTranscript(transcript);
-        renderChat(draft == null ? CHAT_FOCUS_LIST : CHAT_FOCUS_INPUT);
-    }
-
-    private void copyToClipboard(String text) {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(
-            CLIPBOARD_SERVICE
-        );
-        if (clipboard == null) return;
-        clipboard.setPrimaryClip(ClipData.newPlainText("Message", text));
-        toast("Copied");
-    }
-
     private boolean clipboardHasText() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(
             CLIPBOARD_SERVICE
@@ -1391,140 +848,12 @@ public final class MainActivity extends Activity {
         );
     }
 
-    /**
-     * Paste, from the menu rather than from a long press.
-     *
-     * It goes through the draft rather than through the field, because the
-     * field is rebuilt on every redraw and the draft is what survives that.
-     * Text lands at the end, which is where a cursor in an empty or
-     * half-written question already is.
-     */
-    private void pasteIntoInput() {
-        CharSequence pasted = clipboardText();
-        if (pasted == null) return;
-        chatDraft = chatDraft + pasted.toString();
-        renderChat(CHAT_FOCUS_INPUT);
-    }
-
     /** What is on the clipboard as text, or null when there is nothing usable. */
     private CharSequence clipboardText() {
         if (!clipboardHasText()) return null;
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
         CharSequence pasted = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
         return pasted == null || pasted.length() == 0 ? null : pasted;
-    }
-
-    private void send(String text) {
-        final String question = text.trim();
-        if (question.length() == 0) return;
-        if (agentThinking) {
-            // One turn at a time. A second question sent into a turn already
-            // running would interleave two answers into one transcript.
-            toast("Still answering");
-            return;
-        }
-        transcript.add(new ChatTurn(true, question, System.currentTimeMillis()));
-        chatDraft = "";
-
-        if (!backend.chatReady()) {
-            transcript.add(new ChatTurn(false, greeting(), System.currentTimeMillis()));
-            backend.saveTranscript(transcript);
-            renderChat(CHAT_FOCUS_INPUT);
-            return;
-        }
-
-        agentThinking = true;
-        compacting = false;
-        streamingAnswer.setLength(0);
-        streamingAnswerWhen = System.currentTimeMillis();
-        backend.saveTranscript(transcript);
-        renderChat(CHAT_FOCUS_INPUT);
-        ask(question, chatGeneration);
-    }
-
-    /**
-     * Runs one turn.
-     *
-     * Everything the agent reports comes back on a background thread, so each
-     * callback hops to the main thread before it touches anything the screen
-     * is drawn from.
-     */
-    private void ask(final String question, final int generation) {
-        final Agent.Activity activity = new Agent.Activity() {
-            @Override
-            public void text(final String delta) {
-                if (delta == null || delta.length() == 0) return;
-                main.post(
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            if (!agentThinking || generation != chatGeneration) return;
-                            streamingAnswer.append(delta);
-                            updateChat();
-                        }
-                    }
-                );
-            }
-
-            @Override
-            public void reasoning(String delta) {
-                // Private reasoning is not part of the conversation transcript.
-            }
-
-            @Override
-            public void note(String line) {}
-        };
-
-        chatWork.execute(
-            new Runnable() {
-                @Override
-                public void run() {
-                    String reply = null;
-                    String failure = null;
-                    try {
-                        reply = backend.ask(question, activity);
-                    } catch (InterruptedException stopping) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    } catch (java.io.IOException e) {
-                        failure = reason(e);
-                    } catch (RuntimeException e) {
-                        failure = "That answer came back in a form this app could not read.";
-                    }
-                    final String answer = reply;
-                    final String problem = failure;
-                    main.post(
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                answered(answer, problem, generation);
-                            }
-                        }
-                    );
-                }
-            }
-        );
-    }
-
-    private void answered(String answer, String problem, int generation) {
-        // The conversation this belonged to has been cleared out from under it.
-        if (isFinishing() || generation != chatGeneration) return;
-        agentThinking = false;
-        compacting = false;
-        streamingAnswer.setLength(0);
-        streamingAnswerWhen = 0L;
-        if (problem != null) {
-            transcript.add(new ChatTurn(false, problem, System.currentTimeMillis()));
-        } else if (answer != null && answer.length() > 0) {
-            transcript.add(new ChatTurn(false, answer, System.currentTimeMillis()));
-        }
-        backend.saveTranscript(transcript);
-        // Completion replaces the live row with the saved answer; a failure
-        // replaces it with an explanation. Keep this in the same adapter and
-        // bottom-policy path as streaming updates so scrollback never jumps.
-        if (currentTab == CHAT && openWork == null && !settingsOpen) {
-            updateChat();
-        }
     }
 
     // ------------------------------------------------------------------
@@ -1562,9 +891,8 @@ public final class MainActivity extends Activity {
     /**
      * Whether left or right belongs to a text cursor rather than to the tabs.
      *
-     * Inside typed text it belongs to the cursor, which is what anyone who has
-     * just written a question expects. At either end of it, it goes back to
-     * being a tab key: pressing right when the cursor is already as far right
+     * Inside typed text it belongs to the cursor. At either end of it, it goes
+     * back to being a tab key: pressing right when the cursor is already as far right
      * as it goes cannot mean "further right", so it can safely mean the next
      * tab. Without that, a box with something in it is a room with no door,
      * because the only way out would be to press up first and nothing on the
@@ -1573,17 +901,6 @@ public final class MainActivity extends Activity {
      * A selection counts as inside the text. So does an empty field in
      * neither direction, since there is no cursor in it worth moving.
      */
-    /**
-     * Whether the cursor sits on the first line of what has been typed, which
-     * is the point at which up stops being a text key and becomes a way out of
-     * the field. An empty field is always on its first line.
-     */
-    private boolean onFirstLine(EditText field) {
-        Layout laid = field.getLayout();
-        if (laid == null) return true;
-        return laid.getLineForOffset(field.getSelectionStart()) == 0;
-    }
-
     private boolean cursorOwns(int keyCode) {
         View focus = getCurrentFocus();
         if (!(focus instanceof EditText)) return false;
@@ -1629,17 +946,15 @@ public final class MainActivity extends Activity {
      * Stops the background threads when the screen goes for good.
      *
      * They are daemon threads, so the process would exit regardless; this is so
-     * that a turn still running against the network is not left holding a
+     * that a sync still running against the network is not left holding a
      * socket open behind an app somebody has closed.
      */
     @Override
     protected void onDestroy() {
         super.onDestroy();
         work.shutdownNow();
-        chatWork.shutdownNow();
     }
 
-    private static final String STOP = "Stop waiting";
     private static final String EXPAND = "Expand all sections";
     private static final String COLLAPSE = "Collapse all sections";
     private static final String SIGN_OUT = "Sign out";
@@ -1647,20 +962,10 @@ public final class MainActivity extends Activity {
 
     private void showMenu() {
         if (openWork != null || settingsOpen) return;
-        // Paste only appears when there is something to paste, which is the
-        // difference between a menu that answers a question and one that
-        // offers a greyed-out row as an answer.
         List<String> items = new ArrayList<>();
-        if (currentTab == CHAT) {
-            if (agentThinking && !compacting) items.add(STOP);
-            if (clipboardHasText()) items.add(PASTE);
-            items.add(COMPACT);
-            items.add(CLEAR);
-        } else {
-            items.add(REFRESH);
-            items.add(EXPAND);
-            items.add(COLLAPSE);
-        }
+        items.add(REFRESH);
+        items.add(EXPAND);
+        items.add(COLLAPSE);
         items.add(SETTINGS);
         items.add(ABOUT);
         final String[] labels = items.toArray(new String[items.size()]);
@@ -1678,125 +983,13 @@ public final class MainActivity extends Activity {
             .show();
     }
 
-    /** Dispatch by label rather than by index: the menu differs per tab. */
+    /** Dispatch by label rather than by index. */
     private void chose(String label) {
-        if (label.equals(PASTE)) pasteIntoInput();
-        else if (label.equals(STOP)) stopWaiting();
-        else if (label.equals(COMPACT)) compactChat();
-        else if (label.equals(CLEAR)) clearChat();
-        else if (label.equals(REFRESH)) refresh(true);
+        if (label.equals(REFRESH)) refresh(true);
         else if (label.equals(EXPAND)) setAllSections(true);
         else if (label.equals(COLLAPSE)) setAllSections(false);
         else if (label.equals(SETTINGS)) openSettings();
         else showAbout();
-    }
-
-    /**
-     * Gives up on an answer that is taking too long.
-     *
-     * A turn holds the tab against a second question until it finishes, and one
-     * that is reading six courses over a bad signal can hold it for minutes.
-     * The request itself cannot be taken back — it is inside a blocking read on
-     * a worker — so this stops waiting for it rather than stopping it: the
-     * conversation moves on, and the answer is discarded on arrival.
-     */
-    private void stopWaiting() {
-        if (!agentThinking) return;
-        chatGeneration++;
-        agentThinking = false;
-        streamingAnswer.setLength(0);
-        streamingAnswerWhen = 0L;
-        transcript.add(
-            new ChatTurn(false, "Stopped waiting for that one.", System.currentTimeMillis())
-        );
-        backend.saveTranscript(transcript);
-        renderChat(CHAT_FOCUS_INPUT);
-    }
-
-    /**
-     * Replaces the model's working history with a summary while leaving the
-     * visible transcript intact. The saved compact turn holds that summary,
-     * but the adapter renders it as a boundary rather than as somebody's words.
-     */
-    private void compactChat() {
-        if (agentThinking) {
-            toast("Still answering");
-            return;
-        }
-        if (transcript.isEmpty()) {
-            toast("Nothing to compact");
-            return;
-        }
-        if (!backend.chatReady()) {
-            toast("Set up a model first");
-            return;
-        }
-
-        agentThinking = true;
-        compacting = true;
-        streamingAnswer.setLength(0);
-        streamingAnswerWhen = System.currentTimeMillis();
-        renderChat(CHAT_FOCUS_INPUT);
-        final int generation = chatGeneration;
-
-        chatWork.execute(new Runnable() {
-            @Override
-            public void run() {
-                String reply = null;
-                String failure = null;
-                try {
-                    reply = backend.summarize(Agent.Activity.NOOP);
-                } catch (InterruptedException stopping) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } catch (java.io.IOException e) {
-                    failure = reason(e);
-                } catch (RuntimeException e) {
-                    failure = "That summary came back in a form this app could not read.";
-                }
-                final String summary = reply;
-                final String problem = failure;
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        compacted(summary, problem, generation);
-                    }
-                });
-            }
-        });
-    }
-
-    private void compacted(String summary, String problem, int generation) {
-        // Summarization never mutates model history, so an obsolete result can
-        // simply disappear after Clear this chat or signing out.
-        if (isFinishing() || generation != chatGeneration) return;
-        agentThinking = false;
-        compacting = false;
-        streamingAnswer.setLength(0);
-        streamingAnswerWhen = 0L;
-        if (problem != null) {
-            updateChat();
-            alert("Could not compact chat", problem);
-            return;
-        }
-        transcript.add(ChatTurn.compaction(summary, System.currentTimeMillis()));
-        backend.restore(transcript);
-        backend.saveTranscript(transcript);
-        updateChat();
-    }
-
-    private void clearChat() {
-        // Anything still in flight belongs to the conversation being thrown
-        // away, so its answer must not land in the new one.
-        chatGeneration++;
-        agentThinking = false;
-        compacting = false;
-        streamingAnswer.setLength(0);
-        streamingAnswerWhen = 0L;
-        transcript.clear();
-        backend.resetChat();
-        backend.saveTranscript(transcript);
-        renderChat(CHAT_FOCUS_INPUT);
     }
 
     private void setAllSections(boolean expanded) {
@@ -1822,8 +1015,6 @@ public final class MainActivity extends Activity {
                 "so they can be read without a signal. Nothing is ever written " +
                 "back to Canvas: this app cannot turn work in or change a grade.\n\n" +
                 updated + "\n\n" +
-                "Chat sends your question and what it reads from Canvas to the " +
-                "model provider set in Settings.\n\n" +
                 "Left and right move between tabs. OK opens a section or an " +
                 "assignment. Back leaves a page. Menu has refresh and settings."
             )
@@ -1836,7 +1027,6 @@ public final class MainActivity extends Activity {
     // ------------------------------------------------------------------
 
     private void openSettings() {
-        if (currentTab == CHAT) saveChatScrollPosition();
         settingsOpen = true;
         openWork = null;
         // Same reasoning as a detail page: the tab bar is 36dp of a 260dp
@@ -1859,32 +1049,6 @@ public final class MainActivity extends Activity {
         rows.add(row(config, Config.CANVAS_URL, "Canvas address", false));
         rows.add(row(config, Config.COOKIE_URL, "Cookie service", false));
         rows.add(row(config, Config.COOKIE_TOKEN, "Service token", true));
-        rows.add(
-            new SettingsAdapter.Row(
-                Config.PROVIDER,
-                "Model provider",
-                config.claude() ? "Claude Pro/Max login"
-                    : config.codex() ? "ChatGPT (Codex) login" : "OpenAI API key",
-                false
-            )
-        );
-        rows.add(row(config, Config.MODEL, "Model", false));
-        if (config.claude()) {
-            rows.add(new SettingsAdapter.Row(
-                null,
-                CLAUDE_LOGIN,
-                config.chatReady() ? "Signed in" : "Press OK to begin",
-                false
-            ));
-        } else if (config.codex()) {
-            // The refresh token leads, because it is the one that matters: the
-            // access token below it is renewed from this every ten days or so.
-            rows.add(row(config, Config.REFRESH_TOKEN, "Refresh token", true));
-            rows.add(row(config, Config.ACCESS_TOKEN, "Access token", true));
-            rows.add(row(config, Config.ACCOUNT_ID, "Account ID", true));
-        } else {
-            rows.add(row(config, Config.API_KEY, "API key", true));
-        }
         rows.add(row(config, Config.TIMEZONE, "Time zone", false));
         if (backend.hasBundledSetup()) {
             rows.add(new SettingsAdapter.Row(null, RESTORE, "Put this build's own setup back", false));
@@ -1904,13 +1068,7 @@ public final class MainActivity extends Activity {
 
         LinearLayout root = vertical();
         root.addView(heading("Settings"));
-        root.addView(
-            subheading(
-                backend.chatReady()
-                    ? "Work and chat are set up"
-                    : backend.canvasReady() ? "Work is set up; chat needs a model" : "Not set up yet"
-            )
-        );
+        root.addView(subheading(backend.canvasReady() ? "Work is set up" : "Not set up yet"));
         root.addView(divider());
         root.addView(list, weighted());
         wireSettings(list, adapter);
@@ -1982,12 +1140,7 @@ public final class MainActivity extends Activity {
     private void editSetting(final SettingsAdapter.Row row, final int position) {
         if (row.field == null) {
             if (SIGN_OUT.equals(row.label)) confirmSignOut();
-            else if (CLAUDE_LOGIN.equals(row.label)) startClaudeLogin(position);
             else restoreBundledSetup();
-            return;
-        }
-        if (Config.PROVIDER.equals(row.field)) {
-            chooseProvider(position);
             return;
         }
 
@@ -2045,11 +1198,11 @@ public final class MainActivity extends Activity {
          * and then stepping down onto it: three deliberate presses to confirm a
          * value that has already been typed.
          *
-         * Unlike the chat compose field, this acts on the release. That field
-         * has to use the press because the T9 keyboard swallows the first
-         * ENTER release to finish the word it is composing — but these fields
-         * turn prediction off, so there is never a word in the air and the
-         * release always arrives. It matters which way round: dismissing on the
+         * This acts on the release. A field with T9 prediction would have to
+         * use the press, because the keyboard swallows the first ENTER release
+         * to finish the word it is composing — but these fields turn
+         * prediction off, so there is never a word in the air and the release
+         * always arrives. It matters which way round: dismissing on the
          * press leaves the release to be delivered to the settings list
          * underneath, which reads it as OK and opens this dialog straight back
          * up. Both halves are swallowed either way, so ENTER cannot also reach
@@ -2105,140 +1258,10 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void chooseProvider(final int position) {
-        final String[] values = {
-            Config.PROVIDER_API, Config.PROVIDER_CODEX, Config.PROVIDER_CLAUDE
-        };
-        new AlertDialog.Builder(this)
-            .setTitle("Model provider")
-            .setItems(
-                new String[] {
-                    "OpenAI API key", "ChatGPT (Codex) login", "Claude Pro/Max login"
-                },
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        applySetting(Config.PROVIDER, values[which], position);
-                    }
-                }
-            )
-            .show();
-    }
-
-    /** Opens Pi's manual-callback Claude OAuth flow in the phone's browser. */
-    private void startClaudeLogin(final int position) {
-        final ClaudeAuth.Login login;
-        try {
-            login = backend.beginClaudeLogin();
-        } catch (RuntimeException e) {
-            alert("Could not sign in", reason(e));
-            return;
-        }
-
-        final EditText code = new EditText(this);
-        code.setTextSize(13);
-        code.setSingleLine(true);
-        code.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        code.setHint("Final callback URL or code");
-
-        LinearLayout holder = vertical();
-        holder.setPadding(dp(12), dp(4), dp(12), dp(2));
-        TextView help = new TextView(this);
-        help.setTextSize(12);
-        help.setText("Finish in the browser, copy its final localhost URL, then return and paste it here.");
-        holder.addView(help);
-        holder.addView(code, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
-            .setTitle("Claude Pro/Max sign-in")
-            .setView(holder)
-            .setPositiveButton("Finish", null)
-            .setNegativeButton("Cancel", null)
-            // The callback is copied after this dialog is created and the
-            // browser opens, so Paste must exist even if the clipboard is
-            // empty at the beginning of the flow.
-            .setNeutralButton("Paste", null);
-        final AlertDialog dialog = builder.create();
-        dialog.show();
-
-        Button finish = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-        finish.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                final String input = code.getText().toString().trim();
-                if (input.length() == 0) {
-                    toast("Paste the callback URL first");
-                    return;
-                }
-                dialog.dismiss();
-                toast("Finishing Claude sign-in");
-                work.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        String failure = null;
-                        try {
-                            backend.finishClaudeLogin(login, input);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            return;
-                        } catch (java.io.IOException e) {
-                            failure = reason(e);
-                        } catch (RuntimeException e) {
-                            failure = "The Claude login response could not be read.";
-                        }
-                        final String problem = failure;
-                        main.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (problem != null) {
-                                    alert("Could not sign in", problem);
-                                    return;
-                                }
-                                backend.restore(transcript);
-                                toast("Signed in to Claude");
-                                if (settingsOpen) renderSettings(position);
-                            }
-                        });
-                    }
-                });
-            }
-        });
-        Button paste = dialog.getButton(AlertDialog.BUTTON_NEUTRAL);
-        if (paste != null) paste.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                CharSequence text = clipboardText();
-                if (text == null) return;
-                code.setText(text.toString().trim());
-                code.setSelection(code.getText().length());
-            }
-        });
-
-        try {
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(login.url())));
-        } catch (RuntimeException e) {
-            dialog.dismiss();
-            alert("No browser", "This phone could not open the Claude sign-in page.");
-        }
-    }
-
     private void applySetting(String field, String value, int position) {
         Config next;
         try {
             next = backend.config().with(field, value);
-            // Codex and Claude both use rotating access/refresh pairs, but
-            // they are not interchangeable. Never let a provider switch make
-            // one service's token look like a saved login to the other.
-            if (Config.PROVIDER.equals(field)
-                && !backend.config().get(Config.PROVIDER).equals(value)) {
-                next = next
-                    .with(Config.MODEL, "")
-                    .with(Config.ACCESS_TOKEN, "")
-                    .with(Config.REFRESH_TOKEN, "")
-                    .with(Config.ACCOUNT_ID, "")
-                    .with(Config.EXPIRES_AT, "");
-            }
         } catch (IllegalArgumentException e) {
             alert("Not saved", e.getMessage());
             return;
@@ -2249,10 +1272,6 @@ public final class MainActivity extends Activity {
             alert("Not saved", "Could not write to this phone's storage.");
             return;
         }
-        // Saving rebuilds the agent, so the conversation on screen has to be
-        // put back into it or the next question is answered out of context.
-        backend.restore(transcript);
-
         // A different Canvas account means the work on screen belongs to
         // somebody else. Drop it rather than showing it until a sync replaces
         // it row by row.
@@ -2277,7 +1296,6 @@ public final class MainActivity extends Activity {
             alert("Not restored", "This build's bundled setup could not be read.");
             return;
         }
-        backend.restore(transcript);
         snapshot = null;
         syncError = null;
         todos.replace(new ArrayList<Assignment>());
@@ -2290,25 +1308,19 @@ public final class MainActivity extends Activity {
         new AlertDialog.Builder(this)
             .setTitle(SIGN_OUT)
             .setMessage(
-                "Remove the Canvas address, the tokens, the saved work list " +
-                "and this chat from this phone?"
+                "Remove the Canvas address, the token and the saved work " +
+                "list from this phone?"
             )
             .setPositiveButton(
                 SIGN_OUT,
                 new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        chatGeneration++;
-                        agentThinking = false;
-                        compacting = false;
-                        streamingAnswer.setLength(0);
-                        streamingAnswerWhen = 0L;
                         backend.signOut();
                         snapshot = null;
                         syncError = null;
                         todos.replace(new ArrayList<Assignment>());
                         defaulted.clear();
-                        transcript.clear();
                         renderSettings(0);
                     }
                 }
@@ -2356,10 +1368,6 @@ public final class MainActivity extends Activity {
 
     private ListView listView(ListAdapter adapter) {
         return configureListView(new ListView(this), adapter);
-    }
-
-    private ChatListView chatListView(ListAdapter adapter) {
-        return configureListView(new ChatListView(this), adapter);
     }
 
     private <T extends ListView> T configureListView(T list, ListAdapter adapter) {

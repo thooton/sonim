@@ -13,14 +13,4 @@
     <dimen name="text_item">14sp</dimen>
     <dimen name="check_size">18dp</dimen>
     <dimen name="check_gap">10dp</dimen>
-
-    <!-- Full-width chat areas keep only readable inner padding and a small
-         separator between turns. -->
-    <dimen name="text_bubble">14sp</dimen>
-    <dimen name="text_bubble_time">10sp</dimen>
-    <dimen name="bubble_pad_h">10dp</dimen>
-    <dimen name="bubble_pad_top">13dp</dimen>
-    <dimen name="bubble_pad_bottom">4dp</dimen>
-    <dimen name="bubble_time_gap">5dp</dimen>
-    <dimen name="chat_area_gap">1dp</dimen>
 </resources>

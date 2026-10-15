@@ -1,12 +1,10 @@
 package com.list.xp3.data;
 
 import com.list.xp3.Check;
-import com.list.xp3.net.Config;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -121,35 +119,22 @@ public final class DataTests {
                 File dir = Files.createTempDirectory("list-store").toFile();
                 Store store = new Store(dir);
                 check.same("no list yet", Integer.valueOf(0), Integer.valueOf(store.list().size()));
-                check.ok("blank config", !store.settings().chatReady());
 
                 List<Item> items = Arrays.asList(new Item("Milk", true), new Item("Eggs \"large\"", false));
                 store.saveList(items);
                 check.same("list round trip", items, store.list());
 
-                List<ChatTurn> turns = new ArrayList<ChatTurn>();
-                turns.add(new ChatTurn(true, "Add milk", 1000L));
-                turns.add(new ChatTurn(false, "Added.", 2000L));
-                turns.add(ChatTurn.compaction("summary", 3000L));
-                store.saveTranscript(turns);
-                List<ChatTurn> back = store.transcript();
-                check.same("turn count", Integer.valueOf(3), Integer.valueOf(back.size()));
-                check.ok("user turn", back.get(0).fromUser && back.get(0).text.equals("Add milk"));
-                check.ok("compaction kept", back.get(2).isCompaction());
-
-                store.saveSettings(Config.of("access-1", "refresh-1", 12345L));
-                Config config = store.settings();
-                check.ok("login saved", config.chatReady());
-                check.same("access", "access-1", config.accessToken());
-                check.same("refresh", "refresh-1", config.refreshToken());
-                check.same("expiry", Long.valueOf(12345L), Long.valueOf(config.expiresAt()));
-
                 write(new File(dir, "list.json"), "{\"items\":[{\"text\":\"ok\",\"done\":true},{\"text\":\"\"},7]");
                 check.same("truncated list is absent", Integer.valueOf(0), Integer.valueOf(store.list().size()));
                 write(new File(dir, "list.json"), "{\"items\":[{\"text\":\"ok\",\"done\":true},{\"text\":\"  \"},7,{\"done\":true}]}");
                 check.same("bad entries skipped", Arrays.asList(new Item("ok", true)), store.list());
-                write(new File(dir, "settings.json"), "{\"claude\":{\"accessToken\":\"has space\"}}");
-                check.ok("unreadable settings are blank", !store.settings().chatReady());
+
+                write(new File(dir, "settings.json"), "{\"claude\":{}}");
+                write(new File(dir, "chat.json"), "{\"turns\":[]}");
+                store.forgetChat();
+                check.ok("old login removed", !new File(dir, "settings.json").exists());
+                check.ok("old chat removed", !new File(dir, "chat.json").exists());
+                check.same("list kept", Arrays.asList(new Item("ok", true)), store.list());
             }
         });
     }

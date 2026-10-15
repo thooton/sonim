@@ -29,20 +29,4 @@
     <color name="disabled">#F2F2F2</color>
     <color name="disabled_text">#A0A0A0</color>
 
-    <!-- Chat is a transcript of full-width text areas: grey for the user and
-         white for the assistant. -->
-    <color name="chat_page">#FFFFFF</color>
-    <color name="bubble_you">#E6E6E6</color>
-    <color name="bubble_agent">#FFFFFF</color>
-    <color name="chat_time_agent">#99000000</color>
-    <color name="chat_time_you">#99000000</color>
-    <color name="code_fill">#F0F0F0</color>
-
-    <!-- Read off the stock Messages compose field, so the one place in this
-         app where you type looks like the place you already type on this
-         phone: 85% black text, 50% black hint, and the same 50% black in the
-         3dp rule around the box. -->
-    <color name="input_text">#D8000000</color>
-    <color name="input_hint">#7F000000</color>
-    <color name="input_border">#7F000000</color>
 </resources>

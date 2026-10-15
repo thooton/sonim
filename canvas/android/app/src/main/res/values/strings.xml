@@ -4,14 +4,4 @@
     <string name="assigned">Assigned</string>
     <string name="missing">Missing</string>
     <string name="done">Done</string>
-    <string name="chat">Chat</string>
-    <string name="chat_hint">Ask about your work</string>
-
-    <!-- The wording the phone's own Messages app uses for a message this
-         recent, so a timestamp reads the same in both places. -->
-    <string name="posted_now">Now</string>
-    <plurals name="minutes_ago">
-        <item quantity="one">%d min</item>
-        <item quantity="other">%d mins</item>
-    </plurals>
 </resources>

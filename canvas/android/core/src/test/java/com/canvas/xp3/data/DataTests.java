@@ -51,11 +51,6 @@ public final class DataTests {
                 store(check);
             }
         });
-        check.run("chat rewind", new Check.Body() {
-            public void run() {
-                chatRewind(check);
-            }
-        });
         check.run("sync", new Check.Body() {
             public void run() throws Exception {
                 sync(check);
@@ -177,29 +172,6 @@ public final class DataTests {
 
     private static Map<String, Object> record(String json) {
         return Json.object(Json.parse(json));
-    }
-
-    private static void chatRewind(Check check) {
-        List<ChatTurn> turns = new ArrayList<>();
-        turns.add(new ChatTurn(true, "first question", 1000L));
-        turns.add(new ChatTurn(false, "first answer", 2000L));
-        turns.add(ChatTurn.compaction("summary", 3000L));
-        turns.add(new ChatTurn(true, "second question", 4000L));
-        turns.add(new ChatTurn(false, "second answer", 5000L));
-
-        List<ChatTurn> toAssistant = new ArrayList<>(turns);
-        check.same("assistant rewind has no draft", null,
-            ChatHistory.rewind(toAssistant, 1));
-        check.same("assistant rewind keeps that message", 2, toAssistant.size());
-        check.same("assistant is the new end", "first answer", toAssistant.get(1).text);
-        check.ok("rewinding before compaction removes its boundary",
-            !toAssistant.get(toAssistant.size() - 1).isCompaction());
-
-        List<ChatTurn> toUser = new ArrayList<>(turns);
-        check.same("user rewind returns its text", "second question",
-            ChatHistory.rewind(toUser, 3));
-        check.same("user rewind removes that message and the tail", 3, toUser.size());
-        check.ok("an earlier compact boundary remains", toUser.get(2).isCompaction());
     }
 
     private static void mapping(Check check) {
@@ -333,20 +305,15 @@ public final class DataTests {
             Store store = new Store(directory);
             check.ok("an empty store has no settings", !store.settings().canvasReady());
             check.same("an empty store has no cache", null, store.cache());
-            check.same("an empty store has no transcript", 0, store.transcript().size());
 
             Config config = Config.blank()
                 .with(Config.CANVAS_URL, "https://canvas.asu.edu")
                 .with(Config.COOKIE_URL, "https://edit.example.org/api/canvas-cookie/cookie")
-                .with(Config.COOKIE_TOKEN, "abcdefghijklmnopqrstuvwxyz0123456789")
-                .with(Config.MODEL, "gpt-5-codex")
-                .with(Config.API_KEY, "sk-secret");
+                .with(Config.COOKIE_TOKEN, "abcdefghijklmnopqrstuvwxyz0123456789");
             store.saveSettings(config);
-            check.ok("settings come back", store.settings().chatReady());
-            check.same("with the key", "sk-secret", store.settings().get(Config.API_KEY));
-            store.saveBundledRevision("revision-1");
-            check.same("the adopted bundle is remembered", "revision-1",
-                store.bundledRevision());
+            check.ok("settings come back", store.settings().canvasReady());
+            check.same("with the token", "abcdefghijklmnopqrstuvwxyz0123456789",
+                store.settings().get(Config.COOKIE_TOKEN));
 
             List<Assignment> work = new ArrayList<>();
             Assignment item = new Assignment("7", "91", "Lab 3", "Biology", Long.valueOf(1757000000000L),
@@ -369,43 +336,49 @@ public final class DataTests {
             check.same("a null due date survives", null, read.work.get(1).due);
             check.ok("the missing flag survives", read.work.get(1).flaggedMissing);
 
-            List<ChatTurn> turns = new ArrayList<>();
-            turns.add(new ChatTurn(true, "what is due", 1000L));
-            turns.add(new ChatTurn(false, "Lab 3 on Thursday.", 2000L));
-            turns.add(ChatTurn.compaction("The user asked what is due.", 3000L));
-            store.saveTranscript(turns);
-            List<ChatTurn> back = store.transcript();
-            check.same("the transcript comes back", 3, back.size());
-            check.same("who said it", true, back.get(0).fromUser);
-            check.same("what they said", "Lab 3 on Thursday.", back.get(1).text);
-            check.same("and when", 2000L, back.get(1).when);
-            check.ok("a compact boundary comes back", back.get(2).isCompaction());
-            check.same("with its hidden summary", "The user asked what is due.",
-                back.get(2).text);
-
-            List<ChatTurn> many = new ArrayList<>();
-            for (int i = 0; i < 500; i++) many.add(new ChatTurn(i % 2 == 0, "turn " + i, i));
-            store.saveTranscript(many);
-            check.same("a long transcript is trimmed", 200, store.transcript().size());
-            check.same("keeping the newest", "turn 499",
-                store.transcript().get(199).text);
-
             corrupt(directory, "assignments.json");
             check.same("a corrupt cache reads as none", null, store.cache());
-            corrupt(directory, "chat.json");
-            check.same("a corrupt transcript reads as none", 0, store.transcript().size());
             corrupt(directory, "settings.json");
             check.ok("corrupt settings read as unset", !store.settings().canvasReady());
 
             store.saveSettings(config);
             store.clear();
             check.ok("signing out removes the settings", !store.settings().canvasReady());
-            check.same("signing out does not re-arm the same bundle", "revision-1",
-                store.bundledRevision());
+
+            // What a version with the chat left behind.
+            write(new File(directory, "settings.json"),
+                "{\"canvas\":{\"baseUrl\":\"https://canvas.asu.edu\"},"
+                + "\"openai\":{\"provider\":\"claude\",\"refreshToken\":\"secret-refresh\"},"
+                + "\"timezone\":\"America/Phoenix\"}");
+            write(new File(directory, "chat.json"), "{\"turns\":[]}");
+            write(new File(directory, "bundled-setup.txt"), "revision-1");
+            store.forgetChat();
+            check.ok("the old transcript is removed", !new File(directory, "chat.json").exists());
+            check.ok("the old bundle marker is removed", !new File(directory, "bundled-setup.txt").exists());
+            check.ok("the old model login is removed",
+                !read(new File(directory, "settings.json")).contains("secret-refresh"));
+            check.same("the Canvas address is kept", "https://canvas.asu.edu",
+                store.settings().get(Config.CANVAS_URL));
+            check.same("the time zone is kept", "America/Phoenix",
+                store.settings().get(Config.TIMEZONE));
+            corrupt(directory, "settings.json");
+            store.forgetChat();
+            check.ok("an unreadable settings file is left alone",
+                read(new File(directory, "settings.json")).contains("truncated"));
         } finally {
             for (File file : directory.listFiles()) file.delete();
             directory.delete();
         }
+    }
+
+    private static void write(File file, String text) throws Exception {
+        FileOutputStream out = new FileOutputStream(file);
+        out.write(text.getBytes("UTF-8"));
+        out.close();
+    }
+
+    private static String read(File file) throws Exception {
+        return new String(java.nio.file.Files.readAllBytes(file.toPath()), "UTF-8");
     }
 
     private static void corrupt(File directory, String name) throws Exception {

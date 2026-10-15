@@ -2,14 +2,4 @@
 <resources>
     <string name="app_name">List</string>
     <string name="list">List</string>
-    <string name="chat">Chat</string>
-    <string name="chat_hint">What needs doing?</string>
-
-    <!-- The wording the phone's own Messages app uses for a message this
-         recent, so a timestamp reads the same in both places. -->
-    <string name="posted_now">Now</string>
-    <plurals name="minutes_ago">
-        <item quantity="one">%d min</item>
-        <item quantity="other">%d mins</item>
-    </plurals>
 </resources>
