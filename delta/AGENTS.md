@@ -19,21 +19,25 @@ code (HTTP, JSON, cloud OAuth, chat views, Markdown, tabs).
 - Target: 240x320 mdpi, portrait, d-pad/keypad-driven. Not touch-first.
 - Platform Android only: no AndroidX, Material, Compose, or third-party
   libraries. `:core` is plain Java, `--release 8`, and must run on API 27.
-- No repository picker, no model or environment settings: the first
-  `anthropic_cloud` environment on each account is used, with an empty
-  sandbox.
+- No repository picker, no model or environment settings: each account's
+  Delta environment (see The protocol) is used, with an empty sandbox.
 
 ## How it fits into Delta
 
-An agent is started from the Session tab. The first message of every new
-session is `Setup.wrap(typed, server, token)`: a `<delta-setup>` block telling
-the agent to call itself Delta, install the `delta` CLI with the delta repo's
-`latest` release `install.sh` (`curl -fsSL … | sh`), run `delta set-auth <server> <token>`, and read `delta help`, followed by what
-was typed. `Transcript` removes that block again (`Setup.strip`), so the phone
-never shows it, including when an older session is replayed. The agent then
-uses `delta push` to put files on the command center, and they appear in the
-Files tab. Keep the setup block short. Everything else the agent needs to know
-belongs in `delta help` (in the delta repo), not here.
+An agent is started from the Session tab. Its cloud environment does the
+setup (see The protocol): the setup script (`Setup.SCRIPT`) installs the
+`delta` CLI from the delta repo's `latest` release `install.sh`, and the
+`DELTA_SERVER` and `DELTA_TOKEN` variables sign it in to the command center.
+The first message of every new session is `Setup.wrap(typed)`: a
+`<delta-setup>` block telling the agent to call itself Delta and to read
+`delta help`, followed by what was typed. The command center's backup
+sessions are set up the same way and open with the same block, word for
+word (`agentSetup` in `cmd/delta-cc/agents.go` in thooton/delta); keep the
+two in step. `Transcript` removes that block again (`Setup.strip`), so the
+phone never shows it, including when an older session is replayed. The agent
+then uses `delta push` to put files on the command center, and they appear in
+the Files tab. Keep the setup block short. Everything else the agent needs to
+know belongs in `delta help` (in the delta repo), not here.
 
 If you change how this app works in a way an agent needs to know about (for
 example the tabs, or what happens to a pushed file), update `delta help` in
@@ -189,11 +193,17 @@ changes on every renewal and two parties renewing it would kill it.
   the worker restarts after it has been idle. Do not auto-allow
   `can_use_tool` requests, because that would override Auto's own decisions.
   They are shown, and the person allows or denies them from the menu.
-- A newly created environment (only when the account has none) has
-  `allowed_hosts: ["*"]`, which is "Full" network access in the web app,
-  so the sandbox can run `delta` against the command center and reach
-  anything else. An existing environment is used as it is; there is no
-  OAuth call to change it, so its network access is set in the web app.
+- Sessions run in the account's Delta environment, found by its name
+  (`Setup.environmentName`: "Delta" and a short hash of the setup script,
+  the command center's address and its token) and made when there is none.
+  A made one has the setup script as `init_script`, the CLI's login as
+  `environment` variables, and `allowed_hosts: ["*"]`, which is "Full"
+  network access in the web app, so the sandbox can run `delta` against
+  the command center and reach anything else. There is no OAuth call to
+  change an environment, so changing the script, the address or the token
+  makes a new one; the old one is left in the web app to archive. The
+  cloud keeps the setup script's result for later sessions (for about a
+  week), so a new `delta` release reaches new sessions only after that.
 
 `Transcript` keeps only what a person reads: client `user` messages (echoes
 of our own matched by uuid), top-level `assistant` text and `tool_use` lines,

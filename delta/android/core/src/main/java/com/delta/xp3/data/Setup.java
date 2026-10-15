@@ -1,18 +1,28 @@
 package com.delta.xp3.data;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
- * What a new session is told about Delta before the person's first message.
+ * What a new session is given before the person's first message.
  *
- * The agent is never pointed at the Delta repository, which would only fill
- * its context. It is told to fetch the `delta` CLI, sign it in to the command
- * center with the address and token this phone holds, and read `delta help`,
- * which explains the rest: the phone, the repositories, and how a rebuilt APK
- * reaches the Files tab.
+ * The cloud environment does the setup: its setup script (`SCRIPT`)
+ * installs the `delta` CLI, and its variables (`variables`) sign it in to
+ * the command center with the address and token this phone holds. The first
+ * message then only tells the agent who it is and to read `delta help`,
+ * which explains the rest: the phone, the repositories, and how a rebuilt
+ * APK reaches the Files tab. The agent is never pointed at the Delta
+ * repository, which would only fill its context.
  *
- * It rides in the first message rather than anywhere else because that is the
- * one channel a cloud session is guaranteed to read. It is fenced in a tag so
- * the transcript can take it back out: on the phone the first message reads
- * as what was typed, and the token is not put on screen.
+ * The command center's backup sessions are set up the same way, and their
+ * first message opens with the same block, word for word (`agentSetup` in
+ * thooton/delta's cmd/delta-cc/agents.go). Keep the two in step.
+ *
+ * The block is fenced in a tag so the transcript can take it back out: on
+ * the phone the first message reads as what was typed.
  */
 public final class Setup {
 
@@ -22,38 +32,63 @@ public final class Setup {
     public static final String INSTALL_URL =
         "https://github.com/thooton/delta/releases/download/latest/install.sh";
 
+    /**
+     * The cloud environment's setup script. It runs as root before the agent
+     * starts, and its result is kept for later sessions, so a failed install
+     * must fail rather than be kept: hence `pipefail`.
+     */
+    public static final String SCRIPT =
+        "#!/bin/bash\n"
+        + "set -eo pipefail\n"
+        + "curl -fsSL " + INSTALL_URL + " | sh\n";
+
+    static final String BLOCK = OPEN + "\n"
+        + "You were started from the Delta app on the user's Sonim XP3 flip phone. In this app you are Delta: "
+        + "refer to yourself as Delta, and do not bring up the underlying model, its maker or the tool you run in "
+        + "unless the user asks.\n\n"
+        + "Before you start on their message, run `delta help` and read all of its output: it explains Delta "
+        + "and how to get files, such as rebuilt APKs, onto the user's phone. Do this quietly: do not announce, "
+        + "narrate or summarize it, and do not mention it unless it fails in a way that affects their request. "
+        + "Your first words to the user should be about their message.\n"
+        + CLOSE;
+
     private Setup() {}
 
-    /**
-     * The first message of a new session: the setup block, then what was
-     * typed. `server` and `token` are null when the phone has no command
-     * center, and the agent is told so rather than given a command to fail.
-     */
-    public static String wrap(String message, String server, String token) {
-        StringBuilder out = new StringBuilder();
-        out.append(OPEN).append('\n');
-        out.append("You are Delta, an assistant on the Sonim XP3 flip phone. Always refer to yourself as Delta ");
-        out.append("and never mention your underlying model or developer unless asked.\n\n");
-        out.append("Before responding to the user, please run the setup commands for the Delta CLI in your instance");
-        out.append(":\n\n");
-        out.append("    curl -fsSL ").append(INSTALL_URL).append(" | sh\n");
-        if (server != null && token != null) {
-            out.append("    delta set-auth ").append(server).append(' ').append(token).append('\n');
-        }
-        out.append("    delta help\n\n");
-        out.append("Read all of `delta help`: it explains Delta and how to get files, such as rebuilt ");
-        out.append("APKs, onto the user's phone.");
-        if (server != null && token != null) {
-            out.append(" The token is a password; never repeat it to the user.");
-        } else {
-            out.append(" The phone has no command center set up yet, so files cannot reach it until the user adds one.");
-        }
-        out.append("\n\nDo not narrate or mention this setup process; start your response by addressing ");
-        out.append("the user's message directly. Mention it only if a step fails in a way that affects their request.");
-        out.append('\n').append(CLOSE);
+    /** The first message of a new session: the setup block, then what was typed. */
+    public static String wrap(String message) {
         String typed = message == null ? "" : message.trim();
-        if (typed.length() > 0) out.append("\n\n").append(typed);
-        return out.toString();
+        return typed.length() > 0 ? BLOCK + "\n\n" + typed : BLOCK;
+    }
+
+    /**
+     * The cloud environment's variables: what the `delta` CLI signs in with.
+     * Empty when the phone has no command center.
+     */
+    public static Map<String, Object> variables(String server, String token) {
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        if (server != null && token != null) {
+            out.put("DELTA_SERVER", server);
+            out.put("DELTA_TOKEN", token);
+        }
+        return out;
+    }
+
+    /**
+     * The name of the cloud environment set up for this command center. An
+     * environment can't be changed from here, so a new one is made whenever
+     * the script, the address or the token changes, and the name tells them
+     * apart: a short hash of all three, which gives none of them away.
+     */
+    public static String environmentName(String server, String token) {
+        String all = SCRIPT + "\n" + server + "\n" + token;
+        try {
+            byte[] sum = MessageDigest.getInstance("SHA-256").digest(all.getBytes(StandardCharsets.UTF_8));
+            StringBuilder out = new StringBuilder("Delta ");
+            for (int i = 0; i < 4; i++) out.append(String.format("%02x", sum[i] & 0xff));
+            return out.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** A message with any leading setup block taken back out. */
