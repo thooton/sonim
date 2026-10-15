@@ -24,7 +24,9 @@ import java.util.List;
  * and what the copy menu opens on.
  *
  * While a turn runs, one extra note row at the end says so; it is not an
- * entry and is never saved.
+ * entry and is never saved. Neither are the rows after it: a note about the
+ * session (its account being out of usage, say) and a button, which is a
+ * row the d-pad reaches like any other and OK presses.
  *
  * A message's pictures are drawn from the files saved when it was sent from
  * this phone. One sent from somewhere else, or from before a reinstall, has
@@ -36,8 +38,13 @@ final class ChatAdapter extends SelectableAdapter {
     private final LayoutInflater inflater;
     private final Markdown markdown;
     private final Pictures pictures;
+    /** The view type of the button row, past the entry kinds. */
+    private static final int ACTION = Entry.NOTE + 1;
+
     private final List<Entry> entries = new ArrayList<>();
     private int saved;
+    /** The button's label, or null for none; it is always the last row. */
+    private String action;
 
     ChatAdapter(Context context, Pictures pictures) {
         this.context = context;
@@ -48,26 +55,52 @@ final class ChatAdapter extends SelectableAdapter {
 
     /** The entries, plus a working line when `working` is not null. */
     void replace(List<Entry> next, String working) {
+        replace(next, working, null, null);
+    }
+
+    /**
+     * The entries, then a working line, a note and a button, each left out
+     * when it is null.
+     */
+    void replace(List<Entry> next, String working, String note, String button) {
         entries.clear();
         if (next != null) entries.addAll(next);
         saved = entries.size();
         if (working != null) entries.add(new Entry(Entry.NOTE, working, null));
+        if (note != null) entries.add(new Entry(Entry.NOTE, note, null));
+        action = button;
         notifyDataSetChanged();
     }
 
-    /** Whether the row is a real entry rather than the working line. */
+    /** Whether the row is a real entry rather than the working line, a note or the button. */
     boolean isEntry(int position) {
         return position >= 0 && position < saved;
     }
 
-    @Override public int getCount() { return entries.size(); }
-    @Override public Entry getItem(int position) { return entries.get(position); }
+    /** Whether the row is the button. */
+    boolean isAction(int position) {
+        return action != null && position == entries.size();
+    }
+
+    @Override public int getCount() { return entries.size() + (action == null ? 0 : 1); }
+    @Override public Entry getItem(int position) {
+        return isAction(position) ? new Entry(Entry.NOTE, action, null) : entries.get(position);
+    }
     @Override public long getItemId(int position) { return position; }
     @Override public boolean hasStableIds() { return true; }
-    @Override public int getViewTypeCount() { return 4; }
-    @Override public int getItemViewType(int position) { return entries.get(position).kind; }
+    @Override public int getViewTypeCount() { return ACTION + 1; }
+    @Override public int getItemViewType(int position) {
+        return isAction(position) ? ACTION : entries.get(position).kind;
+    }
 
     @Override public View getView(int position, View convertView, ViewGroup parent) {
+        if (isAction(position)) {
+            View view = convertView;
+            if (view == null) view = inflater.inflate(R.layout.row_chat_action, parent, false);
+            view.setSelected(isSelected(position));
+            ((TextView) view.findViewById(R.id.action_text)).setText(action);
+            return view;
+        }
         Entry entry = entries.get(position);
         View view = convertView;
         if (view == null) view = inflater.inflate(layout(entry.kind), parent, false);

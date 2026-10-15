@@ -46,6 +46,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.delta.xp3.data.Attached;
+import com.delta.xp3.data.Queued;
 import com.delta.xp3.data.Chat;
 import com.delta.xp3.data.Entry;
 import com.delta.xp3.data.Folders;
@@ -71,18 +72,24 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Delta on the phone: three tabs over the cloud sessions and the command
+ * Delta on the phone: four tabs over the cloud sessions and the command
  * center.
  *
- * - Chats lists the account's agent sessions in the cloud. OK opens
- *   one in Session; the first row starts a new one.
+ * - Chats lists the agent sessions of every cloud account the command
+ *   center keeps. OK opens one in Session; the first row starts a new one.
  * - Session is one conversation, and a box to add to it. The first message
  *   of a new session creates it, carrying the Delta setup ahead of what was
  *   typed. What is on screen is built from the session's event stream, which
- *   stays open while the app is visible, whichever tab is showing.
+ *   stays open while the app is visible, whichever tab is showing. When the
+ *   session's account runs out of usage, a note and a button at the foot of
+ *   the transcript offer to move the conversation to a new session on
+ *   another account; a message sent instead waits until the limit lifts.
  * - Files lists what agents have pushed to the command center. OK downloads a
  *   file, then installs it if it is an APK or opens it if not. "Move to"
  *   puts the phone's copy in a shared folder such as Music.
+ * - Accounts lists the cloud accounts the command center keeps, in the order
+ *   new sessions try them, with how much of each one's 5-hour and weekly
+ *   limits is used and when each resets.
  *
  * Nothing on this side of the app touches a network. Session requests run in
  * order on one worker, list fetches on another, downloads on a third, the
@@ -100,7 +107,8 @@ public final class MainActivity extends Activity {
     private static final int CHATS = 0;
     private static final int SESSION = 1;
     private static final int FILES = 2;
-    private static final int TABS = 3;
+    private static final int ACCOUNTS = 3;
+    private static final int TABS = 4;
 
     private static final int FOCUS_NONE = 0;
     private static final int FOCUS_LIST = 1;
@@ -204,6 +212,13 @@ public final class MainActivity extends Activity {
     private boolean creating;
     /** Whether the new, unsent session is to be a backup one (▲) rather than a cloud one (●). */
     private boolean newBackup;
+    /** Sends the waiting messages that are due, and redraws the foot of the transcript when a limit lifts. */
+    private final Runnable tick = new Runnable() {
+        @Override
+        public void run() {
+            sendDue();
+        }
+    };
     private Link link;
     private boolean online;
     /** Bumped whenever a different session is opened; anything older that comes back is dropped. */
@@ -251,6 +266,17 @@ public final class MainActivity extends Activity {
     private int pendingPick;
     /** Shows the upload's progress on whichever tab is drawn, or null. */
     private TextView uploadView;
+
+    // ------------------------------------------------------------------
+    // Accounts
+    // ------------------------------------------------------------------
+
+    private List<Backend.AccountUsage> accountUsage = new ArrayList<>();
+    private boolean accountsLoaded;
+    private boolean accountsLoading;
+    private String accountsProblem;
+    private int accountsGeneration;
+    private String accountsKey;
 
     // ------------------------------------------------------------------
     // The session screen
@@ -302,6 +328,7 @@ public final class MainActivity extends Activity {
             findViewById(R.id.tab_chats),
             findViewById(R.id.tab_session),
             findViewById(R.id.tab_files),
+            findViewById(R.id.tab_accounts),
         };
         for (int i = 0; i < tabs.length; i++) {
             final int which = i;
@@ -322,10 +349,28 @@ public final class MainActivity extends Activity {
     protected void onStart() {
         super.onStart();
         connect();
+        // Whether a session can move to another account is decided on the
+        // main thread, from the accounts already listed.
+        if (backend.ready()) {
+            lists.execute(new Runnable() {
+                @Override
+                public void run() {
+                    backend.warm();
+                    main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            updateChat();
+                        }
+                    });
+                }
+            });
+        }
+        sendDue();
         // Coming back is the moment to ask again: a phone like this is put
         // away, not quit, and the agent has usually been busy meanwhile.
         if (currentTab == CHATS) refreshChats();
         else if (currentTab == FILES) refreshFiles();
+        else if (currentTab == ACCOUNTS) refreshAccounts();
     }
 
     @Override
@@ -357,6 +402,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        main.removeCallbacks(tick);
         disconnect();
         if (running != null) running.cancelled = true;
         if (uploading != null) uploading.cancelled = true;
@@ -402,9 +448,12 @@ public final class MainActivity extends Activity {
             refreshChats();
         } else if (tab == SESSION) {
             render(focusContent ? FOCUS_INPUT : FOCUS_NONE);
-        } else {
+        } else if (tab == FILES) {
             renderFiles(focusContent);
             if (!filesLoaded) refreshFiles();
+        } else {
+            renderAccounts(focusContent);
+            refreshAccounts();
         }
     }
 
@@ -414,6 +463,7 @@ public final class MainActivity extends Activity {
             RowAdapter.Row row = rowAdapter.selected();
             if (row != null && currentTab == CHATS) chatsKey = row.key;
             if (row != null && currentTab == FILES) filesKey = row.key;
+            if (row != null && currentTab == ACCOUNTS) accountsKey = row.key;
         }
         chatList = null;
         chatAdapter = null;
@@ -446,6 +496,8 @@ public final class MainActivity extends Activity {
                 String problem = null;
                 try {
                     fetched = backend.sessions();
+                    String left = backend.listProblem();
+                    if (left != null) problem = "Some sessions are missing. " + left;
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;
@@ -635,6 +687,127 @@ public final class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------------
+    // Accounts
+    // ------------------------------------------------------------------
+
+    /** Asks the command center for every account's usage again. */
+    private void refreshAccounts() {
+        if (!backend.ready() || accountsLoading) return;
+        accountsLoading = true;
+        final int forGeneration = ++accountsGeneration;
+        if (currentTab == ACCOUNTS) updateAccountRows();
+        lists.execute(new Runnable() {
+            @Override
+            public void run() {
+                List<Backend.AccountUsage> fetched = null;
+                String problem = null;
+                try {
+                    fetched = backend.usage();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (Exception e) {
+                    problem = "Couldn't refresh: " + reason(e);
+                }
+                final List<Backend.AccountUsage> result = fetched;
+                final String said = problem;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (forGeneration != accountsGeneration || isFinishing()) return;
+                        accountsLoading = false;
+                        accountsProblem = said;
+                        if (result != null) {
+                            accountUsage = result;
+                            accountsLoaded = true;
+                        }
+                        if (currentTab == ACCOUNTS) updateAccountRows();
+                        // What was learnt may change what a session can do.
+                        updateChat();
+                        scheduleTick();
+                    }
+                });
+            }
+        });
+    }
+
+    private void renderAccounts(boolean focusContent) {
+        if (!backend.ready()) {
+            replaceContent(emptyMessage(Backend.NO_LOGIN));
+            return;
+        }
+        LinearLayout root = vertical();
+        root.addView(notice());
+        final RowAdapter adapter = new RowAdapter(this);
+        final ListView list = listView(adapter);
+        root.addView(list, weighted());
+        rowList = list;
+        rowAdapter = adapter;
+        wireRows(list, adapter);
+        replaceContent(root);
+        updateAccountRows();
+        int position = adapter.positionOf(accountsKey);
+        select(list, adapter, position < 0 ? 0 : position);
+        if (focusContent) list.requestFocus();
+    }
+
+    /**
+     * One row per account, in the order new sessions try them: its address,
+     * its 5-hour and weekly use with when each resets, and on the right its
+     * plan, or "Out" while it has no room.
+     */
+    private void updateAccountRows() {
+        if (currentTab != ACCOUNTS || rowAdapter == null) return;
+        RowAdapter.Row was = rowAdapter.selected();
+        List<RowAdapter.Row> rows = new ArrayList<>();
+        for (Backend.AccountUsage entry : accountUsage) {
+            Center.Account account = entry.account;
+            String sub;
+            String extra;
+            if (entry.usage == null) {
+                sub = "Usage unavailable";
+                extra = entry.problem;
+            } else {
+                sub = window("5-hour", entry.usage.fiveHour, entry.usage.fiveHourResets);
+                extra = window("Weekly", entry.usage.weekly, entry.usage.weeklyResets);
+            }
+            boolean out = backend.accountLimit(account.id) > 0
+                || (entry.usage != null && entry.usage.limitedUntil() > System.currentTimeMillis());
+            rows.add(new RowAdapter.Row(account.id, account.email, sub, out ? "Out" : plan(account.plan), extra));
+        }
+        rowAdapter.replace(rows);
+        if (was != null) {
+            int position = rowAdapter.positionOf(was.key);
+            if (position >= 0 && position != rowAdapter.getSelectedPosition()) select(rowList, rowAdapter, position);
+        }
+        View parent = (View) rowList.getParent();
+        TextView notice = parent == null ? null : (TextView) ((ViewGroup) parent).getChildAt(0);
+        if (notice != null) {
+            String said = accountsProblem != null ? accountsProblem
+                : accountsLoading && !accountsLoaded ? "Loading…"
+                : accountsLoaded && accountUsage.isEmpty() ? Backend.NO_ACCOUNTS : null;
+            notice.setText(said);
+            notice.setVisibility(said == null ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    /** "5-hour: 42% · resets 3:05 PM". */
+    private static String window(String name, Double used, long resets) {
+        if (used == null) return name + ": no data";
+        String said = name + ": " + Math.round(used.doubleValue()) + "%";
+        if (resets > 0) said += " · resets " + Backend.clock(resets);
+        return said;
+    }
+
+    /** "claude_pro" as "Pro". */
+    private static String plan(String plan) {
+        if (plan == null) return "";
+        String name = plan.startsWith("claude_") ? plan.substring("claude_".length()) : plan;
+        if (name.length() == 0) return "";
+        return Character.toUpperCase(name.charAt(0)) + name.substring(1);
+    }
+
+    // ------------------------------------------------------------------
     // Switching sessions
     // ------------------------------------------------------------------
 
@@ -688,6 +861,7 @@ public final class MainActivity extends Activity {
         });
         if (link != null) link.start();
         updateHeader();
+        scheduleTick();
     }
 
     private void disconnect() {
@@ -702,7 +876,19 @@ public final class MainActivity extends Activity {
         if (forGeneration != generation || isFinishing()) return;
         long before = transcript.sequence();
         boolean wasWorking = transcript.working();
-        if (transcript.apply(frame.event, frame.id, frame.data)) {
+        boolean changed = transcript.apply(frame.event, frame.id, frame.data);
+        if (backend.limited(sessionId, transcript.limitedUntil())) {
+            saves.execute(new Runnable() {
+                @Override
+                public void run() {
+                    backend.saveLimits();
+                }
+            });
+            // The foot of the transcript now says so, and offers the move.
+            changed = true;
+            scheduleTick();
+        }
+        if (changed) {
             updateChat();
             updateHeader();
             if (wasWorking != transcript.working()) updateChatRows();
@@ -739,9 +925,25 @@ public final class MainActivity extends Activity {
         final int forGeneration = generation;
         final List<File> attached = pictures.commit(uuid);
         final List<String> sentFiles = new ArrayList<>(attachedFiles);
-        transcript.sent(uuid, Attached.line(message, sentFiles), attached.size());
         draft = "";
         attachedFiles.clear();
+        // Sent to a session whose account is out of usage, it would only run
+        // into the same limit; it waits on the phone until the limit lifts.
+        if (sessionId != null && backend.limitedUntil(sessionId) > 0) {
+            transcript.queued(uuid, Attached.line(message, sentFiles), attached.size());
+            backend.enqueue(sessionId, uuid, message, sentFiles, attached.size());
+            saves.execute(new Runnable() {
+                @Override
+                public void run() {
+                    backend.saveQueue();
+                }
+            });
+            scheduleTick();
+            saveNow();
+            render(FOCUS_INPUT);
+            return;
+        }
+        transcript.sent(uuid, Attached.line(message, sentFiles), attached.size());
         if (sessionId == null) {
             creating = true;
             title = message.length() > 0 ? titleFor(message)
@@ -816,6 +1018,198 @@ public final class MainActivity extends Activity {
                 updateHeader();
             }
         });
+    }
+
+    // ------------------------------------------------------------------
+    // Usage limits
+    // ------------------------------------------------------------------
+
+    /**
+     * Moves the open session's conversation, whose account is out of usage,
+     * to a new session on an account with room: the whole conversation, from
+     * the cloud's own history of it, and any messages that were waiting for
+     * the limit to lift. The old session stays in Chats. If the move fails,
+     * the old session comes back with its messages still waiting.
+     */
+    private void moveSession() {
+        if (sessionId == null || creating) return;
+        if (!backend.canMove(sessionId)) {
+            toast("No other account has room right now");
+            return;
+        }
+        final String from = sessionId;
+        final String was = title;
+        final List<Queued> waiting = backend.takeQueued(from);
+        saves.execute(new Runnable() {
+            @Override
+            public void run() {
+                backend.saveQueue();
+            }
+        });
+        StringBuilder typed = new StringBuilder();
+        final List<String> names = new ArrayList<>();
+        final List<File> sentPictures = new ArrayList<>();
+        for (Queued message : waiting) {
+            if (message.text.trim().length() > 0) {
+                if (typed.length() > 0) typed.append("\n\n");
+                typed.append(message.text.trim());
+            }
+            names.addAll(message.files);
+            for (int i = 0; i < message.pictures; i++) {
+                File picture = pictures.sent(message.uuid, i);
+                if (picture.isFile()) sentPictures.add(picture);
+            }
+        }
+        final String text = typed.toString();
+        saveNow();
+        switchTo(null);
+        title = was;
+        creating = true;
+        final String uuid = UUID.randomUUID().toString();
+        final int forGeneration = generation;
+        transcript.carried(uuid);
+        if (text.length() > 0 || !names.isEmpty()) transcript.queued(uuid, Attached.line(text, names), 0);
+        render(FOCUS_INPUT);
+        requests.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final String id = backend.move(from, was, uuid, text, sentPictures, names);
+                    main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            created(id, forGeneration);
+                        }
+                    });
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (Exception e) {
+                    final String problem = reason(e);
+                    main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            notMoved(from, waiting, problem, forGeneration);
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    private void notMoved(String from, List<Queued> waiting, String problem, int forGeneration) {
+        backend.requeue(waiting);
+        saves.execute(new Runnable() {
+            @Override
+            public void run() {
+                backend.saveQueue();
+            }
+        });
+        if (forGeneration != generation || isFinishing()) return;
+        switchTo(from);
+        connect();
+        toast("Not moved: " + problem);
+        if (currentTab == SESSION) render(FOCUS_LIST);
+    }
+
+    /**
+     * Sends the waiting messages that are due and arranges the next tick. A
+     * send that fails is tried again a minute later, up to ten times.
+     */
+    private void sendDue() {
+        main.removeCallbacks(tick);
+        if (isFinishing()) return;
+        final List<Queued> ready = backend.due();
+        if (!ready.isEmpty()) {
+            saves.execute(new Runnable() {
+                @Override
+                public void run() {
+                    backend.saveQueue();
+                }
+            });
+        }
+        for (final Queued message : ready) {
+            if (message.session.equals(sessionId)) transcript.resumed();
+            requests.execute(new Runnable() {
+                @Override
+                public void run() {
+                    List<File> attached = new ArrayList<>();
+                    for (int i = 0; i < message.pictures; i++) {
+                        File picture = pictures.sent(message.uuid, i);
+                        if (picture.isFile()) attached.add(picture);
+                    }
+                    String problem = null;
+                    try {
+                        backend.send(message.session, message.uuid, message.text, attached, message.files);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    } catch (Exception e) {
+                        problem = reason(e);
+                    }
+                    final String said = problem;
+                    main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (said == null) return;
+                            boolean again = message.tries < 9;
+                            if (again) {
+                                backend.retry(message);
+                                saves.execute(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        backend.saveQueue();
+                                    }
+                                });
+                                scheduleTick();
+                            }
+                            if (message.session.equals(sessionId)) {
+                                transcript.idle();
+                                transcript.note((again ? "Not sent yet, trying again in a minute: " : "Not sent: ") + said);
+                                scheduleSave();
+                                updateChat();
+                                updateHeader();
+                            }
+                        }
+                    });
+                }
+            });
+        }
+        updateChat();
+        updateHeader();
+        scheduleTick();
+    }
+
+    /** Wakes up for the next waiting message, or when the open session's limit lifts, whichever is first. */
+    private void scheduleTick() {
+        main.removeCallbacks(tick);
+        long next = backend.nextDue();
+        long lifts = sessionId == null ? 0 : backend.limitedUntil(sessionId);
+        if (lifts > 0 && (next == 0 || lifts < next)) next = lifts;
+        if (next == 0) return;
+        main.postDelayed(tick, Math.max(1000L, next - System.currentTimeMillis() + 500L));
+    }
+
+    /** What the foot of the transcript says about the open session's limit, or null. */
+    private String limitNote() {
+        if (sessionId == null) return null;
+        long until = backend.limitedUntil(sessionId);
+        if (until <= 0) return null;
+        String when = Backend.when(until).replaceFirst("^at ", "until ").replaceFirst("^on ", "until ");
+        String said = "This account is out of usage " + when + ".";
+        int waiting = backend.queuedFor(sessionId);
+        if (waiting > 0) {
+            said += waiting == 1 ? " Your message will be sent then." : " Your messages will be sent then.";
+        } else {
+            said += " A message sent now waits until then.";
+        }
+        if (backend.canMove(sessionId)) said += " Or move the conversation to another account:";
+        return said;
+    }
+
+    /** The button at the foot of the transcript, or null. */
+    private String limitAction() {
+        if (sessionId == null || creating || !backend.canMove(sessionId)) return null;
+        return "Move to a new session";
     }
 
     /** The first line of the first message, which is what the cloud titles a session with too. */
@@ -1431,7 +1825,7 @@ public final class MainActivity extends Activity {
     private void updateChat() {
         if (currentTab != SESSION || chatAdapter == null || chatList == null) return;
         boolean follow = chatList.isPinnedToBottom() || isAtBottom(chatList, chatAdapter);
-        chatAdapter.replace(transcript.entries(), workingLine());
+        chatAdapter.replace(transcript.entries(), workingLine(), limitNote(), limitAction());
         if (follow) chatList.pinToBottomOnce();
     }
 
@@ -1473,7 +1867,7 @@ public final class MainActivity extends Activity {
         updateHeader();
 
         final ChatAdapter adapter = new ChatAdapter(this, pictures);
-        adapter.replace(transcript.entries(), workingLine());
+        adapter.replace(transcript.entries(), workingLine(), limitNote(), limitAction());
         final ChatListView list = new ChatListView(this);
         list.setAdapter(adapter);
         // Rows paint their own focus state edge to edge; a transparent
@@ -1648,9 +2042,10 @@ public final class MainActivity extends Activity {
         list.setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View view, int keyCode, KeyEvent event) {
-                // OK on a row does nothing; holding it opens the menu.
+                // OK on a message does nothing and holding it opens the menu;
+                // OK on the button at the foot presses it.
                 if (!isOk(keyCode)) return false;
-                okOnRow(event, null);
+                if (okOnRow(event, null) && adapter.isAction(adapter.getSelectedPosition())) moveSession();
                 return true;
             }
         });
@@ -2457,12 +2852,12 @@ public final class MainActivity extends Activity {
 
     /**
      * OK on a row. Holding it opens the menu; releasing it without having
-     * held it acts on `row`, if there is one. Every OK press is claimed, so
+     * held it acts on `row`, if there is one, and returns true. Every OK press is claimed, so
      * ListView's own long press, which would open a menu as a centred dialog,
      * never runs. A release whose press began somewhere else (a dialog, the
      * previous tab) does nothing.
      */
-    private void okOnRow(KeyEvent event, RowAdapter.Row row) {
+    private boolean okOnRow(KeyEvent event, RowAdapter.Row row) {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             if (event.getRepeatCount() == 0) {
                 okHeld = false;
@@ -2471,12 +2866,13 @@ public final class MainActivity extends Activity {
                 okHeld = true;
                 showMenu();
             }
-            return;
+            return false;
         }
         boolean act = okDown && !okHeld && !event.isCanceled();
         okHeld = false;
         okDown = false;
         if (act) activateRow(row);
+        return act;
     }
 
     private static boolean isOk(int keyCode) {
@@ -2608,12 +3004,14 @@ public final class MainActivity extends Activity {
                 if (row != null) y = Math.max(0, Math.min(row.getBottom(), rowList.getHeight()));
             }
             if (currentTab == CHATS) chatsMenu();
-            else filesMenu();
+            else if (currentTab == FILES) filesMenu();
+            else accountsMenu();
         } else {
             anchor = content.getChildCount() > 0 ? content.getChildAt(0) : content;
             y = anchor.getHeight() / 2f;
             if (currentTab == FILES) filesMenu();
             else if (currentTab == CHATS && anySessions()) chatsMenu();
+            else if (currentTab == ACCOUNTS && backend.ready()) accountsMenu();
         }
         if (menuIds.isEmpty()) return;
         anchor.showContextMenu(Math.min(dp(32), anchor.getWidth() / 2f), y);
@@ -2653,6 +3051,10 @@ public final class MainActivity extends Activity {
         if (sessionId != null && !Chat.backup(sessionId)) add(MENU_LINK, "Copy session link");
         addNewSessionItems();
         return y;
+    }
+
+    private void accountsMenu() {
+        add(MENU_REFRESH, "Refresh");
     }
 
     private void chatsMenu() {
@@ -2735,7 +3137,8 @@ public final class MainActivity extends Activity {
                 break;
             case MENU_REFRESH:
                 if (currentTab == CHATS) refreshChats();
-                else refreshFiles();
+                else if (currentTab == FILES) refreshFiles();
+                else refreshAccounts();
                 break;
             case MENU_ARCHIVE:
                 if (chat != null) confirmArchive(chat);

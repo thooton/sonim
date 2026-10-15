@@ -6,11 +6,12 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * The two logins the app holds, and nothing else.
+ * The one login the app holds: the command center, an address and a bearer
+ * token, the same pair `delta set-auth` saves for the CLI.
  *
- * The cloud login is the rotating OAuth pair, written back here every time
- * it is renewed. The command center is an address and a bearer token,
- * the same pair `delta set-auth` saves for the CLI; it never rotates.
+ * The cloud logins live on the command center, which renews them. Versions
+ * before that kept one here, as a rotating OAuth pair; it is still read, so
+ * the app can hand it over to the command center, and then dropped.
  *
  * There is no model, environment or repository to configure: the cloud session
  * picks its own model, the first cloud environment on the account is used, and
@@ -40,9 +41,9 @@ public final class Config {
         return new Config(null, null, 0, null, null);
     }
 
-    /** A cloud login alone. */
+    /** An old-style cloud login alone. */
     public static Config of(String accessToken, String refreshToken, long expiresAt) {
-        return blank().withCloud(accessToken, refreshToken, expiresAt);
+        return new Config(credential(accessToken), credential(refreshToken), Math.max(0, expiresAt), null, null);
     }
 
     public static Config parse(String json) {
@@ -69,13 +70,9 @@ public final class Config {
         }
     }
 
-    public Config withCloud(String accessToken, String refreshToken, long expiresAt) {
-        return new Config(credential(accessToken), credential(refreshToken), Math.max(0, expiresAt), server, token);
-    }
-
-    /** The cloud half of `other`, with this config's command center. */
-    public Config withCloudOf(Config other) {
-        return new Config(other.accessToken, other.refreshToken, other.expiresAt, server, token);
+    /** This config once its old-style cloud login has been handed to the command center. */
+    public Config withoutCloud() {
+        return new Config(null, null, 0, server, token);
     }
 
     /**
@@ -91,7 +88,7 @@ public final class Config {
         return new Config(accessToken, refreshToken, expiresAt, address, bearer);
     }
 
-    /** The command center of `other`, with this config's cloud login. */
+    /** The command center of `other`, with this config's old cloud login. */
     public Config withCenterOf(Config other) {
         return new Config(accessToken, refreshToken, expiresAt, other.server, other.token);
     }
@@ -154,9 +151,9 @@ public final class Config {
         return Json.write(root);
     }
 
-    /** Whether there is a login to reach the cloud with. */
-    public boolean ready() {
-        return refreshToken != null || accessToken != null;
+    /** Whether an old-style cloud login is still waiting to be handed to the command center. */
+    public boolean hasCloud() {
+        return refreshToken != null;
     }
 
     /** Whether there is a command center to reach. */

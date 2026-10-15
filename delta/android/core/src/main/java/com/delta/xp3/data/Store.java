@@ -20,9 +20,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * What the app writes down, in its own private directory: the logins, which
- * session is open, the last list of sessions, a transcript per session, and
- * which command-center files have been downloaded.
+ * What the app writes down, in its own private directory: the command center
+ * login, which session is open, the last list of sessions, a transcript per
+ * session, which cloud accounts are out until when, the messages waiting for
+ * a limit to lift, and which command-center files have been downloaded.
  *
  * A transcript could be rebuilt by replaying the session's whole event stream,
  * but on a phone that is a lot of sandbox logs to download every time a
@@ -38,10 +39,11 @@ import java.util.Set;
 public final class Store {
 
     /** Which login a bundled revision marker belongs to. */
-    public static final String CLOUD = "cloud";
     public static final String CENTER = "center";
 
     private static final String SETTINGS = "settings.json";
+    private static final String LIMITS = "limits.json";
+    private static final String QUEUE = "queue.json";
     private static final String OPEN = "open.txt";
     private static final String CHATS = "chats.json";
     private static final String DOWNLOADS = "downloads.json";
@@ -53,11 +55,18 @@ public final class Store {
     public static final class Saved {
         public final String id;
         public final String title;
+        /** The cloud account it runs on, or null if that was not known when it was saved. */
+        public final String account;
         public final Transcript transcript;
 
         public Saved(String id, String title, Transcript transcript) {
+            this(id, title, null, transcript);
+        }
+
+        public Saved(String id, String title, String account, Transcript transcript) {
             this.id = id;
             this.title = title;
+            this.account = account;
             this.transcript = transcript;
         }
     }
@@ -89,8 +98,6 @@ public final class Store {
     /** The bundled login of kind `part` already adopted by this installation, if any. */
     public String bundledRevision(String part) {
         String revision = read(revisionFile(part));
-        // Installs from before the white-label rename have the old marker name.
-        if (revision == null && CLOUD.equals(part)) revision = read("bundled-claude.txt");
         return revision == null ? "" : revision.trim();
     }
 
@@ -99,7 +106,7 @@ public final class Store {
     }
 
     private static String revisionFile(String part) {
-        if (!CLOUD.equals(part) && !CENTER.equals(part)) throw new IllegalArgumentException("Unknown login");
+        if (!CENTER.equals(part)) throw new IllegalArgumentException("Unknown login");
         return "bundled-" + part + ".txt";
     }
 
@@ -131,7 +138,7 @@ public final class Store {
                 if (!Chat.validId(id)) continue;
                 Double updated = Json.number(saved, "updated");
                 chats.add(new Chat(id, Json.text(saved, "title"), Json.text(saved, "status"),
-                    updated == null ? 0 : updated.longValue()));
+                    updated == null ? 0 : updated.longValue(), Json.text(saved, "account")));
             }
         } catch (RuntimeException e) {
             chats.clear();
@@ -142,8 +149,10 @@ public final class Store {
     public void saveChats(List<Chat> chats) throws IOException {
         List<Object> saved = new ArrayList<Object>();
         for (Chat chat : chats) {
-            saved.add(Json.map("id", chat.id, "title", chat.title, "status", chat.status,
-                "updated", Long.valueOf(chat.updated)));
+            Map<String, Object> entry = Json.map("id", chat.id, "title", chat.title, "status", chat.status,
+                "updated", Long.valueOf(chat.updated));
+            if (chat.account != null) entry.put("account", chat.account);
+            saved.add(entry);
         }
         write(CHATS, Json.write(saved), false);
     }
@@ -176,7 +185,7 @@ public final class Store {
                 sequence == null ? 0 : sequence.longValue(),
                 Json.flag(saved, "working")
             );
-            return new Saved(id, Json.text(saved, "title"), transcript);
+            return new Saved(id, Json.text(saved, "title"), Json.text(saved, "account"), transcript);
         } catch (RuntimeException e) {
             return new Saved(id, null, new Transcript());
         }
@@ -184,6 +193,10 @@ public final class Store {
 
     /** Saves a session's transcript. A null id (a session not yet created) saves nothing. */
     public void saveSession(String id, String title, Transcript transcript) throws IOException {
+        saveSession(id, title, null, transcript);
+    }
+
+    public void saveSession(String id, String title, String account, Transcript transcript) throws IOException {
         if (!Chat.validId(id)) return;
         List<Object> entries = new ArrayList<Object>();
         for (Entry entry : transcript.entries()) {
@@ -194,6 +207,7 @@ public final class Store {
         write(SESSIONS + "/" + id + ".json", Json.write(Json.map(
             "id", id,
             "title", title,
+            "account", account,
             "sequence", Long.valueOf(transcript.sequence()),
             "working", Boolean.valueOf(transcript.working()),
             "entries", entries
@@ -239,6 +253,71 @@ public final class Store {
     }
 
     // ------------------------------------------------------------------
+    // Usage limits
+    // ------------------------------------------------------------------
+
+    /** Until when each cloud account is known to be out, in epoch milliseconds, by id. */
+    public Map<String, Long> limits() {
+        Map<String, Long> limits = new LinkedHashMap<String, Long>();
+        String json = read(LIMITS);
+        if (json == null) return limits;
+        try {
+            Map<String, Object> saved = Json.object(Json.parse(json));
+            for (String account : saved.keySet()) {
+                Double until = Json.number(saved, account);
+                if (until != null) limits.put(account, Long.valueOf(until.longValue()));
+            }
+        } catch (RuntimeException e) {
+            limits.clear();
+        }
+        return limits;
+    }
+
+    public void saveLimits(Map<String, Long> limits) throws IOException {
+        write(LIMITS, Json.write(new LinkedHashMap<String, Object>(limits)), false);
+    }
+
+    /** The messages waiting for their account's limit to lift, in the order they were written. */
+    public List<Queued> queue() {
+        List<Queued> queue = new ArrayList<Queued>();
+        String json = read(QUEUE);
+        if (json == null) return queue;
+        try {
+            for (Object value : Json.array(Json.parse(json))) {
+                if (!(value instanceof Map)) continue;
+                Map<String, Object> saved = Json.object(value);
+                Double at = Json.number(saved, "at");
+                Double pictures = Json.number(saved, "pictures");
+                Double tries = Json.number(saved, "tries");
+                List<String> files = new ArrayList<String>();
+                for (Object name : Json.children(saved, "files")) {
+                    if (name instanceof String && RemoteFile.validName((String) name)) files.add((String) name);
+                }
+                try {
+                    queue.add(new Queued(Json.text(saved, "session"), Json.text(saved, "uuid"),
+                        Json.text(saved, "text"), files, pictures == null ? 0 : pictures.intValue(),
+                        at == null ? 0 : at.longValue(), tries == null ? 0 : tries.intValue()));
+                } catch (IllegalArgumentException skipped) {
+                    // Not one this version can send.
+                }
+            }
+        } catch (RuntimeException e) {
+            queue.clear();
+        }
+        return queue;
+    }
+
+    public void saveQueue(List<Queued> queue) throws IOException {
+        List<Object> saved = new ArrayList<Object>();
+        for (Queued message : queue) {
+            saved.add(Json.map("session", message.session, "uuid", message.uuid, "text", message.text,
+                "files", new ArrayList<Object>(message.files), "pictures", Integer.valueOf(message.pictures),
+                "at", Long.valueOf(message.at), "tries", Integer.valueOf(message.tries)));
+        }
+        write(QUEUE, Json.write(saved), false);
+    }
+
+    // ------------------------------------------------------------------
     // Downloads
     // ------------------------------------------------------------------
 
@@ -277,9 +356,9 @@ public final class Store {
     // ------------------------------------------------------------------
 
     /*
-     * Synchronized because more than one thread writes here: a rotated login
-     * is saved from a network worker while a session is saved from the save
-     * worker. They do not share a temporary file, but the directory check and
+     * Synchronized because more than one thread writes here: the settings
+     * are saved from a network worker once an old login has been handed over,
+     * while a session is saved from the save worker. They do not share a temporary file, but the directory check and
      * rename are simpler to reason about one at a time.
      */
 

@@ -171,11 +171,12 @@ public final class DataTests {
                 t.sent("u-1", "Hi", 2);
                 t.apply("client_event", "12", frame(12, "worker", assistant(null,
                     Json.map("type", "text", "text", "Hello **there**"))));
-                store.saveSession("session_01abc", "Hi", t);
+                store.saveSession("session_01abc", "Hi", "acct-2", t);
                 store.saveOpenSession("session_01abc");
 
                 Store.Saved back = store.session("session_01abc");
                 check.same("id", "session_01abc", back.id);
+                check.same("account", "acct-2", back.account);
                 check.same("title", "Hi", back.title);
                 check.same("sequence", 12L, back.transcript.sequence());
                 check.ok("working", back.transcript.working());
@@ -233,7 +234,7 @@ public final class DataTests {
                 Store store = new Store(directory);
                 check.same("no chats yet", 0, store.chats().size());
                 store.saveChats(java.util.Arrays.asList(
-                    new Chat("session_01", "Fix the list app", Chat.WORKING, 1700000000000L),
+                    new Chat("session_01", "Fix the list app", Chat.WORKING, 1700000000000L, "acct-1"),
                     new Chat("session_02", " ", null, 0)));
                 List<Chat> chats = store.chats();
                 check.same("two", 2, chats.size());
@@ -242,6 +243,15 @@ public final class DataTests {
                 check.same("time", 1700000000000L, chats.get(0).updated);
                 check.same("blank title named", "Untitled", chats.get(1).title);
                 check.same("missing status is idle", Chat.IDLE, chats.get(1).status);
+                check.same("account kept", "acct-1", chats.get(0).account);
+                check.ok("unknown account stays unknown", chats.get(1).account == null);
+                check.same("retitling keeps the account", "acct-1", chats.get(0).titled("x").account);
+
+                check.same("no limits yet", 0, store.limits().size());
+                Map<String, Long> limits = new java.util.LinkedHashMap<String, Long>();
+                limits.put("acct-1", Long.valueOf(1900000000000L));
+                store.saveLimits(limits);
+                check.same("limit round trip", Long.valueOf(1900000000000L), store.limits().get("acct-1"));
 
                 Map<String, RemoteFile> downloads = new java.util.LinkedHashMap<String, RemoteFile>();
                 downloads.put("list.apk", new RemoteFile("list.apk", 1234, 1700000000123L));
@@ -331,6 +341,131 @@ public final class DataTests {
             }
         });
 
+        check.run("usage limits from the stream", new Check.Body() {
+            @Override
+            public void run() {
+                Transcript t = new Transcript();
+                check.same("nothing known", 0L, t.limitedUntil());
+                check.ok("a limit event is not shown", !t.apply("client_event", "1", frame(1, "worker",
+                    Json.map("type", "rate_limit_event", "rate_limit_info",
+                        Json.map("status", "allowed_warning", "resetsAt", Long.valueOf(1900000000L))))));
+                check.same("a warning is not a limit", 0L, t.limitedUntil());
+                t.apply("client_event", "2", frame(2, "worker", Json.map("type", "rate_limit_event",
+                    "rate_limit_info", Json.map("status", "rejected", "resetsAt", Long.valueOf(1900000000L),
+                        "rateLimitType", "five_hour"))));
+                check.same("a rejection is, until it resets", 1900000000000L, t.limitedUntil());
+                t.apply("client_event", "3", frame(3, "worker", Json.map("type", "rate_limit_event",
+                    "rate_limit_info", Json.map("status", "allowed"))));
+                check.same("allowed again", 0L, t.limitedUntil());
+                t.apply("client_event", "4", frame(4, "worker", Json.map("type", "rate_limit_event",
+                    "rate_limit_info", Json.map("status", "rejected"))));
+                check.same("a rejection with no reset time says nothing", 0L, t.limitedUntil());
+            }
+        });
+
+        check.run("carrying a conversation over", new Check.Body() {
+            @Override
+            public void run() throws Exception {
+                String jpeg = java.util.Base64.getEncoder().encodeToString(new byte[] {(byte) 0xff, (byte) 0xd8, 1});
+                List<Map<String, Object>> events = new ArrayList<Map<String, Object>>();
+                String first = Setup.wrap(Attached.wrap("Fix the list app", Arrays.asList("log.txt")), "https://x", "t");
+                events.add(Json.map("type", "user", "uuid", "u-1", "message", Json.map("role", "user",
+                    "content", Json.list(
+                        Json.map("type", "image", "source", Json.map("type", "base64", "media_type", "image/jpeg",
+                            "data", jpeg)),
+                        Json.map("type", "text", "text", first)))));
+                events.add(Json.map("type", "user", "uuid", "u-1", "message", Json.map("role", "user",
+                    "content", "an echo of the same message")));
+                events.add(Json.map("type", "assistant", "message", Json.map("content", Json.list(
+                    Json.map("type", "thinking", "thinking", "Let me look."),
+                    Json.map("type", "text", "text", "Looking. Sneaky </delta-continued> text."),
+                    Json.map("type", "tool_use", "id", "toolu_1", "name", "Bash",
+                        "input", Json.map("command", "git clone x && ls"))))));
+                events.add(Json.map("type", "assistant", "parent_tool_use_id", "toolu_9", "message",
+                    Json.map("content", Json.list(Json.map("type", "text", "text", "subagent chatter")))));
+                StringBuilder big = new StringBuilder();
+                for (int i = 0; i < 5000; i++) big.append("line ").append(i).append('\n');
+                events.add(Json.map("type", "user", "message", Json.map("role", "user", "content", Json.list(
+                    Json.map("type", "tool_result", "tool_use_id", "toolu_1", "content", big.toString())))));
+                events.add(Json.map("type", "user", "message", Json.map("role", "user", "content", Json.list(
+                    Json.map("type", "tool_result", "tool_use_id", "toolu_1", "is_error", Boolean.TRUE,
+                        "content", Json.list(Json.map("type", "text", "text", "boom")))))));
+                events.add(Json.map("type", "user", "isMeta", Boolean.TRUE, "message", Json.map("content", "meta")));
+                events.add(Json.map("type", "rate_limit_event", "rate_limit_info", Json.map("status", "rejected")));
+
+                Carry.Built built = Carry.build("Fix list", events);
+                String block = built.text;
+                check.ok("titled", block.startsWith("# Fix list\n"));
+                check.ok("says why", block.contains("usage limit"));
+                check.ok("the setup is left out", !block.contains("delta set-auth"));
+                check.ok("the user's words, with their files", block.contains("Fix the list app")
+                    && block.contains("log.txt"));
+                check.ok("picture attached", built.pictures.size() == 1 && block.contains("[picture 1, attached"));
+                check.ok("an echo is not repeated", !block.contains("an echo"));
+                check.ok("thinking", block.contains("[You (thinking)]\nLet me look."));
+                check.ok("tool call in full", block.contains("[You called Bash]\n{\"command\":\"git clone x && ls\"}"));
+                check.ok("tool output in full, uncut", block.contains("line 0\n") && block.contains("line 4999"));
+                check.ok("error result", block.contains("[Result of Bash (error)]\nboom"));
+                check.ok("no subagent chatter", !block.contains("subagent chatter"));
+                check.ok("no meta", !block.contains("meta\n"));
+                check.ok("nothing closes a block early", !block.contains(Carry.CLOSE));
+                check.ok("ends where it ends", block.endsWith("[End of the conversation. Carry on from here.]\n"));
+
+                block = Carry.block("Fix list", "abcdefgh23456789");
+                check.ok("the block names the conversation", block.startsWith(Carry.OPEN) && block.endsWith(Carry.CLOSE)
+                    && block.contains("delta resume abcdefgh23456789 conversation.md") && block.contains("\"Fix list\""));
+
+                String message = Setup.wrap(block + "\n\n" + Attached.wrap("Keep going", Arrays.asList("b.txt")),
+                    "https://x", "t");
+                Transcript t = new Transcript();
+                t.apply("client_event", "1", frame(1, "client", user("u-9", message)));
+                List<Entry> entries = t.entries();
+                check.same("a note, then the message", 2, entries.size());
+                check.same("note", Carry.NOTE, entries.get(0).text);
+                check.same("message reads as typed", "Keep going\n\nAttached: b.txt", entries.get(1).text);
+
+                Transcript bare = new Transcript();
+                bare.apply("client_event", "1", frame(1, "client", user("u-8", Setup.wrap(block, "https://x", "t"))));
+                check.same("a carry with nothing typed is just the note", 1, bare.size());
+
+                Transcript local = new Transcript();
+                local.carried("u-9");
+                check.ok("a move starts a turn", local.working());
+                local.queued("u-9", "Keep going\n\nAttached: b.txt", 0);
+                local.apply("client_event", "1", frame(1, "client", user("u-9", message)));
+                check.same("the echo of a move made here adds nothing", 2, local.size());
+            }
+        });
+
+        check.run("messages waiting for a limit", new Check.Body() {
+            @Override
+            public void run() throws Exception {
+                Transcript t = new Transcript();
+                t.queued("u-1", "later", 1);
+                check.ok("a waiting message starts no turn", !t.working());
+                check.same("but is shown", "later", t.entries().get(0).text);
+                t.resumed();
+                check.ok("sending it does", t.working());
+
+                File directory = Files.createTempDirectory("delta-queue").toFile();
+                Store store = new Store(directory);
+                check.same("nothing waiting", 0, store.queue().size());
+                List<Queued> queue = new ArrayList<Queued>();
+                queue.add(new Queued("session_01", "u-1", "later", Arrays.asList("a.txt"), 2, 1900000000000L, 0));
+                queue.add(new Queued("session_02", "u-2", "", null, 0, 5, 3).failed(9));
+                store.saveQueue(queue);
+                List<Queued> back = store.queue();
+                check.same("two", 2, back.size());
+                check.same("session", "session_01", back.get(0).session);
+                check.same("text", "later", back.get(0).text);
+                check.same("files", Arrays.asList("a.txt"), back.get(0).files);
+                check.same("pictures", 2, back.get(0).pictures);
+                check.same("when", 1900000000000L, back.get(0).at);
+                check.same("a failed send counts", 4, back.get(1).tries);
+                check.same("and goes again later", 9L, back.get(1).at);
+            }
+        });
+
         check.run("config", new Check.Body() {
             @Override
             public void run() throws Exception {
@@ -339,7 +474,7 @@ public final class DataTests {
                 Config back = Config.parse(both.toJson());
                 check.same("server", "https://cc.example.com", back.server());
                 check.same("token", "delta_t", back.token());
-                check.same("cloud kept", "r", back.refreshToken());
+                check.same("old cloud login kept until handed over", "r", back.refreshToken());
                 check.ok("center ready", back.centerReady());
                 check.ok("cloud only", !Config.of("a", null, 0).centerReady());
                 check.same("prefix kept", "https://example.com/delta",
@@ -364,14 +499,16 @@ public final class DataTests {
                 });
                 Config bad = Config.parse("{\"claude\":{\"refreshToken\":\"r\"},"
                     + "\"center\":{\"server\":\"http://x\",\"token\":\"t\"}}");
-                check.ok("a refused center keeps the cloud login", bad.ready() && !bad.centerReady());
-                Config rotated = both.withCloud("a2", "r2", 9);
-                check.same("rotation keeps the center", "delta_t", rotated.token());
+                check.ok("a refused center keeps the cloud login", bad.hasCloud() && !bad.centerReady());
+                Config handed = both.withoutCloud();
+                check.ok("handed over", !handed.hasCloud() && handed.refreshToken() == null);
+                check.same("handing over keeps the center", "delta_t", handed.token());
+                check.ok("nothing of it written", !handed.toJson().contains("\"r\""));
+                check.ok("and not read back", !Config.parse(handed.toJson()).hasCloud());
                 check.same("center of another", "delta_t", Config.of("x", "y", 1).withCenterOf(both).token());
-                check.same("cloud of another", "r", Config.blank().withCloudOf(both).refreshToken());
                 check.same("legacy login key still read", "r",
                     Config.parse("{\"claude\":{\"refreshToken\":\"r\"}}").refreshToken());
-                check.ok("written under the new key", both.toJson().contains("\"cloud\""));
+                check.ok("an access token alone is nothing to hand over", !Config.of("a", null, 0).hasCloud());
             }
         });
 
@@ -418,6 +555,12 @@ public final class DataTests {
         Transcript t = new Transcript();
         t.apply("client_event", id, frame(sequence, "worker", Json.map("type", "system")));
         return t.sequence();
+    }
+
+    private static String pad(int length) {
+        StringBuilder out = new StringBuilder();
+        while (out.length() < length) out.append('x');
+        return out.toString();
     }
 
     static String frame(int sequence, String source, Map<String, Object> payload) {

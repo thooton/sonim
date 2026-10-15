@@ -20,7 +20,7 @@ code (HTTP, JSON, cloud OAuth, chat views, Markdown, tabs).
 - Platform Android only: no AndroidX, Material, Compose, or third-party
   libraries. `:core` is plain Java, `--release 8`, and must run on API 27.
 - No repository picker, no model or environment settings: the first
-  `anthropic_cloud` environment on the account is used, with an empty
+  `anthropic_cloud` environment on each account is used, with an empty
   sandbox.
 
 ## How it fits into Delta
@@ -41,12 +41,15 @@ example the tabs, or what happens to a pushed file), update `delta help` in
 
 ## Tabs
 
-`MainActivity` has three tabs, laid out like Charge's and Canvas's: a
+`MainActivity` has four tabs, laid out like Charge's and Canvas's: a
 non-focusable tab bar, with left and right switching tabs on their first press
 only. In the composer, left and right move the cursor until it reaches an end
 of the text (`cursorOwns`, as in Canvas).
 
-- **Chats**: `Cloud.sessions()` (`GET /v1/code/sessions`, unscoped, as
+- **Chats**: `Backend.sessions()`: `Cloud.sessions()` for every cloud
+  account (see Cloud accounts), merged newest first, each `Chat` tagged with
+  its account. An account whose list fails is left out and named above the
+  list. `Cloud.sessions()` is `GET /v1/code/sessions` (unscoped, as
   the provider's CLI lists them), keeping only `anthropic_cloud` sessions
   (or ones with no kind) that are not archived. `bridge` sessions are Remote
   Control sessions on someone's own computer and are left out on purpose.
@@ -55,8 +58,10 @@ of the text (`cursorOwns`, as in Canvas).
   `POST /v1/code/sessions/{cse}/archive`, where 409 means already archived.
   Beside them are the command center's backup sessions (`Center.sessions()`,
   `GET /agent-sessions`; ids `session_delta_…`, told apart by `Chat.backup`),
-  merged newest first by `Backend.sessions()`, which keeps a side's last list
-  when only that side can't be reached. Every title is shown with its kind's
+  merged newest first by `Backend.sessions()`, which keeps their last list
+  (and names the failure above the list) when only they can't be listed.
+  They belong to no account, so usage limits, waiting messages and "Move to
+  a new session" never apply to them. Every title is shown with its kind's
   mark (`Chat.label`): ● for a cloud session, ▲ for a backup one. The menu
   offers "New session ●" and "New session ▲" (each only when this build can
   start that kind); a backup session has **Delete** (`DELETE
@@ -94,6 +99,74 @@ of the text (`cursorOwns`, as in Canvas).
   in the list (`RemoteFile.numbered`) and moves on if it is refused with 409.
   Back on Files cancels it. "Send to agent" attaches a file to the next
   message (see Files sent with a message).
+- **Accounts**: `Backend.usage()`: every account (`Center.accounts`, in
+  the order new sessions try them) with its usage report
+  (`Center.usage`: `five_hour` and `seven_day` utilization and
+  `resets_at`), in `RowAdapter` rows with a second line (`Row.extra`): the
+  address, "5-hour: 42% · resets 3:05 PM", "Weekly: …", and on the right
+  the plan, or "Out" while either window is full or a limit is known. A
+  full window it finds is written to `limits.json`, so rotation skips that
+  account at once. Fetched each time the tab is shown and from Menu →
+  Refresh.
+
+## Cloud accounts
+
+The phone holds no cloud login. The command center keeps one or more
+(`delta accounts` in the delta repo adds and removes them; see its
+AGENTS.md) and renews them, because a subscription login's refresh token
+changes on every renewal and two parties renewing it would kill it.
+
+- `Center.accounts()` lists them (`GET /cloud-accounts`), in the order new
+  sessions try them. `CloudAuth.of(center, id)` fetches an account's access
+  token (`POST /cloud-accounts/{id}/token`) and keeps it until five minutes
+  before it expires; after a 401 the next fetch sends the refused token, so
+  the command center renews the login. `Backend` keeps one `Cloud` per
+  account.
+- A session belongs to the account it was started on. `Backend` learns which
+  from the session lists and keeps it in `chats.json` and in each saved
+  transcript (`account`); a session it can't place is looked up again.
+- **Rotation.** `Backend.create` starts a session on the first account not
+  known to be out (`limits.json`, account id to epoch ms) whose usage report
+  (`GET /cloud-accounts/{id}/usage`, via `Center.limitedUntil`) shows room
+  in both the 5-hour and weekly windows. A full one is written down until it
+  resets. If none has room, the error says when the first is free again.
+- **Running out mid-conversation.** The stream's `rate_limit_event` with
+  `status: rejected` and `resetsAt` (seconds) sets
+  `Transcript.limitedUntil()`, and `MainActivity.received` records it for
+  the session's account. While the open session's account is out, the foot
+  of the transcript (`ChatAdapter.replace`'s note and button, neither of
+  them entries or saved) says until when. If another account isn't known
+  to be out (`Backend.canMove`), a **Move to a new session** row follows,
+  which the d-pad reaches like a message and OK presses. The header is
+  unchanged.
+- **Moving** (`MainActivity.moveSession`, `Backend.move`) reads the old
+  session's whole event history (`Cloud.history`: `GET
+  /v1/code/sessions/{cse}/events?sort_order=asc&cursor=<last sequence>`,
+  page by page) and writes it out as text (`Carry.build`): every
+  main-thread message, thinking block, tool call (full input) and tool
+  result (full output), nothing shortened; subagents' inner turns are left
+  out (their results are in). That goes to the command center
+  (`Center.putConversation`, `POST /conversations`), which stores it under
+  a random id. Then a session starts on another account, titled the same,
+  whose first message opens with a `<delta-continued>` block
+  (`Carry.block`) telling the agent to run `delta resume <id>
+  conversation.md` and read the whole file. Pictures the user sent ride
+  along as images on that message, and messages waiting for the limit
+  follow the block. A failed move reopens the old session with its
+  messages still waiting.
+  `Transcript` shows the block as one note (`Carry.NOTE`). `delta help`
+  explains the block; keep the two in step.
+- **Waiting messages.** A message sent while the session's account is out
+  is shown (`Transcript.queued`, no turn starts) and kept in `queue.json`
+  (`Queued`: session, uuid, text, files, picture count, when, tries) until a
+  minute after the limit lifts. A tick (`MainActivity.sendDue`, on a
+  `Handler`, also run at every start) sends what is due; a limit found to
+  last longer pushes it back, and a failed send is tried again each minute,
+  up to ten times. Moving the conversation takes its waiting messages along.
+- **Older installs** kept the cloud login in `settings.json`. The first
+  account listing hands it to the command center (`POST /cloud-accounts`,
+  which keeps its place if the account is already there) and drops it from
+  the phone; a login the provider no longer takes is dropped too.
 
 ## The protocol
 
@@ -130,10 +203,11 @@ Subagent output, tool results, logs and control chatter are dropped. Extend
 
 ## Storage
 
-`Store` writes `settings.json` (both logins, owner-only), the
-`bundled-cloud.txt` / `bundled-center.txt` revision markers (an older
-`bundled-claude.txt`, and a `claude` key in `settings.json`, are still read), `open.txt`,
-`chats.json`, `sessions/<session id>.json` and `downloads.json`. Session ids
+`Store` writes `settings.json` (the command center login, owner-only; an
+older install's cloud login under `cloud` or `claude` is read once to hand
+it over), the `bundled-center.txt` revision marker, `open.txt`,
+`chats.json`, `sessions/<session id>.json`, `limits.json`, `queue.json` and
+`downloads.json`. Session ids
 and file names are validated (`Chat.validId`, `RemoteFile.validName`) before
 they become file names. `prune` keeps the 20 most recent transcripts plus the
 open one, and sent pictures that no kept transcript refers to are deleted
@@ -163,7 +237,7 @@ the two in step.
 
 - `android/core`: `net/` (`Http`, `Json`, `Config`, `CloudAuth`, `Sse`,
   `EventSource`, `Cloud`, `Center`) and `data/` (`Entry`, `Transcript`, `Store`, `Chat`,
-  `RemoteFile`, `Setup`, `Attached`, `Folders`). Tests in `src/test` run via `:core:selfTest` with
+  `RemoteFile`, `Setup`, `Attached`, `Carry`, `Queued`, `Folders`). Tests in `src/test` run via `:core:selfTest` with
   the tiny `Check` harness and loopback `TestServer`.
 - `android/app`: `MainActivity` (tabs, screens, keys, menus, intents),
   `Backend` (the only bridge to disk and network), `Link` (the reconnecting
@@ -200,12 +274,11 @@ checks on the handset.
 
 ## Credentials
 
-There is no in-app cloud sign-in, by design. `android/app/build.gradle` bakes
-in the cloud login (`-Pdelta.cloudAuth`, `../cloud-auth.json`, or the cloud
-demo's `auth.json` beside this repository) and the command center (`-Pdelta.center`,
-`../delta-center.json`, the CLI's `~/.config/delta/config.json`). It writes
-them into a generated `Defaults.java` under `android/app/build/`, with one
-revision marker per login, so a new command center doesn't replace a rotated
-cloud login. A build with neither, such as a CI build or one made in an
-agent's sandbox, installs over a configured copy and keeps its logins. Never
-print, commit, or attach the auth files, the generated source, or any APK.
+There is no in-app cloud sign-in, by design: the cloud logins are on the
+command center (see Cloud accounts). `android/app/build.gradle` bakes in
+only the command center (`-Pdelta.center`, `../delta-center.json`, the CLI's
+`~/.config/delta/config.json`), into a generated `Defaults.java` under
+`android/app/build/` with a revision marker. A build without one, such as a
+CI build or one made in an agent's sandbox, installs over a configured copy
+and keeps its login. Never print, commit, or attach the config files, the
+generated source, or any APK.
