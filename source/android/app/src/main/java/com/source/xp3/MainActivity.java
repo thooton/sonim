@@ -29,15 +29,18 @@ import java.util.List;
 /**
  * One screen, three things to fetch: a song, an album or a book. Type
  * "Artist - Title" (or "Artist - Album") and press OK, and the command center
- * finds and downloads it while its log scrolls by below; the files land in the
- * phone's Music folder, albums in a folder of their own. Or type a book's
- * title, author or ISBN and press OK, and the results take the log's place:
- * Down moves into them, OK downloads the one picked into the Books folder.
+ * searches while its log scrolls by below; then the results take the log's
+ * place, best first by the music config's preferences: Down moves into them,
+ * and OK downloads the one picked, its log in view again, into the phone's
+ * Music folder (albums in a folder of their own). Back returns to the
+ * results. Books work the same way, by title, author or ISBN, into the Books
+ * folder.
  *
- * Keys: OK downloads (or searches, for books); Left and Right switch between
- * Song, Album and Book while the box is empty, and turn the page of book
- * results while picking; Up and Down scroll the log or move through the
- * results; Back cancels, stops picking, or leaves; Menu has the rest.
+ * Keys: OK searches, or downloads the picked result; Left and Right switch
+ * between Song, Album and Book while the box is empty, and turn the page of
+ * book results while picking; Up and Down scroll the log or move through the
+ * results; Back cancels, stops picking, goes back to the music results, or
+ * leaves; Menu has the rest.
  */
 public final class MainActivity extends BaseActivity implements Download.Listener {
 
@@ -55,10 +58,11 @@ public final class MainActivity extends BaseActivity implements Download.Listene
     private final ResultAdapter adapter = new ResultAdapter();
     private String mode = Music.SONG;
     private Login login = Login.blank();
-    /** Whether the keys are moving through the book results rather than typing. */
+    /** Whether the keys are moving through the results rather than typing. */
     private boolean picking;
     private int picked;
-    private Books.Page shown;
+    /** The results `picked` is in: a Books.Page or a Music.Found. */
+    private Object listed;
     private Runnable whenAllowed;
 
     @Override
@@ -136,23 +140,49 @@ public final class MainActivity extends BaseActivity implements Download.Listene
         super.onStop();
     }
 
+    /** The music results for this mode, while they are to be shown rather than the log. */
+    private Music.Found hits() {
+        Music.Found found = Download.found();
+        return !books() && Download.resultsShown() && found.mode.equals(mode) ? found : null;
+    }
+
+    /** This mode's music results, when the log is showing in their place. */
+    private boolean hitsBehindLog() {
+        Music.Found found = Download.found();
+        return !books() && found != null && found.mode.equals(mode) && !found.hits.isEmpty() && !Download.resultsShown();
+    }
+
+    /** The results on screen, or null while the log is. */
+    private Object list() {
+        return books() ? Download.results() : hits();
+    }
+
+    private int rows() {
+        if (books()) {
+            Books.Page page = Download.results();
+            return page == null ? 0 : page.books.size();
+        }
+        Music.Found found = hits();
+        return found == null ? 0 : found.hits.size();
+    }
+
     @Override
     public void changed() {
         boolean running = Download.running();
-        Books.Page page = Download.results();
-        if (page != shown) {
-            // A new page of results: start at its top.
-            shown = page;
+        Object shown = list();
+        if (shown != null && shown != listed) {
+            // New results: start at their top.
+            listed = shown;
             picked = 0;
-            picking = page != null && !page.books.isEmpty() && books();
+            picking = rows() > 0;
         }
-        if (page == null || page.books.isEmpty()) picking = false;
+        if (rows() == 0) picking = false;
 
         String status = Download.status();
         if (status.length() == 0 && !login.ready()) status = "No command center: Menu → Command center.";
         say(status);
 
-        boolean list = books() && page != null;
+        boolean list = shown != null;
         resultList.setVisibility(list ? View.VISIBLE : View.GONE);
         scroll.setVisibility(list ? View.GONE : View.VISIBLE);
         adapter.notifyDataSetChanged();
@@ -204,6 +234,8 @@ public final class MainActivity extends BaseActivity implements Download.Listene
 
     private void setMode(String next) {
         mode = next;
+        listed = list();
+        picked = 0;
         picking = false;
         prefs().edit().putString("mode", mode).apply();
         showMode();
@@ -214,7 +246,8 @@ public final class MainActivity extends BaseActivity implements Download.Listene
         if (Download.running()) return;
         String text = query.getText().toString().trim();
         if (text.length() == 0) {
-            if (books() && hasResults()) setPicking(true);
+            if (hitsBehindLog()) backToResults();
+            else setPicking(true);
             return;
         }
         if (!login.ready()) {
@@ -229,19 +262,24 @@ public final class MainActivity extends BaseActivity implements Download.Listene
             say("A name can't start with \"-\".");
             return;
         }
-        if (needStorage(() -> begin())) return;
-        Download.music(this, login, mode, text);
-        query.setText("");
+        Download.findMusic(this, login, mode, text);
     }
 
     private void downloadPicked() {
-        if (Download.running() || !hasResults()) return;
+        if (Download.running() || rows() == 0) return;
         if (!login.ready()) {
             askLogin();
             return;
         }
         if (needStorage(() -> { downloadPicked(); })) return;
-        Download.book(this, login, Download.results().books.get(picked));
+        if (books()) Download.book(this, login, Download.results().books.get(picked));
+        else Download.music(this, login, hits().hits.get(picked));
+    }
+
+    /** From the log of a music download back to the results, where they were left. */
+    private void backToResults() {
+        Download.showResults(true);
+        setPicking(true);
     }
 
     private void turnPage(int step) {
@@ -276,19 +314,14 @@ public final class MainActivity extends BaseActivity implements Download.Listene
         }
     }
 
-    private boolean hasResults() {
-        Books.Page page = Download.results();
-        return page != null && !page.books.isEmpty();
-    }
-
     private void setPicking(boolean on) {
-        picking = on && hasResults();
+        picking = on && rows() > 0;
         adapter.notifyDataSetChanged();
         if (picking) resultList.smoothScrollToPosition(picked);
     }
 
     private void movePick(int step) {
-        int count = Download.results().books.size();
+        int count = rows();
         int next = picked + step;
         if (next < 0) {
             setPicking(false);
@@ -318,7 +351,7 @@ public final class MainActivity extends BaseActivity implements Download.Listene
                     return true;
                 case KeyEvent.KEYCODE_DPAD_LEFT:
                 case KeyEvent.KEYCODE_DPAD_RIGHT:
-                    if (first) turnPage(key == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1);
+                    if (first && books()) turnPage(key == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1);
                     return true;
                 case KeyEvent.KEYCODE_BACK:
                     if (!down) {
@@ -350,7 +383,7 @@ public final class MainActivity extends BaseActivity implements Download.Listene
                 break;
             case KeyEvent.KEYCODE_DPAD_UP:
             case KeyEvent.KEYCODE_DPAD_DOWN:
-                if (books()) {
+                if (list() != null) {
                     if (first && key == KeyEvent.KEYCODE_DPAD_DOWN) setPicking(true);
                 } else if (down) {
                     int step = (int) (40 * getResources().getDisplayMetrics().density);
@@ -363,6 +396,10 @@ public final class MainActivity extends BaseActivity implements Download.Listene
             case KeyEvent.KEYCODE_BACK:
                 if (running) {
                     if (!down) Download.cancel();
+                    return true;
+                }
+                if (hitsBehindLog()) {
+                    if (!down) backToResults();
                     return true;
                 }
                 break;
@@ -380,11 +417,11 @@ public final class MainActivity extends BaseActivity implements Download.Listene
             actions.add(() -> Download.cancel());
         } else {
             if (!Music.SONG.equals(mode)) {
-                labels.add("Download a song");
+                labels.add("Find a song");
                 actions.add(() -> setMode(Music.SONG));
             }
             if (!Music.ALBUM.equals(mode)) {
-                labels.add("Download an album");
+                labels.add("Find an album");
                 actions.add(() -> setMode(Music.ALBUM));
             }
             if (!books()) {
@@ -412,6 +449,17 @@ public final class MainActivity extends BaseActivity implements Download.Listene
                     actions.add(() -> Download.clearResults());
                 }
             } else {
+                if (hitsBehindLog()) {
+                    labels.add("Show results");
+                    actions.add(() -> backToResults());
+                } else if (hits() != null) {
+                    labels.add("Show log");
+                    actions.add(() -> Download.showResults(false));
+                }
+                if (Download.found() != null) {
+                    labels.add("Clear results");
+                    actions.add(() -> Download.clearFound());
+                }
                 labels.add("Clear log");
                 actions.add(() -> Download.clearLog());
                 labels.add("Reconnect music account");
@@ -491,18 +539,21 @@ public final class MainActivity extends BaseActivity implements Download.Listene
             .show();
     }
 
-    /** The book results: title over "author · year · language · format · size". */
+    /**
+     * The results. A book: title over "author · year · language · format ·
+     * size". Music: the file or folder over "format · bitrate · length ·
+     * size", then who shares it, how fast, and where in their files.
+     */
     private final class ResultAdapter extends BaseAdapter {
 
         @Override
         public int getCount() {
-            Books.Page page = Download.results();
-            return page == null ? 0 : page.books.size();
+            return rows();
         }
 
         @Override
         public Object getItem(int position) {
-            return Download.results().books.get(position);
+            return books() ? Download.results().books.get(position) : hits().hits.get(position);
         }
 
         @Override
@@ -526,19 +577,34 @@ public final class MainActivity extends BaseActivity implements Download.Listene
                 title.setTypeface(Typeface.DEFAULT_BOLD);
                 title.setMaxLines(2);
                 title.setEllipsize(TextUtils.TruncateAt.END);
-                TextView meta = new TextView(MainActivity.this);
-                meta.setTextColor(getColor(R.color.text_muted));
-                meta.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.text_log));
-                meta.setSingleLine(true);
-                meta.setEllipsize(TextUtils.TruncateAt.END);
                 row.addView(title);
-                row.addView(meta);
+                for (int i = 0; i < 2; i++) {
+                    TextView meta = new TextView(MainActivity.this);
+                    meta.setTextColor(getColor(R.color.text_muted));
+                    meta.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.text_log));
+                    meta.setSingleLine(true);
+                    meta.setEllipsize(TextUtils.TruncateAt.END);
+                    row.addView(meta);
+                }
             }
-            Books.Book book = Download.results().books.get(position);
-            ((TextView) row.getChildAt(0)).setText(book.title.length() > 0 ? book.title : "Untitled");
-            String meta = book.meta();
-            if (Download.saved(book)) meta = "✓ Saved · " + meta;
-            ((TextView) row.getChildAt(1)).setText(meta);
+            TextView source = (TextView) row.getChildAt(2);
+            if (books()) {
+                Books.Book book = Download.results().books.get(position);
+                ((TextView) row.getChildAt(0)).setText(book.title.length() > 0 ? book.title : "Untitled");
+                String meta = book.meta();
+                if (Download.saved(book)) meta = "✓ Saved · " + meta;
+                ((TextView) row.getChildAt(1)).setText(meta);
+                source.setVisibility(View.GONE);
+            } else {
+                Music.Hit hit = hits().hits.get(position);
+                ((TextView) row.getChildAt(0)).setText(hit.title());
+                String meta = hit.meta();
+                if (Download.saved(hit)) meta = "✓ Saved · " + meta;
+                ((TextView) row.getChildAt(1)).setText(meta);
+                String where = hit.where();
+                source.setText(hit.source() + (where.length() > 0 ? " · " + where : ""));
+                source.setVisibility(View.VISIBLE);
+            }
             if (picking && position == picked) row.setBackgroundResource(R.drawable.row_focus);
             else row.setBackgroundColor(getColor(R.color.row));
             return row;
