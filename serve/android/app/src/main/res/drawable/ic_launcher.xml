@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A folder giving off signal, in the family's greys. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#424242" android:pathData="M4,4h40v40h-40z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M9,21h11l3,3h16v15h-30z" />
+    <path android:fillColor="#A8A8A8" android:pathData="M24,8a10,10 0,0 1,10 10h-3a7,7 0,0 0,-14 0h-3a10,10 0,0 1,10 -10zM24,13a5,5 0,0 1,5 5h-3a2,2 0,0 0,-4 0h-3a5,5 0,0 1,5 -5z" />
+</vector>
