@@ -81,8 +81,7 @@ public final class ChargingService extends Service {
     static void start(Context context, String sessionId) {
         if (sessionId == null || sessionId.length() == 0) return;
         context.startService(
-            new Intent(context, ChargingService.class)
-                .putExtra(EXTRA_SESSION_ID, sessionId)
+            new Intent(context, ChargingService.class).putExtra(EXTRA_SESSION_ID, sessionId)
         );
     }
 
@@ -120,9 +119,7 @@ public final class ChargingService extends Service {
         super.onCreate();
         instance = this;
         repository = ChargingRepository.get(this);
-        notifications = (NotificationManager) getSystemService(
-            NOTIFICATION_SERVICE
-        );
+        notifications = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         poller = Executors.newSingleThreadScheduledExecutor();
         createChannel();
     }
@@ -193,28 +190,18 @@ public final class ChargingService extends Service {
         }
     }
 
-    private final Runnable poll = new Runnable() {
-        @Override
-        public void run() {
-            if (stopped) return;
-            JSONObject session = null;
-            String error = null;
-            try {
-                session = repository.session(sessionId);
-            } catch (Exception failure) {
-                error = failure.getMessage();
-            }
-            final JSONObject result = session;
-            final String message = error;
-            main.post(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        publish(result, message);
-                    }
-                }
-            );
+    private final Runnable poll = () -> {
+        if (stopped) return;
+        JSONObject session = null;
+        String error = null;
+        try {
+            session = repository.session(sessionId);
+        } catch (Exception failure) {
+            error = failure.getMessage();
         }
+        final JSONObject result = session;
+        final String message = error;
+        main.post(() -> publish(result, message));
     };
 
     private void publish(JSONObject session, String error) {
@@ -257,10 +244,8 @@ public final class ChargingService extends Service {
         // Behaves like the launcher icon rather than a fresh start: with
         // MainActivity marked singleTop this returns to the app as it was left,
         // on whichever tab, instead of building a second copy of it.
-        Intent open = new Intent(this, MainActivity.class)
-            .setAction(Intent.ACTION_MAIN)
-            .addCategory(Intent.CATEGORY_LAUNCHER)
-            .setFlags(
+        Intent open = new Intent(this, MainActivity.class).setAction(Intent.ACTION_MAIN)
+            .addCategory(Intent.CATEGORY_LAUNCHER).setFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK |
                     Intent.FLAG_ACTIVITY_CLEAR_TOP |
                     Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -272,20 +257,13 @@ public final class ChargingService extends Service {
             PendingIntent.FLAG_UPDATE_CURRENT
         );
 
-        return new Notification.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setColor(getResources().getColor(R.color.primary))
-            .setContentTitle(
+        return new Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_notification)
+            .setColor(getResources().getColor(R.color.primary)).setContentTitle(
                 session == null
                     ? "Charging session"
                     : session.optString("statusText", "Charging session")
-            )
-            .setContentText(summary(session, error))
-            .setContentIntent(tap)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setShowWhen(false)
-            .build();
+            ).setContentText(summary(session, error)).setContentIntent(tap).setOngoing(true)
+            .setOnlyAlertOnce(true).setShowWhen(false).build();
     }
 
     /** Charge level, energy and cost, in that order, dropping whichever of them
@@ -298,18 +276,9 @@ public final class ChargingService extends Service {
         if (!session.isNull("stateOfCharge")) {
             parts.add(session.optInt("stateOfCharge") + "%");
         }
+        parts.add(String.format(Locale.US, "%.2f kWh", session.optDouble("energyKwh", 0)));
         parts.add(
-            String.format(
-                Locale.US,
-                "%.2f kWh",
-                session.optDouble("energyKwh", 0)
-            )
-        );
-        parts.add(
-            SiteAdapter.money(
-                session.optDouble("cost", 0),
-                session.optString("currency", "USD")
-            )
+            SiteAdapter.money(session.optDouble("cost", 0), session.optString("currency", "USD"))
         );
         StringBuilder line = new StringBuilder();
         for (String part : parts) {

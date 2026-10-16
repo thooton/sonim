@@ -18,7 +18,8 @@ asks only for READ_EXTERNAL_STORAGE.
     resolved to offsets).
   - `shelf/Shelf`: scans storage for books, caches title and author, and keeps
     reading positions in `shelf.tsv` in the app's private files.
-  - Tests in `src/test` run via `:core:selfTest` with the tiny `Check` harness.
+  - Tests in `src/test` run via `:core:selfTest` with the shared `Check`
+    harness (`../common/core`).
 - `android/app`: `LibraryActivity` + `LibraryView` (the library, drawn),
   `Covers` (thumbnails cached in the cache dir), `ReaderActivity` (loading,
   layouts, keys, the settings sheet and contents), `Pages` (one section as a
@@ -54,8 +55,7 @@ asks only for READ_EXTERNAL_STORAGE.
 ## Build and validation
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRelease
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :books:core:selfTest :books:app:assembleRelease
 ```
 
 There are no UI automation tests. Rendering, keys and paging were checked on

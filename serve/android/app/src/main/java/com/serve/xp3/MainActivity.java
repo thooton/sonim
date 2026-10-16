@@ -1,9 +1,7 @@
 package com.serve.xp3;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -11,6 +9,7 @@ import android.view.KeyEvent;
 import android.widget.TextView;
 import com.serve.xp3.net.Addresses;
 import com.serve.xp3.net.Server;
+import com.xp3.common.ui.BaseActivity;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,7 +23,7 @@ import java.util.List;
  * one); Menu has Choose folder and Start/Stop. Back leaves, and serving goes
  * on under its notification until stopped there or here.
  */
-public final class MainActivity extends Activity implements ServeService.Listener {
+public final class MainActivity extends BaseActivity implements ServeService.Listener {
 
     private static final int ASK_STORAGE = 1;
     private static final String PREFS = "serve";
@@ -143,7 +142,7 @@ public final class MainActivity extends Activity implements ServeService.Listene
     }
 
     private void begin() {
-        if (!allowed(new Runnable() { public void run() { begin(); } })) return;
+        if (!allowed(() -> begin())) return;
         if (!folder.isDirectory()) {
             statusView.setText("That folder is gone. Choose another.");
             return;
@@ -153,7 +152,7 @@ public final class MainActivity extends Activity implements ServeService.Listene
     }
 
     private void choose() {
-        if (!allowed(new Runnable() { public void run() { choose(); } })) return;
+        if (!allowed(() -> choose())) return;
         List<File> roots = volumes();
         if (roots.size() == 1) pick(roots.get(0), roots.get(0));
         else pickVolume(roots);
@@ -185,12 +184,7 @@ public final class MainActivity extends Activity implements ServeService.Listene
         for (int i = 0; i < labels.length; i++) labels[i] = volumeLabel(i);
         new AlertDialog.Builder(this)
             .setTitle("Choose folder")
-            .setItems(labels, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    pick(roots.get(which), roots.get(which));
-                }
-            })
+            .setItems(labels, (dialog, which) -> pick(roots.get(which), roots.get(which)))
             .setNegativeButton("Cancel", null)
             .show();
     }
@@ -213,34 +207,17 @@ public final class MainActivity extends Activity implements ServeService.Listene
         items.add("✓ Serve this folder");
         for (String name : inside) items.add(name + "/");
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle(shown(at))
-            .setItems(items.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    if (which == 0) chosen(at);
-                    else pick(root, new File(at, inside.get(which - 1)));
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .create();
-        dialog.setOnKeyListener(new DialogInterface.OnKeyListener() {
-            @Override
-            public boolean onKey(DialogInterface dialog, int keyCode, KeyEvent event) {
-                if (keyCode != KeyEvent.KEYCODE_BACK) return false;
-                if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
-                    dialog.dismiss();
-                    if (!at.equals(root)) {
-                        pick(root, at.getParentFile());
-                    } else {
-                        List<File> roots = volumes();
-                        if (roots.size() > 1) pickVolume(roots);
-                    }
-                }
-                return true;
+        listDialog(shown(at), items, which -> {
+            if (which == 0) chosen(at);
+            else pick(root, new File(at, inside.get(which - 1)));
+        }, () -> {
+            if (!at.equals(root)) {
+                pick(root, at.getParentFile());
+            } else {
+                List<File> roots = volumes();
+                if (roots.size() > 1) pickVolume(roots);
             }
         });
-        dialog.show();
     }
 
     /** Remembered, and served straight away (moving a running server over). */
@@ -272,12 +249,9 @@ public final class MainActivity extends Activity implements ServeService.Listene
         final boolean running = ServeService.running();
         String[] labels = {running ? "Stop serving" : "Start serving", "Choose folder…"};
         new AlertDialog.Builder(this)
-            .setItems(labels, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    if (which == 0) toggle();
-                    else choose();
-                }
+            .setItems(labels, (dialog, which) -> {
+                if (which == 0) toggle();
+                else choose();
             })
             .show();
     }

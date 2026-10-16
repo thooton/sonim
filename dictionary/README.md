@@ -20,14 +20,16 @@ The page changes as you type. A search goes to the word itself, or else to its d
 
 ## Build
 
+From the repository root:
+
 ```bash
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :app:assembleRelease
-adb install -r app/build/outputs/apk/release/app-release.apk
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :dictionary:app:assembleRelease
+adb install -r dictionary/app/build/outputs/apk/release/app-release.apk
 ```
 
 The release build is signed with the repository's shared key (`../signing/signing.gradle`), which is enough for sideloading and lets a build from any checkout install over another. It also appears in `../launcher` (App Drawer).
 
-To rebuild the data (the generated assets are already in the tree):
+To rebuild the data (the generated assets are already in the tree), from this directory:
 
 ```bash
 curl -LO https://wordnetcode.princeton.edu/wn3.1.dict.tar.gz

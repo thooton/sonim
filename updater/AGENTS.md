@@ -47,9 +47,8 @@ sends the task to the back, so a download keeps going.
 ## Build and validation
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :app:assembleRelease
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :updater:core:selfTest
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :updater:app:assembleRelease
 ```
 
 There are no UI automation tests; key, focus and install changes need manual

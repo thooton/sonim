@@ -1,9 +1,7 @@
 package com.teslacharge.xp3;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -29,12 +27,13 @@ import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 import com.teslacharge.xp3.data.ApiException;
 import com.teslacharge.xp3.data.ChargingRepository;
 import com.teslacharge.xp3.data.FavoriteStore;
-import com.teslacharge.xp3.data.HistoryPage;
 import com.teslacharge.xp3.data.Normalizer;
+import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Tabs;
+import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -46,13 +45,12 @@ import java.util.concurrent.TimeUnit;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends BaseActivity {
 
     private static final int FAVORITES = 0;
     private static final int DISCOVER = 1;
     private static final int SESSION = 2;
     private static final int HISTORY = 3;
-    private static final int TABS = 4;
     private static final int CHARGING_IDLE = 0;
     private static final int CHARGING_STARTING = 1;
     private static final int CHARGING_STOPPING = 2;
@@ -88,7 +86,7 @@ public final class MainActivity extends Activity {
     private ChargingRepository repository;
     private FavoriteStore favorites;
     private FrameLayout content;
-    private Button[] tabs;
+    private Tabs tabs;
     private int currentTab = FAVORITES;
     private boolean detailVisible;
     private double radiusMiles = 12;
@@ -147,28 +145,25 @@ public final class MainActivity extends Activity {
      * would only be asking Tesla the same question twice.
      */
     private final ChargingService.Listener sessionUpdates =
-        new ChargingService.Listener() {
-            @Override
-            public void onSessionUpdate(JSONObject session, String error) {
-                sessionError = error;
-                // Deliberately does not invalidate an in-flight lookup. A poll
-                // lands every few seconds, so bumping the generation here
-                // discarded nearly every explicit lookup's callback, and with
-                // it the watchOrRelease that starts and stops the service. Both
-                // read the same session, and whichever applies second is
-                // corrected by the next poll a moment later.
-                if (session != null) currentSession = session;
-                if (currentTab == SESSION && !detailVisible) renderSession();
-                // The session just ended: an open charger detail is still
-                // showing a disabled Start button, so redraw it to hand
-                // charging back to the user.
-                if (
-                    !sessionActive() &&
-                    detailVisible &&
-                    currentHistorySession == null &&
-                    currentSite != null
-                ) renderSite();
-            }
+        (session, error) -> {
+            sessionError = error;
+            // Deliberately does not invalidate an in-flight lookup. A poll
+            // lands every few seconds, so bumping the generation here
+            // discarded nearly every explicit lookup's callback, and with
+            // it the watchOrRelease that starts and stops the service. Both
+            // read the same session, and whichever applies second is
+            // corrected by the next poll a moment later.
+            if (session != null) currentSession = session;
+            if (currentTab == SESSION && !detailVisible) renderSession();
+            // The session just ended: an open charger detail is still
+            // showing a disabled Start button, so redraw it to hand
+            // charging back to the user.
+            if (
+                !sessionActive() &&
+                detailVisible &&
+                currentHistorySession == null &&
+                currentSite != null
+            ) renderSite();
         };
 
     @Override
@@ -178,23 +173,7 @@ public final class MainActivity extends Activity {
         repository = ChargingRepository.get(this);
         favorites = new FavoriteStore(this);
         content = findViewById(R.id.content);
-        tabs = new Button[] {
-            findViewById(R.id.tab_favorites),
-            findViewById(R.id.tab_discover),
-            findViewById(R.id.tab_session),
-            findViewById(R.id.tab_history),
-        };
-        for (int i = 0; i < tabs.length; i++) {
-            final int tab = i;
-            tabs[i].setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        showTab(tab, true);
-                    }
-                }
-            );
-        }
+        tabs = new Tabs(this, tab -> showTab(tab, true), R.id.tab_favorites, R.id.tab_discover, R.id.tab_session, R.id.tab_history);
         favoriteSites.addAll(favorites.all());
         showTab(FAVORITES, false);
         resumeActiveSession();
@@ -250,7 +229,7 @@ public final class MainActivity extends Activity {
         currentHistorySession = null;
         pendingSiteGuid = null;
         pendingSiteGeneration++;
-        for (int i = 0; i < tabs.length; i++) tabs[i].setSelected(i == tab);
+        tabs.mark(tab);
         if (tab == FAVORITES) renderFavorites(focusContent);
         else if (tab == DISCOVER) renderDiscover();
         else if (tab == SESSION) renderSession();
@@ -265,20 +244,13 @@ public final class MainActivity extends Activity {
             TextView empty = emptyMessage(
                 "No favorites yet.\n\nFind a charger in Discover, open it, then choose Add favorite."
             );
-            root.addView(empty, weighted());
+            root.addView(empty, Ui.weighted());
             Button discover = action("Go to Discover");
-            discover.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        showTab(DISCOVER, true);
-                    }
-                }
-            );
+            discover.setOnClickListener(v -> showTab(DISCOVER, true));
             root.addView(discover);
             if (focusContent) discover.requestFocus();
         } else if (favoritesRefreshing) {
-            root.addView(spinner(), weighted());
+            root.addView(spinner(), Ui.weighted());
         } else {
             if (favoritesRefreshFailures > 0) {
                 root.addView(
@@ -293,23 +265,16 @@ public final class MainActivity extends Activity {
             final SiteAdapter adapter = new SiteAdapter(this);
             adapter.replace(favoriteSites);
             ListView list = listView(adapter);
-            root.addView(list, weighted());
+            root.addView(list, Ui.weighted());
             wireSiteList(list, adapter, null);
             if (focusContent) list.requestFocus();
         }
-        replaceContent(root);
+        Ui.fill(content, root);
     }
 
     /** Collects live favorite data behind the loading screen. */
-    private void applyFavoriteRefresh(
-        int generation,
-        String id,
-        JSONObject refreshed
-    ) {
-        if (
-            generation != favoritesRefreshGeneration ||
-            !favorites.contains(id)
-        ) return;
+    private void applyFavoriteRefresh(int generation, String id, JSONObject refreshed) {
+        if (generation != favoritesRefreshGeneration || !favorites.contains(id)) return;
         for (int i = 0; i < favoriteSites.size(); i++) {
             if (id.equals(favoriteSites.get(i).optString("id"))) {
                 favoriteSites.set(i, refreshed);
@@ -356,44 +321,19 @@ public final class MainActivity extends Activity {
             favoritesRefreshInFlight < MAX_FAVORITE_REQUESTS &&
             favoritesRefreshNext < bookmarks.size()
         ) {
-            final String id = bookmarks
-                .get(favoritesRefreshNext++)
-                .optString("id");
+            final String id = bookmarks.get(favoritesRefreshNext++).optString("id");
             favoritesRefreshInFlight++;
             async(
-                new Callable<JSONObject>() {
-                    @Override
-                    public JSONObject call() throws Exception {
-                        return repository.site(id);
-                    }
+                () -> repository.site(id),
+                site -> {
+                    applyFavoriteRefresh(generation, id, site);
+                    finishFavoriteRefresh(bookmarks, generation, id, false, focusContent);
                 },
-                new Success<JSONObject>() {
-                    @Override
-                    public void accept(JSONObject site) {
-                        applyFavoriteRefresh(generation, id, site);
-                        finishFavoriteRefresh(
-                            bookmarks,
-                            generation,
-                            id,
-                            false,
-                            focusContent
-                        );
-                    }
-                },
-                new Failure() {
-                    @Override
-                    public void accept(Exception error) {
-                        // The stored bookmark remains visible, but contains no
-                        // live availability or price that could be mistaken for
-                        // a fresh reading.
-                        finishFavoriteRefresh(
-                            bookmarks,
-                            generation,
-                            id,
-                            true,
-                            focusContent
-                        );
-                    }
+                error -> {
+                    // The stored bookmark remains visible, but contains no
+                    // live availability or price that could be mistaken for
+                    // a fresh reading.
+                    finishFavoriteRefresh(bookmarks, generation, id, true, focusContent);
                 }
             );
         }
@@ -466,33 +406,23 @@ public final class MainActivity extends Activity {
         final SiteAdapter adapter = new SiteAdapter(this);
         adapter.replace(searchResults);
         final ListView list = listView(adapter);
-        root.addView(list, weighted());
-        find.setOnClickListener(
-            new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    showSearchDialog(status, adapter, list);
-                }
-            }
-        );
+        root.addView(list, Ui.weighted());
+        find.setOnClickListener(view -> showSearchDialog(status, adapter, list));
         find.setOnKeyListener(
-            new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View view, int keyCode, KeyEvent event) {
-                    if (
-                        keyCode != KeyEvent.KEYCODE_DPAD_DOWN ||
-                        event.getAction() != KeyEvent.ACTION_DOWN
-                    ) return false;
-                    if (adapter.getCount() == 0) return false;
-                    list.requestFocus();
-                    adapter.setSelectedPosition(0);
-                    list.setSelection(0);
-                    return true;
-                }
+            (view, keyCode, event) -> {
+                if (
+                    keyCode != KeyEvent.KEYCODE_DPAD_DOWN ||
+                    event.getAction() != KeyEvent.ACTION_DOWN
+                ) return false;
+                if (adapter.getCount() == 0) return false;
+                list.requestFocus();
+                adapter.setSelectedPosition(0);
+                list.setSelection(0);
+                return true;
             }
         );
         wireSiteList(list, adapter, find);
-        replaceContent(root);
+        Ui.fill(content, root);
         find.requestFocus();
         if (research && lastSearchQuery.length() > 0) search(
             lastSearchQuery,
@@ -507,10 +437,8 @@ public final class MainActivity extends Activity {
         final SiteAdapter adapter,
         final ListView list
     ) {
-        final AlertDialog.Builder builder = new AlertDialog.Builder(this)
-            .setTitle("Find Chargers")
-            .setMessage("Enter a ZIP code or address.")
-            .setPositiveButton("Find", null)
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this).setTitle("Find Chargers")
+            .setMessage("Enter a ZIP code or address.").setPositiveButton("Find", null)
             .setNegativeButton("Cancel", null);
         final Context themed = builder.getContext();
 
@@ -534,10 +462,7 @@ public final class MainActivity extends Activity {
         // this screen gets 16dp, and hardcoding 24 pushed the field's text a
         // visible step right of everything above it.
         FrameLayout frame = new FrameLayout(themed);
-        int side = Math.max(
-            0,
-            dialogTextInset(themed) - input.getPaddingLeft()
-        );
+        int side = Math.max(0, dialogTextInset(themed) - input.getPaddingLeft());
         frame.setPadding(side, dp(6), side, dp(10));
         frame.addView(
             input,
@@ -549,46 +474,33 @@ public final class MainActivity extends Activity {
 
         final AlertDialog dialog = builder.setView(frame).create();
         dialog.setOnShowListener(
-            new DialogInterface.OnShowListener() {
-                @Override
-                public void onShow(DialogInterface ignored) {
-                    final Button submit = dialog.getButton(
-                        AlertDialog.BUTTON_POSITIVE
-                    );
-                    submit.setOnClickListener(
-                        new View.OnClickListener() {
-                            @Override
-                            public void onClick(View view) {
-                                String query = input
-                                    .getText()
-                                    .toString()
-                                    .trim();
-                                if (query.length() == 0) {
-                                    input.setError(
-                                        "Enter a ZIP code or address."
-                                    );
-                                    return;
-                                }
-                                lastSearchQuery = query;
-                                dismissKeyboard();
-                                dialog.dismiss();
-                                search(query, status, adapter, list);
-                            }
+            ignored -> {
+                final Button submit = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                submit.setOnClickListener(
+                    view -> {
+                        String query = input.getText().toString().trim();
+                        if (query.length() == 0) {
+                            input.setError("Enter a ZIP code or address.");
+                            return;
                         }
-                    );
-                    input.setOnEditorActionListener((v, actionId, event) -> {
-                        if (
-                            actionId == EditorInfo.IME_ACTION_SEARCH ||
-                            (event != null &&
-                                event.getKeyCode() == KeyEvent.KEYCODE_ENTER)
-                        ) {
-                            submit.performClick();
-                            return true;
-                        }
-                        return false;
-                    });
-                    input.requestFocus();
-                }
+                        lastSearchQuery = query;
+                        dismissKeyboard();
+                        dialog.dismiss();
+                        search(query, status, adapter, list);
+                    }
+                );
+                input.setOnEditorActionListener((v, actionId, event) -> {
+                    if (
+                        actionId == EditorInfo.IME_ACTION_SEARCH ||
+                        (event != null &&
+                            event.getKeyCode() == KeyEvent.KEYCODE_ENTER)
+                    ) {
+                        submit.performClick();
+                        return true;
+                    }
+                    return false;
+                });
+                input.requestFocus();
             }
         );
         dialog.show();
@@ -607,154 +519,41 @@ public final class MainActivity extends Activity {
         final int generation = ++searchRequestGeneration;
         status.setText("Searching for chargers…");
         async(
-            new Callable<JSONObject>() {
-                @Override
-                public JSONObject call() throws Exception {
-                    return repository.search(query, radiusMiles);
+            () -> repository.search(query, radiusMiles),
+            result -> {
+                if (generation != searchRequestGeneration) return;
+                searchOrigin = result.optJSONObject("origin");
+                searchResults.clear();
+                JSONArray sites = result.optJSONArray("sites");
+                if (sites != null) for (
+                    int i = 0;
+                    i < sites.length();
+                    i++
+                ) if (sites.optJSONObject(i) != null) searchResults.add(sites.optJSONObject(i));
+                adapter.replace(searchResults);
+                status.setText(
+                    searchResults.isEmpty()
+                        ? "No chargers found. Try a wider radius."
+                        : resultSummary()
+                );
+                if (!searchResults.isEmpty()) {
+                    // A hardware-key-only device needs a concrete current row,
+                    // not merely a scroll position. Move focus off Find and
+                    // select the first result immediately.
+                    list.requestFocus();
+                    adapter.setSelectedPosition(0);
+                    list.setSelection(0);
                 }
             },
-            new Success<JSONObject>() {
-                @Override
-                public void accept(JSONObject result) {
-                    if (generation != searchRequestGeneration) return;
-                    searchOrigin = result.optJSONObject("origin");
-                    searchResults.clear();
-                    JSONArray sites = result.optJSONArray("sites");
-                    if (sites != null) for (
-                        int i = 0;
-                        i < sites.length();
-                        i++
-                    ) if (sites.optJSONObject(i) != null) searchResults.add(
-                        sites.optJSONObject(i)
-                    );
-                    adapter.replace(searchResults);
-                    status.setText(
-                        searchResults.isEmpty()
-                            ? "No chargers found. Try a wider radius."
-                            : resultSummary()
-                    );
-                    if (!searchResults.isEmpty()) {
-                        // A hardware-key-only device needs a concrete current row,
-                        // not merely a scroll position. Move focus off Find and
-                        // select the first result immediately.
-                        list.requestFocus();
-                        adapter.setSelectedPosition(0);
-                        list.setSelection(0);
-                    }
-                }
-            },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    if (generation != searchRequestGeneration) return;
-                    showError(status).accept(error);
-                }
+            error -> {
+                if (generation != searchRequestGeneration) return;
+                showError(status).accept(error);
             }
         );
     }
 
-    private void wireSiteList(
-        ListView list,
-        final SiteAdapter adapter,
-        final View aboveList
-    ) {
-        list.setOnItemClickListener(
-            new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(
-                    AdapterView<?> parent,
-                    View view,
-                    int position,
-                    long id
-                ) {
-                    openSite(adapter.getItem(position));
-                }
-            }
-        );
-        // Sonim firmware variants report the physical OK key as either
-        // DPAD_CENTER or ENTER. Handle both explicitly: a focusable child row
-        // can otherwise consume OK while the ListView still scrolls normally.
-        list.setFocusable(true);
-        list.setFocusableInTouchMode(true);
-        list.setOnFocusChangeListener(
-            new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View view, boolean hasFocus) {
-                    if (
-                        hasFocus &&
-                        adapter.getCount() > 0 &&
-                        adapter.getSelectedPosition() ==
-                            AdapterView.INVALID_POSITION
-                    ) {
-                        adapter.setSelectedPosition(0);
-                        ((ListView) view).setSelection(0);
-                    }
-                }
-            }
-        );
-        list.setOnItemSelectedListener(
-            new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(
-                    AdapterView<?> parent,
-                    View view,
-                    int position,
-                    long id
-                ) {
-                    adapter.setSelectedPosition(position);
-                }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
-            }
-        );
-        list.setOnKeyListener(
-            new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View view, int keyCode, KeyEvent event) {
-                    ListView sites = (ListView) view;
-                    if (
-                        keyCode == KeyEvent.KEYCODE_DPAD_UP &&
-                        event.getAction() == KeyEvent.ACTION_DOWN &&
-                        aboveList != null &&
-                        adapter.getSelectedPosition() <= 0
-                    ) {
-                        aboveList.requestFocus();
-                        return true;
-                    }
-                    if (
-                        keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
-                        keyCode == KeyEvent.KEYCODE_DPAD_UP
-                    ) {
-                        if (
-                            event.getAction() == KeyEvent.ACTION_DOWN &&
-                            adapter.getCount() > 0
-                        ) {
-                            moveListSelection(
-                                sites,
-                                adapter,
-                                keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : -1
-                            );
-                        }
-                        return true;
-                    }
-
-                    if (
-                        event.getAction() != KeyEvent.ACTION_UP ||
-                        (keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
-                            keyCode != KeyEvent.KEYCODE_ENTER &&
-                            keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER)
-                    ) return false;
-
-                    int position = adapter.getSelectedPosition();
-                    if (position >= 0 && position < adapter.getCount()) {
-                        openSite(adapter.getItem(position));
-                        return true;
-                    }
-                    return false;
-                }
-            }
-        );
+    private void wireSiteList(ListView list, final SiteAdapter adapter, final View aboveList) {
+        wireList(list, adapter, aboveList, position -> openSite(adapter.getItem(position)), position -> {});
     }
 
     private void openSite(final JSONObject listItem) {
@@ -768,40 +567,29 @@ public final class MainActivity extends Activity {
         final int generation = ++pendingSiteGeneration;
         // A bare spinner reads better than a placeholder title that is about to
         // be replaced by the real Supercharger name.
-        replaceContent(spinner());
+        Ui.fill(content, spinner());
         async(
-            new Callable<JSONObject>() {
-                @Override
-                public JSONObject call() throws Exception {
-                    return repository.site(locationGuid);
-                }
+            () -> repository.site(locationGuid),
+            site -> {
+                // Backed out, or opened something else, while this was in
+                // flight: the screen it was asked for is gone, and drawing
+                // it now would cover whatever took its place with a detail
+                // that Back no longer knows how to leave.
+                if (
+                    generation != pendingSiteGeneration ||
+                    !locationGuid.equals(pendingSiteGuid)
+                ) return;
+                pendingSiteGuid = null;
+                currentSite = site;
+                renderSite();
             },
-            new Success<JSONObject>() {
-                @Override
-                public void accept(JSONObject site) {
-                    // Backed out, or opened something else, while this was in
-                    // flight: the screen it was asked for is gone, and drawing
-                    // it now would cover whatever took its place with a detail
-                    // that Back no longer knows how to leave.
-                    if (
-                        generation != pendingSiteGeneration ||
-                        !locationGuid.equals(pendingSiteGuid)
-                    ) return;
-                    pendingSiteGuid = null;
-                    currentSite = site;
-                    renderSite();
-                }
-            },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    if (
-                        generation != pendingSiteGeneration ||
-                        !locationGuid.equals(pendingSiteGuid)
-                    ) return;
-                    pendingSiteGuid = null;
-                    showErrorDialog(error);
-                }
+            error -> {
+                if (
+                    generation != pendingSiteGeneration ||
+                    !locationGuid.equals(pendingSiteGuid)
+                ) return;
+                pendingSiteGuid = null;
+                showErrorDialog(error);
             }
         );
     }
@@ -814,11 +602,7 @@ public final class MainActivity extends Activity {
         // beneath it. Tesla's site name is a restatement of both.
         String street = Normalizer.addressStreet(currentSite);
         root.addView(
-            heading(
-                street.length() > 0
-                    ? street
-                    : currentSite.optString("name", "Charger")
-            )
+            heading(street.length() > 0 ? street : currentSite.optString("name", "Charger"))
         );
         root.addView(body(Normalizer.addressLocality(currentSite)));
         root.addView(divider());
@@ -861,17 +645,12 @@ public final class MainActivity extends Activity {
             metric("Max power", currentSite.optInt("maxPowerKw") + " kW")
         );
 
-        if (!currentSite.isNull("outage")) root.addView(
-            warning(currentSite.optString("outage"))
-        );
+        if (!currentSite.isNull("outage")) root.addView(warning(currentSite.optString("outage")));
         if (!currentSite.isNull("criticalInfo")) root.addView(
             warning(currentSite.optString("criticalInfo"))
         );
         if (currentSite.optBoolean("payToPark")) root.addView(
-            warning(
-                "Paid parking may apply. " +
-                    currentSite.optString("payToParkInstructions")
-            )
+            warning("Paid parking may apply. " + currentSite.optString("payToParkInstructions"))
         );
         if (!currentSite.isNull("accessInstruction")) {
             root.addView(section("Access"));
@@ -919,25 +698,16 @@ public final class MainActivity extends Activity {
                 : "Add favorite"
         );
         favorite.setOnClickListener(
-            new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    String id = currentSite.optString("id");
-                    favorites.toggle(currentSite);
-                    for (int i = favoriteSites.size() - 1; i >= 0; i--) {
-                        if (
-                            id.equals(favoriteSites.get(i).optString("id"))
-                        ) favoriteSites.remove(i);
-                    }
-                    if (favorites.contains(id)) favoriteSites.add(currentSite);
-                    favoritesRefreshFailures = 0;
-                    renderSite();
-                    toast(
-                        favorites.contains(id)
-                            ? "Added to Favorites"
-                            : "Removed from Favorites"
-                    );
+            view -> {
+                String id = currentSite.optString("id");
+                favorites.toggle(currentSite);
+                for (int i = favoriteSites.size() - 1; i >= 0; i--) {
+                    if (id.equals(favoriteSites.get(i).optString("id"))) favoriteSites.remove(i);
                 }
+                if (favorites.contains(id)) favoriteSites.add(currentSite);
+                favoritesRefreshFailures = 0;
+                renderSite();
+                toast(favorites.contains(id) ? "Added to Favorites" : "Removed from Favorites");
             }
         );
         root.addView(favorite);
@@ -963,17 +733,10 @@ public final class MainActivity extends Activity {
                   : "No available stalls"
         );
         start.setEnabled(canStart);
-        start.setOnClickListener(
-            new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    chooseStall();
-                }
-            }
-        );
+        start.setOnClickListener(view -> chooseStall());
         root.addView(start);
         scroll.addView(root);
-        replaceContent(scroll);
+        Ui.fill(content, scroll);
         // Open at the name, not at the buttons. Focusing a button inside a
         // ScrollView scrolls it into view, which lands you at the bottom of the
         // screen having never seen the price. Park focus on the scroller so the
@@ -1065,19 +828,10 @@ public final class MainActivity extends Activity {
         // not long enough to fetch it in. Asking now usually means it is already
         // in hand when that dialog opens.
         loadPaymentMethod(null);
-        new AlertDialog.Builder(this)
-            .setTitle("Choose your stall")
-            .setItems(
+        new AlertDialog.Builder(this).setTitle("Choose your stall").setItems(
                 labels.toArray(new String[0]),
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        confirmStart(available.get(which));
-                    }
-                }
-            )
-            .setNegativeButton("Cancel", null)
-            .show();
+                (dialog, which) -> confirmStart(available.get(which))
+            ).setNegativeButton("Cancel", null).show();
     }
 
     private void confirmStart(final JSONObject charger) {
@@ -1088,39 +842,25 @@ public final class MainActivity extends Activity {
         // The title says what is about to happen and the button says it again,
         // so the message says neither: it names the stall being committed to and
         // the card that will pay for it, which is what is worth a second look.
-        final AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle("Start charging session?")
-            .setMessage(confirmMessage(charger))
-            .setPositiveButton(
+        final AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Start charging session?")
+            .setMessage(confirmMessage(charger)).setPositiveButton(
                 "Start",
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        startSession(charger.optString("id"));
-                    }
+                (d, which) -> {
+                    startSession(charger.optString("id"));
                 }
-            )
-            .setNegativeButton("Cancel", null)
-            .show();
+            ).setNegativeButton("Cancel", null).show();
         // A card that arrives while this is on screen still belongs on it: the
         // press it is meant to inform has not happened yet.
         if (paymentMethod == null) loadPaymentMethod(
-            new Runnable() {
-                @Override
-                public void run() {
-                    if (dialog.isShowing()) dialog.setMessage(
-                        confirmMessage(charger)
-                    );
-                }
+            () -> {
+                if (dialog.isShowing()) dialog.setMessage(confirmMessage(charger));
             }
         );
     }
 
     private String confirmMessage(JSONObject charger) {
-        StringBuilder message = new StringBuilder("» Stall ")
-            .append(charger.optString("label"));
-        if (paymentMethod != null) message.append("\n» Billed to ")
-            .append(paymentMethod);
+        StringBuilder message = new StringBuilder("» Stall ").append(charger.optString("label"));
+        if (paymentMethod != null) message.append("\n» Billed to ").append(paymentMethod);
 
         JSONObject hold = currentSite.optJSONObject("holdAmount");
         if (hold != null) {
@@ -1128,8 +868,7 @@ public final class MainActivity extends Activity {
                 hold.optDouble("price"),
                 hold.optString("currency", "USD")
             );
-            message.append("\n» ").append(amount)
-                .append(" pre-authorization requirement");
+            message.append("\n» ").append(amount).append(" pre-authorization requirement");
         }
         return message.toString();
     }
@@ -1146,30 +885,19 @@ public final class MainActivity extends Activity {
         if (paymentMethod != null || paymentMethodLoading) return;
         paymentMethodLoading = true;
         async(
-            new Callable<String>() {
-                @Override
-                public String call() throws Exception {
-                    return repository.paymentMethod();
-                }
+            () -> repository.paymentMethod(),
+            label -> {
+                paymentMethodLoading = false;
+                paymentMethod = label;
+                Runnable arrival = paymentMethodArrival;
+                paymentMethodArrival = null;
+                if (label != null && arrival != null) arrival.run();
             },
-            new Success<String>() {
-                @Override
-                public void accept(String label) {
-                    paymentMethodLoading = false;
-                    paymentMethod = label;
-                    Runnable arrival = paymentMethodArrival;
-                    paymentMethodArrival = null;
-                    if (label != null && arrival != null) arrival.run();
-                }
-            },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    // Not knowing the card is no reason to interrupt: charging
-                    // starts the same way, and the line simply stays off.
-                    paymentMethodLoading = false;
-                    paymentMethodArrival = null;
-                }
+            error -> {
+                // Not knowing the card is no reason to interrupt: charging
+                // starts the same way, and the line simply stays off.
+                paymentMethodLoading = false;
+                paymentMethodArrival = null;
             }
         );
     }
@@ -1190,36 +918,25 @@ public final class MainActivity extends Activity {
         final int generation = ++chargingOperationGeneration;
         if (detailVisible && currentHistorySession == null) renderSite();
         async(
-            new Callable<JSONObject>() {
-                @Override
-                public JSONObject call() throws Exception {
-                    return repository.start(siteId, chargerId);
-                }
+            () -> repository.start(siteId, chargerId),
+            session -> {
+                if (generation != chargingOperationGeneration) return;
+                chargingOperation = CHARGING_IDLE;
+                currentSession = session;
+                sessionError = null;
+                showTab(SESSION, true);
+                watchOrRelease();
             },
-            new Success<JSONObject>() {
-                @Override
-                public void accept(JSONObject session) {
-                    if (generation != chargingOperationGeneration) return;
-                    chargingOperation = CHARGING_IDLE;
-                    currentSession = session;
-                    sessionError = null;
-                    showTab(SESSION, true);
-                    watchOrRelease();
-                }
-            },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    if (generation != chargingOperationGeneration) return;
-                    chargingOperation = CHARGING_IDLE;
-                    if (
-                        detailVisible &&
-                        currentHistorySession == null &&
-                        currentSite != null &&
-                        siteId.equals(currentSite.optString("id"))
-                    ) renderSite();
-                    showErrorDialog(error);
-                }
+            error -> {
+                if (generation != chargingOperationGeneration) return;
+                chargingOperation = CHARGING_IDLE;
+                if (
+                    detailVisible &&
+                    currentHistorySession == null &&
+                    currentSite != null &&
+                    siteId.equals(currentSite.optString("id"))
+                ) renderSite();
+                showErrorDialog(error);
             }
         );
     }
@@ -1233,19 +950,12 @@ public final class MainActivity extends Activity {
                 emptyMessage(
                     "No active charging session.\n\nStart one from a charger in Favorites or Discover."
                 ),
-                weighted()
+                Ui.weighted()
             );
             Button refresh = action("Check again");
-            refresh.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        resumeActiveSession();
-                    }
-                }
-            );
+            refresh.setOnClickListener(v -> resumeActiveSession());
             empty.addView(refresh);
-            replaceContent(empty);
+            Ui.fill(content, empty);
             refresh.requestFocus();
             return;
         }
@@ -1290,13 +1000,8 @@ public final class MainActivity extends Activity {
         // Same address-first order as the lists. The city line and the stall
         // share a row so the banner stays three lines tall.
         String street = Normalizer.addressStreet(currentSession);
-        if (street.length() == 0) street = currentSession.optString(
-            "siteName",
-            ""
-        );
-        if (street.length() > 0) banner.addView(
-            centeredText(street, 13, color(R.color.text))
-        );
+        if (street.length() == 0) street = currentSession.optString("siteName", "");
+        if (street.length() > 0) banner.addView(centeredText(street, 13, color(R.color.text)));
         String locality = Normalizer.addressLocality(currentSession);
         String stall = currentSession.isNull("stallLabel")
             ? ""
@@ -1314,9 +1019,7 @@ public final class MainActivity extends Activity {
         // not arrive leaves the last one on screen, and power and cost that have
         // quietly stopped advancing look exactly like a charge that has stalled.
         if (sessionError != null) {
-            root.addView(
-                warning("Lost contact with Tesla. Figures below are the last received.")
-            );
+            root.addView(warning("Lost contact with Tesla. Figures below are the last received."));
         }
         if (
             "charging".equals(phase) ||
@@ -1326,21 +1029,13 @@ public final class MainActivity extends Activity {
             root.addView(
                 metric(
                     "Power",
-                    String.format(
-                        Locale.US,
-                        "%.1f kW",
-                        currentSession.optDouble("powerKw")
-                    )
+                    String.format(Locale.US, "%.1f kW", currentSession.optDouble("powerKw"))
                 )
             );
             root.addView(
                 metric(
                     "Energy",
-                    String.format(
-                        Locale.US,
-                        "%.2f kWh",
-                        currentSession.optDouble("energyKwh")
-                    )
+                    String.format(Locale.US, "%.2f kWh", currentSession.optDouble("energyKwh"))
                 )
             );
             root.addView(
@@ -1359,15 +1054,11 @@ public final class MainActivity extends Activity {
                 !currentSession.isNull("timeToBulkSecs") &&
                 currentSession.optDouble("powerKw") > 0;
             String eta = hasEta
-                ? HistoryAdapter.duration(
-                      currentSession.optLong("timeToBulkSecs")
-                  ) + " to 80%"
+                ? HistoryAdapter.duration(currentSession.optLong("timeToBulkSecs")) + " to 80%"
                 : "";
             if (!currentSession.isNull("stateOfCharge")) {
                 String level = currentSession.optInt("stateOfCharge") + "%";
-                root.addView(
-                    metric("Battery", hasEta ? level + " · " + eta : level)
-                );
+                root.addView(metric("Battery", hasEta ? level + " · " + eta : level));
             } else if (hasEta) {
                 root.addView(metric("Battery", eta));
             }
@@ -1394,9 +1085,7 @@ public final class MainActivity extends Activity {
             loadCongestionFees(congestionFees);
         }
         if (currentSession.optBoolean("awaitingUnplug")) root.addView(
-            warning(
-                "Charging has stopped. Unplug the connector to close the session."
-            )
+            warning("Charging has stopped. Unplug the connector to close the session.")
         );
         // Same rule as the banner: a session that has already moved past the
         // stop offers nothing to press, so it keeps no button. Waiting for an
@@ -1410,18 +1099,11 @@ public final class MainActivity extends Activity {
                     : "Cancel session"
             );
             stop.setEnabled(chargingOperation == CHARGING_IDLE);
-            stop.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        confirmStop();
-                    }
-                }
-            );
+            stop.setOnClickListener(v -> confirmStop());
             root.addView(stop);
         }
         scroll.addView(root);
-        replaceContent(scroll);
+        Ui.fill(content, scroll);
     }
 
     private void renderHistory(boolean focusContent) {
@@ -1436,9 +1118,9 @@ public final class MainActivity extends Activity {
                 emptyMessage(
                     "No charging sessions yet.\n\nCompleted charging sessions appear here."
                 ),
-                weighted()
+                Ui.weighted()
             );
-            replaceContent(root);
+            Ui.fill(content, root);
             return;
         }
         final HistoryAdapter adapter = new HistoryAdapter(this);
@@ -1446,62 +1128,41 @@ public final class MainActivity extends Activity {
         historyAdapter = adapter;
         updateHistoryFooter();
         ListView list = listView(adapter);
-        root.addView(list, weighted());
+        root.addView(list, Ui.weighted());
         wireHistoryList(list, adapter);
-        replaceContent(root);
+        Ui.fill(content, root);
         if (focusContent) list.requestFocus();
     }
 
     private void loadHistory() {
-        replaceContent(spinner());
+        Ui.fill(content, spinner());
         final int generation = ++historyLoadGeneration;
         async(
-            new Callable<HistoryPage>() {
-                @Override
-                public HistoryPage call() throws Exception {
-                    return repository.history(1);
-                }
+            () -> repository.history(1),
+            page -> {
+                if (generation != historyLoadGeneration) return;
+                historySessions.clear();
+                historySessions.addAll(page.sessions);
+                historyPage = 1;
+                historyHasMore = page.hasMore;
+                historyLoadingMore = false;
+                historyMoreError = null;
+                historyLoaded = true;
+                if (currentTab == HISTORY) renderHistory(true);
             },
-            new Success<HistoryPage>() {
-                @Override
-                public void accept(HistoryPage page) {
-                    if (generation != historyLoadGeneration) return;
-                    historySessions.clear();
-                    historySessions.addAll(page.sessions);
-                    historyPage = 1;
-                    historyHasMore = page.hasMore;
-                    historyLoadingMore = false;
-                    historyMoreError = null;
-                    historyLoaded = true;
-                    if (currentTab == HISTORY) renderHistory(true);
-                }
-            },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    if (generation != historyLoadGeneration) return;
-                    if (currentTab != HISTORY) return;
-                    LinearLayout root = vertical();
-                    root.addView(
-                        emptyMessage(
-                            "Could not load your charging history.\n\n" +
-                                error.getMessage()
-                        ),
-                        weighted()
-                    );
-                    Button retry = action("Try again");
-                    retry.setOnClickListener(
-                        new View.OnClickListener() {
-                            @Override
-                            public void onClick(View v) {
-                                loadHistory();
-                            }
-                        }
-                    );
-                    root.addView(retry);
-                    replaceContent(root);
-                    retry.requestFocus();
-                }
+            error -> {
+                if (generation != historyLoadGeneration) return;
+                if (currentTab != HISTORY) return;
+                LinearLayout root = vertical();
+                root.addView(
+                    emptyMessage("Could not load your charging history.\n\n" + error.getMessage()),
+                    Ui.weighted()
+                );
+                Button retry = action("Try again");
+                retry.setOnClickListener(v -> loadHistory());
+                root.addView(retry);
+                Ui.fill(content, root);
+                retry.requestFocus();
             }
         );
     }
@@ -1520,35 +1181,22 @@ public final class MainActivity extends Activity {
         updateHistoryFooter();
         final int next = historyPage + 1;
         async(
-            new Callable<HistoryPage>() {
-                @Override
-                public HistoryPage call() throws Exception {
-                    return repository.history(next);
-                }
+            () -> repository.history(next),
+            page -> {
+                historyLoadingMore = false;
+                historyPage = next;
+                historyHasMore = page.hasMore;
+                historySessions.addAll(page.sessions);
+                // Appended rather than re-rendered, for the same reason the
+                // address pass redraws in place: rebuilding the list would
+                // drop the selection out from under whoever is on it.
+                if (historyAdapter != null) historyAdapter.append(page.sessions);
+                updateHistoryFooter();
             },
-            new Success<HistoryPage>() {
-                @Override
-                public void accept(HistoryPage page) {
-                    historyLoadingMore = false;
-                    historyPage = next;
-                    historyHasMore = page.hasMore;
-                    historySessions.addAll(page.sessions);
-                    // Appended rather than re-rendered, for the same reason the
-                    // address pass redraws in place: rebuilding the list would
-                    // drop the selection out from under whoever is on it.
-                    if (historyAdapter != null) historyAdapter.append(
-                        page.sessions
-                    );
-                    updateHistoryFooter();
-                }
-            },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    historyLoadingMore = false;
-                    historyMoreError = error.getMessage();
-                    updateHistoryFooter();
-                }
+            error -> {
+                historyLoadingMore = false;
+                historyMoreError = error.getMessage();
+                updateHistoryFooter();
             }
         );
     }
@@ -1562,10 +1210,7 @@ public final class MainActivity extends Activity {
             historyMoreError + "\nPress OK to try again.",
             false
         );
-        else if (historyHasMore) historyAdapter.setFooter(
-            "Load older sessions",
-            false
-        );
+        else if (historyHasMore) historyAdapter.setFooter("Load older sessions", false);
         else historyAdapter.setFooter(null, false);
     }
 
@@ -1588,137 +1233,80 @@ public final class MainActivity extends Activity {
     }
 
     private void wireHistoryList(ListView list, final HistoryAdapter adapter) {
-        list.setFocusable(true);
-        list.setFocusableInTouchMode(true);
-        list.setOnItemClickListener(
-            new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(
-                    AdapterView<?> parent,
-                    View view,
-                    int position,
-                    long id
-                ) {
-                    if (adapter.isFooter(position)) openHistoryFooter();
-                    else openHistorySession(adapter.getItem(position));
-                }
-            }
-        );
+        wireList(list, adapter, null, position -> {
+            if (adapter.isFooter(position)) openHistoryFooter();
+            else openHistorySession(adapter.getItem(position));
+        }, this::maybeLoadMoreHistory);
         // Touch scrolling reaching the end asks for the next page too: the key
-        // handler below is the only path on a keypad, but it is not the only
-        // way this list moves.
-        list.setOnScrollListener(
-            new AbsListView.OnScrollListener() {
-                @Override
-                public void onScrollStateChanged(
-                    AbsListView view,
-                    int scrollState
-                ) {}
+        // handler is the only path on a keypad, but it is not the only way
+        // this list moves.
+        list.setOnScrollListener(new AbsListView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(AbsListView view, int scrollState) {}
 
-                @Override
-                public void onScroll(
-                    AbsListView view,
-                    int firstVisible,
-                    int visibleCount,
-                    int totalCount
-                ) {
-                    if (visibleCount > 0) maybeLoadMoreHistory(
-                        firstVisible + visibleCount - 1
-                    );
-                }
+            @Override
+            public void onScroll(AbsListView view, int firstVisible, int visibleCount, int totalCount) {
+                if (visibleCount > 0) maybeLoadMoreHistory(firstVisible + visibleCount - 1);
             }
-        );
-        list.setOnFocusChangeListener(
-            new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View view, boolean hasFocus) {
-                    if (
-                        hasFocus &&
-                        adapter.getCount() > 0 &&
-                        adapter.getSelectedPosition() ==
-                            AdapterView.INVALID_POSITION
-                    ) {
-                        adapter.setSelectedPosition(0);
-                        ((ListView) view).setSelection(0);
-                    }
-                }
-            }
-        );
-        list.setOnItemSelectedListener(
-            new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(
-                    AdapterView<?> parent,
-                    View view,
-                    int position,
-                    long id
-                ) {
-                    adapter.setSelectedPosition(position);
-                    maybeLoadMoreHistory(position);
-                }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
-            }
-        );
-        list.setOnKeyListener(
-            new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View view, int keyCode, KeyEvent event) {
-                    ListView sessions = (ListView) view;
-                    if (
-                        keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
-                        keyCode == KeyEvent.KEYCODE_DPAD_UP
-                    ) {
-                        if (
-                            event.getAction() == KeyEvent.ACTION_DOWN &&
-                            adapter.getCount() > 0
-                        ) {
-                            moveListSelection(
-                                sessions,
-                                adapter,
-                                keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : -1
-                            );
-                            maybeLoadMoreHistory(adapter.getSelectedPosition());
-                        }
-                        return true;
-                    }
-
-                    if (
-                        event.getAction() != KeyEvent.ACTION_UP ||
-                        (keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
-                            keyCode != KeyEvent.KEYCODE_ENTER &&
-                            keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER)
-                    ) return false;
-
-                    int position = adapter.getSelectedPosition();
-                    if (adapter.isFooter(position)) {
-                        openHistoryFooter();
-                        return true;
-                    }
-                    if (position >= 0 && position < adapter.getCount()) {
-                        openHistorySession(adapter.getItem(position));
-                        return true;
-                    }
-                    return false;
-                }
-            }
-        );
+        });
     }
 
-    private void moveListSelection(
-        ListView list,
-        RowAdapter adapter,
-        int direction
+    /**
+     * A list of rows that paint their own highlight. Focus lands on the first
+     * row; up and down move one row at a time (see moveListSelection), and up
+     * from the top row goes to `aboveList` when there is one; OK opens the
+     * row. `moved` hears every new selection.
+     *
+     * Sonim firmware variants report the physical OK key as either
+     * DPAD_CENTER or ENTER. Both are handled explicitly: a focusable child row
+     * can otherwise consume OK while the ListView still scrolls normally.
+     */
+    private void wireList(
+        final ListView list, final RowAdapter adapter, final View aboveList,
+        final Ui.Selected open, final Ui.Selected moved
     ) {
+        list.setFocusable(true);
+        list.setFocusableInTouchMode(true);
+        list.setOnItemClickListener((parent, view, position, id) -> open.at(position));
+        list.setOnFocusChangeListener((view, hasFocus) -> {
+            if (hasFocus && adapter.getCount() > 0
+                && adapter.getSelectedPosition() == AdapterView.INVALID_POSITION) {
+                adapter.setSelectedPosition(0);
+                list.setSelection(0);
+            }
+        });
+        Ui.onSelect(list, position -> {
+            adapter.setSelectedPosition(position);
+            moved.at(position);
+        });
+        list.setOnKeyListener((view, keyCode, event) -> {
+            boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP && down && aboveList != null
+                && adapter.getSelectedPosition() <= 0) {
+                aboveList.requestFocus();
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                if (down && adapter.getCount() > 0) {
+                    moveListSelection(list, adapter, keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : -1);
+                    moved.at(adapter.getSelectedPosition());
+                }
+                return true;
+            }
+            if (event.getAction() != KeyEvent.ACTION_UP || !Ui.isOk(keyCode)) return false;
+            int position = adapter.getSelectedPosition();
+            if (position < 0 || position >= adapter.getCount()) return false;
+            open.at(position);
+            return true;
+        });
+    }
+
+    private void moveListSelection(ListView list, RowAdapter adapter, int direction) {
         int current = adapter.getSelectedPosition();
         int target =
             current == AdapterView.INVALID_POSITION
                 ? 0
-                : Math.max(
-                      0,
-                      Math.min(adapter.getCount() - 1, current + direction)
-                  );
+                : Math.max(0, Math.min(adapter.getCount() - 1, current + direction));
         if (target == current) return;
 
         int firstVisible = list.getFirstVisiblePosition();
@@ -1764,35 +1352,22 @@ public final class MainActivity extends Activity {
             renderHistorySession();
             return;
         }
-        replaceContent(spinner());
+        Ui.fill(content, spinner());
         async(
-            new Callable<JSONObject>() {
-                @Override
-                public JSONObject call() {
-                    repository.historySite(session);
-                    return session;
-                }
+            () -> {
+                repository.historySite(session);
+                return session;
             },
-            new Success<JSONObject>() {
-                @Override
-                public void accept(JSONObject resolved) {
-                    // Backed out while it was in flight: whatever is on screen
-                    // now is not this session's receipt.
-                    if (
-                        currentHistorySession == resolved
-                    ) renderHistorySession();
-                }
+            resolved -> {
+                // Backed out while it was in flight: whatever is on screen
+                // now is not this session's receipt.
+                if (currentHistorySession == resolved) renderHistorySession();
             },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    // The receipt is complete without the charger behind it, so
-                    // a failed lookup still gets a screen - just one with no
-                    // stall label and no open button.
-                    if (
-                        currentHistorySession == session
-                    ) renderHistorySession();
-                }
+            error -> {
+                // The receipt is complete without the charger behind it, so
+                // a failed lookup still gets a screen - just one with no
+                // stall label and no open button.
+                if (currentHistorySession == session) renderHistorySession();
             }
         );
     }
@@ -1829,39 +1404,26 @@ public final class MainActivity extends Activity {
             metric("Ended", HistoryAdapter.at(session.optLong("endedAt")))
         );
         if (!session.isNull("durationSecs")) root.addView(
-            metric(
-                "Charged for",
-                HistoryAdapter.duration(session.optLong("durationSecs"))
-            )
+            metric("Charged for", HistoryAdapter.duration(session.optLong("durationSecs")))
         );
         // Only worth a row once it is long enough to be a decision someone
         // made rather than the seconds it takes to put a cable away.
         if (!session.isNull("idleSecs") && session.optLong("idleSecs") >= 300) {
             root.addView(
-                metric(
-                    "Plugged in after",
-                    HistoryAdapter.duration(session.optLong("idleSecs"))
-                )
+                metric("Plugged in after", HistoryAdapter.duration(session.optLong("idleSecs")))
             );
         }
         root.addView(
             metric(
                 "Energy",
-                String.format(
-                    Locale.US,
-                    "%.2f kWh",
-                    session.optDouble("energyKwh", 0)
-                )
+                String.format(Locale.US, "%.2f kWh", session.optDouble("energyKwh", 0))
             )
         );
         if (!session.isNull("pricePerKwh")) {
             root.addView(
                 metric(
                     "Cost per kWh",
-                    SiteAdapter.money(
-                        session.optDouble("pricePerKwh"),
-                        currency
-                    ) + "/kWh"
+                    SiteAdapter.money(session.optDouble("pricePerKwh"), currency) + "/kWh"
                 )
             );
         }
@@ -1881,29 +1443,18 @@ public final class MainActivity extends Activity {
         final String locationGuid = session.optString("locationGUID", "");
         if (locationGuid.length() > 0) {
             Button charger = action("Open this charger");
-            charger.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        openSite(locationGuid);
-                    }
-                }
-            );
+            charger.setOnClickListener(view -> openSite(locationGuid));
             root.addView(charger);
         }
         scroll.addView(root);
-        replaceContent(scroll);
+        Ui.fill(content, scroll);
         scroll.setFocusableInTouchMode(true);
         scroll.setDescendantFocusability(ViewGroup.FOCUS_BEFORE_DESCENDANTS);
         scroll.requestFocus();
     }
 
     /** Itemized totals for everything billed during the session. */
-    private void addSessionFees(
-        LinearLayout root,
-        JSONObject session,
-        String currency
-    ) {
+    private void addSessionFees(LinearLayout root, JSONObject session, String currency) {
         JSONArray fees = session.optJSONArray("fees");
         boolean titled = false;
         for (int i = 0; fees != null && i < fees.length(); i++) {
@@ -1920,10 +1471,7 @@ public final class MainActivity extends Activity {
                     fee.optString("label"),
                     fee.optBoolean("waived") && total == 0
                         ? "Waived"
-                        : SiteAdapter.money(
-                              total,
-                              fee.optString("currency", currency)
-                          )
+                        : SiteAdapter.money(total, fee.optString("currency", currency))
                 )
             );
         }
@@ -1932,63 +1480,46 @@ public final class MainActivity extends Activity {
     private void loadCongestionFees(final LinearLayout root) {
         final String id = currentSession.optString("authorizationSessionId");
         async(
-            new Callable<JSONObject>() {
-                @Override
-                public JSONObject call() throws Exception {
-                    return repository.sessionFees(id);
-                }
-            },
-            new Success<JSONObject>() {
-                @Override
-                public void accept(JSONObject summary) {
-                    if (summary == null) return;
-                    JSONArray fees = summary.optJSONArray("fees");
-                    boolean hasCongestionFee = false;
-                    for (int i = 0; fees != null && i < fees.length(); i++) {
-                        JSONObject fee = fees.optJSONObject(i);
-                        if (
-                            fee == null ||
-                            !"CONGESTION".equals(fee.optString("type"))
-                        ) continue;
-                        double total = fee.optDouble("total", 0);
-                        if (total == 0 && !fee.optBoolean("waived")) continue;
-                        hasCongestionFee = true;
-                        root.addView(
-                            metric(
-                                "Congestion fee",
-                                fee.optBoolean("waived") && total == 0
-                                    ? "Waived"
-                                    : SiteAdapter.money(
-                                          total,
-                                          fee.optString(
-                                              "currency",
-                                              summary.optString(
-                                                  "currency",
-                                                  "USD"
-                                              )
-                                          )
-                                      )
-                            )
-                        );
-                    }
-                    if (hasCongestionFee) root.addView(
+            () -> repository.sessionFees(id),
+            summary -> {
+                if (summary == null) return;
+                JSONArray fees = summary.optJSONArray("fees");
+                boolean hasCongestionFee = false;
+                for (int i = 0; fees != null && i < fees.length(); i++) {
+                    JSONObject fee = fees.optJSONObject(i);
+                    if (fee == null || !"CONGESTION".equals(fee.optString("type"))) continue;
+                    double total = fee.optDouble("total", 0);
+                    if (total == 0 && !fee.optBoolean("waived")) continue;
+                    hasCongestionFee = true;
+                    root.addView(
                         metric(
-                            "Total",
-                            SiteAdapter.money(
-                                summary.optDouble("total"),
-                                summary.optString("currency", "USD")
-                            )
+                            "Congestion fee",
+                            fee.optBoolean("waived") && total == 0
+                                ? "Waived"
+                                : SiteAdapter.money(
+                                      total,
+                                      fee.optString(
+                                          "currency",
+                                          summary.optString("currency", "USD")
+                                      )
+                                  )
                         )
                     );
                 }
+                if (hasCongestionFee) root.addView(
+                    metric(
+                        "Total",
+                        SiteAdapter.money(
+                            summary.optDouble("total"),
+                            summary.optString("currency", "USD")
+                        )
+                    )
+                );
             },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    // Congestion is optional supporting detail. The running
-                    // total above remains useful if its breakdown is late or
-                    // temporarily unavailable.
-                }
+            error -> {
+                // Congestion is optional supporting detail. The running
+                // total above remains useful if its breakdown is late or
+                // temporarily unavailable.
             }
         );
     }
@@ -1999,24 +1530,15 @@ public final class MainActivity extends Activity {
             return;
         }
         final boolean charging = currentSession.optBoolean("charging");
-        new AlertDialog.Builder(this)
-            .setTitle(charging ? "Stop charging?" : "Cancel session?")
+        new AlertDialog.Builder(this).setTitle(charging ? "Stop charging?" : "Cancel session?")
             .setMessage(
                 charging
                     ? "This ends the current charge. Starting again requires a new session."
                     : "This releases the reserved stall."
-            )
-            .setPositiveButton(
+            ).setPositiveButton(
                 charging ? "Stop" : "Cancel session",
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        stopSession();
-                    }
-                }
-            )
-            .setNegativeButton("Keep session", null)
-            .show();
+                (dialog, which) -> stopSession()
+            ).setNegativeButton("Keep session", null).show();
     }
 
     private void stopSession() {
@@ -2033,31 +1555,20 @@ public final class MainActivity extends Activity {
         final int generation = ++chargingOperationGeneration;
         if (currentTab == SESSION && !detailVisible) renderSession();
         async(
-            new Callable<JSONObject>() {
-                @Override
-                public JSONObject call() throws Exception {
-                    return repository.stop(id);
-                }
+            () -> repository.stop(id),
+            session -> {
+                if (generation != chargingOperationGeneration) return;
+                chargingOperation = CHARGING_IDLE;
+                currentSession = session;
+                sessionError = null;
+                if (currentTab == SESSION && !detailVisible) renderSession();
+                watchOrRelease();
             },
-            new Success<JSONObject>() {
-                @Override
-                public void accept(JSONObject session) {
-                    if (generation != chargingOperationGeneration) return;
-                    chargingOperation = CHARGING_IDLE;
-                    currentSession = session;
-                    sessionError = null;
-                    if (currentTab == SESSION && !detailVisible) renderSession();
-                    watchOrRelease();
-                }
-            },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    if (generation != chargingOperationGeneration) return;
-                    chargingOperation = CHARGING_IDLE;
-                    if (currentTab == SESSION && !detailVisible) renderSession();
-                    showErrorDialog(error);
-                }
+            error -> {
+                if (generation != chargingOperationGeneration) return;
+                chargingOperation = CHARGING_IDLE;
+                if (currentTab == SESSION && !detailVisible) renderSession();
+                showErrorDialog(error);
             }
         );
     }
@@ -2065,33 +1576,22 @@ public final class MainActivity extends Activity {
     private void resumeActiveSession() {
         final int generation = ++activeSessionRequestGeneration;
         async(
-            new Callable<JSONObject>() {
-                @Override
-                public JSONObject call() throws Exception {
-                    return repository.activeSession();
-                }
+            () -> repository.activeSession(),
+            session -> {
+                if (generation != activeSessionRequestGeneration) return;
+                currentSession = session;
+                sessionError = null;
+                if (currentTab == SESSION) renderSession();
+                else if (
+                    detailVisible &&
+                    currentHistorySession == null &&
+                    currentSite != null
+                ) renderSite();
+                watchOrRelease();
             },
-            new Success<JSONObject>() {
-                @Override
-                public void accept(JSONObject session) {
-                    if (generation != activeSessionRequestGeneration) return;
-                    currentSession = session;
-                    sessionError = null;
-                    if (currentTab == SESSION) renderSession();
-                    else if (
-                        detailVisible &&
-                        currentHistorySession == null &&
-                        currentSite != null
-                    ) renderSite();
-                    watchOrRelease();
-                }
-            },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    if (generation != activeSessionRequestGeneration) return;
-                    if (currentTab == SESSION) showErrorDialog(error);
-                }
+            error -> {
+                if (generation != activeSessionRequestGeneration) return;
+                if (currentTab == SESSION) showErrorDialog(error);
             }
         );
     }
@@ -2109,10 +1609,7 @@ public final class MainActivity extends Activity {
      */
     private void startWatchingSession() {
         if (!sessionActive()) return;
-        ChargingService.start(
-            this,
-            currentSession.optString("authorizationSessionId")
-        );
+        ChargingService.start(this, currentSession.optString("authorizationSessionId"));
     }
 
     /**
@@ -2134,18 +1631,10 @@ public final class MainActivity extends Activity {
         // First press only. Auto-repeat from a held d-pad would cycle the tabs
         // as fast as the key fires, re-rendering each one and, on History,
         // starting a fresh page load every time round.
-        if (
-            event.getAction() == KeyEvent.ACTION_DOWN &&
-            event.getRepeatCount() == 0
-        ) {
-            if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_LEFT) {
-                showTab((currentTab + TABS - 1) % TABS, true);
-                return true;
-            }
-            if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                showTab((currentTab + 1) % TABS, true);
-                return true;
-            }
+        int next = tabs.step(event, getCurrentFocus(), currentTab);
+        if (next >= 0) {
+            showTab(next, true);
+            return true;
         }
         return super.dispatchKeyEvent(event);
     }
@@ -2180,20 +1669,14 @@ public final class MainActivity extends Activity {
             "Search radius: " + displayRadius(),
             "Account info",
         };
-        new AlertDialog.Builder(this)
-            .setTitle("Menu")
-            .setItems(
+        new AlertDialog.Builder(this).setTitle("Menu").setItems(
                 items,
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        if (which == 0) refreshCurrentScreen();
-                        else if (which == 1) chooseRadius();
-                        else showAccount();
-                    }
+                (dialog, which) -> {
+                    if (which == 0) refreshCurrentScreen();
+                    else if (which == 1) chooseRadius();
+                    else showAccount();
                 }
-            )
-            .show();
+            ).show();
     }
 
     /** Reloads whatever is on screen, in place. */
@@ -2227,18 +1710,13 @@ public final class MainActivity extends Activity {
      * balance that has since been settled is exactly what a stale copy hides.
      */
     private void showAccount() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
-            .setTitle("Account info")
-            .setMessage("")
-            .setPositiveButton("OK", null);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this).setTitle("Account info")
+            .setMessage("").setPositiveButton("OK", null);
         final Context themed = builder.getContext();
         final FrameLayout loading = new FrameLayout(themed);
         loading.setPadding(0, dp(4), 0, dp(14));
         ProgressBar progress = new ProgressBar(themed);
-        FrameLayout.LayoutParams centred = new FrameLayout.LayoutParams(
-            dp(32),
-            dp(32)
-        );
+        FrameLayout.LayoutParams centred = new FrameLayout.LayoutParams(dp(32), dp(32));
         centred.gravity = Gravity.CENTER;
         loading.addView(progress, centred);
 
@@ -2255,40 +1733,26 @@ public final class MainActivity extends Activity {
         messagePanel.setVisibility(View.GONE);
         final int generation = ++accountRequestGeneration;
         async(
-            new Callable<JSONObject>() {
-                @Override
-                public JSONObject call() throws Exception {
-                    return repository.account();
+            () -> repository.account(),
+            value -> {
+                if (generation != accountRequestGeneration) return;
+                // The start-charging dialog wants the same card and cannot
+                // wait on a request, so it takes this copy for free.
+                JSONObject payment = value.optJSONObject("payment");
+                if (payment != null && !payment.isNull("label")) {
+                    paymentMethod = payment.optString("label");
                 }
+                if (!dialog.isShowing()) return;
+                dialog.setMessage(accountMessage(value));
+                loadingPanel.setVisibility(View.GONE);
+                messagePanel.setVisibility(View.VISIBLE);
             },
-            new Success<JSONObject>() {
-                @Override
-                public void accept(JSONObject value) {
-                    if (generation != accountRequestGeneration) return;
-                    // The start-charging dialog wants the same card and cannot
-                    // wait on a request, so it takes this copy for free.
-                    JSONObject payment = value.optJSONObject("payment");
-                    if (payment != null && !payment.isNull("label")) {
-                        paymentMethod = payment.optString("label");
-                    }
-                    if (!dialog.isShowing()) return;
-                    dialog.setMessage(accountMessage(value));
-                    loadingPanel.setVisibility(View.GONE);
-                    messagePanel.setVisibility(View.VISIBLE);
-                }
-            },
-            new Failure() {
-                @Override
-                public void accept(Exception error) {
-                    if (generation != accountRequestGeneration) return;
-                    if (!dialog.isShowing()) return;
-                    dialog.setMessage(
-                        "Your account could not be loaded.\n\n" +
-                            error.getMessage()
-                    );
-                    loadingPanel.setVisibility(View.GONE);
-                    messagePanel.setVisibility(View.VISIBLE);
-                }
+            error -> {
+                if (generation != accountRequestGeneration) return;
+                if (!dialog.isShowing()) return;
+                dialog.setMessage("Your account could not be loaded.\n\n" + error.getMessage());
+                loadingPanel.setVisibility(View.GONE);
+                messagePanel.setVisibility(View.VISIBLE);
             }
         );
     }
@@ -2316,12 +1780,8 @@ public final class MainActivity extends Activity {
             String lastFour = payment.isNull("lastFour")
                 ? null
                 : payment.optString("lastFour");
-            if (lastFour == null) text.append(
-                brand == null ? "Card on file" : brand
-            );
-            else text.append(brand == null ? "Card" : brand)
-                .append(" ending in ")
-                .append(lastFour);
+            if (lastFour == null) text.append(brand == null ? "Card on file" : brand);
+            else text.append(brand == null ? "Card" : brand).append(" ending in ").append(lastFour);
             if (!payment.isNull("expiryMonth")) {
                 text.append(
                     String.format(
@@ -2354,13 +1814,8 @@ public final class MainActivity extends Activity {
                 if (i > 0) text.append("\n» ");
                 int sessions = entry.optInt("sessions");
                 text.append(
-                    SiteAdapter.money(
-                        entry.optDouble("amount"),
-                        entry.optString("currency", "USD")
-                    )
-                )
-                    .append(" owed across ")
-                    .append(sessions)
+                    SiteAdapter.money(entry.optDouble("amount"), entry.optString("currency", "USD"))
+                ).append(" owed across ").append(sessions)
                     .append(sessions == 1 ? " session" : " sessions");
             }
         } else text.append(
@@ -2429,19 +1884,13 @@ public final class MainActivity extends Activity {
     private void chooseRadius() {
         final double[] values = { 5, 12, 30, 60 };
         String[] labels = { "5 miles", "12 miles", "30 miles", "60 miles" };
-        new AlertDialog.Builder(this)
-            .setTitle("Search radius")
-            .setItems(
+        new AlertDialog.Builder(this).setTitle("Search radius").setItems(
                 labels,
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        radiusMiles = values[which];
-                        if (currentTab == DISCOVER) renderDiscover();
-                    }
+                (dialog, which) -> {
+                    radiusMiles = values[which];
+                    if (currentTab == DISCOVER) renderDiscover();
                 }
-            )
-            .show();
+            ).show();
     }
 
     private String displayRadius() {
@@ -2466,80 +1915,35 @@ public final class MainActivity extends Activity {
         final Failure failure
     ) {
         network.submit(
-            new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        final T result = task.call();
-                        main.post(
-                            new Runnable() {
-                                @Override
-                                public void run() {
-                                    if (!isFinishing()) success.accept(result);
-                                }
-                            }
-                        );
-                    } catch (final Exception error) {
-                        main.post(
-                            new Runnable() {
-                                @Override
-                                public void run() {
-                                    if (!isFinishing()) failure.accept(error);
-                                }
-                            }
-                        );
-                    }
+            () -> {
+                try {
+                    final T result = task.call();
+                    main.post(
+                        () -> {
+                            if (!isFinishing()) success.accept(result);
+                        }
+                    );
+                } catch (final Exception error) {
+                    main.post(
+                        () -> {
+                            if (!isFinishing()) failure.accept(error);
+                        }
+                    );
                 }
             }
         );
     }
 
     private Failure showError(final TextView inline) {
-        return new Failure() {
-            @Override
-            public void accept(Exception error) {
-                if (inline != null) inline.setText(error.getMessage());
-                else showErrorDialog(error);
-            }
+        return error -> {
+            if (inline != null) inline.setText(error.getMessage());
+            else showErrorDialog(error);
         };
     }
 
     private void showErrorDialog(Exception error) {
-        new AlertDialog.Builder(this)
-            .setTitle("Could not complete request")
-            .setMessage(error.getMessage())
-            .setPositiveButton("OK", null)
-            .show();
-    }
-
-
-    private void toast(String value) {
-        Toast.makeText(this, value, Toast.LENGTH_SHORT).show();
-    }
-
-    private void replaceContent(View view) {
-        content.removeAllViews();
-        content.addView(
-            view,
-            new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        );
-    }
-
-    private LinearLayout vertical() {
-        LinearLayout view = new LinearLayout(this);
-        view.setOrientation(LinearLayout.VERTICAL);
-        return view;
-    }
-
-    private LinearLayout.LayoutParams weighted() {
-        return new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            0,
-            1
-        );
+        new AlertDialog.Builder(this).setTitle("Could not complete request")
+            .setMessage(error.getMessage()).setPositiveButton("OK", null).show();
     }
 
     /** A centred spinner filling the content area while a request is in flight. */
@@ -2547,10 +1951,7 @@ public final class MainActivity extends Activity {
         FrameLayout host = new FrameLayout(this);
         host.setBackgroundColor(color(R.color.page));
         ProgressBar progress = new ProgressBar(this);
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-            dp(40),
-            dp(40)
-        );
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(dp(40), dp(40));
         params.gravity = Gravity.CENTER;
         host.addView(progress, params);
         return host;
@@ -2573,14 +1974,9 @@ public final class MainActivity extends Activity {
     }
 
     private void dismissKeyboard() {
-        InputMethodManager imm = (InputMethodManager) getSystemService(
-            INPUT_METHOD_SERVICE
-        );
+        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
         View focus = getCurrentFocus();
-        if (imm != null && focus != null) imm.hideSoftInputFromWindow(
-            focus.getWindowToken(),
-            0
-        );
+        if (imm != null && focus != null) imm.hideSoftInputFromWindow(focus.getWindowToken(), 0);
     }
 
     /** The single most useful action on a screen: filled, bold, unmistakable. */
@@ -2598,9 +1994,7 @@ public final class MainActivity extends Activity {
         button.setText(label);
         button.setTextSize(14);
         button.setAllCaps(false);
-        button.setBackgroundResource(
-            primary ? R.drawable.btn_primary : R.drawable.btn_secondary
-        );
+        button.setBackgroundResource(primary ? R.drawable.btn_primary : R.drawable.btn_secondary);
         button.setTextColor(
             primary
                 ? getResources().getColorStateList(R.color.btn_primary_text)
@@ -2636,11 +2030,7 @@ public final class MainActivity extends Activity {
     /** Quiet all-caps label grouping the rows beneath it. Capitals carry the
      *  hierarchy here, so this does not also need to be bold. */
     private TextView section(String text) {
-        TextView view = text(
-            text.toUpperCase(Locale.US),
-            11,
-            color(R.color.text_muted)
-        );
+        TextView view = text(text.toUpperCase(Locale.US), 11, color(R.color.text_muted));
         view.setPadding(dp(10), dp(10), dp(10), dp(4));
         return view;
     }
@@ -2682,14 +2072,7 @@ public final class MainActivity extends Activity {
         row.setPadding(dp(10), dp(5), dp(10), dp(5));
         TextView name = text(label, 13, color(R.color.text_muted));
         name.setSingleLine(true);
-        row.addView(
-            name,
-            new LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1
-            )
-        );
+        row.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         // Label and value are separated by colour, not weight: a screen of bold
         // numbers has no emphasis left to give.
         TextView amount = text(value, 13, color(R.color.text));
@@ -2710,33 +2093,13 @@ public final class MainActivity extends Activity {
         return view;
     }
 
-    private TextView text(String text, int sp, int color) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextSize(sp);
-        view.setTextColor(color);
-        view.setIncludeFontPadding(false);
-        return view;
-    }
-
     private View divider() {
         View line = new View(this);
         line.setBackgroundColor(color(R.color.divider));
         line.setLayoutParams(
-            new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(1)
-            )
+            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1))
         );
         return line;
-    }
-
-    private int color(int resId) {
-        return getResources().getColor(resId);
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     /** The inset a dialog puts its title and message text at, read from the
@@ -2744,9 +2107,7 @@ public final class MainActivity extends Activity {
      *  them. Falls back to the platform's usual 24dp if the theme is silent. */
     private int dialogTextInset(Context themed) {
         TypedValue value = new TypedValue();
-        boolean found = themed
-            .getTheme()
-            .resolveAttribute(
+        boolean found = themed.getTheme().resolveAttribute(
                 android.R.attr.dialogPreferredPadding,
                 value,
                 true

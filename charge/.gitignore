@@ -1,7 +1,5 @@
-# Build outputs. The release APK embeds a live Tesla refresh token in its DEX,
-# so it must never be committed: anyone with the file has the account.
-*.apk
-*.apk.idsig
+# Every APK is ignored at the root: the release APK embeds a live Tesla
+# refresh token in its DEX, and anyone with the file has the account.
 
 # Signing material
 *.jks

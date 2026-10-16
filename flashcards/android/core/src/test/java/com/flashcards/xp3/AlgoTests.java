@@ -2,13 +2,15 @@ package com.flashcards.xp3;
 
 import com.flashcards.xp3.algo.Fsrs;
 import com.flashcards.xp3.algo.GroupBuilder;
-import com.flashcards.xp3.algo.Scheduler;
+import com.flashcards.xp3.algo.ReviewSession;
 import com.flashcards.xp3.data.CardDef;
 import com.flashcards.xp3.data.Deck;
 import com.flashcards.xp3.data.DeckCard;
 
+import com.xp3.common.Check;
 import io.github.openspacedrepetition.Card;
 import io.github.openspacedrepetition.Rating;
+import io.github.openspacedrepetition.Scheduler;
 import io.github.openspacedrepetition.State;
 
 import java.time.Duration;
@@ -52,7 +54,7 @@ public final class AlgoTests {
 
     private static void fsrs(Check c) {
         c.run("fsrs", () -> {
-            io.github.openspacedrepetition.Scheduler sch = Fsrs.defaults();
+            Scheduler sch = Fsrs.defaults();
             // R(S, S) == 0.9 by construction of FACTOR: stability 1, one day ago.
             Card s1 = reviewed(1.0, 5.0, T0);
             c.close(
@@ -135,8 +137,8 @@ public final class AlgoTests {
         c.run("java-fsrs vectors", () -> {
             // testReviewCard: the interval history for the chain
             // G G G G G G A A G G G G G (fuzz off).
-            io.github.openspacedrepetition.Scheduler sch =
-                io.github.openspacedrepetition.Scheduler.builder()
+            Scheduler sch =
+                Scheduler.builder()
                     .parameters(JAVA_FSRS_1_PARAMETERS)
                     .enableFuzzing(false)
                     .build();
@@ -158,8 +160,8 @@ public final class AlgoTests {
             c.ok("interval history matches java-fsrs", expected.equals(ivlHistory));
 
             // testMemoState: AGAIN G G G G G then G (fuzz on, stability/difficulty unaffected).
-            io.github.openspacedrepetition.Scheduler sch2 =
-                io.github.openspacedrepetition.Scheduler.builder()
+            Scheduler sch2 =
+                Scheduler.builder()
                     .parameters(JAVA_FSRS_1_PARAMETERS)
                     .build();
             Card memo = Card.builder().cardId(101).build();
@@ -177,8 +179,8 @@ public final class AlgoTests {
             c.close("memo state difficulty", 6.8271, memo.getDifficulty(), 1e-4);
 
             // testRepeatedCorrectReviews: ten same-instant Easy ratings floor difficulty at 1.0.
-            io.github.openspacedrepetition.Scheduler sch3 =
-                io.github.openspacedrepetition.Scheduler.builder().enableFuzzing(false).build();
+            Scheduler sch3 =
+                Scheduler.builder().enableFuzzing(false).build();
             Card floor = Card.builder().cardId(102).build();
             for (int i = 0; i < 10; i++) {
                 floor =
@@ -193,8 +195,8 @@ public final class AlgoTests {
 
     private static void learningSteps(Check c) {
         c.run("learning steps", () -> {
-            io.github.openspacedrepetition.Scheduler sch =
-                io.github.openspacedrepetition.Scheduler.builder().build();
+            Scheduler sch =
+                Scheduler.builder().build();
             Card card = Card.builder().cardId(200).build();
             c.same("starts learning step 0", 0, card.getStep());
 
@@ -217,8 +219,8 @@ public final class AlgoTests {
             c.same("easy graduates at once", State.REVIEW, easy.getState());
 
             // A scheduler with no learning steps serves long-term intervals right away.
-            io.github.openspacedrepetition.Scheduler sch0 =
-                io.github.openspacedrepetition.Scheduler.builder()
+            Scheduler sch0 =
+                Scheduler.builder()
                     .learningSteps(new Duration[0])
                     .build();
             Card r0 =
@@ -235,8 +237,8 @@ public final class AlgoTests {
 
     private static void correctedFsrsEdges(Check c) {
         c.run("corrected FSRS edges", () -> {
-            io.github.openspacedrepetition.Scheduler sch =
-                io.github.openspacedrepetition.Scheduler.builder()
+            Scheduler sch =
+                Scheduler.builder()
                     .learningSteps(new Duration[]{Duration.ofMinutes(1)})
                     .relearningSteps(
                         new Duration[]{Duration.ofMinutes(2), Duration.ofMinutes(20)})
@@ -263,7 +265,7 @@ public final class AlgoTests {
             c.fails(
                 "rejects wrong parameter count",
                 "21 parameters",
-                () -> io.github.openspacedrepetition.Scheduler.builder()
+                () -> Scheduler.builder()
                     .parameters(new double[20])
                     .build());
             c.fails(
@@ -279,8 +281,8 @@ public final class AlgoTests {
             // days. Reference fuzz bounds for seven days are [5, 9].
             int[] seeds = {0, 1, 42, 12345, Integer.MAX_VALUE};
             for (int seed : seeds) {
-                io.github.openspacedrepetition.Scheduler sch =
-                    io.github.openspacedrepetition.Scheduler.builder()
+                Scheduler sch =
+                    Scheduler.builder()
                         .randomSeedNumber(seed)
                         .build();
                 Instant t = Instant.parse("2022-11-29T12:30:00Z");
@@ -296,13 +298,13 @@ public final class AlgoTests {
         c.run("stability floor", () -> {
             // Stability never dips under the library's STABILITY_MIN across a
             // thousand daily-late lapses.
-            io.github.openspacedrepetition.Scheduler sch =
-                io.github.openspacedrepetition.Scheduler.builder().build();
+            Scheduler sch =
+                Scheduler.builder().build();
             Card card = Card.builder().cardId(400).build();
             boolean bounded = true;
             for (int i = 0; i < 1000; i++) {
                 card = sch.reviewCard(card, Rating.AGAIN, card.getDue().plus(Duration.ofDays(1))).getCard();
-                if (card.getStability() < io.github.openspacedrepetition.Scheduler.STABILITY_MIN) {
+                if (card.getStability() < Scheduler.STABILITY_MIN) {
                     bounded = false;
                 }
             }
@@ -389,7 +391,7 @@ public final class AlgoTests {
             DeckCard firstNew = deck.cards().get(10);
             DeckCard secondNew = deck.cards().get(11);
 
-            Scheduler scheduler = new Scheduler(deck, now, new Random(9L));
+            ReviewSession scheduler = new ReviewSession(deck, now, new Random(9L));
             scheduler.next();
 
             int introduced = 0;
@@ -520,7 +522,7 @@ public final class AlgoTests {
             for (DeckCard card : deck.cards()) {
                 card.fsrs = reviewed(4.0, 5.0, originalReview);
             }
-            Scheduler s = new Scheduler(deck, now, new Random(3L));
+            ReviewSession s = new ReviewSession(deck, now, new Random(3L));
 
             // A deck of 12 yields a first group of exactly GROUP_SIZE.
             DeckCard first = s.next();

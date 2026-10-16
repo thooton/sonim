@@ -1,6 +1,6 @@
 package com.delta.xp3.data;
 
-import com.delta.xp3.net.Json;
+import com.xp3.common.Json;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

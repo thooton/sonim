@@ -26,7 +26,8 @@ do. Search, download link and download are the source's own `/eapi` endpoints,
 with the CLI's headers, cookies, redirects and domain selection; if the CLI's
 client changes, change `Books` here and keep its test in step.
 
-- `android/core`: `net/` — `Http`, `Json` (copied from Delta), `Login` (the
+- `android/core`: `net/` — over the shared `Http` and `Json`
+  (`../common/core`): `Login` (the
   command center address and token, validated as Delta's `Config` does),
   `Music` (the music routes), `Books` (the book source client and file
   names), `Tar` (a minimal reader), `Names` (makes job paths safe under the
@@ -39,8 +40,8 @@ client changes, change `Books` here and keep its test in step.
 
 ## Credentials
 
-`app/build.gradle` bakes the login into a generated `Defaults.java` under
+`app/build.gradle` bakes the login into a generated `Bundled.java` under
 `build/`, from the same places as the Delta app plus the `DELTA_SERVER` /
-`DELTA_TOKEN` environment. A bundled login is adopted once per revision.
+`DELTA_TOKEN` environment (`deltaCenter` in `../gradle/bundled.gradle`). A bundled login is adopted once per revision.
 Never print, commit or attach the config files, the generated source, the
 book account or session, or the APK.

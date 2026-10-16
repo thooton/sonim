@@ -1,0 +1,35 @@
+// What every :core shares. A core is the Android-free half of an app, plain
+// Java so it can be run and checked on a desktop JVM; each app's
+// core/build.gradle applies this and adds at most a dependency on
+// :common:core.
+
+apply plugin: "java-library"
+
+// `release = 8` is the guard that makes "plain Java" mean something.
+// Everything here also has to run unchanged on Android at API 27, and the
+// compiler is the only thing that reliably notices code reaching for an API
+// the phone does not have: List.of, String.isBlank, java.net.http and the rest
+// fail the build here rather than at the first launch on a handset.
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 8
+}
+
+// A plain Java test runner rather than a framework, which would be the first
+// third-party dependency in a tree that has none. Check, the whole of the
+// "framework", is shared from :common:core's test fixtures, and each app's
+// tests start at com.<app>.xp3.SelfTest.
+dependencies {
+    testImplementation testFixtures(project(":common:core"))
+}
+
+tasks.register("selfTest", JavaExec) {
+    dependsOn "testClasses"
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = "com.${project.parent.name}.xp3.SelfTest"
+}
+tasks.named("check") { dependsOn "selfTest" }
+tasks.named("test") {
+    dependsOn "selfTest"
+    enabled = false // The runner above replaces framework discovery.
+}

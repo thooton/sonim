@@ -1,6 +1,5 @@
 package com.list.xp3;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -13,23 +12,21 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
-import android.widget.AdapterView;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.list.xp3.data.Checklist;
 import com.list.xp3.data.Item;
+import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Ui;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * The checklist and the keys that edit it.
@@ -40,7 +37,7 @@ import java.util.concurrent.ThreadFactory;
  * Everything with a disk behind it is behind Backend. The list is saved on
  * its own single thread so writes land in the order the edits were made.
  */
-public final class MainActivity extends Activity {
+public final class MainActivity extends BaseActivity {
 
     /** Menu item ids. The menu is rebuilt on every press of Menu. */
     private static final int MENU_INSERT_ABOVE = 1;
@@ -54,18 +51,7 @@ public final class MainActivity extends Activity {
     private Backend backend;
     private FrameLayout content;
 
-    private final ExecutorService saves = pool("list-save");
-
-    private static ExecutorService pool(final String name) {
-        return Executors.newSingleThreadExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable runnable) {
-                Thread thread = new Thread(runnable, name);
-                thread.setDaemon(true);
-                return thread;
-            }
-        });
-    }
+    private final ExecutorService saves = Ui.worker("list-save");
 
     // ------------------------------------------------------------------
     // List state
@@ -127,8 +113,8 @@ public final class MainActivity extends Activity {
             // and so Menu's popup has something to sit beside.
             empty.setFocusable(true);
             empty.setFocusableInTouchMode(true);
-            root.addView(empty, weighted());
-            replaceContent(root);
+            root.addView(empty, Ui.weighted());
+            Ui.fill(content, root);
             emptyView = empty;
             listSelection = 0;
             if (focus) empty.requestFocus();
@@ -139,9 +125,9 @@ public final class MainActivity extends Activity {
         final ItemAdapter adapter = new ItemAdapter(this);
         adapter.replace(items);
         ListView list = listView(adapter);
-        root.addView(list, weighted());
+        root.addView(list, Ui.weighted());
         wireList(list, adapter);
-        replaceContent(root);
+        Ui.fill(content, root);
         listAdapter = adapter;
         listView = list;
 
@@ -180,37 +166,23 @@ public final class MainActivity extends Activity {
     private void wireList(final ListView list, final ItemAdapter adapter) {
         list.setFocusable(true);
         list.setFocusableInTouchMode(true);
-        list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                adapter.trackSelectedPosition(position);
-                listSelection = position;
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+        Ui.onSelect(list, position -> {
+            adapter.trackSelectedPosition(position);
+            listSelection = position;
         });
-        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                toggle(position);
-            }
-        });
+        list.setOnItemClickListener((parent, view, position, id) -> toggle(position));
         // Sonim firmware variants report the physical OK key as either
         // DPAD_CENTER or ENTER. Handle activation only; arrows stay with
         // ListView's native selection and scrolling implementation.
-        list.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View view, int keyCode, KeyEvent event) {
-                if (!isOk(keyCode)) return false;
-                if (heldForMenu(event)) return true;
-                if (event.getAction() != KeyEvent.ACTION_UP) return true;
-                if (event.getDownTime() == consumedOkDownTime) return true;
-                int position = adapter.getSelectedPosition();
-                if (position < 0 || position >= adapter.getCount()) return false;
-                toggle(position);
-                return true;
-            }
+        list.setOnKeyListener((view, keyCode, event) -> {
+            if (!Ui.isOk(keyCode)) return false;
+            if (heldForMenu(event)) return true;
+            if (event.getAction() != KeyEvent.ACTION_UP) return true;
+            if (event.getDownTime() == consumedOkDownTime) return true;
+            int position = adapter.getSelectedPosition();
+            if (position < 0 || position >= adapter.getCount()) return false;
+            toggle(position);
+            return true;
         });
     }
 
@@ -238,12 +210,6 @@ public final class MainActivity extends Activity {
 
     private boolean okHeld;
 
-    private static boolean isOk(int keyCode) {
-        return keyCode == KeyEvent.KEYCODE_DPAD_CENTER
-            || keyCode == KeyEvent.KEYCODE_ENTER
-            || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER;
-    }
-
     private void toggle(int position) {
         Checklist list = backend.checklist();
         if (position < 0 || position >= list.size()) return;
@@ -254,12 +220,7 @@ public final class MainActivity extends Activity {
 
     private void itemAction(int action, final int position, final Item chosen) {
         if (action == MENU_ADD) {
-            promptText("Add item", "", new TextResult() {
-                @Override
-                public void accept(String text) {
-                    insertNear(-1, null, 0, text);
-                }
-            });
+            promptText("Add item", "", text -> insertNear(-1, null, 0, text));
             return;
         }
         if (locate(position, chosen) < 0) {
@@ -268,25 +229,19 @@ public final class MainActivity extends Activity {
         }
         if (action == MENU_INSERT_ABOVE || action == MENU_INSERT_BELOW) {
             final int offset = action == MENU_INSERT_ABOVE ? 0 : 1;
-            promptText(action == MENU_INSERT_ABOVE ? "Insert above" : "Insert below", "", new TextResult() {
-                @Override
-                public void accept(String text) {
-                    insertNear(position, chosen, offset, text);
-                }
+            promptText(action == MENU_INSERT_ABOVE ? "Insert above" : "Insert below", "", text -> {
+                insertNear(position, chosen, offset, text);
             });
         } else if (action == MENU_EDIT) {
-            promptText("Edit item", chosen.text, new TextResult() {
-                @Override
-                public void accept(String text) {
-                    int at = locate(position, chosen);
-                    if (at < 0) {
-                        toast("That item has changed");
-                        return;
-                    }
-                    backend.checklist().edit(at, text);
-                    saveList();
-                    redrawList(at);
+            promptText("Edit item", chosen.text, text -> {
+                int at = locate(position, chosen);
+                if (at < 0) {
+                    toast("That item has changed");
+                    return;
                 }
+                backend.checklist().edit(at, text);
+                saveList();
+                redrawList(at);
             });
         } else if (action == MENU_MOVE_UP || action == MENU_MOVE_DOWN) {
             int at = locate(position, chosen);
@@ -370,61 +325,42 @@ public final class MainActivity extends Activity {
             .setPositiveButton("Save", null)
             .setNegativeButton("Cancel", null)
             .create();
-        final Runnable commit = new Runnable() {
-            @Override
-            public void run() {
-                String text = field.getText().toString().trim();
-                if (text.length() == 0) {
-                    toast("Type something first");
-                    return;
-                }
-                dialog.dismiss();
-                try {
-                    result.accept(text);
-                } catch (IllegalArgumentException e) {
-                    toast(e.getMessage());
-                }
+        final Runnable commit = () -> {
+            String text = field.getText().toString().trim();
+            if (text.length() == 0) {
+                toast("Type something first");
+                return;
+            }
+            dialog.dismiss();
+            try {
+                result.accept(text);
+            } catch (IllegalArgumentException e) {
+                toast(e.getMessage());
             }
         };
-        field.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View view, int keyCode, KeyEvent event) {
-                if (!isOk(keyCode)) return false;
-                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-                    consumedOkDownTime = event.getDownTime();
-                    commit.run();
-                }
-                return true;
-            }
-        });
-        field.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(TextView view, int actionId, KeyEvent event) {
-                if (actionId != EditorInfo.IME_ACTION_DONE) return false;
+        field.setOnKeyListener((view, keyCode, event) -> {
+            if (!Ui.isOk(keyCode)) return false;
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                consumedOkDownTime = event.getDownTime();
                 commit.run();
-                return true;
             }
+            return true;
+        });
+        field.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId != EditorInfo.IME_ACTION_DONE) return false;
+            commit.run();
+            return true;
         });
         dialog.show();
         // Wired after show() so an empty field keeps the dialog open.
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                commit.run();
-            }
-        });
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> commit.run());
         field.requestFocus();
     }
 
     /** Writes the list down as it stands now, in edit order, off the main thread. */
     private void saveList() {
         final List<Item> snapshot = backend.checklist().items();
-        saves.execute(new Runnable() {
-            @Override
-            public void run() {
-                backend.saveList(snapshot);
-            }
-        });
+        saves.execute(() -> backend.saveList(snapshot));
     }
 
     // ------------------------------------------------------------------
@@ -578,26 +514,6 @@ public final class MainActivity extends Activity {
         }
     }
 
-    // ------------------------------------------------------------------
-    // View helpers
-    // ------------------------------------------------------------------
-
-    private void replaceContent(View view) {
-        content.removeAllViews();
-        content.addView(view, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-    }
-
-    private LinearLayout vertical() {
-        LinearLayout view = new LinearLayout(this);
-        view.setOrientation(LinearLayout.VERTICAL);
-        return view;
-    }
-
-    private LinearLayout.LayoutParams weighted() {
-        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1);
-    }
-
     private ListView listView(ListAdapter adapter) {
         return configureListView(new ListView(this), adapter);
     }
@@ -628,17 +544,5 @@ public final class MainActivity extends Activity {
         view.setLineSpacing(dp(3), 1f);
         view.setPadding(dp(16), dp(16), dp(16), dp(16));
         return view;
-    }
-
-    private void toast(String value) {
-        Toast.makeText(this, value, Toast.LENGTH_SHORT).show();
-    }
-
-    private int color(int resId) {
-        return getResources().getColor(resId);
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

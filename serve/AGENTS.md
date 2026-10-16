@@ -16,7 +16,7 @@ driven, no AndroidX or third-party libraries, `:core` plain Java
   `Ranges`, `Mime`, `Addresses` (local IPv4s, Wi-Fi first). Tests in
   `src/test` run a real server on loopback via `:core:selfTest`.
 - `android/app`: `MainActivity` (the one screen, keys, the folder picker as
-  stacked AlertDialogs like Delta's file picker) and `ServeService` (the
+  stacked list dialogs, `listDialog` in `common/ui`, like Delta's file picker) and `ServeService` (the
   foreground service that owns the running `Server`, with a partial wake
   lock and a Wi-Fi lock, and a Stop action on its notification).
 
@@ -30,8 +30,7 @@ the ports dev servers commonly use.
 ## Build and validation
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRelease
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :serve:core:selfTest :serve:app:assembleRelease
 ```
 
 There are no UI automation tests; key, dialog and notification changes need

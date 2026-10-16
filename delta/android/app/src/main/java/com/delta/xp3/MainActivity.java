@@ -1,6 +1,5 @@
 package com.delta.xp3;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
@@ -36,14 +35,12 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.delta.xp3.data.Attached;
 import com.delta.xp3.data.Queued;
@@ -56,6 +53,9 @@ import com.delta.xp3.data.Transcript;
 import com.delta.xp3.net.Center;
 import com.delta.xp3.net.Cloud;
 import com.delta.xp3.net.Sse;
+import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Tabs;
+import com.xp3.common.ui.Ui;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -68,8 +68,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * Delta on the phone: four tabs over the cloud sessions and the command
@@ -102,13 +100,12 @@ import java.util.concurrent.ThreadFactory;
  * serves (CaptureProvider), or the stock Gallery's picker. They wait above the
  * box, shrunk and saved, until the next message carries them.
  */
-public final class MainActivity extends Activity {
+public final class MainActivity extends BaseActivity {
 
     private static final int CHATS = 0;
     private static final int SESSION = 1;
     private static final int FILES = 2;
     private static final int ACCOUNTS = 3;
-    private static final int TABS = 4;
 
     private static final int FOCUS_NONE = 0;
     private static final int FOCUS_LIST = 1;
@@ -173,31 +170,20 @@ public final class MainActivity extends Activity {
     /** The first row of Chats, which is not a session. */
 
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final ExecutorService saves = pool("delta-save");
-    private final ExecutorService requests = pool("delta-request");
-    private final ExecutorService lists = pool("delta-list");
-    private final ExecutorService downloads = pool("delta-download");
-    private final ExecutorService picturesWork = pool("delta-pictures");
-    private final ExecutorService moves = pool("delta-move");
-    private final ExecutorService uploads = pool("delta-upload");
-
-    private static ExecutorService pool(final String name) {
-        return Executors.newSingleThreadExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable runnable) {
-                Thread thread = new Thread(runnable, name);
-                thread.setDaemon(true);
-                return thread;
-            }
-        });
-    }
+    private final ExecutorService saves = Ui.worker("delta-save");
+    private final ExecutorService requests = Ui.worker("delta-request");
+    private final ExecutorService lists = Ui.worker("delta-list");
+    private final ExecutorService downloads = Ui.worker("delta-download");
+    private final ExecutorService picturesWork = Ui.worker("delta-pictures");
+    private final ExecutorService moves = Ui.worker("delta-move");
+    private final ExecutorService uploads = Ui.worker("delta-upload");
 
     private Backend backend;
     private Pictures pictures;
     /** Pictures still being shrunk; a message waits for them. */
     private int preparing;
     private FrameLayout content;
-    private Button[] tabs;
+    private Tabs tabs;
     private int currentTab = CHATS;
 
     // ------------------------------------------------------------------
@@ -213,12 +199,7 @@ public final class MainActivity extends Activity {
     /** Whether the new, unsent session is to be a backup one (▲) rather than a cloud one (●). */
     private boolean newBackup;
     /** Sends the waiting messages that are due, and redraws the foot of the transcript when a limit lifts. */
-    private final Runnable tick = new Runnable() {
-        @Override
-        public void run() {
-            sendDue();
-        }
-    };
+    private final Runnable tick = () -> sendDue();
     private Link link;
     private boolean online;
     /** Bumped whenever a different session is opened; anything older that comes back is dropped. */
@@ -324,21 +305,7 @@ public final class MainActivity extends Activity {
         local = backend.downloads();
 
         content = findViewById(R.id.content);
-        tabs = new Button[] {
-            findViewById(R.id.tab_chats),
-            findViewById(R.id.tab_session),
-            findViewById(R.id.tab_files),
-            findViewById(R.id.tab_accounts),
-        };
-        for (int i = 0; i < tabs.length; i++) {
-            final int which = i;
-            tabs[i].setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    showTab(which, true);
-                }
-            });
-        }
+        tabs = new Tabs(this, which -> showTab(which, true), R.id.tab_chats, R.id.tab_session, R.id.tab_files, R.id.tab_accounts);
         // Every context menu is answered here; see showMenu.
         registerForContextMenu(content);
         showTab(tab, true);
@@ -352,17 +319,9 @@ public final class MainActivity extends Activity {
         // Whether a session can move to another account is decided on the
         // main thread, from the accounts already listed.
         if (backend.ready()) {
-            lists.execute(new Runnable() {
-                @Override
-                public void run() {
-                    backend.warm();
-                    main.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            updateChat();
-                        }
-                    });
-                }
+            lists.execute(() -> {
+                backend.warm();
+                main.post(() -> updateChat());
             });
         }
         sendDue();
@@ -420,17 +379,9 @@ public final class MainActivity extends Activity {
     /** Forgets old transcripts, and the pictures only they showed. */
     private void prune() {
         final String open = sessionId;
-        saves.execute(new Runnable() {
-            @Override
-            public void run() {
-                final Set<String> shown = backend.prune(open);
-                picturesWork.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        pictures.retain(shown);
-                    }
-                });
-            }
+        saves.execute(() -> {
+            final Set<String> shown = backend.prune(open);
+            picturesWork.execute(() -> pictures.retain(shown));
         });
     }
 
@@ -442,7 +393,7 @@ public final class MainActivity extends Activity {
         if (currentTab == SESSION && tab != SESSION) saveScrollPosition();
         leaveScreens();
         currentTab = tab;
-        for (int i = 0; i < tabs.length; i++) tabs[i].setSelected(i == tab);
+        tabs.mark(tab);
         if (tab == CHATS) {
             renderChats(focusContent);
             refreshChats();
@@ -474,12 +425,6 @@ public final class MainActivity extends Activity {
         uploadView = null;
     }
 
-    private void replaceContent(View view) {
-        content.removeAllViews();
-        content.addView(view, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-    }
-
     // ------------------------------------------------------------------
     // Chats
     // ------------------------------------------------------------------
@@ -489,30 +434,22 @@ public final class MainActivity extends Activity {
         chatsLoading = true;
         final int forGeneration = ++chatsGeneration;
         if (currentTab == CHATS) updateChatRows();
-        lists.execute(new Runnable() {
-            @Override
-            public void run() {
-                List<Chat> fetched = null;
-                String problem = null;
-                try {
-                    fetched = backend.sessions();
-                    String left = backend.listProblem();
-                    if (left != null) problem = "Some sessions are missing. " + left;
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } catch (Exception e) {
-                    problem = "Couldn't refresh: " + reason(e);
-                }
-                final List<Chat> result = fetched;
-                final String said = problem;
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        chatsFetched(result, said, forGeneration);
-                    }
-                });
+        lists.execute(() -> {
+            List<Chat> fetched = null;
+            String problem = null;
+            try {
+                fetched = backend.sessions();
+                String left = backend.listProblem();
+                if (left != null) problem = "Some sessions are missing. " + left;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception e) {
+                problem = "Couldn't refresh: " + reason(e);
             }
+            final List<Chat> result = fetched;
+            final String said = problem;
+            main.post(() -> chatsFetched(result, said, forGeneration));
         });
     }
 
@@ -523,12 +460,7 @@ public final class MainActivity extends Activity {
         if (fetched != null) {
             chats = fetched;
             final List<Chat> snapshot = new ArrayList<>(fetched);
-            saves.execute(new Runnable() {
-                @Override
-                public void run() {
-                    backend.saveChats(snapshot);
-                }
-            });
+            saves.execute(() -> backend.saveChats(snapshot));
             // A session is titled by the cloud after its first turn, or renamed
             // on the web; the open one follows.
             for (Chat chat : fetched) {
@@ -544,7 +476,7 @@ public final class MainActivity extends Activity {
 
     private void renderChats(boolean focusContent) {
         if (!anySessions()) {
-            replaceContent(emptyMessage(Backend.NO_LOGIN));
+            Ui.fill(content, emptyMessage(Backend.NO_LOGIN));
             return;
         }
         LinearLayout root = vertical();
@@ -552,11 +484,11 @@ public final class MainActivity extends Activity {
         root.addView(notice);
         final RowAdapter adapter = new RowAdapter(this);
         final ListView list = listView(adapter);
-        root.addView(list, weighted());
+        root.addView(list, Ui.weighted());
         rowList = list;
         rowAdapter = adapter;
         wireRows(list, adapter);
-        replaceContent(root);
+        Ui.fill(content, root);
         updateChatRows();
         int position = adapter.positionOf(chatsKey != null ? chatsKey : sessionId);
         select(list, adapter, position < 0 ? 0 : position);
@@ -635,48 +567,37 @@ public final class MainActivity extends Activity {
         new AlertDialog.Builder(this)
             .setTitle(verb)
             .setMessage(message)
-            .setPositiveButton(verb, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    archive(chat);
-                }
-            })
+            .setPositiveButton(verb, (dialog, which) -> archive(chat))
             .setNegativeButton("Cancel", null)
             .show();
     }
 
     private void archive(final Chat chat) {
-        lists.execute(new Runnable() {
-            @Override
-            public void run() {
-                String problem = null;
-                try {
-                    backend.archive(chat.id);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } catch (Exception e) {
-                    problem = reason(e);
-                }
-                final String said = problem;
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (isFinishing()) return;
-                        boolean backup = Chat.backup(chat.id);
-                        if (said != null) {
-                            toast((backup ? "Not deleted: " : "Not archived: ") + said);
-                            return;
-                        }
-                        toast(backup ? "Deleted" : "Archived");
-                        List<Chat> left = new ArrayList<>();
-                        for (Chat other : chats) if (!other.id.equals(chat.id)) left.add(other);
-                        chats = left;
-                        if (chat.id.equals(sessionId)) newSession(defaultBackup());
-                        if (currentTab == CHATS) updateChatRows();
-                    }
-                });
+        lists.execute(() -> {
+            String problem = null;
+            try {
+                backend.archive(chat.id);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception e) {
+                problem = reason(e);
             }
+            final String said = problem;
+            main.post(() -> {
+                if (isFinishing()) return;
+                boolean backup = Chat.backup(chat.id);
+                if (said != null) {
+                    toast((backup ? "Not deleted: " : "Not archived: ") + said);
+                    return;
+                }
+                toast(backup ? "Deleted" : "Archived");
+                List<Chat> left = new ArrayList<>();
+                for (Chat other : chats) if (!other.id.equals(chat.id)) left.add(other);
+                chats = left;
+                if (chat.id.equals(sessionId)) newSession(defaultBackup());
+                if (currentTab == CHATS) updateChatRows();
+            });
         });
     }
 
@@ -696,55 +617,49 @@ public final class MainActivity extends Activity {
         accountsLoading = true;
         final int forGeneration = ++accountsGeneration;
         if (currentTab == ACCOUNTS) updateAccountRows();
-        lists.execute(new Runnable() {
-            @Override
-            public void run() {
-                List<Backend.AccountUsage> fetched = null;
-                String problem = null;
-                try {
-                    fetched = backend.usage();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } catch (Exception e) {
-                    problem = "Couldn't refresh: " + reason(e);
-                }
-                final List<Backend.AccountUsage> result = fetched;
-                final String said = problem;
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (forGeneration != accountsGeneration || isFinishing()) return;
-                        accountsLoading = false;
-                        accountsProblem = said;
-                        if (result != null) {
-                            accountUsage = result;
-                            accountsLoaded = true;
-                        }
-                        if (currentTab == ACCOUNTS) updateAccountRows();
-                        // What was learnt may change what a session can do.
-                        updateChat();
-                        scheduleTick();
-                    }
-                });
+        lists.execute(() -> {
+            List<Backend.AccountUsage> fetched = null;
+            String problem = null;
+            try {
+                fetched = backend.usage();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception e) {
+                problem = "Couldn't refresh: " + reason(e);
             }
+            final List<Backend.AccountUsage> result = fetched;
+            final String said = problem;
+            main.post(() -> {
+                if (forGeneration != accountsGeneration || isFinishing()) return;
+                accountsLoading = false;
+                accountsProblem = said;
+                if (result != null) {
+                    accountUsage = result;
+                    accountsLoaded = true;
+                }
+                if (currentTab == ACCOUNTS) updateAccountRows();
+                // What was learnt may change what a session can do.
+                updateChat();
+                scheduleTick();
+            });
         });
     }
 
     private void renderAccounts(boolean focusContent) {
         if (!backend.ready()) {
-            replaceContent(emptyMessage(Backend.NO_LOGIN));
+            Ui.fill(content, emptyMessage(Backend.NO_LOGIN));
             return;
         }
         LinearLayout root = vertical();
         root.addView(notice());
         final RowAdapter adapter = new RowAdapter(this);
         final ListView list = listView(adapter);
-        root.addView(list, weighted());
+        root.addView(list, Ui.weighted());
         rowList = list;
         rowAdapter = adapter;
         wireRows(list, adapter);
-        replaceContent(root);
+        Ui.fill(content, root);
         updateAccountRows();
         int position = adapter.positionOf(accountsKey);
         select(list, adapter, position < 0 ? 0 : position);
@@ -838,24 +753,16 @@ public final class MainActivity extends Activity {
         link = backend.link(sessionId, transcript.sequence(), new Link.Listener() {
             @Override
             public void frame(final Sse.Frame frame) {
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        received(frame, forGeneration);
-                    }
-                });
+                main.post(() -> received(frame, forGeneration));
             }
 
             @Override
             public void online(final boolean up) {
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (forGeneration != generation) return;
-                        online = up;
-                        updateHeader();
-                        updateChatRows();
-                    }
+                main.post(() -> {
+                    if (forGeneration != generation) return;
+                    online = up;
+                    updateHeader();
+                    updateChatRows();
                 });
             }
         });
@@ -878,12 +785,7 @@ public final class MainActivity extends Activity {
         boolean wasWorking = transcript.working();
         boolean changed = transcript.apply(frame.event, frame.id, frame.data);
         if (backend.limited(sessionId, transcript.limitedUntil())) {
-            saves.execute(new Runnable() {
-                @Override
-                public void run() {
-                    backend.saveLimits();
-                }
-            });
+            saves.execute(() -> backend.saveLimits());
             // The foot of the transcript now says so, and offers the move.
             changed = true;
             scheduleTick();
@@ -932,12 +834,7 @@ public final class MainActivity extends Activity {
         if (sessionId != null && backend.limitedUntil(sessionId) > 0) {
             transcript.queued(uuid, Attached.line(message, sentFiles), attached.size());
             backend.enqueue(sessionId, uuid, message, sentFiles, attached.size());
-            saves.execute(new Runnable() {
-                @Override
-                public void run() {
-                    backend.saveQueue();
-                }
-            });
+            saves.execute(() -> backend.saveQueue());
             scheduleTick();
             saveNow();
             render(FOCUS_INPUT);
@@ -950,36 +847,25 @@ public final class MainActivity extends Activity {
                 : !attached.isEmpty() ? (attached.size() == 1 ? "Picture" : "Pictures")
                 : titleFor(sentFiles.get(0));
             final String sessionTitle = title;
-            requests.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        final String id = backend.create(backup, sessionTitle, uuid, message, attached, sentFiles);
-                        main.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                created(id, forGeneration);
-                            }
-                        });
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    } catch (Exception e) {
-                        failed("Could not start the session: " + reason(e), forGeneration);
-                    }
+            requests.execute(() -> {
+                try {
+                    final String id = backend.create(backup, sessionTitle, uuid, message, attached, sentFiles);
+                    main.post(() -> created(id, forGeneration));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (Exception e) {
+                    failed("Could not start the session: " + reason(e), forGeneration);
                 }
             });
         } else {
             final String session = sessionId;
-            requests.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        backend.send(session, uuid, message, attached, sentFiles);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    } catch (Exception e) {
-                        failed("Not sent: " + reason(e), forGeneration);
-                    }
+            requests.execute(() -> {
+                try {
+                    backend.send(session, uuid, message, attached, sentFiles);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (Exception e) {
+                    failed("Not sent: " + reason(e), forGeneration);
                 }
             });
         }
@@ -1003,20 +889,17 @@ public final class MainActivity extends Activity {
 
     /** Called on the request worker. */
     private void failed(final String problem, final int forGeneration) {
-        main.post(new Runnable() {
-            @Override
-            public void run() {
-                if (forGeneration != generation || isFinishing()) return;
-                if (creating) {
-                    creating = false;
-                    title = null;
-                }
-                transcript.note(problem);
-                transcript.idle();
-                saveNow();
-                updateChat();
-                updateHeader();
+        main.post(() -> {
+            if (forGeneration != generation || isFinishing()) return;
+            if (creating) {
+                creating = false;
+                title = null;
             }
+            transcript.note(problem);
+            transcript.idle();
+            saveNow();
+            updateChat();
+            updateHeader();
         });
     }
 
@@ -1040,12 +923,7 @@ public final class MainActivity extends Activity {
         final String from = sessionId;
         final String was = title;
         final List<Queued> waiting = backend.takeQueued(from);
-        saves.execute(new Runnable() {
-            @Override
-            public void run() {
-                backend.saveQueue();
-            }
-        });
+        saves.execute(() -> backend.saveQueue());
         StringBuilder typed = new StringBuilder();
         final List<String> names = new ArrayList<>();
         final List<File> sentPictures = new ArrayList<>();
@@ -1070,40 +948,22 @@ public final class MainActivity extends Activity {
         transcript.carried(uuid);
         if (text.length() > 0 || !names.isEmpty()) transcript.queued(uuid, Attached.line(text, names), 0);
         render(FOCUS_INPUT);
-        requests.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    final String id = backend.move(from, was, uuid, text, sentPictures, names);
-                    main.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            created(id, forGeneration);
-                        }
-                    });
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } catch (Exception e) {
-                    final String problem = reason(e);
-                    main.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            notMoved(from, waiting, problem, forGeneration);
-                        }
-                    });
-                }
+        requests.execute(() -> {
+            try {
+                final String id = backend.move(from, was, uuid, text, sentPictures, names);
+                main.post(() -> created(id, forGeneration));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                final String problem = reason(e);
+                main.post(() -> notMoved(from, waiting, problem, forGeneration));
             }
         });
     }
 
     private void notMoved(String from, List<Queued> waiting, String problem, int forGeneration) {
         backend.requeue(waiting);
-        saves.execute(new Runnable() {
-            @Override
-            public void run() {
-                backend.saveQueue();
-            }
-        });
+        saves.execute(() -> backend.saveQueue());
         if (forGeneration != generation || isFinishing()) return;
         switchTo(from);
         connect();
@@ -1120,58 +980,42 @@ public final class MainActivity extends Activity {
         if (isFinishing()) return;
         final List<Queued> ready = backend.due();
         if (!ready.isEmpty()) {
-            saves.execute(new Runnable() {
-                @Override
-                public void run() {
-                    backend.saveQueue();
-                }
-            });
+            saves.execute(() -> backend.saveQueue());
         }
         for (final Queued message : ready) {
             if (message.session.equals(sessionId)) transcript.resumed();
-            requests.execute(new Runnable() {
-                @Override
-                public void run() {
-                    List<File> attached = new ArrayList<>();
-                    for (int i = 0; i < message.pictures; i++) {
-                        File picture = pictures.sent(message.uuid, i);
-                        if (picture.isFile()) attached.add(picture);
-                    }
-                    String problem = null;
-                    try {
-                        backend.send(message.session, message.uuid, message.text, attached, message.files);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    } catch (Exception e) {
-                        problem = reason(e);
-                    }
-                    final String said = problem;
-                    main.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (said == null) return;
-                            boolean again = message.tries < 9;
-                            if (again) {
-                                backend.retry(message);
-                                saves.execute(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        backend.saveQueue();
-                                    }
-                                });
-                                scheduleTick();
-                            }
-                            if (message.session.equals(sessionId)) {
-                                transcript.idle();
-                                transcript.note((again ? "Not sent yet, trying again in a minute: " : "Not sent: ") + said);
-                                scheduleSave();
-                                updateChat();
-                                updateHeader();
-                            }
-                        }
-                    });
+            requests.execute(() -> {
+                List<File> attached = new ArrayList<>();
+                for (int i = 0; i < message.pictures; i++) {
+                    File picture = pictures.sent(message.uuid, i);
+                    if (picture.isFile()) attached.add(picture);
                 }
+                String problem = null;
+                try {
+                    backend.send(message.session, message.uuid, message.text, attached, message.files);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (Exception e) {
+                    problem = reason(e);
+                }
+                final String said = problem;
+                main.post(() -> {
+                    if (said == null) return;
+                    boolean again = message.tries < 9;
+                    if (again) {
+                        backend.retry(message);
+                        saves.execute(() -> backend.saveQueue());
+                        scheduleTick();
+                    }
+                    if (message.session.equals(sessionId)) {
+                        transcript.idle();
+                        transcript.note((again ? "Not sent yet, trying again in a minute: " : "Not sent: ") + said);
+                        scheduleSave();
+                        updateChat();
+                        updateHeader();
+                    }
+                });
             });
         }
         updateChat();
@@ -1221,26 +1065,18 @@ public final class MainActivity extends Activity {
     private void interrupt() {
         if (sessionId == null) return;
         final String session = sessionId;
-        requests.execute(new Runnable() {
-            @Override
-            public void run() {
-                String problem = null;
-                try {
-                    backend.interrupt(session);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } catch (Exception e) {
-                    problem = reason(e);
-                }
-                final String said = problem == null ? "Interrupt sent" : "Interrupt not sent: " + problem;
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        toast(said);
-                    }
-                });
+        requests.execute(() -> {
+            String problem = null;
+            try {
+                backend.interrupt(session);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception e) {
+                problem = reason(e);
             }
+            final String said = problem == null ? "Interrupt sent" : "Interrupt not sent: " + problem;
+            main.post(() -> toast(said));
         });
     }
 
@@ -1258,16 +1094,13 @@ public final class MainActivity extends Activity {
         scheduleSave();
         updateChat();
         updateHeader();
-        requests.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    backend.answer(session, pending.requestId, allow, pending.input);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } catch (Exception e) {
-                    failed("Answer not sent: " + reason(e), forGeneration);
-                }
+        requests.execute(() -> {
+            try {
+                backend.answer(session, pending.requestId, allow, pending.input);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                failed("Answer not sent: " + reason(e), forGeneration);
             }
         });
     }
@@ -1368,12 +1201,7 @@ public final class MainActivity extends Activity {
         if (request == TAKE_PICTURE) {
             final File shot = Pictures.capture(getFilesDir());
             if (shot.isFile() && shot.length() > 0) {
-                prepare(new Pictures.Source() {
-                    @Override
-                    public InputStream open() throws IOException {
-                        return new FileInputStream(shot);
-                    }
-                }, shot);
+                prepare(() -> new FileInputStream(shot), shot);
                 return;
             }
             // A camera that ignored EXTRA_OUTPUT hands back only a thumbnail.
@@ -1394,13 +1222,10 @@ public final class MainActivity extends Activity {
             if (chosen.size() > room) toast("Only " + Pictures.MAX_DRAFT + " pictures fit in one message");
             for (int i = 0; i < chosen.size() && i < room; i++) {
                 final Uri uri = chosen.get(i);
-                prepare(new Pictures.Source() {
-                    @Override
-                    public InputStream open() throws IOException {
-                        InputStream in = getContentResolver().openInputStream(uri);
-                        if (in == null) throw new IOException("That picture could not be opened");
-                        return in;
-                    }
+                prepare(() -> {
+                    InputStream in = getContentResolver().openInputStream(uri);
+                    if (in == null) throw new IOException("That picture could not be opened");
+                    return in;
                 }, null);
             }
         }
@@ -1409,64 +1234,52 @@ public final class MainActivity extends Activity {
     /** Shrinks a picture off the main thread and adds it to the draft. `consumed` is deleted after. */
     private void prepare(final Pictures.Source source, final File consumed) {
         preparing++;
-        picturesWork.execute(new Runnable() {
-            @Override
-            public void run() {
-                String problem = null;
-                try {
-                    pictures.addToDraft(Pictures.prepare(source));
-                } catch (IOException e) {
-                    problem = reason(e);
-                } catch (SecurityException e) {
-                    problem = "That picture could not be opened";
-                } finally {
-                    if (consumed != null) consumed.delete();
-                }
-                prepared(problem);
+        picturesWork.execute(() -> {
+            String problem = null;
+            try {
+                pictures.addToDraft(Pictures.prepare(source));
+            } catch (IOException e) {
+                problem = reason(e);
+            } catch (SecurityException e) {
+                problem = "That picture could not be opened";
+            } finally {
+                if (consumed != null) consumed.delete();
             }
+            prepared(problem);
         });
         toast("Adding picture…");
     }
 
     private void prepareBitmap(final Bitmap bitmap) {
         preparing++;
-        picturesWork.execute(new Runnable() {
-            @Override
-            public void run() {
-                String problem = null;
-                try {
-                    pictures.addToDraft(Pictures.prepare(bitmap));
-                } catch (IOException e) {
-                    problem = reason(e);
-                }
-                prepared(problem);
+        picturesWork.execute(() -> {
+            String problem = null;
+            try {
+                pictures.addToDraft(Pictures.prepare(bitmap));
+            } catch (IOException e) {
+                problem = reason(e);
             }
+            prepared(problem);
         });
     }
 
     /** Called on the pictures worker. */
     private void prepared(final String problem) {
-        main.post(new Runnable() {
-            @Override
-            public void run() {
-                preparing--;
-                if (isFinishing()) return;
-                if (problem != null) toast(problem);
-                if (currentTab != SESSION) return;
-                saveScrollPosition();
-                render(FOCUS_INPUT);
-            }
+        main.post(() -> {
+            preparing--;
+            if (isFinishing()) return;
+            if (problem != null) toast(problem);
+            if (currentTab != SESSION) return;
+            saveScrollPosition();
+            render(FOCUS_INPUT);
         });
     }
 
     private void removePictures() {
         preparing++;
-        picturesWork.execute(new Runnable() {
-            @Override
-            public void run() {
-                pictures.clearDraft();
-                prepared(null);
-            }
+        picturesWork.execute(() -> {
+            pictures.clearDraft();
+            prepared(null);
         });
     }
 
@@ -1594,38 +1407,20 @@ public final class MainActivity extends Activity {
         for (String each : inside) items.add(each + "/");
         for (String each : found) items.add(each);
         if (items.isEmpty()) items.add("(Nothing here)");
-        AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle(path.length() == 0 ? (purpose == PICK_ATTACH ? "Attach file" : "Upload") : path)
-            .setItems(items.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    if (which < inside.size()) {
-                        String next = inside.get(which);
-                        pickFile(purpose, path.length() == 0 ? next : path + "/" + next);
-                    } else if (which - inside.size() < found.size()) {
-                        String name = found.get(which - inside.size());
-                        upload(new File(path.length() == 0 ? Environment.getExternalStorageDirectory() : shared(path), name),
-                            purpose == PICK_ATTACH);
-                    } else {
-                        pickFile(purpose, path);
-                    }
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .create();
-        dialog.setOnKeyListener(new DialogInterface.OnKeyListener() {
-            @Override
-            public boolean onKey(DialogInterface dialog, int keyCode, KeyEvent event) {
-                if (keyCode != KeyEvent.KEYCODE_BACK) return false;
-                if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
-                    dialog.dismiss();
-                    int slash = path.lastIndexOf('/');
-                    if (path.length() > 0) pickFile(purpose, slash < 0 ? "" : path.substring(0, slash));
-                }
-                return true;
+        String title = path.length() == 0 ? (purpose == PICK_ATTACH ? "Attach file" : "Upload") : path;
+        listDialog(title, items, which -> {
+            if (which < inside.size()) {
+                String next = inside.get(which);
+                pickFile(purpose, path.length() == 0 ? next : path + "/" + next);
+            } else if (which - inside.size() < found.size()) {
+                upload(new File(folder, found.get(which - inside.size())), purpose == PICK_ATTACH);
+            } else {
+                pickFile(purpose, path);
             }
+        }, () -> {
+            int slash = path.lastIndexOf('/');
+            if (path.length() > 0) pickFile(purpose, slash < 0 ? "" : path.substring(0, slash));
         });
-        dialog.show();
     }
 
     private void upload(File file, boolean attach) {
@@ -1731,12 +1526,7 @@ public final class MainActivity extends Activity {
             }
             final String sentAs = name;
             final String said = problem;
-            main.post(new Runnable() {
-                @Override
-                public void run() {
-                    uploaded(Upload.this, sentAs, said);
-                }
-            });
+            main.post(() -> uploaded(Upload.this, sentAs, said));
         }
 
         @Override
@@ -1749,14 +1539,11 @@ public final class MainActivity extends Activity {
             long at = SystemClock.uptimeMillis();
             if (now > 0 && now < size && at - lastUpdate < 250) return;
             lastUpdate = at;
-            main.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (uploading != Upload.this) return;
-                    done = now;
-                    total = size;
-                    if (uploadView != null) uploadView.setText(uploadLine());
-                }
+            main.post(() -> {
+                if (uploading != Upload.this) return;
+                done = now;
+                total = size;
+                if (uploadView != null) uploadView.setText(uploadLine());
             });
         }
     }
@@ -1772,11 +1559,8 @@ public final class MainActivity extends Activity {
     private void scheduleSave() {
         if (savePending) return;
         savePending = true;
-        main.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (savePending) saveNow();
-            }
+        main.postDelayed(() -> {
+            if (savePending) saveNow();
         }, SAVE_DELAY_MS);
     }
 
@@ -1786,12 +1570,7 @@ public final class MainActivity extends Activity {
         final String id = sessionId;
         final String name = title;
         final Transcript snapshot = new Transcript(transcript.entries(), transcript.sequence(), transcript.working());
-        saves.execute(new Runnable() {
-            @Override
-            public void run() {
-                backend.save(id, name, snapshot);
-            }
-        });
+        saves.execute(() -> backend.save(id, name, snapshot));
     }
 
     // ------------------------------------------------------------------
@@ -1926,21 +1705,18 @@ public final class MainActivity extends Activity {
                 if (input.hasFocus()) list.pinToBottomOnce();
             }
         });
-        input.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(TextView view, int actionId, KeyEvent event) {
-                if (
-                    actionId == EditorInfo.IME_ACTION_SEND ||
-                    actionId == EditorInfo.IME_ACTION_DONE ||
-                    (event != null &&
-                        event.getKeyCode() == KeyEvent.KEYCODE_ENTER &&
-                        event.getAction() == KeyEvent.ACTION_DOWN)
-                ) {
-                    send(view.getText().toString());
-                    return true;
-                }
-                return false;
+        input.setOnEditorActionListener((view, actionId, event) -> {
+            if (
+                actionId == EditorInfo.IME_ACTION_SEND ||
+                actionId == EditorInfo.IME_ACTION_DONE ||
+                (event != null &&
+                    event.getKeyCode() == KeyEvent.KEYCODE_ENTER &&
+                    event.getAction() == KeyEvent.ACTION_DOWN)
+            ) {
+                send(view.getText().toString());
+                return true;
             }
+            return false;
         });
         int listId = View.generateViewId();
         int inputId = View.generateViewId();
@@ -1948,13 +1724,10 @@ public final class MainActivity extends Activity {
         input.setId(inputId);
         list.setNextFocusDownId(inputId);
         input.setNextFocusUpId(listId);
-        input.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-            @Override
-            public void onFocusChange(View view, boolean hasFocus) {
-                // Reaching the composer proves the transcript was read to its
-                // end. Keep the last row's bottom fixed while typing.
-                list.setPinnedToBottom(hasFocus);
-            }
+        input.setOnFocusChangeListener((view, hasFocus) -> {
+            // Reaching the composer proves the transcript was read to its
+            // end. Keep the last row's bottom fixed while typing.
+            list.setPinnedToBottom(hasFocus);
         });
         /*
          * OK sends, on the press rather than the release: with the T9 keyboard
@@ -1962,24 +1735,21 @@ public final class MainActivity extends Activity {
          * keyboard takes it to finish the word it is composing. Both halves
          * are swallowed so ENTER cannot also drop a newline into the field.
          */
-        input.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View view, int keyCode, KeyEvent event) {
-                // Up out of the box once there is no line of your own above
-                // the cursor, without the platform's extra dead press.
-                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                    if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
-                    if (!onFirstLine((EditText) view)) return false;
-                    if (list.getCount() == 0) return false;
-                    list.requestFocus();
-                    return true;
-                }
-                if (!isOk(keyCode)) return false;
-                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-                    send(((EditText) view).getText().toString());
-                }
+        input.setOnKeyListener((view, keyCode, event) -> {
+            // Up out of the box once there is no line of your own above
+            // the cursor, without the platform's extra dead press.
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+                if (!onFirstLine((EditText) view)) return false;
+                if (list.getCount() == 0) return false;
+                list.requestFocus();
                 return true;
             }
+            if (!Ui.isOk(keyCode)) return false;
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                send(((EditText) view).getText().toString());
+            }
+            return true;
         });
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
@@ -1994,7 +1764,7 @@ public final class MainActivity extends Activity {
         root.addView(input, inputParams);
 
         wireTranscript(list, adapter);
-        replaceContent(root);
+        Ui.fill(content, root);
         restoreScrollPosition(list, adapter);
         if (focus == FOCUS_INPUT) input.requestFocus();
         else if (focus == FOCUS_LIST && adapter.getCount() > 0) list.requestFocus();
@@ -2009,44 +1779,32 @@ public final class MainActivity extends Activity {
     private void wireTranscript(final ChatListView list, final ChatAdapter adapter) {
         list.setFocusable(true);
         list.setFocusableInTouchMode(true);
-        list.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-            @Override
-            public void onFocusChange(View view, boolean hasFocus) {
-                if (adapter.getCount() == 0) return;
-                if (hasFocus) {
-                    list.setPinnedToBottom(false);
-                    if (adapter.getSelectedPosition() == AdapterView.INVALID_POSITION) {
-                        int selected = list.getSelectedItemPosition();
-                        if (selected == AdapterView.INVALID_POSITION) selected = list.getLastVisiblePosition();
-                        adapter.trackSelectedPosition(selected);
-                        View selectedView = list.getSelectedView();
-                        if (selectedView != null) selectedView.setSelected(true);
-                    }
-                } else {
+        list.setOnFocusChangeListener((view, hasFocus) -> {
+            if (adapter.getCount() == 0) return;
+            if (hasFocus) {
+                list.setPinnedToBottom(false);
+                if (adapter.getSelectedPosition() == AdapterView.INVALID_POSITION) {
+                    int selected = list.getSelectedItemPosition();
+                    if (selected == AdapterView.INVALID_POSITION) selected = list.getLastVisiblePosition();
+                    adapter.trackSelectedPosition(selected);
                     View selectedView = list.getSelectedView();
-                    if (selectedView != null) selectedView.setSelected(false);
-                    adapter.trackSelectedPosition(AdapterView.INVALID_POSITION);
+                    if (selectedView != null) selectedView.setSelected(true);
                 }
+            } else {
+                View selectedView = list.getSelectedView();
+                if (selectedView != null) selectedView.setSelected(false);
+                adapter.trackSelectedPosition(AdapterView.INVALID_POSITION);
             }
         });
-        list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (parent.hasFocus()) adapter.trackSelectedPosition(position);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+        Ui.onSelect(list, position -> {
+            if (list.hasFocus()) adapter.trackSelectedPosition(position);
         });
-        list.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View view, int keyCode, KeyEvent event) {
-                // OK on a message does nothing and holding it opens the menu;
-                // OK on the button at the foot presses it.
-                if (!isOk(keyCode)) return false;
-                if (okOnRow(event, null) && adapter.isAction(adapter.getSelectedPosition())) moveSession();
-                return true;
-            }
+        list.setOnKeyListener((view, keyCode, event) -> {
+            // OK on a message does nothing and holding it opens the menu;
+            // OK on the button at the foot presses it.
+            if (!Ui.isOk(keyCode)) return false;
+            if (okOnRow(event, null) && adapter.isAction(adapter.getSelectedPosition())) moveSession();
+            return true;
         });
     }
 
@@ -2089,35 +1847,29 @@ public final class MainActivity extends Activity {
         filesLoading = true;
         final int forGeneration = ++filesGeneration;
         if (currentTab == FILES) renderFilesKeepingFocus();
-        lists.execute(new Runnable() {
-            @Override
-            public void run() {
-                List<RemoteFile> fetched = null;
-                String problem = null;
-                try {
-                    fetched = backend.files();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } catch (Exception e) {
-                    problem = "Couldn't refresh: " + reason(e);
-                }
-                final List<RemoteFile> result = fetched;
-                final String said = problem;
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (forGeneration != filesGeneration || isFinishing()) return;
-                        filesLoading = false;
-                        filesProblem = said;
-                        if (result != null) {
-                            files = result;
-                            filesLoaded = true;
-                        }
-                        if (currentTab == FILES) renderFilesKeepingFocus();
-                    }
-                });
+        lists.execute(() -> {
+            List<RemoteFile> fetched = null;
+            String problem = null;
+            try {
+                fetched = backend.files();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception e) {
+                problem = "Couldn't refresh: " + reason(e);
             }
+            final List<RemoteFile> result = fetched;
+            final String said = problem;
+            main.post(() -> {
+                if (forGeneration != filesGeneration || isFinishing()) return;
+                filesLoading = false;
+                filesProblem = said;
+                if (result != null) {
+                    files = result;
+                    filesLoaded = true;
+                }
+                if (currentTab == FILES) renderFilesKeepingFocus();
+            });
         });
     }
 
@@ -2131,7 +1883,7 @@ public final class MainActivity extends Activity {
 
     private void renderFiles(boolean focusContent) {
         if (!backend.centerReady()) {
-            replaceContent(emptyMessage(Backend.NO_CENTER));
+            Ui.fill(content, emptyMessage(Backend.NO_CENTER));
             return;
         }
         if (files.isEmpty()) {
@@ -2141,7 +1893,7 @@ public final class MainActivity extends Activity {
                 : "No files yet.";
             View empty = emptyMessage(said);
             if (uploading != null) uploadView = (TextView) empty;
-            replaceContent(empty);
+            Ui.fill(content, empty);
             return;
         }
         LinearLayout root = vertical();
@@ -2158,11 +1910,11 @@ public final class MainActivity extends Activity {
         }
         final RowAdapter adapter = new RowAdapter(this);
         final ListView list = listView(adapter);
-        root.addView(list, weighted());
+        root.addView(list, Ui.weighted());
         rowList = list;
         rowAdapter = adapter;
         wireRows(list, adapter);
-        replaceContent(root);
+        Ui.fill(content, root);
         updateFileRows();
         int position = adapter.positionOf(filesKey);
         select(list, adapter, position < 0 ? 0 : position);
@@ -2301,12 +2053,7 @@ public final class MainActivity extends Activity {
         final List<String> folders = Folders.forName(name);
         new AlertDialog.Builder(this)
             .setTitle("Move to")
-            .setItems(folders.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    browse(name, folders.get(which));
-                }
-            })
+            .setItems(folders.toArray(new String[0]), (dialog, which) -> browse(name, folders.get(which)))
             .setNegativeButton("Cancel", null)
             .show();
     }
@@ -2322,32 +2069,15 @@ public final class MainActivity extends Activity {
         items.add("Move here");
         items.add("New folder…");
         for (String folder : inside) items.add(folder + "/");
-        AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle(path)
-            .setItems(items.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    if (which == 0) moveTo(name, path);
-                    else if (which == 1) newFolder(name, path);
-                    else browse(name, path + "/" + inside.get(which - 2));
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .create();
-        dialog.setOnKeyListener(new DialogInterface.OnKeyListener() {
-            @Override
-            public boolean onKey(DialogInterface dialog, int keyCode, KeyEvent event) {
-                if (keyCode != KeyEvent.KEYCODE_BACK) return false;
-                if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
-                    dialog.dismiss();
-                    int slash = path.lastIndexOf('/');
-                    if (slash < 0) showFolders(name);
-                    else browse(name, path.substring(0, slash));
-                }
-                return true;
-            }
+        listDialog(path, items, which -> {
+            if (which == 0) moveTo(name, path);
+            else if (which == 1) newFolder(name, path);
+            else browse(name, path + "/" + inside.get(which - 2));
+        }, () -> {
+            int slash = path.lastIndexOf('/');
+            if (slash < 0) showFolders(name);
+            else browse(name, path.substring(0, slash));
         });
-        dialog.show();
     }
 
     /** Makes a folder inside `path` and opens it; giving up goes back to `path`. */
@@ -2361,38 +2091,25 @@ public final class MainActivity extends Activity {
         LinearLayout form = vertical();
         form.setPadding(dp(16), dp(8), dp(16), 0);
         form.addView(field);
-        final DialogInterface.OnClickListener back = new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                browse(name, path);
-            }
-        };
+        final DialogInterface.OnClickListener back = (dialog, which) -> browse(name, path);
         new AlertDialog.Builder(this)
             .setTitle("New folder in " + path)
             .setView(form)
-            .setPositiveButton("Create", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    String folder = field.getText().toString().trim();
-                    File made = new File(shared(path), folder);
-                    if (!RemoteFile.validName(folder)) {
-                        toast("Not a folder name");
-                        browse(name, path);
-                    } else if (!made.isDirectory() && !made.mkdirs()) {
-                        toast("Couldn't make the folder");
-                        browse(name, path);
-                    } else {
-                        browse(name, path + "/" + folder);
-                    }
+            .setPositiveButton("Create", (dialog, which) -> {
+                String folder = field.getText().toString().trim();
+                File made = new File(shared(path), folder);
+                if (!RemoteFile.validName(folder)) {
+                    toast("Not a folder name");
+                    browse(name, path);
+                } else if (!made.isDirectory() && !made.mkdirs()) {
+                    toast("Couldn't make the folder");
+                    browse(name, path);
+                } else {
+                    browse(name, path + "/" + folder);
                 }
             })
             .setNegativeButton("Cancel", back)
-            .setOnCancelListener(new DialogInterface.OnCancelListener() {
-                @Override
-                public void onCancel(DialogInterface dialog) {
-                    browse(name, path);
-                }
-            })
+            .setOnCancelListener(dialog -> browse(name, path))
             .show();
     }
 
@@ -2420,25 +2137,17 @@ public final class MainActivity extends Activity {
         }
         moving = file.name;
         final File into = shared(folder);
-        moves.execute(new Runnable() {
-            @Override
-            public void run() {
-                File placed = null;
-                String problem = null;
-                try {
-                    placed = backend.moveOut(file.name, into);
-                } catch (IOException e) {
-                    problem = reason(e);
-                }
-                final File where = placed;
-                final String said = problem;
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        moved(file.name, folder, where, said);
-                    }
-                });
+        moves.execute(() -> {
+            File placed = null;
+            String problem = null;
+            try {
+                placed = backend.moveOut(file.name, into);
+            } catch (IOException e) {
+                problem = reason(e);
             }
+            final File where = placed;
+            final String said = problem;
+            main.post(() -> moved(file.name, folder, where, said));
         });
         updateFileRows();
     }
@@ -2544,60 +2253,44 @@ public final class MainActivity extends Activity {
 
     private void saveDownloads() {
         final Map<String, RemoteFile> snapshot = new LinkedHashMap<>(local);
-        saves.execute(new Runnable() {
-            @Override
-            public void run() {
-                backend.saveDownloads(snapshot);
-            }
-        });
+        saves.execute(() -> backend.saveDownloads(snapshot));
     }
 
     private void confirmDelete(final RemoteFile file) {
         new AlertDialog.Builder(this)
             .setTitle("Delete")
             .setMessage("Delete " + file.name + " from the command center?")
-            .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    delete(file);
-                }
-            })
+            .setPositiveButton("Delete", (dialog, which) -> delete(file))
             .setNegativeButton("Cancel", null)
             .show();
     }
 
     private void delete(final RemoteFile file) {
         if (running != null && running.file.name.equals(file.name)) running.cancelled = true;
-        lists.execute(new Runnable() {
-            @Override
-            public void run() {
-                String problem = null;
-                try {
-                    backend.deleteFile(file.name);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } catch (Exception e) {
-                    problem = reason(e);
-                }
-                final String said = problem;
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (isFinishing()) return;
-                        if (said != null) {
-                            toast("Not deleted: " + said);
-                            return;
-                        }
-                        toast("Deleted " + file.name);
-                        List<RemoteFile> left = new ArrayList<>();
-                        for (RemoteFile other : files) if (!other.name.equals(file.name)) left.add(other);
-                        files = left;
-                        forget(file.name);
-                        if (currentTab == FILES) renderFilesKeepingFocus();
-                    }
-                });
+        lists.execute(() -> {
+            String problem = null;
+            try {
+                backend.deleteFile(file.name);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception e) {
+                problem = reason(e);
             }
+            final String said = problem;
+            main.post(() -> {
+                if (isFinishing()) return;
+                if (said != null) {
+                    toast("Not deleted: " + said);
+                    return;
+                }
+                toast("Deleted " + file.name);
+                List<RemoteFile> left = new ArrayList<>();
+                for (RemoteFile other : files) if (!other.name.equals(file.name)) left.add(other);
+                files = left;
+                forget(file.name);
+                if (currentTab == FILES) renderFilesKeepingFocus();
+            });
         });
     }
 
@@ -2629,11 +2322,8 @@ public final class MainActivity extends Activity {
         new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(form)
-            .setPositiveButton("Connect", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    connectCenter(address.getText().toString(), token.getText().toString());
-                }
+            .setPositiveButton("Connect", (dialog, which) -> {
+                connectCenter(address.getText().toString(), token.getText().toString());
             })
             .setNegativeButton("Cancel", null)
             .show();
@@ -2641,40 +2331,34 @@ public final class MainActivity extends Activity {
 
     private void connectCenter(final String server, final String token) {
         toast("Checking the command center…");
-        lists.execute(new Runnable() {
-            @Override
-            public void run() {
-                String problem = null;
-                try {
-                    backend.connectCenter(server, token);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } catch (IllegalArgumentException e) {
-                    problem = e.getMessage();
-                } catch (Exception e) {
-                    problem = reason(e);
-                }
-                final String said = problem;
-                main.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (isFinishing()) return;
-                        if (said != null) {
-                            toast("Not connected: " + said);
-                            return;
-                        }
-                        toast("Connected to the command center");
-                        files = new ArrayList<>();
-                        filesLoaded = false;
-                        filesProblem = null;
-                        filesGeneration++;
-                        filesLoading = false;
-                        if (currentTab == FILES) renderFiles(true);
-                        refreshFiles();
-                    }
-                });
+        lists.execute(() -> {
+            String problem = null;
+            try {
+                backend.connectCenter(server, token);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (IllegalArgumentException e) {
+                problem = e.getMessage();
+            } catch (Exception e) {
+                problem = reason(e);
             }
+            final String said = problem;
+            main.post(() -> {
+                if (isFinishing()) return;
+                if (said != null) {
+                    toast("Not connected: " + said);
+                    return;
+                }
+                toast("Connected to the command center");
+                files = new ArrayList<>();
+                filesLoaded = false;
+                filesProblem = null;
+                filesGeneration++;
+                filesLoading = false;
+                if (currentTab == FILES) renderFiles(true);
+                refreshFiles();
+            });
         });
     }
 
@@ -2709,11 +2393,8 @@ public final class MainActivity extends Activity {
                 problem = "The download failed.";
             }
             final String said = problem;
-            main.post(new Runnable() {
-                @Override
-                public void run() {
-                    downloaded(Download.this, said);
-                }
+            main.post(() -> {
+                downloaded(Download.this, said);
             });
         }
 
@@ -2727,14 +2408,11 @@ public final class MainActivity extends Activity {
             long at = SystemClock.uptimeMillis();
             if (now > 0 && at - lastUpdate < 250) return;
             lastUpdate = at;
-            main.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (running != Download.this) return;
-                    done = now;
-                    total = size;
-                    updateFileRows();
-                }
+            main.post(() -> {
+                if (running != Download.this) return;
+                done = now;
+                total = size;
+                updateFileRows();
             });
         }
     }
@@ -2749,29 +2427,15 @@ public final class MainActivity extends Activity {
      * phone's own lists.
      */
     private void wireRows(final ListView list, final RowAdapter adapter) {
-        list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                adapter.setSelectedPosition(position);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+        Ui.onSelect(list, position -> adapter.setSelectedPosition(position));
+        list.setOnItemClickListener((parent, view, position, id) -> {
+            adapter.setSelectedPosition(position);
+            activateRow(adapter.getItem(position));
         });
-        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                adapter.setSelectedPosition(position);
-                activateRow(adapter.getItem(position));
-            }
-        });
-        list.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View view, int keyCode, KeyEvent event) {
-                if (!isOk(keyCode)) return false;
-                okOnRow(event, adapter.selected());
-                return true;
-            }
+        list.setOnKeyListener((view, keyCode, event) -> {
+            if (!Ui.isOk(keyCode)) return false;
+            okOnRow(event, adapter.selected());
+            return true;
         });
     }
 
@@ -2800,16 +2464,6 @@ public final class MainActivity extends Activity {
         if (position < 0 || position >= adapter.getCount()) return;
         adapter.setSelectedPosition(position);
         list.setSelection(position);
-    }
-
-    private LinearLayout vertical() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        return root;
-    }
-
-    private static LinearLayout.LayoutParams weighted() {
-        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1);
     }
 
     /** A quiet line over a list: loading, or why the list is not fresh. */
@@ -2874,12 +2528,6 @@ public final class MainActivity extends Activity {
         return act;
     }
 
-    private static boolean isOk(int keyCode) {
-        return keyCode == KeyEvent.KEYCODE_DPAD_CENTER
-            || keyCode == KeyEvent.KEYCODE_ENTER
-            || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER;
-    }
-
     /** Whether the cursor sits on the first line of what has been typed. */
     private static boolean onFirstLine(EditText field) {
         Layout laid = field.getLayout();
@@ -2892,43 +2540,12 @@ public final class MainActivity extends Activity {
         // First press only. Auto-repeat from a held d-pad would cycle the tabs
         // as fast as the key fires and redraw every one of them on the way.
         // Inside typed text, left and right belong to the cursor instead.
-        if (
-            event.getAction() == KeyEvent.ACTION_DOWN &&
-            event.getRepeatCount() == 0 &&
-            !cursorOwns(event.getKeyCode())
-        ) {
-            if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_LEFT) {
-                showTab((currentTab + TABS - 1) % TABS, true);
-                return true;
-            }
-            if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                showTab((currentTab + 1) % TABS, true);
-                return true;
-            }
+        int next = tabs.step(event, getCurrentFocus(), currentTab);
+        if (next >= 0) {
+            showTab(next, true);
+            return true;
         }
         return super.dispatchKeyEvent(event);
-    }
-
-    /**
-     * Whether left or right belongs to the text cursor rather than to the tabs.
-     *
-     * Inside typed text it belongs to the cursor. At either end of it, it goes
-     * back to being a tab key: pressing right when the cursor is already as
-     * far right as it goes cannot mean "further right", so it can safely mean
-     * the next tab. Without that, a box with something in it is a room with no
-     * door. A selection counts as inside the text; an empty box never owns them.
-     */
-    private boolean cursorOwns(int keyCode) {
-        if (keyCode != KeyEvent.KEYCODE_DPAD_LEFT && keyCode != KeyEvent.KEYCODE_DPAD_RIGHT) return false;
-        View focus = getCurrentFocus();
-        if (!(focus instanceof EditText)) return false;
-        EditText field = (EditText) focus;
-        int length = field.getText().length();
-        if (length == 0) return false;
-        int start = field.getSelectionStart();
-        int end = field.getSelectionEnd();
-        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return !(start == 0 && end == 0);
-        return !(start == length && end == length);
     }
 
     /*
@@ -3231,17 +2848,5 @@ public final class MainActivity extends Activity {
         if (e instanceof RuntimeException) return "the answer could not be read.";
         String message = e.getMessage();
         return message == null || message.length() == 0 ? "the network could not be reached." : message;
-    }
-
-    private void toast(String value) {
-        Toast.makeText(this, value, Toast.LENGTH_SHORT).show();
-    }
-
-    private int color(int resId) {
-        return getResources().getColor(resId);
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

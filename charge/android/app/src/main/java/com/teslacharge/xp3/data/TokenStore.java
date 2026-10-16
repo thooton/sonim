@@ -18,12 +18,10 @@ public final class TokenStore {
     public TokenStore(Context context) {
         preferences = context.getSharedPreferences("tesla_credentials", Context.MODE_PRIVATE);
         if (!preferences.contains("refresh_token")) {
-            preferences.edit()
-                .putString("refresh_token", BundledSecrets.REFRESH_TOKEN)
-                .putString("previous_refresh_token", BundledSecrets.PREVIOUS_REFRESH_TOKEN)
-                .putString("access_token", BundledSecrets.ACCESS_TOKEN)
-                .putLong("access_expires_at", BundledSecrets.ACCESS_EXPIRES_AT)
-                .commit();
+            preferences.edit().putString("refresh_token", Bundled.REFRESH_TOKEN)
+                .putString("previous_refresh_token", Bundled.PREVIOUS_REFRESH_TOKEN)
+                .putString("access_token", Bundled.ACCESS_TOKEN)
+                .putLong("access_expires_at", Bundled.ACCESS_EXPIRES_AT).commit();
         }
     }
 
@@ -78,17 +76,15 @@ public final class TokenStore {
 
     private String exchangeAndStore(String refreshToken) throws ApiException {
         try {
-            JSONObject body = new JSONObject()
-                .put("grant_type", "refresh_token")
-                .put("refresh_token", refreshToken)
-                .put("client_id", "ownerapi")
+            JSONObject body = new JSONObject().put("grant_type", "refresh_token")
+                .put("refresh_token", refreshToken).put("client_id", "ownerapi")
                 .put("scope", "openid email offline_access phone");
             Map<String, String> headers = new HashMap<>();
             headers.put("content-type", "application/json");
             headers.put("accept", "*/*");
-            headers.put("accept-language", BundledSecrets.DEVICE_LANGUAGE);
-            headers.put("user-agent", "TeslaV4/" + BundledSecrets.APP_VERSION + " (com.teslamotors.TeslaApp; build:4542; iOS 26.0.0)");
-            headers.put("x-tesla-user-agent", BundledSecrets.TESLA_USER_AGENT);
+            headers.put("accept-language", Bundled.DEVICE_LANGUAGE);
+            headers.put("user-agent", "TeslaV4/" + Bundled.APP_VERSION + " (com.teslamotors.TeslaApp; build:4542; iOS 26.0.0)");
+            headers.put("x-tesla-user-agent", Bundled.TESLA_USER_AGENT);
 
             HttpJson.Response response = HttpJson.post(AUTH_URL, headers, body);
             JSONObject payload = response.object();
@@ -100,14 +96,11 @@ public final class TokenStore {
             String nextRefresh = payload.optString("refresh_token", refreshToken);
             long accessExpiry = System.currentTimeMillis() + payload.optLong("expires_in", 28_800L) * 1000L;
             long refreshExpiry = jwtExpiry(nextRefresh);
-            preferences.edit()
-                .putString("access_token", access)
-                .putLong("access_expires_at", accessExpiry)
-                .putString("refresh_token", nextRefresh)
+            preferences.edit().putString("access_token", access)
+                .putLong("access_expires_at", accessExpiry).putString("refresh_token", nextRefresh)
                 .putString("previous_refresh_token", nextRefresh.equals(refreshToken) ? preferences.getString("previous_refresh_token", "") : refreshToken)
                 .putLong("refresh_expires_at", refreshExpiry)
-                .putLong("last_refresh_at", System.currentTimeMillis())
-                .commit();
+                .putLong("last_refresh_at", System.currentTimeMillis()).commit();
             return access;
         } catch (ApiException e) {
             throw e;

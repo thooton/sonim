@@ -1,10 +1,10 @@
 package com.flashcards.xp3;
 
 import com.flashcards.xp3.data.CardDef;
-import com.flashcards.xp3.data.Deck;
 import com.flashcards.xp3.data.DeckCard;
 import com.flashcards.xp3.data.Store;
 
+import com.xp3.common.Check;
 import io.github.openspacedrepetition.Card;
 import io.github.openspacedrepetition.State;
 

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Defaults for what the shared drawables and Markdown draw with. Every app
+     defines its own values under the same names, and those win. -->
+<resources>
+    <color name="primary">#0F4C4C</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_primary_dim">#8FB8B8</color>
+    <color name="row">#FFFFFF</color>
+    <color name="section_fill">#EFEFEF</color>
+    <color name="divider">#DCDCDC</color>
+    <color name="focus_fill">#E3EFEF</color>
+    <color name="focus_rule">#0F4C4C</color>
+    <color name="press_fill">#CDE2E2</color>
+    <color name="text">#1A1A1A</color>
+    <color name="text_muted">#6E6E6E</color>
+    <color name="code_fill">#F0F0F0</color>
+
+    <dimen name="tab_underline">3dp</dimen>
+    <dimen name="focus_rule">2dp</dimen>
+</resources>

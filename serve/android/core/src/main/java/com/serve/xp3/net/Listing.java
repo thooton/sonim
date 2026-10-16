@@ -2,7 +2,6 @@ package com.serve.xp3.net;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -87,13 +86,10 @@ public final class Listing {
     /** The listing of the folder at this decoded path ("/a/b/"). */
     public static String render(String path, List<Entry> entries) {
         List<Entry> sorted = new ArrayList<Entry>(entries);
-        Collections.sort(sorted, new Comparator<Entry>() {
-            @Override
-            public int compare(Entry a, Entry b) {
-                if (a.folder != b.folder) return a.folder ? -1 : 1;
-                int folded = a.name.toLowerCase(Locale.ROOT).compareTo(b.name.toLowerCase(Locale.ROOT));
-                return folded != 0 ? folded : a.name.compareTo(b.name);
-            }
+        Collections.sort(sorted, (a, b) -> {
+            if (a.folder != b.folder) return a.folder ? -1 : 1;
+            int folded = a.name.toLowerCase(Locale.ROOT).compareTo(b.name.toLowerCase(Locale.ROOT));
+            return folded != 0 ? folded : a.name.compareTo(b.name);
         });
 
         StringBuilder html = new StringBuilder(4096);

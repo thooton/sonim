@@ -18,9 +18,8 @@ The first message of every new session also tells the agent to install the `delt
 ## Build and test
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRelease
-adb install -r app/build/outputs/apk/release/app-release.apk
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :delta:core:selfTest :delta:app:assembleRelease
+adb install -r delta/android/app/build/outputs/apk/release/app-release.apk
 ```
 
 The command center login is baked in at build time, and a build without it keeps whatever an installed copy already has. The Claude logins are on the command center (see above).

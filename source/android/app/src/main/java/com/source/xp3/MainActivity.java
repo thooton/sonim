@@ -1,9 +1,7 @@
 package com.source.xp3;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
@@ -24,6 +22,7 @@ import android.widget.TextView;
 import com.source.xp3.net.Books;
 import com.source.xp3.net.Login;
 import com.source.xp3.net.Music;
+import com.xp3.common.ui.BaseActivity;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,7 +39,7 @@ import java.util.List;
  * results while picking; Up and Down scroll the log or move through the
  * results; Back cancels, stops picking, or leaves; Menu has the rest.
  */
-public final class MainActivity extends Activity implements Download.Listener {
+public final class MainActivity extends BaseActivity implements Download.Listener {
 
     private static final int ASK_STORAGE = 1;
     private static final String PREFS = "source";
@@ -79,15 +78,12 @@ public final class MainActivity extends Activity implements Download.Listener {
         for (String m : MODES) if (m.equals(prefs.getString("mode", Music.SONG))) mode = m;
         login = loadLogin(prefs);
 
-        query.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-                if (actionId == EditorInfo.IME_ACTION_GO || actionId == EditorInfo.IME_ACTION_DONE) {
-                    begin();
-                    return true;
-                }
-                return false;
+        query.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_GO || actionId == EditorInfo.IME_ACTION_DONE) {
+                begin();
+                return true;
             }
+            return false;
         });
         showMode();
         query.requestFocus();
@@ -98,9 +94,14 @@ public final class MainActivity extends Activity implements Download.Listener {
      * otherwise whatever was saved (perhaps typed in from the menu) is kept.
      */
     private Login loadLogin(SharedPreferences prefs) {
-        String revision = Defaults.revision();
+        String revision = Bundled.REVISION;
         if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled = Defaults.login();
+            Login bundled;
+            try {
+                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
+            } catch (IllegalArgumentException e) {
+                bundled = Login.blank();
+            }
             if (bundled.ready()) {
                 prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
                 return bundled;
@@ -160,12 +161,9 @@ public final class MainActivity extends Activity implements Download.Listener {
         scroll.setVisibility(list ? View.GONE : View.VISIBLE);
         adapter.notifyDataSetChanged();
         if (list) {
-            resultList.post(new Runnable() {
-                @Override
-                public void run() {
-                    resultList.smoothScrollToPosition(picked);
-                    query.requestFocus();
-                }
+            resultList.post(() -> {
+                resultList.smoothScrollToPosition(picked);
+                query.requestFocus();
             });
         } else {
             StringBuilder text = new StringBuilder();
@@ -174,12 +172,9 @@ public final class MainActivity extends Activity implements Download.Listener {
                 text.append(line);
             }
             logView.setText(text);
-            scroll.post(new Runnable() {
-                @Override
-                public void run() {
-                    scroll.fullScroll(View.FOCUS_DOWN);
-                    query.requestFocus();
-                }
+            scroll.post(() -> {
+                scroll.fullScroll(View.FOCUS_DOWN);
+                query.requestFocus();
             });
         }
         query.setEnabled(!running);
@@ -232,7 +227,7 @@ public final class MainActivity extends Activity implements Download.Listener {
             statusView.setText("A name can't start with \"-\".");
             return;
         }
-        if (needStorage(new Runnable() { public void run() { begin(); } })) return;
+        if (needStorage(() -> begin())) return;
         Download.music(this, login, mode, text);
         query.setText("");
     }
@@ -243,7 +238,7 @@ public final class MainActivity extends Activity implements Download.Listener {
             askLogin();
             return;
         }
-        if (needStorage(new Runnable() { public void run() { downloadPicked(); } })) return;
+        if (needStorage(() -> { downloadPicked(); })) return;
         Download.book(this, login, Download.results().books.get(picked));
     }
 
@@ -380,58 +375,51 @@ public final class MainActivity extends Activity implements Download.Listener {
         final List<Runnable> actions = new ArrayList<Runnable>();
         if (Download.running()) {
             labels.add("Cancel");
-            actions.add(new Runnable() { public void run() { Download.cancel(); } });
+            actions.add(() -> Download.cancel());
         } else {
             if (!Music.SONG.equals(mode)) {
                 labels.add("Download a song");
-                actions.add(new Runnable() { public void run() { setMode(Music.SONG); } });
+                actions.add(() -> setMode(Music.SONG));
             }
             if (!Music.ALBUM.equals(mode)) {
                 labels.add("Download an album");
-                actions.add(new Runnable() { public void run() { setMode(Music.ALBUM); } });
+                actions.add(() -> setMode(Music.ALBUM));
             }
             if (!books()) {
                 labels.add("Find a book");
-                actions.add(new Runnable() { public void run() { setMode(BOOK); } });
+                actions.add(() -> setMode(BOOK));
             }
             if (books()) {
                 final Books.Page page = Download.results();
                 if (page != null && page.page < page.pages) {
                     labels.add("Next page");
-                    actions.add(new Runnable() { public void run() { turnPage(1); } });
+                    actions.add(() -> turnPage(1));
                 }
                 if (page != null && page.page > 1) {
                     labels.add("Previous page");
-                    actions.add(new Runnable() { public void run() { turnPage(-1); } });
+                    actions.add(() -> turnPage(-1));
                 }
                 final boolean any = format() == null;
                 labels.add(any ? "Search EPUBs only" : "Search every format");
-                actions.add(new Runnable() {
-                    public void run() {
-                        prefs().edit().putBoolean("any_format", !any).apply();
-                        statusView.setText(any ? "Searches look for EPUBs first." : "Searches show every format.");
-                    }
+                actions.add(() -> {
+                    prefs().edit().putBoolean("any_format", !any).apply();
+                    statusView.setText(any ? "Searches look for EPUBs first." : "Searches show every format.");
                 });
                 if (page != null) {
                     labels.add("Clear results");
-                    actions.add(new Runnable() { public void run() { Download.clearResults(); } });
+                    actions.add(() -> Download.clearResults());
                 }
             } else {
                 labels.add("Clear log");
-                actions.add(new Runnable() { public void run() { Download.clearLog(); } });
+                actions.add(() -> Download.clearLog());
                 labels.add("Reconnect music account");
-                actions.add(new Runnable() { public void run() { confirmRelogin(); } });
+                actions.add(() -> confirmRelogin());
             }
         }
         labels.add("Command center…");
-        actions.add(new Runnable() { public void run() { askLogin(); } });
+        actions.add(() -> askLogin());
         new AlertDialog.Builder(this)
-            .setItems(labels.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    actions.get(which).run();
-                }
-            })
+            .setItems(labels.toArray(new String[0]), (dialog, which) -> actions.get(which).run())
             .show();
     }
 
@@ -443,12 +431,7 @@ public final class MainActivity extends Activity implements Download.Listener {
         }
         new AlertDialog.Builder(this)
             .setMessage("Only if downloads keep saying they couldn't connect: too many new logins get the command center throttled. Reconnect?")
-            .setPositiveButton("Reconnect", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    relogin();
-                }
-            })
+            .setPositiveButton("Reconnect", (dialog, which) -> relogin())
             .setNegativeButton("Cancel", null)
             .show();
     }
@@ -456,24 +439,16 @@ public final class MainActivity extends Activity implements Download.Listener {
     private void relogin() {
         statusView.setText("Reconnecting…");
         final Login using = login;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                String result;
-                try {
-                    new Music(using).relogin();
-                    result = "Reconnected. Try the download again.";
-                } catch (Exception e) {
-                    result = "Couldn't reconnect: " + e.getMessage();
-                }
-                final String shown = result;
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        statusView.setText(shown);
-                    }
-                });
+        new Thread(() -> {
+            String result;
+            try {
+                new Music(using).relogin();
+                result = "Reconnected. Try the download again.";
+            } catch (Exception e) {
+                result = "Couldn't reconnect: " + e.getMessage();
             }
+            final String shown = result;
+            runOnUiThread(() -> statusView.setText(shown));
         }).start();
     }
 
@@ -497,20 +472,17 @@ public final class MainActivity extends Activity implements Download.Listener {
         new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
-            .setPositiveButton("Save", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    String typed = token.getText().toString();
-                    if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                    try {
-                        Login next = Login.of(server.getText().toString(), typed);
-                        if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                        login = next;
-                        prefs().edit().putString("login", next.toJson()).apply();
-                        statusView.setText("Saved: " + next.host());
-                    } catch (IllegalArgumentException e) {
-                        statusView.setText(e.getMessage());
-                    }
+            .setPositiveButton("Save", (dialog, which) -> {
+                String typed = token.getText().toString();
+                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
+                try {
+                    Login next = Login.of(server.getText().toString(), typed);
+                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
+                    login = next;
+                    prefs().edit().putString("login", next.toJson()).apply();
+                    statusView.setText("Saved: " + next.host());
+                } catch (IllegalArgumentException e) {
+                    statusView.setText(e.getMessage());
                 }
             })
             .setNegativeButton("Cancel", null)

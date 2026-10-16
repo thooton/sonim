@@ -2,7 +2,6 @@ package com.updater.xp3.core;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,12 +66,7 @@ public final class Catalog {
             if (packageName == null || !validPackage(packageName)) continue;
             out.add(new Entry(version.getKey(), version.getValue(), packageName));
         }
-        Collections.sort(out, new Comparator<Entry>() {
-            @Override
-            public int compare(Entry a, Entry b) {
-                return a.name.compareToIgnoreCase(b.name);
-            }
-        });
+        Collections.sort(out, (a, b) -> a.name.compareToIgnoreCase(b.name));
         return out;
     }
 

@@ -5,7 +5,7 @@ import com.canvas.xp3.data.Store;
 import com.canvas.xp3.data.Sync;
 import com.canvas.xp3.net.Canvas;
 import com.canvas.xp3.net.Config;
-import com.canvas.xp3.net.Http;
+import com.xp3.common.Http;
 
 import java.io.File;
 import java.io.IOException;
@@ -45,9 +45,9 @@ final class Backend {
         config = store.settings();
         // Adopt a bundled setup on first launch only, so signing out of it
         // stays signed out.
-        if (Defaults.available() && !store.hasSettings()) {
+        if (hasBundledSetup() && !store.hasSettings()) {
             try {
-                Config bundled = Defaults.config();
+                Config bundled = Config.parse(Bundled.SETTINGS);
                 store.saveSettings(bundled);
                 config = bundled;
             } catch (IOException e) {
@@ -65,7 +65,7 @@ final class Backend {
 
     private static Config safeDefaults() {
         try {
-            return Defaults.config();
+            return Config.parse(Bundled.SETTINGS);
         } catch (RuntimeException e) {
             return Config.blank();
         }
@@ -73,13 +73,13 @@ final class Backend {
 
     /** Whether this build has a setup baked into it at all. */
     boolean hasBundledSetup() {
-        return Defaults.available();
+        return Bundled.SETTINGS.length() > 0;
     }
 
     /** Puts the bundled setup back, after signing out or editing something wrong. */
     void restoreBundledSetup() throws IOException {
-        if (!Defaults.available()) return;
-        saveSettings(Defaults.config());
+        if (!hasBundledSetup()) return;
+        saveSettings(Config.parse(Bundled.SETTINGS));
     }
 
     private void build() {

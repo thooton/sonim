@@ -6,7 +6,6 @@ import io.github.openspacedrepetition.State;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
@@ -124,12 +123,7 @@ public final class GroupBuilder {
         List<DeckCard> urgent = new ArrayList<>(pool);
         // Preserve urgency while giving exact probability ties a fair order.
         Collections.shuffle(urgent, rng);
-        Collections.sort(urgent, new Comparator<DeckCard>() {
-            @Override
-            public int compare(DeckCard a, DeckCard b) {
-                return Double.compare(probability(a), probability(b));
-            }
-        });
+        Collections.sort(urgent, (a, b) -> Double.compare(probability(a), probability(b)));
         for (DeckCard card : urgent) {
             if (picks.size() >= holes) break;
             if (picks.size() >= MIN_URGENT && neededAverage() > MAX_NEEDED) {
@@ -150,12 +144,7 @@ public final class GroupBuilder {
         // sort by probability; a stable sort plus a pre-shuffle makes the
         // exact ties land at random rather than by pool order
         Collections.shuffle(remaining, rng);
-        Collections.sort(remaining, new Comparator<DeckCard>() {
-            @Override
-            public int compare(DeckCard a, DeckCard b) {
-                return Double.compare(probability(a), probability(b));
-            }
-        });
+        Collections.sort(remaining, (a, b) -> Double.compare(probability(a), probability(b)));
         while (picks.size() < holes) {
             double needed = Math.min(neededAverage(), MAX_NEEDED);
             // `needed` splits remaining into two queues: those below it,
@@ -216,12 +205,7 @@ public final class GroupBuilder {
      */
     private void order() {
         if (picks.size() <= 3) return;
-        Collections.sort(picks, new Comparator<DeckCard>() {
-            @Override
-            public int compare(DeckCard a, DeckCard b) {
-                return Double.compare(probability(b), probability(a));
-            }
-        });
+        Collections.sort(picks, (a, b) -> Double.compare(probability(b), probability(a)));
         DeckCard opener = picks.remove(0);
         DeckCard closer = picks.remove(0);
         List<DeckCard> middle = new ArrayList<>(picks);
