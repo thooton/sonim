@@ -1,0 +1,166 @@
+package com.updater.xp3;
+
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+import com.updater.xp3.core.Catalog;
+import com.updater.xp3.core.Releases;
+import com.updater.xp3.core.Status;
+import com.updater.xp3.core.Version;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Everything in :core, checked on a desktop JVM: which version is newer,
+ * reading the release's two files, and fetching from a release served here.
+ */
+public final class SelfTest {
+
+    public static void main(String[] args) throws Exception {
+        final Check check = new Check();
+        check.run("Version", new Check.Body() {
+            @Override
+            public void run() {
+                versions(check);
+            }
+        });
+        check.run("Catalog", new Check.Body() {
+            @Override
+            public void run() {
+                catalog(check);
+            }
+        });
+        check.run("Status", new Check.Body() {
+            @Override
+            public void run() {
+                status(check);
+            }
+        });
+        check.run("Releases", new Check.Body() {
+            @Override
+            public void run() throws Exception {
+                releases(check);
+            }
+        });
+        if (!check.report()) System.exit(1);
+    }
+
+    private static void versions(Check check) {
+        check.same("equal", 0, Version.compare("1.0.0", "1.0.0"));
+        check.same("patch", -1, Version.compare("1.0.2", "1.0.3"));
+        check.same("minor beats patch", 1, Version.compare("1.1.0", "1.0.9"));
+        check.same("numbers, not text", 1, Version.compare("1.10.0", "1.9.0"));
+        check.same("missing parts are 0", 0, Version.compare("1.0", "1.0.0"));
+        check.same("longer and newer", -1, Version.compare("1.0", "1.0.1"));
+        check.same("leading v", 0, Version.compare("v1.2.0", "1.2.0"));
+        check.same("leading zeros", 0, Version.compare("1.02", "1.2"));
+        check.same("release beats pre-release", 1, Version.compare("1.0.0", "1.0.0-beta"));
+        check.same("null is oldest", -1, Version.compare(null, "0.0.1"));
+        check.same("empty is oldest", -1, Version.compare("", "1"));
+        check.same("huge parts", 1, Version.compare("1.99999999999999999999", "1.9"));
+    }
+
+    private static void catalog(Check check) {
+        Map<String, String> versions = Catalog.parse(
+            "delta = 1.1.0\n# a comment\n\nlist=1.0.0\r\nbad name = 1\n../x = 2\nempty =\nnoequals\nAppDrawer = 1.0\n");
+        check.same("kept", 3, versions.size());
+        check.same("spaces trimmed", "1.1.0", versions.get("delta"));
+        check.same("no spaces", "1.0.0", versions.get("list"));
+        check.same("CRLF", "1.0.0", versions.get("list"));
+        check.ok("unsafe name dropped", !versions.containsKey("../x"));
+        check.ok("empty value dropped", !versions.containsKey("empty"));
+
+        Map<String, String> packages = Catalog.parse(
+            "list = com.list.xp3\ndelta = com.delta.xp3\nAppDrawer = not a package\n");
+        List<Catalog.Entry> entries = Catalog.join(versions, packages);
+        check.same("only apps in both, with a valid package", 2, entries.size());
+        check.same("sorted", "delta", entries.get(0).name);
+        check.same("version", "1.1.0", entries.get(0).version);
+        check.same("package", "com.list.xp3", entries.get(1).packageName);
+        check.same("apk", "list.apk", entries.get(1).apk());
+        check.same("null text", 0, Catalog.parse(null).size());
+    }
+
+    private static void status(Check check) {
+        check.same("missing", Status.INSTALL, Status.of(false, null, "1.0.0"));
+        check.same("older", Status.UPDATE, Status.of(true, "1.0.0", "1.0.1"));
+        check.same("same", Status.CURRENT, Status.of(true, "1.0", "1.0.0"));
+        check.same("newer", Status.NEWER, Status.of(true, "1.2.0", "1.1.0"));
+        check.same("no versionName", Status.UPDATE, Status.of(true, null, "1.0.0"));
+    }
+
+    private static void releases(Check check) throws Exception {
+        final byte[] apk = new byte[300 * 1024];
+        for (int i = 0; i < apk.length; i++) apk[i] = (byte) i;
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                String path = exchange.getRequestURI().getPath();
+                if (path.equals("/latest/versions.txt")) {
+                    send(exchange, 200, "list = 1.0.1\nnew = 2.0.0\n".getBytes("UTF-8"));
+                } else if (path.equals("/latest/packages.txt")) {
+                    send(exchange, 200, "list = com.list.xp3\nnew = com.new.xp3\n".getBytes("UTF-8"));
+                } else if (path.equals("/latest/list.apk")) {
+                    // As GitHub does: the file itself is somewhere else.
+                    exchange.getResponseHeaders().set("Location", "/files/list.apk");
+                    send(exchange, 302, new byte[0]);
+                } else if (path.equals("/files/list.apk")) {
+                    send(exchange, 200, apk);
+                } else {
+                    send(exchange, 404, "Not Found".getBytes("UTF-8"));
+                }
+            }
+        });
+        server.start();
+        File dir = Files.createTempDirectory("updater-test").toFile();
+        try {
+            final Releases releases = new Releases(
+                "http://127.0.0.1:" + server.getAddress().getPort() + "/latest");
+            List<Catalog.Entry> entries = releases.catalog();
+            check.same("catalog size", 2, entries.size());
+            check.same("catalog version", "1.0.1", entries.get(0).version);
+            check.same("catalog package", "com.new.xp3", entries.get(1).packageName);
+
+            final File to = new File(dir, "list.apk");
+            final long[] last = {-1, -1};
+            releases.download("list.apk", to, new Releases.Progress() {
+                @Override
+                public void update(long done, long total) {
+                    last[0] = done;
+                    last[1] = total;
+                }
+            });
+            check.ok("downloaded through the redirect", java.util.Arrays.equals(apk, Files.readAllBytes(to.toPath())));
+            check.same("progress reached the end", Long.valueOf(apk.length), Long.valueOf(last[0]));
+            check.same("progress knew the total", Long.valueOf(apk.length), Long.valueOf(last[1]));
+            check.ok("no part file left", !new File(dir, "list.apk.part").exists());
+
+            check.fails("missing file", "has no gone.apk", new Check.Body() {
+                @Override
+                public void run() throws Exception {
+                    releases.download("gone.apk", new File(to.getParentFile(), "gone.apk"), null);
+                }
+            });
+            check.ok("failed download leaves nothing", !new File(dir, "gone.apk").exists()
+                && !new File(dir, "gone.apk.part").exists());
+        } finally {
+            server.stop(0);
+            for (File f : dir.listFiles()) f.delete();
+            dir.delete();
+        }
+    }
+
+    private static void send(HttpExchange exchange, int status, byte[] body) throws IOException {
+        exchange.sendResponseHeaders(status, body.length == 0 ? -1 : body.length);
+        OutputStream out = exchange.getResponseBody();
+        out.write(body);
+        out.close();
+    }
+}
