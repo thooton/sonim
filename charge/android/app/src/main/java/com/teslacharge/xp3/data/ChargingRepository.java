@@ -82,8 +82,7 @@ public final class ChargingRepository {
             if (started == null || started.optString("authorizationSessionId").length() == 0) {
                 throw new ApiException(started == null ? "The charging session could not be started." : started.optString("reason", "The charging session could not be started."), 502);
             }
-            JSONObject context = new JSONObject()
-                .put("locationGUID", locationGuid)
+            JSONObject context = new JSONObject().put("locationGUID", locationGuid)
                 .put("siteName", detail.optString("name"))
                 .put("siteAddress", detail.optString("address"))
                 .put("addressStreet", detail.optString("addressStreet"))
@@ -129,9 +128,7 @@ public final class ChargingRepository {
             int loaded = 0;
 
             try {
-                JSONObject payment = Normalizer.paymentInstrument(
-                    api.paymentInstrument()
-                );
+                JSONObject payment = Normalizer.paymentInstrument(api.paymentInstrument());
                 if (payment != null) result.put("payment", payment);
                 loaded++;
             } catch (ApiException e) {
@@ -171,7 +168,7 @@ public final class ChargingRepository {
             // asked for the payment instrument in. Carried even though the
             // balances name their own, because a zero balance is a list with
             // nothing in it to read a currency off.
-            result.put("currency", BundledSecrets.CURRENCY_CODE);
+            result.put("currency", Bundled.CURRENCY_CODE);
             return result;
         } catch (ApiException e) {
             throw e;

@@ -28,8 +28,8 @@ reintroduce an older web implementation or assume there is a companion server.
 
 ## Repository map
 
-- `android/app/build.gradle`: Android configuration and the
-  `generateBundledSecrets` task.
+- `android/app/build.gradle`: the app's version, R8 settings and the bundled
+  secrets (see `../gradle/bundled.gradle`).
 - `android/app/src/main/AndroidManifest.xml`: portrait single-activity app and
   the non-exported charging foreground service.
 - `MainActivity.java`: four tabs, programmatic detail/session screens, keypad
@@ -74,13 +74,13 @@ MainActivity / ChargingService
 
 ### Credentials and live-account safety
 
-- `android/.tokens.json`, `android/.env`, generated `BundledSecrets.java`,
+- `android/.tokens.json`, `android/.env`, generated `data/Bundled.java`,
   keystores, and every APK are secrets or secret-bearing artifacts. They are
   ignored intentionally. Never commit, paste, print, log, or expose their
   contents. Do not add a task that includes their values in Gradle output.
-- `generateBundledSecrets` requires `.tokens.json` with a `refreshToken`; it
-  reads optional regional/geocoder settings from `.env` and writes only under
-  `android/app/build/generated/source/secrets/`.
+- The build requires `.tokens.json` with a `refreshToken`; it reads optional
+  regional/geocoder settings from `.env` and writes only under
+  `android/app/build/generated/bundled/`.
 - Every debug and release APK embeds a live Tesla refresh token and must be
   treated as a credential, not as a distributable build artifact.
 - Tesla rotates refresh tokens on use. Always obtain
@@ -183,8 +183,9 @@ MainActivity / ChargingService
 ## Implementation conventions
 
 - Match the existing Java style: four-space indentation, braces on the same
-  line, explicit anonymous listener/callback classes, imports grouped by
-  platform/project/JDK/JSON, and small helpers for repeated view construction.
+  line, lambdas for listeners and callbacks, imports grouped by
+  platform/project/JDK/JSON, and small helpers for repeated view construction
+  (shared ones live in `common/ui`).
 - Prefer focused changes over architectural rewrites. `MainActivity` is large,
   but its state and generation counters are tightly coupled to navigation and
   lifecycle behavior; extract code only with equivalent behavior and clear
@@ -203,15 +204,15 @@ MainActivity / ChargingService
 
 ## Build and validation
 
-Run commands from `android/` unless a command says otherwise.
+Run commands from the repository root unless a command says otherwise.
 
 ```bash
-./gradlew :app:assembleDebug
+./gradlew :charge:app:assembleDebug
 ```
 
 This is the minimum validation for Java, resource, manifest, or Gradle changes.
 It runs secret generation and writes the debug APK beneath
-`app/build/outputs/apk/debug/`; that APK is sensitive and ignored.
+`android/app/build/outputs/apk/debug/`; that APK is sensitive and ignored.
 
 There are currently no unit or instrumentation test sources. When logic can be
 tested without Android or live Tesla calls, add focused tests under
@@ -247,12 +248,12 @@ non-mutating behavior.
 ## Release builds
 
 ```bash
-./gradlew :app:assembleRelease
+./gradlew :charge:app:assembleRelease
 ```
 
 This builds the minified, resource-shrunk APK, signed with the repository's
 shared key (`../signing/signing.gradle`), at
-`app/build/outputs/apk/release/app-release.apk`. That is the APK to hand to the
+`android/app/build/outputs/apk/release/app-release.apk`. That is the APK to hand to the
 user; the debug build is only for checking that the code compiles. Never commit
 it, or distribute it beyond the user's own phone, unless the user explicitly
 asks and understands that it embeds a live account credential.

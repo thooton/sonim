@@ -37,8 +37,9 @@ rationale comments beside the implementation.
   - `data/Store.java` owns settings and assignment cache persistence.
   - `net/Config.java` is the single validation and serialization boundary for
     settings.
-  - `net/Http.java`, `Canvas.java`, `RemoteCookies.java`, and `Cookies.java`
-    implement bounded HTTP, fixed Canvas routes, and short-lived cookie access.
+  - `net/Canvas.java`, `RemoteCookies.java`, and `Cookies.java` implement
+    fixed Canvas routes and short-lived cookie access over the shared bounded
+    `Http` (`common/core`).
     Some `Canvas` routes (posts, pages, grading, `due`) were the chat's and
     are now unused by the app; they remain read-only and tested.
 - `android/app`: Android UI and orchestration.
@@ -48,12 +49,13 @@ rationale comments beside the implementation.
   - The adapters own painted selection state.
   - Repeated row shapes are XML layouts. Screens whose contents are dynamic are
     assembled in `MainActivity`.
-  - `Markdown.java` renders the dialect emitted by core `Html.java`; changes to
-    one side often require checking the other.
+  - The shared `Markdown` (`common/ui`, also used by Delta) renders the
+    dialect emitted by core `Html.java`; changes to one side often require
+    checking the other.
 - `android/core/src/test`: the framework-free desktop test suite and local HTTP
   server.
-- `android/app/build.gradle`: Android configuration and the build-time bundled
-  setup generator.
+- `android/app/build.gradle`: the app's version and the build-time bundled
+  setup (see `../gradle/bundled.gradle`).
 
 ## Architecture and invariants
 
@@ -67,8 +69,8 @@ handling in `:app`.
 Java 8 syntax is not the whole compatibility requirement. Avoid APIs absent on
 API 27 or from Java 8, including `List.of`, `String.isBlank`, `java.net.http`,
 records, streams added after Java 8, and newer convenience methods. Follow the
-existing explicit collections, loops, anonymous classes, and null-based
-absence conventions.
+existing explicit collections, loops, and null-based absence conventions;
+lambdas are fine.
 
 The application uses two worker threads for assignment work. Network work must
 not run on the main thread. Worker results return through the main `Handler`.
@@ -150,13 +152,12 @@ user navigates away.
 
 ## Build and validation
 
-Run Gradle from `android/` with the wrapper. The known development JDK is 21,
-while source compatibility remains Java 8:
+Run Gradle from the repository root with the wrapper. The known development
+JDK is 21, while source compatibility remains Java 8:
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :app:assembleDebug
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :canvas:core:selfTest
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :canvas:app:assembleDebug
 ```
 
 The first command is the primary logic/network check. `:core:test` is disabled
@@ -164,7 +165,7 @@ because this project intentionally has no JUnit dependency; `selfTest` runs
 `com.canvas.xp3.SelfTest`, which delegates to `NetTests` and `DataTests` and exits
 nonzero on failure. `:core:check` also depends on `selfTest`.
 
-Tests use `Check` directly. Add a named `check.run(...)` group or extend the
+Tests use the shared `Check` (`common/core` test fixtures) directly. Add a named `check.run(...)` group or extend the
 nearest existing group, use `check.ok`, `check.same`, and `check.fails`, and
 keep fixtures deterministic. Use injected clocks, local loopback
 `TestServer`, and temporary directories rather than live Canvas calls or
@@ -186,15 +187,16 @@ Validation should match the change:
 
 The APK to hand to the user is the release build, `:app:assembleRelease`, at
 `android/app/build/outputs/apk/release/app-release.apk`. It is signed with the
-repository's shared key (`../signing/signing.gradle`), so it installs over the
+repository's shared key (`../signing/signing.gradle`, applied by
+`../gradle/app.gradle`), so it installs over the
 copy on the phone. The debug APK is only for checking that the code compiles.
 
 ## Credentials and generated files
 
-`android/app/build.gradle` may read deployment credentials from the sibling
-Canvas project or explicitly supplied Gradle properties. It writes a
-generated `Defaults.java` under `android/app/build/`; never edit or commit that
-file.
+`android/app/build.gradle` may read deployment credentials (`auth.json` and
+`service-api-token.txt` beside `android/`, or explicitly supplied Gradle
+properties). `../gradle/bundled.gradle` writes them into a generated
+`Bundled.java` under `android/app/build/`; never edit or commit that file.
 
 An assembled personal APK can contain live Canvas credentials and
 must be treated like a password. Never print, decode, attach, or commit any APK,

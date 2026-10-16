@@ -9,6 +9,8 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.xp3.common.ui.SelectableAdapter;
+
 /** The settings list: a label, what it is currently set to, and nothing else. */
 final class SettingsAdapter extends SelectableAdapter {
 

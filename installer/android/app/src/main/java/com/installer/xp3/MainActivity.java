@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.admin.DevicePolicyManager;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
@@ -41,12 +40,7 @@ public final class MainActivity extends Activity {
 
         release = new Button(this);
         release.setText("Stop being device owner");
-        release.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                confirmRelease();
-            }
-        });
+        release.setOnClickListener(view -> confirmRelease());
 
         LinearLayout column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);
@@ -86,12 +80,9 @@ public final class MainActivity extends Activity {
         new AlertDialog.Builder(this)
             .setTitle("Stop being device owner?")
             .setMessage("Installs from Delta and the Updater will be blocked again until this is set up anew over adb.")
-            .setPositiveButton("Stop", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    dpm.clearDeviceOwnerApp(getPackageName());
-                    show();
-                }
+            .setPositiveButton("Stop", (dialog, which) -> {
+                dpm.clearDeviceOwnerApp(getPackageName());
+                show();
             })
             .setNegativeButton("Cancel", null)
             .show();

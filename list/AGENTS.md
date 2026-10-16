@@ -20,8 +20,9 @@ assistant's writes and are kept, tested, for any future second writer.
 
 ## Layout
 
-- `android/core`: `data/` (`Item`, `Checklist`, `Store`) and `net/Json`.
-  Tests in `src/test` run via `:core:selfTest` with the tiny `Check` harness.
+- `android/core`: `data/` (`Item`, `Checklist`, `Store`), over the shared
+  `Json` and `Disk` (`../common/core`). Tests in `src/test` run via
+  `:core:selfTest` with the shared `Check` harness.
 - `android/app`: `MainActivity` (the list, its keys and its popup menu),
   `Backend` (the only bridge to disk; owns the shared `Checklist`) and
   `ItemAdapter`. The bar at the top is a single, always-selected tab that
@@ -50,9 +51,8 @@ assistant's writes and are kept, tested, for any future second writer.
 ## Build and validation
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :app:assembleDebug
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :list:core:selfTest
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :list:app:assembleDebug
 ```
 
 There are no UI automation tests; key, focus, and popup changes need manual

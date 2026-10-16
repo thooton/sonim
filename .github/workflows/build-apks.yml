@@ -11,142 +11,59 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ANDROID_PLATFORM: android-35
   ANDROID_BUILD_TOOLS: 35.0.1
 
 jobs:
-  gradle:
-    name: ${{ matrix.app }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - app: books
-            dir: books/android
-            selftest: true
-          - app: canvas
-            dir: canvas/android
-          - app: charge
-            dir: charge/android
-          - app: delta
-            dir: delta/android
-            selftest: true
-          - app: dictionary
-            dir: dictionary
-          - app: flashcards
-            dir: flashcards/android
-          - app: installer
-            dir: installer/android
-          - app: list
-            dir: list/android
-          - app: serve
-            dir: serve/android
-            selftest: true
-          - app: source
-            dir: source/android
-            selftest: true
-          - app: updater
-            dir: updater/android
-            selftest: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platforms;${{ env.ANDROID_PLATFORM }} build-tools;${{ env.ANDROID_BUILD_TOOLS }}
-
-      - uses: gradle/actions/setup-gradle@v4
-
-      # Charge refuses to build without android/.tokens.json. CI never bakes a
-      # real Tesla credential into a downloadable artifact, so it gets a
-      # placeholder: the APK builds, but has no working login.
-      - name: Placeholder Charge token
-        if: matrix.app == 'charge'
-        run: echo '{"refreshToken":"ci-placeholder"}' > charge/android/.tokens.json
-
-      # Books, Delta, Serve, Source and the Updater keep their parsing and
-      # protocol code in a plain Java :core with its own runner. CI has no
-      # logins, so the APKs it builds carry none.
-      - name: Self-test
-        if: matrix.selftest
-        working-directory: ${{ matrix.dir }}
-        run: ./gradlew --no-daemon :core:selfTest
-
-      # Release builds are signed with the shared key in signing/, the same
-      # one the copies on the phone carry, so they install over them.
-      - name: Build release APK
-        working-directory: ${{ matrix.dir }}
-        run: ./gradlew --no-daemon :app:assembleRelease
-
-      - name: Collect APK
-        run: |
-          mkdir -p out
-          cp ${{ matrix.dir }}/app/build/outputs/apk/release/app-release.apk out/${{ matrix.app }}.apk
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.app }}-apk
-          path: out/*.apk
-          if-no-files-found: error
-
-  launcher:
-    name: launcher
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platforms;${{ env.ANDROID_PLATFORM }} build-tools;${{ env.ANDROID_BUILD_TOOLS }}
-
-      # build.sh calls `aapt` from PATH and signs with launcher/signing/.
-      - name: Build AppDrawer APK
-        run: |
-          export PATH="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS:$PATH"
-          ./launcher/build.sh
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: launcher-apk
-          path: launcher/AppDrawer.apk
-          if-no-files-found: error
-
-  bundle:
+  build:
     name: All APKs
-    needs: [gradle, launcher]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/setup-java@v4
         with:
-          pattern: '*-apk'
-          path: apks
-          merge-multiple: true
+          distribution: temurin
+          java-version: 21
 
       - uses: android-actions/setup-android@v3
         with:
-          packages: build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+          packages: platforms;android-35 build-tools;${{ env.ANDROID_BUILD_TOOLS }}
 
-      # What the Updater app reads: each APK's version and package, keyed by
-      # its file name without .apk (which is also its name in the release).
-      # Both come from the built APKs themselves, so they can't drift from
-      # the build files.
-      - name: List versions and packages
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Charge refuses to build without android/.tokens.json. CI never bakes a
+      # real Tesla credential into a downloadable artifact, so it gets a
+      # placeholder: the APK builds, but has no working login. CI has no other
+      # logins either, so the APKs it builds carry none.
+      - name: Placeholder Charge token
+        run: echo '{"refreshToken":"ci-placeholder"}' > charge/android/.tokens.json
+
+      # Every app is one Gradle build (settings.gradle finds them), so this
+      # runs every :core's self-test and builds every release APK, signed with
+      # the shared key in signing/ like the copies on the phone.
+      - name: Self-test and build
+        run: ./gradlew --no-daemon selfTest assembleRelease
+
+      # build.sh calls `aapt` from PATH and signs with launcher/signing/.
+      - name: Build the launcher
         run: |
+          export PATH="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS:$PATH"
+          ./launcher/build.sh
+
+      # Each APK is named for its app's directory (the launcher keeps its old
+      # AppDrawer.apk), which is also its name in the release. Then what the
+      # Updater app reads: each APK's version and
+      # package, from the built APKs themselves, so they can't drift from the
+      # build files.
+      - name: Collect APKs, versions and packages
+        run: |
+          mkdir apks
+          for apk in */android/app/build/outputs/apk/release/app-release.apk */app/build/outputs/apk/release/app-release.apk; do
+            [ -f "$apk" ] && cp "$apk" "apks/${apk%%/*}.apk"
+          done
+          cp launcher/AppDrawer.apk apks/
           aapt2="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS/aapt2"
           : > apks/versions.txt
           : > apks/packages.txt
@@ -167,10 +84,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: all-apks
-          path: |
-            apks/*.apk
-            apks/versions.txt
-            apks/packages.txt
+          path: apks/
           if-no-files-found: error
 
       # Pushes to master also publish the APKs to the rolling "latest" release.

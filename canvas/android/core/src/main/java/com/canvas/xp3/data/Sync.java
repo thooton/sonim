@@ -1,7 +1,7 @@
 package com.canvas.xp3.data;
 
 import com.canvas.xp3.net.Canvas;
-import com.canvas.xp3.net.Json;
+import com.xp3.common.Json;
 import com.canvas.xp3.net.Submissions;
 
 import java.io.IOException;

@@ -46,12 +46,9 @@ final class PageView extends View {
     private int track;
     private int noticeFill;
     private String notice;
-    private final Runnable clearNotice = new Runnable() {
-        @Override
-        public void run() {
-            notice = null;
-            invalidate();
-        }
+    private final Runnable clearNotice = () -> {
+        notice = null;
+        invalidate();
     };
 
     PageView(Context context) {

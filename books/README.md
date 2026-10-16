@@ -46,9 +46,8 @@ The screen stays on while you read, until five minutes after the last key press.
 ## Build and test
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRelease
-adb install -r app/build/outputs/apk/release/app-release.apk
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :books:core:selfTest :books:app:assembleRelease
+adb install -r books/android/app/build/outputs/apk/release/app-release.apk
 ```
 
 ## Fonts

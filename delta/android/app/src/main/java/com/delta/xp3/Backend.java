@@ -13,8 +13,7 @@ import com.delta.xp3.net.Center;
 import com.delta.xp3.net.CloudAuth;
 import com.delta.xp3.net.Cloud;
 import com.delta.xp3.net.Config;
-import com.delta.xp3.net.EventSource;
-import com.delta.xp3.net.Http;
+import com.xp3.common.Http;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -25,7 +24,6 @@ import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -108,11 +106,11 @@ final class Backend {
         Config saved = store.settings();
         Config bundled;
         try {
-            bundled = Defaults.config();
+            bundled = Config.blank().withCenter(Bundled.SERVER, Bundled.TOKEN);
         } catch (RuntimeException e) {
             return saved;
         }
-        String revision = Defaults.revision(Store.CENTER);
+        String revision = Bundled.REVISION;
         if (!bundled.centerReady() || revision.equals(store.bundledRevision(Store.CENTER))) return saved;
         Config next = saved.withCenterOf(bundled);
         try {
@@ -654,12 +652,7 @@ final class Backend {
             for (Chat chat : all) if (chat.account != null) owners.put(chat.id, chat.account);
         }
         if (!any) throw listed.isEmpty() && failure == null ? new IOException(NO_ACCOUNTS) : failure;
-        Collections.sort(all, new Comparator<Chat>() {
-            @Override
-            public int compare(Chat a, Chat b) {
-                return a.updated == b.updated ? 0 : a.updated > b.updated ? -1 : 1;
-            }
-        });
+        Collections.sort(all, (a, b) -> a.updated == b.updated ? 0 : a.updated > b.updated ? -1 : 1);
         return all;
     }
 
@@ -682,12 +675,7 @@ final class Backend {
         }
         if (center == null) return null;
         if (Chat.backup(session)) return new Link(center, session, after, listener);
-        return new Link(new EventSource() {
-            @Override
-            public Http.Stream open(String session, long after) throws IOException, InterruptedException {
-                return cloudFor(session).open(session, after);
-            }
-        }, session, after, listener);
+        return new Link((id, from) -> cloudFor(id).open(id, from), session, after, listener);
     }
 
     // ------------------------------------------------------------------

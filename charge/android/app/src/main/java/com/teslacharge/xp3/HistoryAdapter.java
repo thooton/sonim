@@ -71,8 +71,7 @@ final class HistoryAdapter extends RowAdapter {
             : inflater().inflate(R.layout.row_history_footer, parent, false);
         row.setSelected(position == getSelectedPosition());
         ((TextView) row.findViewById(R.id.footer_text)).setText(footer);
-        row.findViewById(R.id.footer_progress)
-            .setVisibility(footerBusy ? View.VISIBLE : View.GONE);
+        row.findViewById(R.id.footer_progress).setVisibility(footerBusy ? View.VISIBLE : View.GONE);
         return row;
     }
 

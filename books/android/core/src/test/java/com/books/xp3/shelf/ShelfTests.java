@@ -1,23 +1,17 @@
 package com.books.xp3.shelf;
 
-import com.books.xp3.Check;
+import com.xp3.common.Check;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public final class ShelfTests {
 
     public static void run(final Check check) {
-        check.run("shelf", new Check.Body() {
-            @Override
-            public void run() throws Exception {
-                shelf(check);
-            }
-        });
+        check.run("shelf", () -> shelf(check));
     }
 
     private static void shelf(Check check) throws IOException {

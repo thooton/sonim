@@ -123,11 +123,8 @@ final class Download {
     private static void start(Context context, String name, Work work) {
         final Download download = new Download(context.getApplicationContext(), work);
         current = download;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                download.work();
-            }
+        new Thread(() -> {
+            download.work();
         }, name).start();
     }
 
@@ -174,12 +171,7 @@ final class Download {
     private static void runMusic(Context app, Music music, String mode, String query) throws IOException, InterruptedException {
         String job = null;
         try {
-            Music.Result result = music.run(mode, query, new Music.Listener() {
-                @Override
-                public void line(String text, boolean error) {
-                    Download.line(text);
-                }
-            });
+            Music.Result result = music.run(mode, query, (text, error) -> Download.line(text));
             job = result.job;
             if (job != null) {
                 String size = result.bytes > 0 ? " (" + human(result.bytes) + ")" : "";
@@ -224,54 +216,51 @@ final class Download {
         final Saved saved = new Saved();
         final List<String> scan = new ArrayList<String>();
         final long[] done = {0};
-        music.fetch(job, new Music.Sink() {
-            @Override
-            public void file(String path, long size, InputStream body) throws IOException, InterruptedException {
-                List<String> parts = Names.parts(path);
-                if (parts.isEmpty()) return;
-                File dir = root;
-                for (int i = 0; i < parts.size() - 1; i++) dir = new File(dir, parts.get(i));
-                if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Can't make the folder " + dir.getName() + ".");
-                if (parts.size() > 1 && saved.folder == null) saved.folder = parts.get(0);
-                String name = parts.get(parts.size() - 1);
-                File target = new File(dir, name);
-                if (target.isFile() && target.length() == size) {
-                    // The same file from an earlier download: keep it.
-                    saved.kept++;
-                    drain(body);
-                    done[0] += size;
-                    return;
-                }
-                for (int n = 2; target.exists(); n++) target = new File(dir, Names.numbered(name, n));
-                File part = new File(dir, "." + target.getName() + ".part");
-                OutputStream out = new FileOutputStream(part);
-                try {
-                    byte[] buffer = new byte[64 * 1024];
-                    long last = 0;
-                    for (int count; (count = body.read(buffer)) >= 0; ) {
-                        if (Thread.currentThread().isInterrupted() || music.cancelled()) throw new InterruptedException();
-                        out.write(buffer, 0, count);
-                        done[0] += count;
-                        long now = System.currentTimeMillis();
-                        if (now - last > 500) {
-                            last = now;
-                            post(null, "Saving… " + human(done[0]) + (total > 0 ? " of " + human(total) : ""));
-                        }
-                    }
-                    out.close();
-                } catch (IOException | InterruptedException e) {
-                    try { out.close(); } catch (IOException ignored) { /* already failing */ }
-                    part.delete();
-                    throw e;
-                }
-                if (!part.renameTo(target)) {
-                    part.delete();
-                    throw new IOException("Can't save " + target.getName() + ".");
-                }
-                saved.count++;
-                scan.add(target.getAbsolutePath());
-                line("  " + (dir.equals(root) ? "" : dir.getName() + "/") + target.getName());
+        music.fetch(job, (path, size, body) -> {
+            List<String> parts = Names.parts(path);
+            if (parts.isEmpty()) return;
+            File dir = root;
+            for (int i = 0; i < parts.size() - 1; i++) dir = new File(dir, parts.get(i));
+            if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Can't make the folder " + dir.getName() + ".");
+            if (parts.size() > 1 && saved.folder == null) saved.folder = parts.get(0);
+            String name = parts.get(parts.size() - 1);
+            File target = new File(dir, name);
+            if (target.isFile() && target.length() == size) {
+                // The same file from an earlier download: keep it.
+                saved.kept++;
+                drain(body);
+                done[0] += size;
+                return;
             }
+            for (int n = 2; target.exists(); n++) target = new File(dir, Names.numbered(name, n));
+            File part = new File(dir, "." + target.getName() + ".part");
+            OutputStream out = new FileOutputStream(part);
+            try {
+                byte[] buffer = new byte[64 * 1024];
+                long last = 0;
+                for (int count; (count = body.read(buffer)) >= 0; ) {
+                    if (Thread.currentThread().isInterrupted() || music.cancelled()) throw new InterruptedException();
+                    out.write(buffer, 0, count);
+                    done[0] += count;
+                    long now = System.currentTimeMillis();
+                    if (now - last > 500) {
+                        last = now;
+                        post(null, "Saving… " + human(done[0]) + (total > 0 ? " of " + human(total) : ""));
+                    }
+                }
+                out.close();
+            } catch (IOException | InterruptedException e) {
+                try { out.close(); } catch (IOException ignored) { /* already failing */ }
+                part.delete();
+                throw e;
+            }
+            if (!part.renameTo(target)) {
+                part.delete();
+                throw new IOException("Can't save " + target.getName() + ".");
+            }
+            saved.count++;
+            scan.add(target.getAbsolutePath());
+            line("  " + (dir.equals(root) ? "" : dir.getName() + "/") + target.getName());
         });
         if (!scan.isEmpty()) {
             MediaScannerConnection.scanFile(app, scan.toArray(new String[0]), null, null);
@@ -294,12 +283,7 @@ final class Download {
     private static Books books(Context context, Login login) {
         final SharedPreferences prefs = context.getApplicationContext().getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE);
         Books.Session session = Books.Session.parse(prefs.getString("session", ""));
-        return new Books(login, session, new Books.Keeper() {
-            @Override
-            public void keep(Books.Session session) {
-                prefs.edit().putString("session", session.toJson()).apply();
-            }
-        });
+        return new Books(login, session, kept -> prefs.edit().putString("session", kept.toJson()).apply());
     }
 
     /**
@@ -323,14 +307,11 @@ final class Download {
                 final Books.Page shown = found;
                 final String said = found.books.isEmpty()
                     ? "Nothing found for \"" + query + "\"."
-                    : note + "Page " + found.page + " of " + found.pages + ".";
-                MAIN.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        results = shown;
-                        status = said;
-                        changed();
-                    }
+                    : note + "Page " + found.page + " of " + found.pages + "";
+                MAIN.post(() -> {
+                    results = shown;
+                    status = said;
+                    changed();
                 });
             }
 
@@ -351,22 +332,14 @@ final class Download {
             @Override
             public void run() throws IOException, InterruptedException {
                 File folder = new File(Environment.getExternalStorageDirectory(), BOOKS_FOLDER);
-                Books.Saved saved = books.download(book, folder, new Books.Progress() {
-                    @Override
-                    public void saved(long done, long total) {
-                        post(null, "Downloading… " + human(done) + (total > 0 ? " of " + human(total) : ""));
-                    }
+                Books.Saved saved = books.download(book, folder, (done, total) -> {
+                    post(null, "Downloading… " + human(done) + (total > 0 ? " of " + human(total) : ""));
                 });
                 if (!saved.kept) {
                     MediaScannerConnection.scanFile(app, new String[] {saved.file.getAbsolutePath()}, null, null);
                 }
                 final String key = book.id + "/" + book.hash;
-                MAIN.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        savedBooks.add(key);
-                    }
-                });
+                MAIN.post(() -> savedBooks.add(key));
                 String where = BOOKS_FOLDER + "/" + saved.file.getName();
                 post("✓ " + (saved.kept ? "Already there: " : "Saved ") + where,
                     saved.kept ? "Already in " + BOOKS_FOLDER : "Saved to " + BOOKS_FOLDER + " (" + human(saved.bytes) + ")");
@@ -402,12 +375,7 @@ final class Download {
             apply(text, newStatus);
             return;
         }
-        MAIN.post(new Runnable() {
-            @Override
-            public void run() {
-                apply(text, newStatus);
-            }
-        });
+        MAIN.post(() -> apply(text, newStatus));
     }
 
     private static void apply(String text, String newStatus) {

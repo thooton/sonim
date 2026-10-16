@@ -9,6 +9,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.list.xp3.data.Item;
+import com.xp3.common.ui.SelectableAdapter;
 
 import java.util.ArrayList;
 import java.util.List;

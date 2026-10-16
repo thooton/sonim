@@ -1,141 +1,46 @@
-import groovy.json.JsonOutput
-import groovy.json.JsonSlurper
-
 plugins {
     id "com.android.application"
 }
 
-/*
- * The bundled setup, for a personal deployment.
- *
- * This is one person's phone, so the app ships already set up rather than
- * asking somebody to type a Canvas address and a forty character token into a
- * T9 keypad. The values are read at build time from the canvas project's own
- * config beside this one and written into a generated source file under
- * build/. Nothing secret is ever committed, and a checkout on any other machine
- * simply builds an app with an empty setup screen. An installed copy keeps the
- * settings it already has either way.
- *
- * The APK that comes out of this contains live credentials. It is gitignored,
- * and it should be treated as a password: anything with the file can read this
- * Canvas account.
- */
-def bundledSource = layout.buildDirectory.dir("generated/bundled")
+apply from: rootProject.file("gradle/app.gradle")
 
-tasks.register("generateDefaults") {
-    description = "Bakes this deployment's Canvas setup into the APK."
-    def canvasConfig = file(project.findProperty("todo.canvasConfig") ?: "${rootDir}/../../canvas/auth.json")
-    def serviceToken = file(project.findProperty("todo.serviceToken") ?: "${rootDir}/../../canvas/service-api-token.txt")
+apply from: rootProject.file("gradle/bundled.gradle")
 
-    inputs.files(canvasConfig, serviceToken)
-        .withPropertyName("sources")
-        .ignoreEmptyDirectories().optional(true)
-    outputs.dir(bundledSource)
-
-    doLast {
-        def config = canvasConfig.isFile() ? new JsonSlurper().parse(canvasConfig) : [:]
-        def token = serviceToken.isFile() ? serviceToken.text.trim() : null
-
-        def service = [:]
-        if (config.canvas?.cookieService?.url) service.url = config.canvas.cookieService.url
-        if (token) service.token = token
-
-        def canvas = [:]
-        if (config.canvas?.baseUrl) canvas.baseUrl = config.canvas.baseUrl
-        if (service) canvas.cookieService = service
-
-        def root = [:]
-        if (canvas) root.canvas = canvas
-        if (config.timezone) root.timezone = config.timezone
-
-        // Only claim a bundled setup when Canvas is actually complete; a
-        // half-filled one would seed settings that cannot fetch anything.
-        def usable = canvas.baseUrl && service.url && service.token
-        def settings = usable ? JsonOutput.toJson(root) : ""
-        def quoted = settings.replace("\\", "\\\\").replace('"', '\\"')
-
-        def target = new File(bundledSource.get().asFile, "com/canvas/xp3")
-        target.mkdirs()
-        new File(target, "Defaults.java").text = """package com.canvas.xp3;
-
-import com.canvas.xp3.net.Config;
-
-/**
- * The setup baked in at build time. GENERATED - do not edit, do not commit.
- *
- * Empty when the build had no credentials to hand, which is what a checkout on
- * another machine gets: the app then opens on its setup screen as normal.
- */
-final class Defaults {
-
-    private Defaults() {}
-
-    private static final String SETTINGS = "${quoted}";
-
-    /** Whether this build came with a setup in it. */
-    static boolean available() {
-        return SETTINGS.length() > 0;
-    }
-
-    /** The bundled setup, validated the same way a typed one is. */
-    static Config config() {
-        return Config.parse(SETTINGS);
-    }
-}
-"""
-        logger.lifecycle(usable
-            ? "Bundled setup: canvas ${canvas.baseUrl}"
-            : "Bundled setup: none found; the app will open on its setup screen")
-    }
-}
-
-tasks.named("preBuild") { dependsOn "generateDefaults" }
-
-// One dependency, and it is the other half of this repository. Nothing third
-// party: no AndroidX, no Material components, no Markdown, JSON or HTTP
-// library. Everything this module draws is a View from android.widget and
-// everything it fetches goes through java.net, which is what keeps a debug APK
-// for a 240x320 phone in the low hundreds of kilobytes.
-//
-// :core is the Android-free half: the assignment model and the Canvas client,
-// plain Java so they can be tested on a desktop JVM.
-dependencies {
-    implementation project(":core")
+// The Canvas address, cookie service and its token, from the canvas project's
+// own config beside this directory (auth.json and service-api-token.txt, or
+// -Ptodo.canvasConfig / -Ptodo.serviceToken). Only a complete setup is
+// bundled: a half-filled one would seed settings that cannot fetch anything.
+// An installed copy adopts it on first launch only.
+bundled("com.canvas.xp3") {
+    def canvasConfig = file(project.findProperty("todo.canvasConfig") ?: "../../auth.json")
+    def serviceToken = file(project.findProperty("todo.serviceToken") ?: "../../service-api-token.txt")
+    def config = canvasConfig.isFile() ? new groovy.json.JsonSlurper().parse(canvasConfig) : [:]
+    def token = serviceToken.isFile() ? serviceToken.text.trim() : ""
+    def baseUrl = config.canvas?.baseUrl ?: ""
+    def serviceUrl = config.canvas?.cookieService?.url ?: ""
+    def usable = baseUrl && serviceUrl && token
+    logger.lifecycle(usable
+        ? "Bundled setup: canvas $baseUrl"
+        : "Bundled setup: none found; the app will open on its setup screen")
+    def settings = [canvas: [baseUrl: baseUrl, cookieService: [url: serviceUrl, token: token]]]
+    if (config.timezone) settings.timezone = config.timezone
+    [SETTINGS: usable ? groovy.json.JsonOutput.toJson(settings) : ""]
 }
 
 android {
     namespace "com.canvas.xp3"
-    compileSdk 35
-    buildToolsVersion "35.0.1"
 
     defaultConfig {
         // Kept from before the rename to Canvas: a new applicationId would
         // install a second app beside the old one, without its settings or
         // cached work.
         applicationId "com.todo.xp3"
-        minSdk 27
-        targetSdk 27
-        versionCode 2
-        versionName "1.0.0"
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-
-    // API 27 is the phone's own version; this app is never going to Play.
-    lint {
-        disable "ExpiredTargetSdkVersion"
-    }
-
-    sourceSets {
-        main {
-            java.srcDir bundledSource
-        }
+        versionCode 3
+        versionName "1.0.1"
     }
 }
 
-// Debug and release builds alike are signed with the shared key, which the
-// copies on the phone were signed with too (see that file).
-apply from: rootProject.file("../../signing/signing.gradle")
+dependencies {
+    implementation project(":canvas:core")
+    implementation project(":common:ui")
+}

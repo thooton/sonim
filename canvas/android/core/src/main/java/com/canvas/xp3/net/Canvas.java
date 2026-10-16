@@ -1,12 +1,13 @@
 package com.canvas.xp3.net;
 
+import com.xp3.common.Http;
+import com.xp3.common.Json;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,11 +47,8 @@ public final class Canvas {
     private final Sleeper sleeper;
 
     public Canvas(Config config, Http http) {
-        this(config.canvasBase(), new RemoteCookies(config, http), http, new Sleeper() {
-            @Override
-            public void sleep(long milliseconds) throws InterruptedException {
-                Thread.sleep(milliseconds);
-            }
+        this(config.canvasBase(), new RemoteCookies(config, http), http, milliseconds -> {
+            Thread.sleep(milliseconds);
         });
     }
 
@@ -161,12 +159,9 @@ public final class Canvas {
                 failures.add(Json.map("course_id", id, "error", "Invalid Canvas data"));
             }
         }
-        Collections.sort(found, new Comparator<Object>() {
-            @Override
-            public int compare(Object left, Object right) {
-                return Instant.parse((String) Json.object(left).get("effective_due_at"))
-                    .compareTo(Instant.parse((String) Json.object(right).get("effective_due_at")));
-            }
+        Collections.sort(found, (left, right) -> {
+            return Instant.parse((String) Json.object(left).get("effective_due_at"))
+                .compareTo(Instant.parse((String) Json.object(right).get("effective_due_at")));
         });
         return Json.map("from", from.toString(), "to_exclusive", to.toString(), "assignments", found,
             "complete", Boolean.valueOf(failures.isEmpty()), "unavailable_courses", failures,

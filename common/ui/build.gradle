@@ -1,0 +1,21 @@
+// Android code and resources the apps share: Markdown, list highlighting, the
+// tab bar and small view helpers. An app's own colors and dimens override the
+// defaults in res/values, so the shared selectors take each app's palette.
+plugins {
+    id "com.android.library"
+}
+
+android {
+    namespace "com.xp3.common.ui"
+    compileSdk 35
+    buildToolsVersion "35.0.1"
+
+    defaultConfig {
+        minSdk 27
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
