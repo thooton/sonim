@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One line of a form that is a list of rows (Mail's To, Cc and Subject):
+     a hairline along the bottom, inset to the text edge, and the focus wash
+     across the row while its field has the keys. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <layer-list>
+            <item><color android:color="@color/focus_fill" /></item>
+            <item android:gravity="bottom" android:height="1dp"><color android:color="@color/divider" /></item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item><color android:color="@color/row" /></item>
+            <item android:gravity="bottom" android:height="1dp" android:left="@dimen/family_gutter"><color android:color="@color/divider" /></item>
+        </layer-list>
+    </item>
+</selector>

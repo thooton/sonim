@@ -1,29 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- A deep letterbox red across the top; the rest is the sibling apps'
-         greys, with focus marked by a rule rather than a filled block. -->
-    <color name="primary">#9E2A1E</color>
-    <color name="primary_dark">#6E1D15</color>
+    <!-- An oxblood in the family's four tones (DESIGN.md): the band near
+         black, so the screen is framed rather than alarmed; the accent for
+         focus and for what is new; a pale wash behind the picked
+         conversation; and greys tinted to match. The status bar is the
+         band's own colour. -->
+    <color name="primary">#4D1711</color>
+    <color name="primary_dark">#4D1711</color>
     <color name="on_primary">#FFFFFF</color>
-    <color name="on_primary_dim">#E8BDB7</color>
+    <color name="on_primary_dim">#DBB3AC</color>
 
-    <color name="page">#FAFAFA</color>
+    <color name="page">#FFFFFF</color>
     <color name="row">#FFFFFF</color>
-    <color name="section_fill">#EFEFEF</color>
-    <color name="divider">#DCDCDC</color>
+    <color name="divider">#EFE6E4</color>
+    <color name="field_fill">#F6F0EF</color>
 
-    <color name="focus_fill">#F6E8E6</color>
-    <color name="focus_rule">#9E2A1E</color>
-    <color name="press_fill">#ECD0CC</color>
+    <color name="focus_fill">#FCEFEC</color>
+    <color name="focus_rule">#A12C1D</color>
+    <color name="press_fill">#F4D9D4</color>
 
-    <color name="text">#1A1A1A</color>
-    <color name="text_muted">#6E6E6E</color>
+    <color name="text">#1B1B1D</color>
+    <color name="text_muted">#6F6563</color>
+    <color name="input_hint">#8E8482</color>
     <!-- A star, and a draft not yet sent. -->
     <color name="star">#C58A00</color>
     <color name="draft">#B3261E</color>
-
-    <!-- The stock Messages compose field, as in the sibling apps. -->
-    <color name="input_text">#D8000000</color>
-    <color name="input_hint">#7F000000</color>
-    <color name="input_border">#7F000000</color>
 </resources>

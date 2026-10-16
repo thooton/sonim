@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A group of facts on a grouped page (a place's address and phone, an
+     assignment's points): white, 10dp corners, no border or shadow. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/row" />
+    <corners android:radius="10dp" />
+</shape>

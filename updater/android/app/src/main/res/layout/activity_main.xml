@@ -16,14 +16,10 @@
         android:paddingLeft="@dimen/row_pad_h"
         android:paddingRight="@dimen/row_pad_h">
         <TextView
+            style="@style/FamilyTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:includeFontPadding="false"
-            android:singleLine="true"
-            android:text="@string/app_name"
-            android:textColor="@color/on_primary"
-            android:textSize="@dimen/title_text"
-            android:textStyle="bold" />
+            android:text="@string/app_name" />
         <TextView
             android:id="@+id/summary"
             android:layout_width="0dp"
@@ -34,8 +30,7 @@
             android:gravity="right"
             android:includeFontPadding="false"
             android:singleLine="true"
-            android:textColor="@color/on_primary_dim"
-            android:textSize="@dimen/summary_text" />
+            style="@style/FamilyTitleMeta" />
     </LinearLayout>
 
     <FrameLayout android:id="@+id/content" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:background="@color/page" />

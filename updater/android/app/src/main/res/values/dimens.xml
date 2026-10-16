@@ -1,15 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Against the XP3's 240x320 mdpi panel: 24dp status bar and a 36dp
-         title bar leave 260dp, which is five two-line rows and the edge of a
-         sixth. -->
     <dimen name="title_bar_height">36dp</dimen>
-    <dimen name="title_text">15sp</dimen>
-    <dimen name="summary_text">12sp</dimen>
-
-    <dimen name="row_min_height">48dp</dimen>
+    <dimen name="row_min_height">44dp</dimen>
     <dimen name="row_pad_h">10dp</dimen>
     <dimen name="focus_rule">2dp</dimen>
-    <dimen name="text_name">14sp</dimen>
-    <dimen name="text_status">12sp</dimen>
+    <dimen name="text_name">13.5sp</dimen>
+    <dimen name="text_status">11.5sp</dimen>
 </resources>

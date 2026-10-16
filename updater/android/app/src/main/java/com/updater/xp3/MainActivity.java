@@ -5,12 +5,10 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.ContextMenu;
-import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -24,6 +22,7 @@ import com.updater.xp3.core.Releases;
 import com.updater.xp3.core.Status;
 import com.updater.xp3.core.Version;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Family;
 import com.xp3.common.ui.Ui;
 
 import java.io.File;
@@ -267,14 +266,11 @@ public final class MainActivity extends BaseActivity {
         adapter = new AppAdapter(this);
         final ListView list = new ListView(this);
         list.setAdapter(adapter);
-        // Rows paint their own focus state edge to edge; a transparent
-        // selector stops the platform drawing a second highlight beneath.
-        list.setSelector(new ColorDrawable(0x00000000));
-        list.setDivider(new ColorDrawable(getResources().getColor(R.color.divider)));
-        list.setDividerHeight(dp(1));
-        list.setBackgroundColor(getResources().getColor(R.color.page));
-        list.setCacheColorHint(0x00000000);
-        list.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY);
+        // Rows paint their own focus card and their own hairlines (see
+        // row_app), so the list draws neither a selector nor dividers.
+        Family.list(list);
+        list.setDivider(null);
+        list.setDividerHeight(0);
         list.setItemsCanFocus(false);
         list.setFocusable(true);
         list.setFocusableInTouchMode(true);
@@ -297,17 +293,12 @@ public final class MainActivity extends BaseActivity {
 
     /** Checking, the reason a check failed, or an empty release. */
     private void showMessage() {
-        String text;
-        if (checking) text = "Checking for updates…";
-        else if (checkError != null) text = "Couldn't check for updates.\n\n" + checkError + "\n\nMenu: Check again";
-        else text = "The release lists no apps.\n\nMenu: Check again";
+        CharSequence text;
+        if (checking) text = Family.emptyText(this, "Checking for updates…", null);
+        else if (checkError != null) text = Family.emptyText(this, "Couldn't check for updates", checkError + "\n\nPress Menu to check again");
+        else text = Family.emptyText(this, "The release lists no apps", "Press Menu to check again");
         if (messageView == null) {
-            TextView view = new TextView(this);
-            view.setTextSize(13);
-            view.setTextColor(getResources().getColor(R.color.text_muted));
-            view.setGravity(Gravity.CENTER);
-            view.setLineSpacing(dp(3), 1f);
-            view.setPadding(dp(16), dp(16), dp(16), dp(16));
+            TextView view = Family.empty(this, "", null);
             // Focusable so keys land somewhere and the menu has an anchor.
             view.setFocusable(true);
             view.setFocusableInTouchMode(true);

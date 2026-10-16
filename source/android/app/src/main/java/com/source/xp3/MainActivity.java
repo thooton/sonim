@@ -23,6 +23,7 @@ import com.source.xp3.net.Books;
 import com.xp3.common.Login;
 import com.source.xp3.net.Music;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Family;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,8 +51,9 @@ public final class MainActivity extends BaseActivity implements Download.Listene
     private static final String[] MODES = {Music.SONG, Music.ALBUM, BOOK};
 
     private EditText query;
-    private TextView modeView;
+    private TextView[] tabs;
     private TextView statusView;
+    private TextView emptyView;
     private TextView logView;
     private ScrollView scroll;
     private ListView resultList;
@@ -70,12 +72,18 @@ public final class MainActivity extends BaseActivity implements Download.Listene
         super.onCreate(state);
         setContentView(R.layout.activity_main);
         query = (EditText) findViewById(R.id.query);
-        modeView = (TextView) findViewById(R.id.mode);
+        tabs = new TextView[] {
+            (TextView) findViewById(R.id.tab_song),
+            (TextView) findViewById(R.id.tab_album),
+            (TextView) findViewById(R.id.tab_book),
+        };
         statusView = (TextView) findViewById(R.id.status);
+        emptyView = (TextView) findViewById(R.id.empty);
         logView = (TextView) findViewById(R.id.log);
         scroll = (ScrollView) findViewById(R.id.scroll);
         resultList = (ListView) findViewById(R.id.results);
         resultList.setAdapter(adapter);
+        Family.list(resultList);
 
         SharedPreferences prefs = prefs();
         mode = Music.SONG;
@@ -183,8 +191,11 @@ public final class MainActivity extends BaseActivity implements Download.Listene
         say(status);
 
         boolean list = shown != null;
+        boolean blank = !list && Download.log().isEmpty();
         resultList.setVisibility(list ? View.VISIBLE : View.GONE);
-        scroll.setVisibility(list ? View.GONE : View.VISIBLE);
+        scroll.setVisibility(list || blank ? View.GONE : View.VISIBLE);
+        emptyView.setVisibility(blank ? View.VISIBLE : View.GONE);
+        if (blank) showEmpty();
         adapter.notifyDataSetChanged();
         if (list) {
             resultList.post(() -> {
@@ -206,23 +217,34 @@ public final class MainActivity extends BaseActivity implements Download.Listene
         query.setEnabled(!running);
     }
 
-    /** The line under the box; it takes no room while there is nothing to say. */
+    /**
+     * The line under the box; it takes no room while there is nothing to
+     * say. While a search or download runs it is in the accent, since it is
+     * the one thing on the screen that is changing.
+     */
     private void say(String text) {
+        boolean running = Download.running();
         statusView.setText(text);
+        statusView.setTextColor(getColor(running ? R.color.focus_rule : R.color.text_muted));
+        statusView.setTypeface(running ? Family.MEDIUM : Typeface.DEFAULT);
         statusView.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
     }
 
     private void showMode() {
-        if (Music.ALBUM.equals(mode)) {
-            modeView.setText("◂ Album ▸");
-            query.setHint(R.string.hint_album);
-        } else if (books()) {
-            modeView.setText("◂ Book ▸");
-            query.setHint(R.string.hint_book);
-        } else {
-            modeView.setText("◂ Song ▸");
-            query.setHint(R.string.hint_song);
-        }
+        for (int i = 0; i < MODES.length; i++) tabs[i].setSelected(MODES[i].equals(mode));
+        if (Music.ALBUM.equals(mode)) query.setHint(R.string.hint_album);
+        else if (books()) query.setHint(R.string.hint_book);
+        else query.setHint(R.string.hint_song);
+        if (emptyView.getVisibility() == View.VISIBLE) showEmpty();
+    }
+
+    /** Before anything has been searched for: what this tab finds, and how. */
+    private void showEmpty() {
+        String title = books() ? "Find a book" : Music.ALBUM.equals(mode) ? "Find an album" : "Find a song";
+        String how = books() ? "Type a title, author or ISBN,\nthen press OK."
+            : Music.ALBUM.equals(mode) ? "Type an artist and album,\nthen press OK."
+            : "Type an artist and title,\nthen press OK.";
+        emptyView.setText(Family.emptyText(this, title, how + "\n\nLeft and Right switch between\nsongs, albums and books."));
     }
 
     /** Song, Album, Book and round again; `step` is 1 or -1. */
@@ -567,23 +589,27 @@ public final class MainActivity extends BaseActivity implements Download.Listene
             if (row == null) {
                 float density = getResources().getDisplayMetrics().density;
                 int padH = getResources().getDimensionPixelSize(R.dimen.pad_h);
-                int padV = (int) (5 * density);
+                int padV = (int) (7 * density);
                 row = new LinearLayout(MainActivity.this);
                 row.setOrientation(LinearLayout.VERTICAL);
+                row.setBackgroundResource(com.xp3.common.ui.R.drawable.family_pick);
                 row.setPadding(padH, padV, padH, padV);
                 TextView title = new TextView(MainActivity.this);
                 title.setTextColor(getColor(R.color.text));
                 title.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.text_book));
-                title.setTypeface(Typeface.DEFAULT_BOLD);
+                title.setTypeface(Family.MEDIUM);
                 title.setMaxLines(2);
                 title.setEllipsize(TextUtils.TruncateAt.END);
+                title.setIncludeFontPadding(false);
                 row.addView(title);
                 for (int i = 0; i < 2; i++) {
                     TextView meta = new TextView(MainActivity.this);
                     meta.setTextColor(getColor(R.color.text_muted));
-                    meta.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.text_log));
+                    meta.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.text_meta));
                     meta.setSingleLine(true);
                     meta.setEllipsize(TextUtils.TruncateAt.END);
+                    meta.setIncludeFontPadding(false);
+                    meta.setPadding(0, (int) (3 * density), 0, 0);
                     row.addView(meta);
                 }
             }
@@ -605,8 +631,7 @@ public final class MainActivity extends BaseActivity implements Download.Listene
                 source.setText(hit.source() + (where.length() > 0 ? " · " + where : ""));
                 source.setVisibility(View.VISIBLE);
             }
-            if (picking && position == picked) row.setBackgroundResource(R.drawable.row_focus);
-            else row.setBackgroundColor(getColor(R.color.row));
+            row.setActivated(picking && position == picked);
             return row;
         }
     }

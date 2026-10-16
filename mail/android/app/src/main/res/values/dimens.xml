@@ -4,13 +4,12 @@
     <dimen name="bar_height">36dp</dimen>
     <dimen name="pad_h">10dp</dimen>
     <dimen name="label_width">34dp</dimen>
-    <dimen name="text_title">15sp</dimen>
-    <dimen name="text_count">13sp</dimen>
     <dimen name="text_label">12sp</dimen>
-    <dimen name="text_input">14sp</dimen>
-    <dimen name="text_status">12sp</dimen>
-    <dimen name="text_name">13sp</dimen>
-    <dimen name="text_meta">12sp</dimen>
+    <dimen name="text_input">13.5sp</dimen>
+    <dimen name="text_status">11.5sp</dimen>
+    <dimen name="text_name">13.5sp</dimen>
+    <dimen name="text_subject">12.5sp</dimen>
+    <dimen name="text_meta">11.5sp</dimen>
     <dimen name="text_detail">13sp</dimen>
     <dimen name="focus_rule">2dp</dimen>
 </resources>

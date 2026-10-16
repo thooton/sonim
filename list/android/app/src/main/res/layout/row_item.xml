@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One line of the checklist: a box, then the task. Text wraps to three
+<!-- One line of the checklist: a ring, then the task. Text wraps to three
      lines rather than scrolling, since a marquee on a 240px row is in motion
-     for as long as you are trying to read it. The box is centred on the first
+     for as long as you are trying to read it. The ring is centred on the first
      line, not the row, so a long item still reads as one tick and one task. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:minHeight="@dimen/item_min_height"
-    android:background="@drawable/focus_selector"
+    android:background="@drawable/family_focus"
     android:clickable="false"
     android:descendantFocusability="blocksDescendants"
     android:focusable="false"
@@ -25,7 +25,7 @@
         android:layout_height="@dimen/check_size"
         android:layout_gravity="top"
         android:layout_marginRight="@dimen/check_gap"
-        android:layout_marginTop="1dp"
+        android:layout_marginTop="0.5dp"
         android:importantForAccessibility="no" />
 
     <TextView

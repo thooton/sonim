@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The family's stock dialogs: rounded, with sentence-case buttons in the
+     app's accent. An app opts in with
+     <item name="android:alertDialogTheme">@style/FamilyDialog</item>. -->
+<resources>
+    <style name="FamilyDialog" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">@color/focus_rule</item>
+        <item name="android:colorControlHighlight">@color/press_fill</item>
+        <item name="android:windowBackground">@drawable/family_dialog</item>
+        <item name="android:colorBackground">@color/row</item>
+        <item name="android:buttonBarButtonStyle">@style/FamilyDialogButton</item>
+        <item name="android:textColorPrimary">@color/text</item>
+    </style>
+
+    <style name="FamilyDialogButton" parent="android:style/Widget.Material.Light.Button.Borderless.Colored">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <!-- The highlight a stock menu or dialog list puts on the item the d-pad
+         is on, in the app's hue rather than the platform's grey. An app's
+         theme names it as its android:colorControlHighlight. -->
+
+    <!-- A tab in the family's tab bar. -->
+    <style name="FamilyTab">
+        <item name="android:background">@drawable/family_tab</item>
+        <item name="android:textColor">@color/tab_text_selector</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:padding">0dp</item>
+        <item name="android:paddingLeft">1dp</item>
+        <item name="android:paddingRight">1dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+    </style>
+
+    <!-- The 36dp header: the title on the left. -->
+    <style name="FamilyTitle">
+        <item name="android:textColor">@color/on_primary</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <!-- What sits on the header's right: a count, a state. -->
+    <style name="FamilyTitleMeta">
+        <item name="android:textColor">@color/on_primary_dim</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <!-- A section heading in a list: small, Medium, muted. -->
+    <style name="FamilySection">
+        <item name="android:textColor">@color/text_muted</item>
+        <item name="android:textSize">11.5sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <!-- A screen's one main action. -->
+    <style name="FamilyButton">
+        <item name="android:background">@drawable/family_button</item>
+        <item name="android:textColor">@color/family_button_text</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:gravity">center</item>
+        <item name="android:minHeight">36dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+    </style>
+</resources>

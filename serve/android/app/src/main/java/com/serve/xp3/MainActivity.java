@@ -4,13 +4,19 @@ import android.Manifest;
 import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Typeface;
 import android.os.Bundle;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.TextView;
 import com.serve.xp3.net.Addresses;
 import com.serve.xp3.net.Server;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Family;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,7 +40,8 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     private TextView addressView;
     private TextView othersView;
     private TextView statusView;
-    private View statusRule;
+    private TextView actionView;
+    private View hintView;
     private File folder;
     private Runnable whenAllowed;
 
@@ -51,7 +58,10 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
         addressView = (TextView) findViewById(R.id.address);
         othersView = (TextView) findViewById(R.id.others);
         statusView = (TextView) findViewById(R.id.status);
-        statusRule = findViewById(R.id.status_rule);
+        actionView = (TextView) findViewById(R.id.action);
+        hintView = findViewById(R.id.hint);
+        // Drawn as focused: it is what OK does, whatever has the focus.
+        actionView.setSelected(true);
         String saved = prefs().getString("folder", "");
         folder = saved.length() == 0 ? null : new File(saved);
     }
@@ -76,8 +86,13 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     @Override
     public void changed() {
         boolean running = ServeService.running();
-        stateView.setText(running ? "● Serving" : "Stopped");
+        stateView.setText(running ? "Serving" : "Not serving");
+        stateView.setTextColor(getColor(running ? R.color.live_text : R.color.text_muted));
+        stateView.setTypeface(running ? Family.MEDIUM : Typeface.DEFAULT);
+        stateView.getCompoundDrawablesRelative()[0].setLevel(running ? 1 : 0);
         folderView.setText(folder == null ? "None chosen" : shown(folder));
+        actionView.setText(running ? "Stop serving" : folder == null ? "Choose a folder" : "Start serving");
+        hintView.setVisibility(folder == null || running ? View.GONE : View.VISIBLE);
 
         // The address changes with the network, so it is read afresh each time.
         List<String> addresses = Addresses.local();
@@ -85,26 +100,34 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
             addressView.setText("No network");
             othersView.setText("Join Wi-Fi or turn on the hotspot.");
         } else {
-            addressView.setText(url(addresses.get(0)));
+            addressView.setText(address(addresses.get(0)));
             StringBuilder others = new StringBuilder();
+            if (running) others.append("Open it in a browser on the same Wi-Fi");
             for (int i = 1; i < addresses.size(); i++) {
                 if (others.length() > 0) others.append('\n');
-                others.append(url(addresses.get(i)));
+                others.append(i == 1 ? "or " : "").append(url(addresses.get(i)));
             }
             othersView.setText(others);
         }
-        addressView.setTextColor(getResources().getColor(running ? R.color.text : R.color.text_muted));
+        othersView.setVisibility(othersView.length() == 0 ? View.GONE : View.VISIBLE);
 
         String error = ServeService.error();
         problem(error.length() > 0 && !running ? error : null);
     }
 
+    /** "http://" small and muted, so the part that differs is what is read. */
+    private CharSequence address(String host) {
+        SpannableStringBuilder out = new SpannableStringBuilder(url(host));
+        int scheme = "http://".length();
+        out.setSpan(new ForegroundColorSpan(getColor(R.color.text_muted)), 0, scheme, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        out.setSpan(new RelativeSizeSpan(0.75f), 0, scheme, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return out;
+    }
+
     /** Shows what went wrong at the foot of the screen; null hides it. */
     private void problem(String text) {
-        int visibility = text == null ? View.GONE : View.VISIBLE;
         statusView.setText(text);
-        statusView.setVisibility(visibility);
-        statusRule.setVisibility(visibility);
+        statusView.setVisibility(text == null ? View.GONE : View.VISIBLE);
     }
 
     /** "Phone/Music", "SD card/DCIM": the folder under the storage it is on. */

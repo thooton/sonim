@@ -1,10 +1,8 @@
 package com.list.xp3;
 
 import android.app.AlertDialog;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.text.InputType;
-import android.view.Gravity;
 import android.view.ContextMenu;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -22,6 +20,7 @@ import android.widget.TextView;
 import com.list.xp3.data.Checklist;
 import com.list.xp3.data.Item;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Family;
 import com.xp3.common.ui.Ui;
 
 import java.util.ArrayList;
@@ -50,6 +49,7 @@ public final class MainActivity extends BaseActivity {
 
     private Backend backend;
     private FrameLayout content;
+    private TextView countView;
 
     private final ExecutorService saves = Ui.worker("list-save");
 
@@ -93,7 +93,7 @@ public final class MainActivity extends BaseActivity {
         content = findViewById(R.id.content);
         // Every context menu is answered here; see showMenu.
         registerForContextMenu(content);
-        findViewById(R.id.tab_list).setSelected(true);
+        countView = findViewById(R.id.count);
         renderList(true);
     }
 
@@ -104,11 +104,12 @@ public final class MainActivity extends BaseActivity {
     private void renderList(boolean focus) {
         List<Item> items = backend.checklist().items();
         LinearLayout root = vertical();
+        showCount(items);
 
         if (items.isEmpty()) {
             listAdapter = null;
             listView = null;
-            TextView empty = emptyMessage("No list items yet");
+            TextView empty = Family.empty(this, "Nothing on the list", "Press Menu to add an item");
             // Focusable so the screen still has somewhere for keys to land,
             // and so Menu's popup has something to sit beside.
             empty.setFocusable(true);
@@ -157,6 +158,7 @@ public final class MainActivity extends BaseActivity {
         }
         int at = Math.max(0, Math.min(position, items.size() - 1));
         listSelection = at;
+        showCount(items);
         listAdapter.replace(items);
         listAdapter.setSelectedPosition(at);
         listView.setSelection(at);
@@ -520,29 +522,19 @@ public final class MainActivity extends BaseActivity {
 
     private <T extends ListView> T configureListView(T list, ListAdapter adapter) {
         list.setAdapter(adapter);
-        // Rows paint their own focus state edge to edge. A transparent
-        // selector stops the platform highlight from drawing a second,
-        // differently shaped indicator underneath them.
-        list.setSelector(new ColorDrawable(0x00000000));
-        list.setDivider(new ColorDrawable(color(R.color.divider)));
-        list.setDividerHeight(dp(1));
-        list.setBackgroundColor(color(R.color.page));
-        list.setCacheColorHint(0x00000000);
-        list.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY);
+        // Rows paint their own focus card, so Family turns the platform
+        // selector off and insets the hairlines to the text edge.
+        Family.list(list);
         list.setItemsCanFocus(false);
         return list;
     }
 
-    /** Centred guidance for a screen that has nothing in it. */
-    private TextView emptyMessage(String message) {
-        TextView view = new TextView(this);
-        view.setText(message);
-        view.setTextSize(13);
-        view.setTextColor(color(R.color.text_muted));
-        view.setIncludeFontPadding(false);
-        view.setGravity(Gravity.CENTER);
-        view.setLineSpacing(dp(3), 1f);
-        view.setPadding(dp(16), dp(16), dp(16), dp(16));
-        return view;
+    /** The header's right side: how many items, or how many of them are done. */
+    private void showCount(List<Item> items) {
+        int done = 0;
+        for (Item item : items) if (item.done) done++;
+        if (items.isEmpty()) countView.setText("");
+        else if (done == 0) countView.setText(items.size() == 1 ? "1 item" : items.size() + " items");
+        else countView.setText(done + " of " + items.size() + " done");
     }
 }
