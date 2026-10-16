@@ -19,17 +19,27 @@ import java.io.OutputStream;
 /**
  * Installs the APK named by its data URI and returns the outcome to the caller.
  *
- * The caller (Delta) starts this for a result, with the APK as a content URI
- * and a read grant on it. Because this app is the device owner, committing the
- * session installs straight away, with no confirmation screen. The result is
- * RESULT_OK on success, or RESULT_CANCELED with {@link #EXTRA_MESSAGE} saying
- * what went wrong.
+ * The caller (Delta or the Updater) starts this for a result, with the APK as
+ * a content URI and a read grant on it. Because this app is the device owner,
+ * committing the session installs straight away, with no confirmation screen.
+ * The result is RESULT_OK on success, or RESULT_CANCELED with
+ * {@link #EXTRA_MESSAGE} saying what went wrong.
+ *
+ * A caller that knows which app the APK must be (the Updater, which fetched
+ * it by name) says so in {@link #EXTRA_PACKAGE}; Android then refuses an APK
+ * for any other package instead of installing it.
+ *
+ * When the APK is this app's own update, Android stops this app to replace
+ * it, so the caller gets RESULT_CANCELED with no message and has to look at
+ * the installed version to learn how it went.
  *
  * No window is drawn (the theme is translucent): the caller stays on screen.
  */
 public final class InstallActivity extends Activity {
 
     public static final String EXTRA_MESSAGE = "message";
+    /** Optional: the package the APK has to be, or the install is refused. */
+    public static final String EXTRA_PACKAGE = "package";
 
     private static final String ACTION_STATUS = "com.installer.xp3.STATUS";
 
@@ -44,6 +54,7 @@ public final class InstallActivity extends Activity {
         if (state != null) return;
 
         final Uri uri = getIntent() == null ? null : getIntent().getData();
+        final String expected = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_PACKAGE);
         if (uri == null) {
             fail("No file to install.");
             return;
@@ -68,18 +79,20 @@ public final class InstallActivity extends Activity {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                commit(uri);
+                commit(uri, expected);
             }
         }, "installer-commit").start();
     }
 
     /** Streams the APK into a session and commits it. Off the main thread. */
-    private void commit(Uri uri) {
+    private void commit(Uri uri, String expected) {
         PackageInstaller installer = getPackageManager().getPackageInstaller();
         int id = -1;
         try {
             PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(
                 PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+            // The session checks the APK against it when it is committed.
+            if (expected != null) params.setAppPackageName(expected);
             id = installer.createSession(params);
             PackageInstaller.Session session = installer.openSession(id);
             try {

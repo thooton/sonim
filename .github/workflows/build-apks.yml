@@ -30,12 +30,21 @@ jobs:
             dir: charge/android
           - app: delta
             dir: delta/android
+            selftest: true
           - app: dictionary
             dir: dictionary
           - app: flashcards
             dir: flashcards/android
+          - app: installer
+            dir: installer/android
           - app: list
             dir: list/android
+          - app: source
+            dir: source/android
+            selftest: true
+          - app: updater
+            dir: updater/android
+            selftest: true
     steps:
       - uses: actions/checkout@v4
 
@@ -57,10 +66,11 @@ jobs:
         if: matrix.app == 'charge'
         run: echo '{"refreshToken":"ci-placeholder"}' > charge/android/.tokens.json
 
-      # Delta's protocol, store and command-center client are plain Java with
-      # their own runner. CI has no logins, so the APK it builds carries none.
-      - name: Delta self-test
-        if: matrix.app == 'delta'
+      # Delta, Source and the Updater keep their protocol and parsing code in
+      # a plain Java :core with its own runner. CI has no logins, so the APKs
+      # it builds carry none.
+      - name: Self-test
+        if: matrix.selftest
         working-directory: ${{ matrix.dir }}
         run: ./gradlew --no-daemon :core:selfTest
 
@@ -123,10 +133,40 @@ jobs:
           path: apks
           merge-multiple: true
 
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+
+      # What the Updater app reads: each APK's version and package, keyed by
+      # its file name without .apk (which is also its name in the release).
+      # Both come from the built APKs themselves, so they can't drift from
+      # the build files.
+      - name: List versions and packages
+        run: |
+          aapt2="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS/aapt2"
+          : > apks/versions.txt
+          : > apks/packages.txt
+          for apk in apks/*.apk; do
+            app=$(basename "$apk" .apk)
+            badging=$("$aapt2" dump badging "$apk" | head -n 1)
+            version=$(printf '%s\n' "$badging" | sed -n "s/.* versionName='\([^']*\)'.*/\1/p")
+            package=$(printf '%s\n' "$badging" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+            if [ -z "$version" ] || [ -z "$package" ]; then
+              echo "No version or package in $apk: $badging" >&2
+              exit 1
+            fi
+            echo "$app = $version" >> apks/versions.txt
+            echo "$app = $package" >> apks/packages.txt
+          done
+          cat apks/versions.txt apks/packages.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: all-apks
-          path: apks/*.apk
+          path: |
+            apks/*.apk
+            apks/versions.txt
+            apks/packages.txt
           if-no-files-found: error
 
       # Pushes to master also publish the APKs to the rolling "latest" release.
@@ -138,12 +178,14 @@ jobs:
           git tag -f latest
           git push -f origin latest
           cat > notes.md <<'EOF'
-          Built automatically from master. Download the APK for the app you want and install it with `adb install <file>.apk`.
+          Built automatically from master. Download the APK for the app you want and install it with `adb install <file>.apk`, or let the Updater app on the phone do it.
+
+          `versions.txt` lists each app's latest version and `packages.txt` its package name; the Updater reads both.
           EOF
           gh release view latest >/dev/null 2>&1 || \
             gh release create latest --title "Sonim apps (latest)" --notes-file notes.md
           gh release edit latest --notes-file notes.md
-          gh release upload latest apks/*.apk --clobber
+          gh release upload latest apks/*.apk apks/versions.txt apks/packages.txt --clobber
           # Drop assets no build produces any more, such as the old
           # *-debug.apk files.
           gh release view latest --json assets -q '.assets[].name' | while read -r name; do

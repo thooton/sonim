@@ -17,7 +17,7 @@ import android.widget.TextView;
  * A one-screen status page: whether this app is the device owner and, if not,
  * the one command that makes it so. If it is, one button gives the role up
  * again, which is the only way to undo it short of a factory reset. The real
- * work is done by {@link InstallActivity} when Delta calls it.
+ * work is done by {@link InstallActivity} when Delta or the Updater calls it.
  */
 public final class MainActivity extends Activity {
 
@@ -71,9 +71,9 @@ public final class MainActivity extends Activity {
         heading.setText(owner ? "Ready" : "Not set up");
         heading.setTextColor(owner ? 0xFF1F4037 : 0xFFB00020);
         body.setText(owner
-            ? "This app is the device owner, so Delta can install apps without "
-                + "the “App not installed” screen.\n"
-            : "Delta's installs will still be blocked until this app is the "
+            ? "This app is the device owner, so Delta and the Updater can install "
+                + "apps without the “App not installed” screen.\n"
+            : "Installs from Delta and the Updater will still be blocked until this app is the "
                 + "device owner. With the phone connected to a computer and no "
                 + "accounts on the phone, run:\n\n"
                 + "adb shell dpm set-device-owner com.installer.xp3/.Admin\n\n"
@@ -85,7 +85,7 @@ public final class MainActivity extends Activity {
     private void confirmRelease() {
         new AlertDialog.Builder(this)
             .setTitle("Stop being device owner?")
-            .setMessage("Delta's installs will be blocked again until this is set up anew over adb.")
+            .setMessage("Installs from Delta and the Updater will be blocked again until this is set up anew over adb.")
             .setPositiveButton("Stop", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
