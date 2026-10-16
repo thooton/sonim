@@ -1,0 +1,140 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+plugins {
+    id "com.android.application"
+}
+
+/*
+ * The bundled login, as in the Delta app (see ../../delta/android/app/build.gradle).
+ *
+ * Source talks to the same command center with the same delta token, and ships
+ * already signed in to it, because nobody wants to type a 49-character token
+ * on a T9 keypad. It is read at build time into a generated source file under
+ * build/. Nothing secret is ever committed, and a build that finds no login
+ * installs over a configured copy and keeps its login.
+ *
+ * Looked for in order: -Pdelta.center=<file>, delta-center.json beside the
+ * android directory, the CLI's own config ($XDG_CONFIG_HOME/delta/config.json),
+ * and last the DELTA_SERVER and DELTA_TOKEN environment variables, which an
+ * agent's sandbox signs the CLI in with. Files are {"server": "...",
+ * "token": "..."}. Only an https command center is bundled.
+ *
+ * The APK that comes out of this contains a live credential: treat it like a
+ * password. It is gitignored.
+ */
+def bundledSource = layout.buildDirectory.dir("generated/bundled")
+
+def firstFile(String property, List<String> candidates) {
+    def chosen = project.findProperty(property) ?: candidates.find { new File(it).isFile() } ?: candidates[0]
+    return file(chosen)
+}
+
+static String sha256(byte[] bytes) {
+    byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+    return digest.collect { String.format("%02x", it & 0xff) }.join()
+}
+
+tasks.register("generateDefaults") {
+    description = "Bakes this deployment's command center into the APK."
+    def configHome = System.getenv("XDG_CONFIG_HOME") ?: "${System.getProperty("user.home")}/.config"
+    def localCenter = firstFile("delta.center", [
+        "${rootDir}/../delta-center.json",
+        "${configHome}/delta/config.json",
+    ])
+    def envServer = System.getenv("DELTA_SERVER") ?: ""
+    def envToken = System.getenv("DELTA_TOKEN") ?: ""
+
+    inputs.files(localCenter)
+        .withPropertyName("sources")
+        .ignoreEmptyDirectories().optional(true)
+    inputs.property("envLogin", sha256((envServer + "\n" + envToken).getBytes("UTF-8")))
+    outputs.dir(bundledSource)
+
+    doLast {
+        def center = localCenter.isFile() ? new JsonSlurper().parse(localCenter) : [:]
+        def from = localCenter.toString()
+        if (!(center.server && center.token) && envServer && envToken) {
+            center = [server: envServer, token: envToken]
+            from = "DELTA_SERVER and DELTA_TOKEN"
+        }
+
+        def json = ""
+        if (center.server && center.token) {
+            if (center.server.toString().toLowerCase().startsWith("https://")) {
+                json = JsonOutput.toJson([server: center.server.toString(), token: center.token.toString()])
+                logger.lifecycle("Bundled setup: command center from ${from}")
+            } else {
+                logger.warn("Bundled setup: the command center in ${from} is not https; left out")
+            }
+        } else {
+            logger.lifecycle("Bundled setup: no command center found; add one from the app's menu")
+        }
+        def revision = json ? sha256(json.getBytes("UTF-8")) : ""
+        def quoted = json.replace("\\", "\\\\").replace('"', '\\"')
+
+        def target = new File(bundledSource.get().asFile, "com/source/xp3")
+        target.mkdirs()
+        new File(target, "Defaults.java").text = """package com.source.xp3;
+
+import com.source.xp3.net.Login;
+
+/**
+ * The command center baked in at build time. GENERATED - do not edit, do not commit.
+ *
+ * Empty when the build had no login to hand: the app then keeps whatever it
+ * already has.
+ */
+final class Defaults {
+
+    private Defaults() {}
+
+    private static final String LOGIN = "${quoted}";
+    private static final String REVISION = "${revision}";
+
+    /** Identifies the bundled login without exposing it; empty when there is none. */
+    static String revision() {
+        return REVISION;
+    }
+
+    static Login login() {
+        return Login.parse(LOGIN);
+    }
+}
+"""
+    }
+}
+
+tasks.named("preBuild") { dependsOn "generateDefaults" }
+
+dependencies {
+    implementation project(":core")
+}
+
+android {
+    namespace "com.source.xp3"
+    compileSdk 35
+    buildToolsVersion "35.0.1"
+
+    defaultConfig {
+        applicationId "com.source.xp3"
+        minSdk 27
+        targetSdk 27
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    sourceSets {
+        main {
+            java.srcDir bundledSource
+        }
+    }
+}
+
+// Signed with the shared key, like every app in this repository.
+apply from: rootProject.file("../../signing/signing.gradle")
