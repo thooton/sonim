@@ -79,9 +79,25 @@ public final class SelfTest {
                 if (!"Bearer tok".equals(request.header("authorization"))) {
                     return TestServer.Reply.of(401, "application/json", "{\"error\":\"invalid or missing auth token\"}");
                 }
+                if (request.method.equals("POST") && request.path.equals("/music-search")) {
+                    if (request.body.contains("Nothing")) {
+                        return TestServer.Reply.of(200, "application/x-ndjson",
+                            "{\"done\":{\"error\":\"Nothing on Soulseek met the config's conditions\",\"results\":[]}}\n");
+                    }
+                    return TestServer.Reply.of(200, "application/x-ndjson",
+                        "{\"stdout\":\"[002] SongJob: searching\"}\n{}\n"
+                        + "{\"done\":{\"results\":["
+                        + "{\"link\":\"slsk://bob/@@m/Music/Artist - Song.mp3\",\"user\":\"bob\",\"speed\":1.25,\"free\":true,"
+                        + "\"files\":[{\"path\":\"@@m\\\\Music\\\\Artist - Song.mp3\",\"size\":8500000,\"length\":252,\"bitrate\":320}]},"
+                        + "{\"link\":\"slsk://carol/m/Artist/Album (2001)/\",\"user\":\"carol\",\"speed\":0.04,\"free\":false,"
+                        + "\"folder\":\"m\\\\Artist\\\\Album (2001)\",\"files\":["
+                        + "{\"path\":\"m\\\\Artist\\\\Album (2001)\\\\01.flac\",\"size\":30000000,\"length\":3000,\"samplerate\":44100,\"bitdepth\":16},"
+                        + "{\"path\":\"m\\\\Artist\\\\Album (2001)\\\\02.flac\",\"size\":20000000,\"length\":725,\"samplerate\":44100,\"bitdepth\":16}]},"
+                        + "{\"user\":\"nolink\",\"files\":[]}]}}\n");
+                }
                 if (request.method.equals("POST") && request.path.equals("/music")) {
                     return TestServer.Reply.of(200, "application/x-ndjson",
-                        "{\"stdout\":\"Searching\"}\n{}\nnot json\n{\"stderr\":\"slow\"}\n"
+                        "{\"stdout\":\"Downloading\"}\n{}\nnot json\n{\"stderr\":\"slow\"}\n"
                         + "{\"done\":{\"job\":\"j1\",\"files\":[{\"path\":\"Artist - Song.mp3\",\"size\":7}]}}\n");
                 }
                 if (request.method.equals("GET") && request.path.equals("/music-jobs/j1")) {
@@ -99,14 +115,35 @@ public final class SelfTest {
                 Login login = Login.of(base, "tok");
                 Music music = new Music(new PlainLogin(login).get());
                 final List<String> lines = new ArrayList<String>();
-                Music.Result result = music.run(Music.SONG, " Artist - Song ", (text, error) -> {
+                Music.Found found = music.search(Music.SONG, " Artist - Song ", (text, error) -> {
                     lines.add((error ? "! " : "") + text);
                 });
-                check.same("log", "[Searching, ! slow]", lines.toString());
+                check.same("search log", "[[002] SongJob: searching]", lines.toString());
+                check.ok("query sent trimmed", server.seen.get(0).body.contains("\"query\":\"Artist - Song\""));
+                check.ok("search found", found.error == null);
+                check.same("results without a link dropped", 2, found.hits.size());
+                Music.Hit song = found.hits.get(0);
+                check.same("song title", "Artist - Song.mp3", song.title());
+                check.same("song meta", "MP3 · 320 kbps · 4:12 · 8.1 MB", song.meta());
+                check.same("song source", "bob · 1.3 MB/s", song.source());
+                check.same("song where", "@@m\\Music", song.where());
+                Music.Hit album = found.hits.get(1);
+                check.ok("album", album.album() && !song.album());
+                check.same("album title", "Artist / Album (2001)", album.title());
+                check.same("album meta", "2 files · FLAC · 16/44.1 kHz · 1:02:05 · 47.7 MB", album.meta());
+                check.same("album source", "carol · 0.0 MB/s · queued", album.source());
+                Music.Found none = music.search(Music.ALBUM, "Nothing", (text, error) -> {});
+                check.ok("nothing found", none.hits.isEmpty() && none.error.startsWith("Nothing on Soulseek"));
+
+                lines.clear();
+                Music.Result result = music.download(song, (text, error) -> {
+                    lines.add((error ? "! " : "") + text);
+                });
+                check.same("log", "[Downloading, ! slow]", lines.toString());
                 check.same("job", "j1", result.job);
                 check.ok("no error", result.error == null);
                 check.same("bytes", 7L, result.bytes);
-                check.ok("query sent trimmed", server.seen.get(0).body.contains("\"query\":\"Artist - Song\""));
+                check.same("link sent", "{\"link\":\"slsk://bob/@@m/Music/Artist - Song.mp3\"}", server.seen.get(2).body);
                 final List<String> got = new ArrayList<String>();
                 int count = music.fetch("j1", (path, size, body) -> {
                     got.add(path + "=" + new String(readAll(body), "UTF-8"));
@@ -117,7 +154,7 @@ public final class SelfTest {
                 music.delete("gone");
                 final Music refused = new Music(new PlainLogin(Login.of(base, "wrong")).get());
                 check.fails("bad token", "refused the token", () -> {
-                    refused.run(Music.ALBUM, "x", (text, error) -> {});
+                    refused.search(Music.ALBUM, "x", (text, error) -> {});
                 });
             } finally {
                 server.close();
