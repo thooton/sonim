@@ -16,8 +16,10 @@ asks only for READ_EXTERNAL_STORAGE.
     (Gutenberg header/footer, paragraph and heading detection, UTF-8 else
     Windows-1252), and `Book` (chapters cut into `Section`s and the contents
     resolved to offsets).
-  - `shelf/Shelf`: scans storage for books, caches title and author, and keeps
-    reading positions in `shelf.tsv` in the app's private files.
+  - `shelf/Shelf`: scans the folders it is given for books, caches title and
+    author, and keeps reading positions in `shelf.tsv` in the app's private
+    files. The library gives it only `Books` at the top of internal storage
+    and of each SD card; never widen that to a search of the filesystem.
   - Tests in `src/test` run via `:core:selfTest` with the tiny `Check` harness.
 - `android/app`: `LibraryActivity` + `LibraryView` (the library, drawn),
   `Covers` (thumbnails cached in the cache dir), `ReaderActivity` (loading,
@@ -40,16 +42,20 @@ asks only for READ_EXTERNAL_STORAGE.
   outright. Do not make it add to the metrics it is handed: StaticLayout can
   pass a later line what an earlier call left behind, and the space then
   lands on every line.
-- Night Shift only recolours the paint; nothing that only changes colour may
-  trigger a relayout (`Settings.layoutKey` leaves it out).
+- Night Shift is a colour-matrix filter on each activity's root view
+  (`NightShift`), so everything the app draws is warmed, covers included. It
+  never relayouts (`Settings.layoutKey` leaves it out). Because system
+  windows escape the filter, the app shows no toasts (`PageView.flash`) and
+  no platform popups.
 
 ## UI rules
 
 - No view takes focus. Both activities route every key themselves, OK and
   Menu acting on their *release* (tracked with `startTracking`), so a
   release never lands on something that has just opened.
-- The library's Menu is the platform's context menu, opened with
-  `showContextMenu(x, y)` beside the chosen row, as in `../list`.
+- The library's Menu is an action sheet drawn with `ListPanel`, not the
+  platform's context menu as in `../list`: the popup is its own window, which
+  Night Shift's filter would miss.
 
 ## Build and validation
 

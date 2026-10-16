@@ -135,11 +135,6 @@ final class LibraryView extends View {
         invalidate();
     }
 
-    /** The focused row's bottom, for the menu to open under. */
-    float focusedBottom() {
-        return headerHeight + (focus + 1) * rowHeight - scroll;
-    }
-
     private void reveal() {
         if (getHeight() == 0) return;
         int top = focus * rowHeight;
