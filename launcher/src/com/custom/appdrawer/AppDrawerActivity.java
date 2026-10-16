@@ -100,13 +100,6 @@ public final class AppDrawerActivity extends Activity {
 
     private boolean resumed;
 
-    /**
-     * The grid position to restore on resume. The first app is selected only when
-     * the drawer starts; after that, reopening it (from the PTT key or by coming
-     * back from an app) keeps the selection where it was left.
-     */
-    private int lastPosition = 0;
-
     private FrameLayout root;
     private GridView grid;
     private AppAdapter adapter;
@@ -183,8 +176,7 @@ public final class AppDrawerActivity extends Activity {
         packageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
         packageFilter.addDataScheme("package");
         registerReceiver(packageReceiver, packageFilter);
-        // onResume, which always follows, fills the grid and selects lastPosition,
-        // which starts on the first app.
+        // onResume, which always follows, fills the grid and focuses the first app.
     }
 
     @Override
@@ -192,16 +184,12 @@ public final class AppDrawerActivity extends Activity {
         super.onResume();
         resumed = true;
         refreshApps();
-        selectPosition(Math.min(lastPosition, adapter.getCount() - 1));
+        focusFirstApp();
     }
 
     @Override
     protected void onPause() {
         resumed = false;
-        int selected = grid.getSelectedItemPosition();
-        if (selected != AdapterView.INVALID_POSITION) {
-            lastPosition = selected;
-        }
         super.onPause();
     }
 
@@ -215,6 +203,7 @@ public final class AppDrawerActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        focusFirstApp();
     }
 
     @Override
@@ -452,6 +441,10 @@ public final class AppDrawerActivity extends Activity {
                     getString(R.string.app_unavailable, entry.label),
                     Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void focusFirstApp() {
+        selectPosition(0);
     }
 
     private void selectPosition(final int position) {

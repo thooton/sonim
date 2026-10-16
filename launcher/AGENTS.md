@@ -49,8 +49,7 @@ the app's minimum and target SDK at API 27. A successful build ends by running
 There is no automated test suite. For code or resource changes, run
 `./build.sh` at minimum. For interaction changes, also install with
 `adb install -r AppDrawer.apk` and verify on an XP3800 or equivalent API 27
-device that D-pad focus starts on the first item when the drawer starts and
-stays where it was left when the drawer is reopened, navigation and center-key
+device that D-pad focus starts on the first item, navigation and center-key
 launching work, labels/icons render correctly, absent target apps remain
 safe to select, and the Menu key's Add/Remove program actions update and
 persist the grid.
