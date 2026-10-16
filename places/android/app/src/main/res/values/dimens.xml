@@ -10,6 +10,7 @@
     <dimen name="text_input">14sp</dimen>
     <dimen name="text_status">12sp</dimen>
     <dimen name="text_name">13sp</dimen>
+    <dimen name="text_address">12sp</dimen>
     <dimen name="text_meta">12sp</dimen>
     <dimen name="text_detail">13sp</dimen>
     <dimen name="focus_rule">2dp</dimen>

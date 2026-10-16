@@ -620,7 +620,12 @@ public final class MainActivity extends BaseActivity {
             .show();
     }
 
-    /** A result: its name, then rating, price and kind, then how far and whether it is open. */
+    /**
+     * A result: its name, then where it is (street and town, in full-strength
+     * text, since that is what tells one branch from another), then rating,
+     * price and kind, then how far and whether it is open now. Name and
+     * address wrap to a second line rather than lose their ends.
+     */
     private final class ResultAdapter extends BaseAdapter {
 
         @Override
@@ -646,34 +651,42 @@ public final class MainActivity extends BaseActivity {
                 int padV = dp(5);
                 row = vertical();
                 row.setPadding(padH, padV, padH, padV);
-                row.addView(line(R.dimen.text_name, R.color.text, true));
-                row.addView(line(R.dimen.text_meta, R.color.text_muted, false));
-                row.addView(line(R.dimen.text_meta, R.color.text_muted, false));
+                row.addView(line(R.dimen.text_name, R.color.text, true, 2));
+                row.addView(line(R.dimen.text_address, R.color.text, false, 2));
+                row.addView(line(R.dimen.text_meta, R.color.text_muted, false, 1));
+                row.addView(line(R.dimen.text_meta, R.color.text_muted, false, 1));
             }
             Place place = results.get(position);
             ((TextView) row.getChildAt(0)).setText(place.name());
-            TextView summary = (TextView) row.getChildAt(1);
-            summary.setText(place.summary());
-            summary.setVisibility(place.summary().length() == 0 ? View.GONE : View.VISIBLE);
+            show((TextView) row.getChildAt(1), place.shortAddress());
+            show((TextView) row.getChildAt(2), place.summary());
+            // Only the open-or-closed part takes a colour; the distance before it stays muted.
             String status = place.status(System.currentTimeMillis());
             String distance = place.distanceFrom(searchedNear);
-            TextView last = (TextView) row.getChildAt(2);
-            last.setText(distance.length() == 0 ? status : distance + " · " + status);
+            SpannableStringBuilder last = new SpannableStringBuilder(distance.length() == 0 ? "" : distance + " · ");
             Boolean open = place.openNow();
-            last.setTextColor(color(open == null ? R.color.text_muted : open ? R.color.open : R.color.closed));
+            if (open == null) last.append(status);
+            else span(last, status, new ForegroundColorSpan(color(open ? R.color.open : R.color.closed)));
+            ((TextView) row.getChildAt(3)).setText(last);
             if (picking && position == picked) row.setBackgroundResource(R.drawable.row_focus);
             else row.setBackgroundColor(color(R.color.row));
             return row;
         }
 
-        private TextView line(int size, int textColor, boolean bold) {
+        private TextView line(int size, int textColor, boolean bold, int lines) {
             TextView view = new TextView(MainActivity.this);
             view.setTextColor(color(textColor));
             view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(size));
             if (bold) view.setTypeface(Typeface.DEFAULT_BOLD);
-            view.setSingleLine(true);
+            view.setMaxLines(lines);
             view.setEllipsize(TextUtils.TruncateAt.END);
             return view;
+        }
+
+        /** A line that takes no room when there is nothing to put on it. */
+        private void show(TextView view, String text) {
+            view.setText(text);
+            view.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
         }
     }
 }

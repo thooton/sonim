@@ -75,6 +75,12 @@ public final class Place {
         return orEmpty(Json.text(raw, "formattedAddress"));
     }
 
+    /** "433 S Farmer Ave, Tempe": street and town, for a row of results; the full address when Google gives no short one. */
+    public String shortAddress() {
+        String street = Json.text(raw, "shortFormattedAddress");
+        return street != null && street.trim().length() > 0 ? street.trim() : address();
+    }
+
     /** The national number, which is what the phone dials; the international one when there is no other. */
     public String phone() {
         String phone = Json.text(raw, "nationalPhoneNumber");
@@ -134,7 +140,7 @@ public final class Place {
         return "";
     }
 
-    /** "$$ ($10–20 per person)", or as much of it as Google knows. */
+    /** "$$ ($10-20 per person)", or as much of it as Google knows. */
     String price() {
         String level = priceLevel();
         Map<String, Object> range = Json.child(raw, "priceRange");
@@ -142,7 +148,7 @@ public final class Place {
         String text = money(Json.child(range, "startPrice"));
         if (range.get("endPrice") instanceof Map) {
             String end = money(Json.child(range, "endPrice"));
-            text += "–" + (end.startsWith("$") ? end.substring(1) : end);
+            text += "-" + (end.startsWith("$") ? end.substring(1) : end);
         } else {
             text += "+";
         }

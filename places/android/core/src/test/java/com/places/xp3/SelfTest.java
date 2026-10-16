@@ -65,6 +65,9 @@ public final class SelfTest {
             check.same("line", "4.6★ (1,820) · $$ · Coffee shop", p.summary());
             check.same("here", "164 ft", p.distanceFrom(new Anchor("x", "x", 33.4255 + 50 / 111195.0, -111.94)));
             check.same("no anchor", "", p.distanceFrom(null));
+            check.same("short address", "433 S Farmer Ave, Tempe",
+                place("{\"formattedAddress\":\"433 S Farmer Ave, Tempe, AZ 85281, USA\",\"shortFormattedAddress\":\"433 S Farmer Ave, Tempe\"}").shortAddress());
+            check.same("no short address", "Tempe, AZ, USA", place("{\"formattedAddress\":\"Tempe, AZ, USA\"}").shortAddress());
             check.same("unnamed", "Unnamed place", place("{}").name());
             check.same("nothing known", "", place("{}").summary());
         });
@@ -85,7 +88,7 @@ public final class SelfTest {
                 + "\"reviews\":[{\"rating\":5,\"relativePublishTimeDescription\":\"a week ago\",\"text\":{\"text\":\" Great. \"},"
                 + "\"authorAttribution\":{\"displayName\":\"Sam\"}}]}");
             List<Place.Section> sections = p.details(NOON, new Anchor("Tempe", "Tempe, AZ, USA", 33.4255, -111.94));
-            check.same("top", "Diner\n★★★★☆ 4.0 (1 review)\n$ ($10–20 per person)\nOpen until 9:00 PM\n0 ft from Tempe, AZ, USA",
+            check.same("top", "Diner\n★★★★☆ 4.0 (1 review)\n$ ($10-20 per person)\nOpen until 9:00 PM\n0 ft from Tempe, AZ, USA",
                 text(sections, null));
             check.same("address", "1 Mill Ave, Tempe, AZ", text(sections, "Address"));
             check.same("phone", "(480) 555-0100", p.phone());
@@ -154,6 +157,7 @@ public final class SelfTest {
                 Map<String, Object> circle = Json.child(Json.child(sent, "locationBias"), "circle");
                 check.close("biased toward the anchor", 33.4, Json.number(Json.child(circle, "center"), "latitude"), 1e-9);
                 check.ok("search asks for hours", last(server).header("X-Goog-FieldMask").contains("currentOpeningHours.openNow"));
+                check.ok("search asks for the short address", last(server).header("X-Goog-FieldMask").contains("places.shortFormattedAddress"));
                 check.ok("search leaves reviews out", !last(server).header("X-Goog-FieldMask").contains("reviews"));
                 Places.Page second = places.search("coffee", tempe, page.next);
                 check.same("next page", "Third", second.places.get(0).name());

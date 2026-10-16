@@ -31,7 +31,9 @@ again on the next request, in case it was replaced.
 
 Field masks decide what Google bills, so keep them the CLI's: search asks
 for nothing past the Enterprise tier, only a place's details ask for
-reviews and the other Atmosphere fields. If the CLI's masks or wording
+reviews and the other Atmosphere fields. The one addition is
+`shortFormattedAddress` in the search mask, for the results list: a Pro
+field, so the search still bills as Enterprise. If the CLI's masks or wording
 change, change `Places` and `Place` here and keep the test in step.
 
 Times are shown in the place's own offset (`utcOffsetMinutes`).
