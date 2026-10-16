@@ -15,10 +15,8 @@
     <color name="switch_off">#39393D</color>
 
     <!-- The page. Text is a soft white rather than pure white, which glares
-         on a small LCD in the dark; Night Shift swaps it for a warm amber
-         that keeps blue light off the screen at night. -->
+         on a small LCD in the dark. Night Shift has no colours of its own:
+         it warms the whole screen through a filter (see NightShift). -->
     <color name="text_day">#E3E3E5</color>
     <color name="text_day_dim">#7C7C80</color>
-    <color name="text_night">#F0C987</color>
-    <color name="text_night_dim">#8A7550</color>
 </resources>

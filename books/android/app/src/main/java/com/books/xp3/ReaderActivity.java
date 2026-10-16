@@ -9,7 +9,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
-import android.widget.Toast;
 
 import com.books.xp3.book.Book;
 import com.books.xp3.book.Section;
@@ -647,15 +646,18 @@ public final class ReaderActivity extends Activity implements PageView.SizeListe
         if (layout) relayout();
     }
 
+    /** The page's colours, with Night Shift warming the whole screen over them. */
     private void applyColors() {
-        boolean night = settings.nightShift;
-        pageView.setColors(
-            getResources().getColor(night ? R.color.text_night : R.color.text_day),
-            getResources().getColor(night ? R.color.text_night_dim : R.color.text_day_dim));
+        pageView.setColors(getResources().getColor(R.color.text_day), getResources().getColor(R.color.text_day_dim));
+        NightShift.apply(root, settings.nightShift);
     }
 
+    /*
+     * Notices are drawn on the page rather than shown as toasts: a toast is
+     * a window of the system's, which Night Shift's filter cannot reach.
+     */
     private void toast(String text) {
-        Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
+        pageView.flash(text);
     }
 
     private int dp(int value) {

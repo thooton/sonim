@@ -24,24 +24,28 @@ public final class ShelfTests {
         File root = new File(System.getProperty("java.io.tmpdir"), "books-shelf-" + System.nanoTime());
         File storage = new File(root, "storage");
         File books = new File(storage, "Books");
-        File hidden = new File(storage, "Android/data/x");
+        File byAuthor = new File(books, "Some Author");
+        File elsewhere = new File(storage, "Download");
         File state = new File(root, "state");
-        books.mkdirs();
-        hidden.mkdirs();
+        byAuthor.mkdirs();
+        elsewhere.mkdirs();
         state.mkdirs();
         try {
             write(new File(books, "Zed_Tale.txt"), "Just text.\n");
             write(new File(books, "alpha.txt"), "Title: Alpha\tTabs\nAuthor: A\n*** START OF IT ***\nText.\n");
             write(new File(books, "notes.md"), "not a book");
-            write(new File(hidden, "skipped.txt"), "in Android/");
-            write(new File(storage, ".hidden.txt"), "dot file");
+            write(new File(elsewhere, "not-in-books.epub"), "outside the Books folder");
+            write(new File(storage, "loose.txt"), "outside the Books folder");
+            write(new File(books, ".hidden.txt"), "dot file");
+            write(new File(byAuthor, "nested.txt"), "Title: Nested\n*** START OF IT ***\nText.\n");
 
-            List<File> roots = Collections.singletonList(storage);
+            List<File> roots = Collections.singletonList(books);
             Shelf shelf = new Shelf(state);
             List<Shelf.Entry> found = shelf.scan(roots);
-            check.same("found", 2, found.size());
+            check.same("only the Books folder, subfolders included", 3, found.size());
             check.same("sorted by title, white space tidied", "Alpha Tabs", found.get(0).displayTitle());
-            check.same("file name stands in", "Zed Tale", found.get(1).displayTitle());
+            check.same("subfolder book", "Nested", found.get(1).displayTitle());
+            check.same("file name stands in", "Zed Tale", found.get(2).displayTitle());
             check.ok("new", found.get(0).isNew());
 
             String zed = new File(books, "Zed_Tale.txt").getAbsolutePath();
@@ -54,6 +58,8 @@ public final class ShelfTests {
             check.same("recent first", zed, reloaded.get(0).path);
             check.same("position kept", Long.valueOf(50), Long.valueOf(reloaded.get(0).position));
             check.same("title kept", "Alpha Tabs", reloaded.get(1).title);
+            check.same("missing Books folder finds nothing", 0,
+                new Shelf(state).scan(Collections.singletonList(new File(storage, "NoSuchFolder"))).size());
 
             again.progress(zed, 200, 200, 2000);
             check.ok("finished", again.get(zed).finished());

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.text.TextPaint;
@@ -11,7 +12,8 @@ import android.text.TextUtils;
 import android.view.View;
 
 /**
- * The page: the book's text, edge to edge on black, and nothing else.
+ * The page: the book's text, edge to edge on black, with only how far
+ * through the book it is, small and grey in the bottom corner.
  *
  * OK brings up the controls Books shows when the page is tapped, drawn over
  * the text rather than pushing it about: the chapter's name at the top, and
@@ -24,7 +26,7 @@ final class PageView extends View {
     }
 
     private final TextPaint label = new TextPaint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
-    private final Paint fill = new Paint();
+    private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Typeface regular;
     private final Typeface bold;
     private SizeListener sizeListener;
@@ -42,6 +44,15 @@ final class PageView extends View {
     private float progress;
     private int accent;
     private int track;
+    private int noticeFill;
+    private String notice;
+    private final Runnable clearNotice = new Runnable() {
+        @Override
+        public void run() {
+            notice = null;
+            invalidate();
+        }
+    };
 
     PageView(Context context) {
         super(context);
@@ -49,6 +60,7 @@ final class PageView extends View {
         bold = Fonts.ui(context.getAssets(), true);
         accent = getResources().getColor(R.color.accent);
         track = getResources().getColor(R.color.separator);
+        noticeFill = getResources().getColor(R.color.surface_raised);
         setBackgroundColor(getResources().getColor(R.color.page));
     }
 
@@ -93,6 +105,14 @@ final class PageView extends View {
         if (chrome) invalidate();
     }
 
+    /** A short notice over the page, gone after a moment: "Night Shift on". */
+    void flash(String text) {
+        notice = text;
+        removeCallbacks(clearNotice);
+        postDelayed(clearNotice, 1600);
+        invalidate();
+    }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
@@ -105,6 +125,7 @@ final class PageView extends View {
         int height = getHeight();
         if (pages != null) {
             pages.draw(canvas, page, textColor, dimColor);
+            drawPercent(canvas, width, height);
         } else if (message != null) {
             label.setTypeface(regular);
             label.setTextSize(dp(13));
@@ -114,6 +135,34 @@ final class PageView extends View {
             label.setTextAlign(Paint.Align.LEFT);
         }
         if (chrome) drawChrome(canvas, width, height);
+        if (notice != null) drawNotice(canvas, width, height);
+    }
+
+    /** How far through the book the page is, small and grey in the bottom margin. */
+    private void drawPercent(Canvas canvas, int width, int height) {
+        if (percent.length() == 0) return;
+        label.setTypeface(regular);
+        label.setTextSize(dp(10));
+        label.setColor(dimColor);
+        label.setTextAlign(Paint.Align.RIGHT);
+        canvas.drawText(percent, width - pages.left, height - dp(5), label);
+        label.setTextAlign(Paint.Align.LEFT);
+    }
+
+    private void drawNotice(Canvas canvas, int width, int height) {
+        label.setTypeface(bold);
+        label.setTextSize(dp(12));
+        String text = ellipsize(notice, width - dp(40));
+        float w = label.measureText(text) + dp(24);
+        float top = height - dp(64);
+        fill.setShader(null);
+        fill.setColor(noticeFill);
+        RectF box = new RectF((width - w) / 2, top, (width + w) / 2, top + dp(28));
+        canvas.drawRoundRect(box, dp(14), dp(14), fill);
+        label.setColor(textColor);
+        label.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText(text, width / 2f, top + dp(18), label);
+        label.setTextAlign(Paint.Align.LEFT);
     }
 
     private void drawChrome(Canvas canvas, int width, int height) {
