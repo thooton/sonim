@@ -10,22 +10,31 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The command center's music routes, the same ones `delta music` uses
  * (cmd/delta/music.go and cmd/delta-cc/music_run.go in thooton/delta):
  *
- *   POST   /music             {"mode": "song"|"album", "query": "..."}; streams
+ *   POST   /music-search      {"mode": "song"|"album", "query": "..."}; streams
  *                             JSON lines: {"stdout"}, {"stderr"}, {} keepalives
- *                             and last {"done": {"error", "job", "files"}}.
+ *                             and last {"done": {"error", "results"}}.
+ *   POST   /music             {"link": "slsk://..."}, one of those results;
+ *                             streams the same way, ending {"done": {"error",
+ *                             "job", "files"}}.
  *   GET    /music-jobs/{id}   The job's files, as a tar.
  *   DELETE /music-jobs/{id}   Removes the job.
  *   POST   /music-login       Gives the command center a new account.
  *
- * The command center makes every choice (best match, a broader second try),
- * so a download is just a mode and a name. Dropping the connection while the
+ * A search finds every result that meets the command center's music config,
+ * best first by its preferences (a broader second try when there are none),
+ * and the user picks one to download. Unlike `delta music`, Source sees the
+ * engine's log as it is, Soulseek and all. Dropping the connection while a
  * run streams stops it on the command center too.
  */
 public final class Music {
@@ -41,6 +50,133 @@ public final class Music {
     /** Takes each fetched file; the stream ends at the end of that file. */
     public interface Sink {
         void file(String path, long size, InputStream body) throws IOException, InterruptedException;
+    }
+
+    /** One file of a result, as it is shared. Numbers the sharer's client didn't give are 0. */
+    public static final class Track {
+        public final String path;
+        public final long size;
+        public final int seconds;
+        public final int bitrate;
+        public final int sampleRate;
+        public final int bitDepth;
+
+        Track(Map<String, Object> source) {
+            path = text(source, "path");
+            size = (long) count(source, "size");
+            seconds = (int) count(source, "length");
+            bitrate = (int) count(source, "bitrate");
+            sampleRate = (int) count(source, "samplerate");
+            bitDepth = (int) count(source, "bitdepth");
+        }
+
+        /** The file's name, after the last backslash. */
+        public String name() {
+            return path.substring(path.lastIndexOf('\\') + 1);
+        }
+
+        String format() {
+            int dot = name().lastIndexOf('.');
+            return dot < 0 ? "" : name().substring(dot + 1).toUpperCase(Locale.US);
+        }
+    }
+
+    /** A search result: one file for a song, one shared folder for an album. */
+    public static final class Hit {
+        public final String link;
+        public final String user;
+        /** The sharer's upload speed, in MB/s. */
+        public final double speed;
+        /** Whether the sharer has an upload slot free, or would queue the download. */
+        public final boolean free;
+        /** An album's folder, as shared; "" for a song. */
+        public final String folder;
+        public final List<Track> tracks;
+
+        Hit(Map<String, Object> source) {
+            link = text(source, "link");
+            user = text(source, "user");
+            Double mbs = Json.number(source, "speed");
+            speed = mbs == null ? 0 : mbs;
+            free = Json.flag(source, "free");
+            folder = text(source, "folder");
+            List<Track> list = new ArrayList<Track>();
+            for (Object value : Json.children(source, "files")) {
+                if (value instanceof Map) list.add(new Track(Json.object(value)));
+            }
+            tracks = Collections.unmodifiableList(list);
+        }
+
+        public boolean album() {
+            return folder.length() > 0;
+        }
+
+        /** A song's file name, or an album's folder with the one above it ("Artist / Album"). */
+        public String title() {
+            if (!album()) return tracks.isEmpty() ? "" : tracks.get(0).name();
+            String[] parts = folder.split("\\\\");
+            String last = parts[parts.length - 1];
+            return parts.length > 1 ? parts[parts.length - 2] + " / " + last : last;
+        }
+
+        /** "MP3 · 320 kbps · 4:12 · 8.1 MB"; an album leads with its file count. Unknowns are left out. */
+        public String meta() {
+            Set<String> formats = new LinkedHashSet<String>();
+            int low = Integer.MAX_VALUE;
+            int high = 0;
+            long seconds = 0;
+            long bytes = 0;
+            int depth = 0;
+            int rate = 0;
+            for (Track t : tracks) {
+                if (t.format().length() > 0) formats.add(t.format());
+                if (t.bitrate > 0) {
+                    low = Math.min(low, t.bitrate);
+                    high = Math.max(high, t.bitrate);
+                }
+                seconds += t.seconds;
+                bytes += t.size;
+                depth = Math.max(depth, t.bitDepth);
+                rate = Math.max(rate, t.sampleRate);
+            }
+            List<String> parts = new ArrayList<String>();
+            if (album()) parts.add(tracks.size() + (tracks.size() == 1 ? " file" : " files"));
+            if (!formats.isEmpty()) parts.add(join(formats, "/"));
+            if (high > 0) parts.add((low == high ? "" : low + "-") + high + " kbps");
+            if (depth > 0 && rate > 0) parts.add(depth + "/" + trim(rate / 1000.0) + " kHz");
+            if (seconds > 0) parts.add(clock(seconds));
+            if (bytes > 0) parts.add(human(bytes));
+            return join(parts, " · ");
+        }
+
+        /** Who shares it and how fast: "bob · 1.2 MB/s", "· queued" without a free slot. */
+        public String source() {
+            String out = user + " · " + String.format(Locale.US, "%.1f MB/s", speed);
+            return free ? out : out + " · queued";
+        }
+
+        /** Where it is in the sharer's files: a song's folder, an album's own. */
+        public String where() {
+            if (album()) return folder;
+            String path = tracks.isEmpty() ? "" : tracks.get(0).path;
+            int slash = path.lastIndexOf('\\');
+            return slash < 0 ? "" : path.substring(0, slash);
+        }
+    }
+
+    /** A finished search: the results, best first, and why there are none, if there aren't. */
+    public static final class Found {
+        public final String mode;
+        public final String query;
+        public final String error;
+        public final List<Hit> hits;
+
+        Found(String mode, String query, String error, List<Hit> hits) {
+            this.mode = mode;
+            this.query = query;
+            this.error = error;
+            this.hits = Collections.unmodifiableList(hits);
+        }
     }
 
     /** A finished run: the job holding its files, if any, and why it failed, if it did. */
@@ -79,11 +215,30 @@ public final class Music {
         return cancelled;
     }
 
-    /** Runs a download on the command center, passing on its log, until it is done. */
-    public Result run(String mode, String query, Listener listener) throws IOException, InterruptedException {
+    /** Searches on the command center, passing on its log, for the results to choose from. */
+    public Found search(String mode, String query, Listener listener) throws IOException, InterruptedException {
         if (!SONG.equals(mode) && !ALBUM.equals(mode)) throw new IllegalArgumentException("Unknown mode");
-        String body = Json.write(Json.map("mode", mode, "query", query.trim()));
-        Http.Stream stream = open(request("/music").post(body).header("Content-Type", "application/json").identity());
+        String trimmed = query.trim();
+        Map<String, Object> done = stream("/music-search", Json.map("mode", mode, "query", trimmed), listener, "search");
+        List<Hit> hits = new ArrayList<Hit>();
+        for (Object value : Json.children(done, "results")) {
+            if (!(value instanceof Map)) continue;
+            Hit hit = new Hit(Json.object(value));
+            if (hit.link.length() > 0 && !hit.tracks.isEmpty()) hits.add(hit);
+        }
+        String error = Json.text(done, "error");
+        return new Found(mode, trimmed, hits.isEmpty() && error != null && error.length() > 0 ? error : null, hits);
+    }
+
+    /** Downloads one search result on the command center, passing on its log, until it is done. */
+    public Result download(Hit hit, Listener listener) throws IOException, InterruptedException {
+        return result(stream("/music", Json.map("link", hit.link), listener, "download"));
+    }
+
+    /** Posts `body` and passes on the run's log, returning its "done". */
+    private Map<String, Object> stream(String path, Map<String, Object> body, Listener listener, String what)
+            throws IOException, InterruptedException {
+        Http.Stream stream = open(request(path).post(Json.write(body)).header("Content-Type", "application/json").identity());
         try {
             BufferedReader reader = new BufferedReader(new InputStreamReader(stream.stream(), "UTF-8"));
             for (String line; (line = reader.readLine()) != null; ) {
@@ -99,7 +254,7 @@ public final class Music {
                 } else if (event.get("stderr") instanceof String) {
                     listener.line((String) event.get("stderr"), true);
                 } else if (event.get("done") instanceof Map) {
-                    return result(Json.object(event.get("done")));
+                    return Json.object(event.get("done"));
                 }
             }
         } catch (IOException e) {
@@ -110,7 +265,7 @@ public final class Music {
             current = null;
         }
         if (cancelled) throw new InterruptedException();
-        throw new IOException("Lost the connection to the command center before the download finished.");
+        throw new IOException("Lost the connection to the command center before the " + what + " finished.");
     }
 
     static Result result(Map<String, Object> done) {
@@ -215,6 +370,45 @@ public final class Music {
         } catch (java.io.UnsupportedEncodingException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    private static String text(Map<String, Object> source, String key) {
+        String value = Json.text(source, key);
+        return value == null ? "" : value;
+    }
+
+    private static double count(Map<String, Object> source, String key) {
+        Double value = Json.number(source, key);
+        return value == null || value < 0 ? 0 : value;
+    }
+
+    static String join(Iterable<String> parts, String between) {
+        StringBuilder out = new StringBuilder();
+        for (String part : parts) {
+            if (out.length() > 0) out.append(between);
+            out.append(part);
+        }
+        return out.toString();
+    }
+
+    /** 44.1 or 48, without a needless ".0". */
+    private static String trim(double value) {
+        return value == Math.floor(value) ? String.valueOf((long) value) : String.format(Locale.US, "%.1f", value);
+    }
+
+    /** 4:05, or 1:02:05 past an hour. */
+    static String clock(long seconds) {
+        if (seconds >= 3600) {
+            return String.format(Locale.US, "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60);
+        }
+        return String.format(Locale.US, "%d:%02d", seconds / 60, seconds % 60);
+    }
+
+    public static String human(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format(Locale.US, "%.0f KB", bytes / 1024.0);
+        if (bytes < 1024L * 1024 * 1024) return String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024));
+        return String.format(Locale.US, "%.2f GB", bytes / (1024.0 * 1024 * 1024));
     }
 
     private static String readAll(InputStream in) throws IOException {

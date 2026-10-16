@@ -23,15 +23,18 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * The one thing that can run at a time: a music download, a book search or a
- * book download. It is kept outside the activity so it carries on when the
- * phone is shut or the screen is rebuilt, and so does what it found: the log,
- * the status line, and the last page of book results. The activity attaches a
- * Listener to watch it; everything it is told arrives on the main thread.
+ * The one thing that can run at a time: a music search or download, a book
+ * search or a book download. It is kept outside the activity so it carries on
+ * when the phone is shut or the screen is rebuilt, and so does what it found:
+ * the log, the status line, the last music results and the last page of book
+ * results. The activity attaches a Listener to watch it; everything it is
+ * told arrives on the main thread.
  *
- * A music download is three steps, as `delta music` does them: the command
- * center runs it and streams its log, then the app fetches the job's files as
- * a tar straight into the shared Music folder, then it removes the job.
+ * Music starts with a search on the command center, which streams its log
+ * and ends with the results to pick from. Downloading the one picked is three
+ * steps, as `delta music` does them: the command center downloads it and
+ * streams its log, then the app fetches the job's files as a tar straight
+ * into the shared Music folder, then it removes the job.
  *
  * Books are `delta books`: the phone logs in to the book source with the
  * account kept on the command center, searches, and downloads the chosen
@@ -62,6 +65,10 @@ final class Download {
     private static Listener listener;
     private static Books.Page results;
     private static final Set<String> savedBooks = new HashSet<String>();
+    private static Music.Found musicFound;
+    /** Whether the log is showing in place of the music results. */
+    private static boolean logShown = true;
+    private static final Set<String> savedHits = new HashSet<String>();
 
     private final Context app;
     private final Work work;
@@ -94,6 +101,27 @@ final class Download {
         return savedBooks.contains(book.id + "/" + book.hash);
     }
 
+    /** The last music search, or null before any. */
+    static Music.Found found() {
+        return musicFound;
+    }
+
+    /** Whether the music results, rather than the log, are to be shown. */
+    static boolean resultsShown() {
+        return musicFound != null && !musicFound.hits.isEmpty() && !logShown;
+    }
+
+    /** Back to the music results from the log, when there are any. */
+    static void showResults(boolean show) {
+        if (running()) return;
+        logShown = !show;
+        changed();
+    }
+
+    static boolean saved(Music.Hit hit) {
+        return savedHits.contains(hit.link);
+    }
+
     static void listen(Listener l) {
         listener = l;
     }
@@ -108,6 +136,14 @@ final class Download {
     static void clearResults() {
         if (running()) return;
         results = null;
+        status = "";
+        changed();
+    }
+
+    static void clearFound() {
+        if (running()) return;
+        musicFound = null;
+        logShown = true;
         status = "";
         changed();
     }
@@ -148,17 +184,30 @@ final class Download {
 
     // ---- Music.
 
-    static void music(Context context, Login login, final String mode, final String query) {
+    /** Searches for a song or an album; the results replace the log when there are any. */
+    static void findMusic(Context context, Login login, final String mode, final String query) {
         if (running()) return;
         final Music music = new Music(login);
-        final Context app = context.getApplicationContext();
         log.clear();
-        line("» " + (Music.ALBUM.equals(mode) ? "Album: " : "Song: ") + query);
+        logShown = true;
+        line("» Search for " + (Music.ALBUM.equals(mode) ? "album: " : "song: ") + query);
         setStatus("Searching… (Back cancels)");
-        start(context, "music-download", new Work() {
+        start(context, "music-search", new Work() {
             @Override
             public void run() throws IOException, InterruptedException {
-                runMusic(app, music, mode, query);
+                final Music.Found result = music.search(mode, query, (text, error) -> Download.line(text));
+                final int count = result.hits.size();
+                final String said = count == 0
+                    ? "Nothing found; see the log"
+                    : count + (count == 1 ? " result" : " results") + ", best first";
+                if (result.error != null) line("✗ " + result.error);
+                else line("✓ " + said);
+                MAIN.post(() -> {
+                    musicFound = result;
+                    logShown = count == 0;
+                    status = said;
+                    changed();
+                });
             }
 
             @Override
@@ -168,10 +217,35 @@ final class Download {
         });
     }
 
-    private static void runMusic(Context app, Music music, String mode, String query) throws IOException, InterruptedException {
+    /** Downloads one of the music results into the shared Music folder, its log in view. */
+    static void music(Context context, Login login, final Music.Hit hit) {
+        if (running()) return;
+        final Music music = new Music(login);
+        final Context app = context.getApplicationContext();
+        logShown = true;
+        line("");
+        line("» Download " + hit.link);
+        setStatus("Downloading… (Back cancels)");
+        start(context, "music-download", new Work() {
+            @Override
+            public void run() throws IOException, InterruptedException {
+                if (runMusic(app, music, hit)) {
+                    MAIN.post(() -> savedHits.add(hit.link));
+                }
+            }
+
+            @Override
+            public void cancel() {
+                music.cancel();
+            }
+        });
+    }
+
+    /** True when something was saved. */
+    private static boolean runMusic(Context app, Music music, Music.Hit hit) throws IOException, InterruptedException {
         String job = null;
         try {
-            Music.Result result = music.run(mode, query, (text, error) -> Download.line(text));
+            Music.Result result = music.download(hit, (text, error) -> Download.line(text));
             job = result.job;
             if (job != null) {
                 String size = result.bytes > 0 ? " (" + human(result.bytes) + ")" : "";
@@ -191,6 +265,7 @@ final class Download {
             if (result.error != null) {
                 post("✗ " + result.error, result.job == null ? "Nothing downloaded; see the log" : status);
             }
+            return result.job != null;
         } finally {
             if (job != null) {
                 try {
@@ -353,10 +428,7 @@ final class Download {
     }
 
     static String human(long bytes) {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return String.format(Locale.US, "%.0f KB", bytes / 1024.0);
-        if (bytes < 1024L * 1024 * 1024) return String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024));
-        return String.format(Locale.US, "%.2f GB", bytes / (1024.0 * 1024 * 1024));
+        return Music.human(bytes);
     }
 
     // Everything below hops to the main thread, which owns `log` and `status`.
