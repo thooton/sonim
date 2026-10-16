@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The stock Messages compose box, matched as in the sibling apps: white
+     fill, a 3dp rule of half black, square corners. There are two fields
+     here, so the one the keys type into says so: its rule turns the colour
+     every focused row in the app uses, and keeps its width so nothing shifts. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF" />
+            <stroke android:width="3dp" android:color="@color/focus_rule" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF" />
+            <stroke android:width="3dp" android:color="@color/input_border" />
+        </shape>
+    </item>
+</selector>

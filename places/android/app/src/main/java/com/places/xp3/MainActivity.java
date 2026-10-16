@@ -1,0 +1,679 @@
+package com.places.xp3;
+
+import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Bundle;
+import android.text.InputType;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.StyleSpan;
+import android.util.TypedValue;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.widget.BaseAdapter;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import com.places.xp3.net.Anchor;
+import com.places.xp3.net.Place;
+import com.places.xp3.net.Places;
+import com.xp3.common.Login;
+import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Ui;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+
+/**
+ * One screen: where to search near, what to find, and the places found.
+ *
+ * Near is kept between searches (and the point Google found for it, so it is
+ * looked up once). OK in Near moves to Find; OK in Find searches, and the
+ * results come up with the first one picked. Up and Down move through them
+ * (Down past the last loads more), OK shows everything about the picked
+ * place, and in there Left and Right go to the previous or next one, Call
+ * dials it, and Back goes back to the list.
+ */
+public final class MainActivity extends BaseActivity {
+
+    private static final String PREFS = "places";
+
+    /** Work for the background thread: returns what to do with its result on the main thread. */
+    private interface Work {
+        Runnable call() throws Exception;
+    }
+
+    private EditText near;
+    private EditText query;
+    private View form;
+    private TextView countView;
+    private TextView statusView;
+    private ListView resultList;
+    private ScrollView detail;
+    private TextView detailText;
+    private final ResultAdapter adapter = new ResultAdapter();
+    private final ExecutorService worker = Ui.worker("places");
+
+    private Login login = Login.blank();
+    private Places places;
+    /** Where the last search was made near, with Google's point for it. */
+    private Anchor anchor;
+
+    /** The results so far, the search they answer, and Google's token for more. */
+    private final List<Place> results = new ArrayList<Place>();
+    private String searched;
+    private Anchor searchedNear;
+    private String nextPage;
+    /** Places whose details were fetched, by id, so going back and forth costs nothing. */
+    private final Map<String, Place> details = new HashMap<String, Place>();
+
+    /** Whether the keys are moving through the results rather than typing. */
+    private boolean picking;
+    private int picked;
+    /** Whether the picked place's details fill the screen. */
+    private boolean showing;
+
+    private Future<?> job;
+    private int generation;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        setContentView(R.layout.activity_main);
+        near = (EditText) findViewById(R.id.near);
+        query = (EditText) findViewById(R.id.query);
+        form = findViewById(R.id.form);
+        countView = (TextView) findViewById(R.id.count);
+        statusView = (TextView) findViewById(R.id.status);
+        resultList = (ListView) findViewById(R.id.results);
+        detail = (ScrollView) findViewById(R.id.detail);
+        detailText = (TextView) findViewById(R.id.detail_text);
+        resultList.setAdapter(adapter);
+
+        SharedPreferences prefs = prefs();
+        login = loadLogin(prefs);
+        anchor = Anchor.parse(prefs.getString("anchor", ""));
+        near.setText(prefs.getString("near", ""));
+        near.setSelection(near.length());
+
+        near.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_NEXT || actionId == EditorInfo.IME_ACTION_DONE) {
+                toFind();
+                return true;
+            }
+            return false;
+        });
+        query.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+                search();
+                return true;
+            }
+            return false;
+        });
+        if (near.length() == 0) near.requestFocus();
+        else query.requestFocus();
+        say(login.ready() ? "" : "No command center: Menu → Command center.");
+        refresh();
+    }
+
+    @Override
+    protected void onPause() {
+        saveNear();
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        worker.shutdownNow();
+        super.onDestroy();
+    }
+
+    /**
+     * The bundled login is adopted once per build that carries a new one;
+     * otherwise whatever was saved (perhaps typed in from the menu) is kept.
+     */
+    private Login loadLogin(SharedPreferences prefs) {
+        String revision = Bundled.REVISION;
+        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
+            Login bundled;
+            try {
+                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
+            } catch (IllegalArgumentException e) {
+                bundled = Login.blank();
+            }
+            if (bundled.ready()) {
+                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
+                return bundled;
+            }
+        }
+        return Login.parse(prefs.getString("login", ""));
+    }
+
+    private SharedPreferences prefs() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE);
+    }
+
+    /** One client per login, so the key it fetched is reused. */
+    private Places places() {
+        if (places == null) places = new Places(login);
+        return places;
+    }
+
+    private void saveNear() {
+        prefs().edit().putString("near", near.getText().toString().trim()).apply();
+    }
+
+    private void toFind() {
+        saveNear();
+        query.requestFocus();
+        query.setSelection(query.length());
+    }
+
+    // ---- Background work ----
+
+    /** Runs `work` off the main thread, in place of anything already running. */
+    private void start(String doing, final Work work) {
+        stop();
+        final int mine = ++generation;
+        say(doing);
+        job = worker.submit(() -> {
+            Runnable done;
+            try {
+                done = work.call();
+            } catch (InterruptedException e) {
+                return;
+            } catch (Exception e) {
+                final String message = e.getMessage() != null ? e.getMessage() : e.toString();
+                done = () -> say(message);
+            }
+            final Runnable then = done;
+            runOnUiThread(() -> {
+                if (mine != generation) return;
+                job = null;
+                then.run();
+            });
+        });
+    }
+
+    private boolean busy() {
+        return job != null;
+    }
+
+    /** Abandons what is running; whatever it was doing is never shown. */
+    private void stop() {
+        if (job == null) return;
+        job.cancel(true);
+        job = null;
+        generation++;
+    }
+
+    // ---- Searching ----
+
+    private void search() {
+        if (busy()) return;
+        final String what = query.getText().toString().trim();
+        if (what.length() == 0) {
+            setPicking(true);
+            return;
+        }
+        if (!login.ready()) {
+            askLogin();
+            return;
+        }
+        final String where = near.getText().toString().trim();
+        saveNear();
+        final Anchor known = where.length() > 0 && anchor != null && anchor.isFor(where) ? anchor : null;
+        final Places client = places();
+        start(where.length() > 0 && known == null ? "Finding " + where + "…" : "Searching…", () -> {
+            final Anchor at = where.length() == 0 ? null : known != null ? known : client.locate(where);
+            final Places.Page page = client.search(what, at, null);
+            return () -> {
+                if (at != null && at != known) {
+                    anchor = at;
+                    prefs().edit().putString("anchor", at.toJson()).apply();
+                }
+                results.clear();
+                results.addAll(page.places);
+                searched = page.query;
+                searchedNear = page.near;
+                nextPage = page.next;
+                picked = 0;
+                showing = false;
+                picking = !results.isEmpty();
+                say(found());
+                refresh();
+            };
+        });
+    }
+
+    /** The next page of the same search, after the ones already shown. */
+    private void more() {
+        if (busy() || nextPage == null) return;
+        final String after = nextPage;
+        final String what = searched;
+        final Anchor at = searchedNear;
+        final Places client = places();
+        start("Loading more…", () -> {
+            final Places.Page page = client.search(what, at, after);
+            return () -> {
+                boolean wasLast = picked == results.size() - 1;
+                results.addAll(page.places);
+                nextPage = page.next;
+                if (wasLast && picked + 1 < results.size()) picked++;
+                say(found());
+                refresh();
+            };
+        });
+    }
+
+    /** "20+ places near Tempe, AZ, USA". */
+    private String found() {
+        String where = searchedNear == null ? "" : " near " + searchedNear.label;
+        if (results.isEmpty()) return "Nothing found" + where + ".";
+        int count = results.size();
+        return count + (nextPage != null ? "+" : "") + (count == 1 && nextPage == null ? " place" : " places") + where;
+    }
+
+    // ---- Showing ----
+
+    /** Puts the screen in step with the state: the form and list, or one place. */
+    private void refresh() {
+        form.setVisibility(showing ? View.GONE : View.VISIBLE);
+        resultList.setVisibility(showing ? View.GONE : View.VISIBLE);
+        detail.setVisibility(showing ? View.VISIBLE : View.GONE);
+        countView.setText((picking || showing) && !results.isEmpty() ? (picked + 1) + "/" + results.size() : "");
+        adapter.notifyDataSetChanged();
+        if (!showing) {
+            if (!near.hasFocus() && !query.hasFocus()) query.requestFocus();
+            if (picking) resultList.post(() -> resultList.smoothScrollToPosition(picked));
+        }
+    }
+
+    /** The line under the fields; it takes no room while there is nothing to say. */
+    private void say(String text) {
+        statusView.setText(text);
+        statusView.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
+    }
+
+    private void setPicking(boolean on) {
+        picking = on && !results.isEmpty();
+        if (picking) picked = Math.min(picked, results.size() - 1);
+        refresh();
+    }
+
+    private void movePick(int step) {
+        int next = picked + step;
+        if (next < 0) {
+            setPicking(false);
+            return;
+        }
+        if (next >= results.size()) {
+            more();
+            return;
+        }
+        picked = next;
+        refresh();
+    }
+
+    private Place current() {
+        Place listed = results.get(picked);
+        Place full = details.get(listed.id());
+        return full != null ? full : listed;
+    }
+
+    /** The picked place's own screen: what the search knew at once, then everything. */
+    private void open() {
+        if (results.isEmpty()) return;
+        stop();
+        showing = true;
+        picking = true;
+        final Place listed = results.get(picked);
+        final String id = listed.id();
+        boolean known = details.containsKey(id);
+        render(current(), !known);
+        say("");
+        refresh();
+        if (known || id.length() == 0) return;
+        final Places client = places();
+        start("Loading details…", () -> {
+            final Place full = client.details(id);
+            return () -> {
+                details.put(id, full);
+                say("");
+                if (showing && results.get(picked) == listed) render(full, false);
+            };
+        });
+    }
+
+    private void close() {
+        stop();
+        showing = false;
+        say(found());
+        refresh();
+    }
+
+    /** Left and Right, on a place's screen: the one before or after it in the results. */
+    private void step(int by) {
+        int next = picked + by;
+        if (next < 0 || next >= results.size()) return;
+        picked = next;
+        open();
+    }
+
+    /**
+     * The name, large, then each section: a bold heading over its text. A
+     * place that only has what the search returned shows just its first
+     * lines and address, rather than "no hours" for hours not yet fetched.
+     */
+    private void render(Place place, boolean partial) {
+        SpannableStringBuilder out = new SpannableStringBuilder();
+        span(out, place.name(), new StyleSpan(Typeface.BOLD), new RelativeSizeSpan(1.2f));
+        for (Place.Section section : place.details(System.currentTimeMillis(), searchedNear)) {
+            if (partial && section.title != null && !section.title.equals("Address")) continue;
+            if (section.title == null) {
+                out.append('\n');
+                span(out, section.text, new ForegroundColorSpan(color(R.color.text_muted)));
+                continue;
+            }
+            out.append("\n\n");
+            span(out, section.title, new StyleSpan(Typeface.BOLD), new ForegroundColorSpan(color(R.color.primary)));
+            out.append('\n').append(section.text);
+        }
+        detailText.setText(out);
+        detail.scrollTo(0, 0);
+    }
+
+    private static void span(SpannableStringBuilder out, String text, Object... spans) {
+        int start = out.length();
+        out.append(text);
+        for (Object span : spans) out.setSpan(span, start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    }
+
+    // ---- Keys ----
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int key = event.getKeyCode();
+        boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+        boolean first = down && event.getRepeatCount() == 0;
+        if (key == KeyEvent.KEYCODE_MENU) {
+            if (!down) menu();
+            return true;
+        }
+        if (showing) return placeKey(event, key, down, first);
+        if (key == KeyEvent.KEYCODE_BACK && busy()) {
+            if (!down) {
+                stop();
+                say("Stopped.");
+            }
+            return true;
+        }
+        if (picking) return pickingKey(event, key, down, first);
+        // On the press: T9 eats the first release.
+        if (Ui.isOk(key)) {
+            if (first) {
+                if (near.hasFocus()) toFind();
+                else search();
+            }
+            return true;
+        }
+        if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
+            if (first) {
+                if (near.hasFocus()) toFind();
+                else setPicking(true);
+            }
+            return true;
+        }
+        if (key == KeyEvent.KEYCODE_DPAD_UP) {
+            if (first && query.hasFocus()) {
+                near.requestFocus();
+                near.setSelection(near.length());
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    private boolean pickingKey(KeyEvent event, int key, boolean down, boolean first) {
+        if (Ui.isOk(key)) {
+            if (first) open();
+            return true;
+        }
+        switch (key) {
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                if (down) movePick(key == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1);
+                return true;
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                return true;
+            case KeyEvent.KEYCODE_BACK:
+                if (!down) setPicking(false);
+                return true;
+            default:
+                // Anything else is typing: back to the box with it.
+                if (down && event.isPrintingKey()) setPicking(false);
+                return super.dispatchKeyEvent(event);
+        }
+    }
+
+    private boolean placeKey(KeyEvent event, int key, boolean down, boolean first) {
+        if (Ui.isOk(key)) {
+            if (first) menu();
+            return true;
+        }
+        switch (key) {
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                if (down) detail.smoothScrollBy(0, (key == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1) * dp(60));
+                return true;
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                if (first) step(key == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1);
+                return true;
+            case KeyEvent.KEYCODE_CALL:
+                if (first) dial(current().phone());
+                return true;
+            case KeyEvent.KEYCODE_BACK:
+                if (!down) close();
+                return true;
+            default:
+                // The fields are hidden: typing would land in one unseen.
+                return event.isPrintingKey() || super.dispatchKeyEvent(event);
+        }
+    }
+
+    // ---- Menu ----
+
+    private void menu() {
+        final List<String> labels = new ArrayList<String>();
+        final List<Runnable> actions = new ArrayList<Runnable>();
+        if (busy()) {
+            labels.add("Stop");
+            actions.add(() -> {
+                stop();
+                say(showing ? "" : "Stopped.");
+            });
+        }
+        if (showing) {
+            final Place place = current();
+            if (place.phone().length() > 0) {
+                labels.add("Call " + place.phone());
+                actions.add(() -> dial(place.phone()));
+            }
+            if (place.website().length() > 0) {
+                labels.add("Open website");
+                actions.add(() -> view(place.website()));
+            }
+            if (picked + 1 < results.size()) {
+                labels.add("Next place");
+                actions.add(() -> step(1));
+            }
+            if (picked > 0) {
+                labels.add("Previous place");
+                actions.add(() -> step(-1));
+            }
+            labels.add("Back to results");
+            actions.add(() -> close());
+        } else if (!busy()) {
+            if (query.getText().toString().trim().length() > 0) {
+                labels.add("Search");
+                actions.add(() -> search());
+            }
+            if (nextPage != null) {
+                labels.add("More results");
+                actions.add(() -> more());
+            }
+            labels.add("Change where");
+            actions.add(() -> {
+                setPicking(false);
+                near.requestFocus();
+                near.selectAll();
+            });
+            if (!results.isEmpty()) {
+                labels.add("Clear results");
+                actions.add(() -> {
+                    results.clear();
+                    nextPage = null;
+                    picking = false;
+                    say("");
+                    refresh();
+                });
+            }
+        }
+        labels.add("Command center…");
+        actions.add(() -> askLogin());
+        new AlertDialog.Builder(this)
+            .setItems(labels.toArray(new String[0]), (dialog, which) -> actions.get(which).run())
+            .show();
+    }
+
+    /** The phone's own dialer, with the number filled in: nothing is dialled until Call is pressed there. */
+    private void dial(String phone) {
+        if (phone.length() == 0) {
+            toast(showing && busy() ? "Still loading the details." : "No phone number listed.");
+            return;
+        }
+        launch(Intent.ACTION_DIAL, Uri.fromParts("tel", phone, null));
+    }
+
+    private void view(String address) {
+        launch(Intent.ACTION_VIEW, Uri.parse(address));
+    }
+
+    private void launch(String action, Uri uri) {
+        try {
+            startActivity(new Intent(action, uri));
+        } catch (ActivityNotFoundException e) {
+            toast("Nothing on this phone can open that.");
+        }
+    }
+
+    /** The fallback for a build without a bundled login. */
+    private void askLogin() {
+        LinearLayout box = vertical();
+        int pad = dp(12);
+        box.setPadding(pad, pad / 2, pad, 0);
+        final EditText server = new EditText(this);
+        server.setHint("https://…");
+        server.setSingleLine(true);
+        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        server.setText(login.server() == null ? "" : login.server());
+        final EditText token = new EditText(this);
+        token.setHint(login.ready() ? "Token (blank keeps it)" : "Delta token");
+        token.setSingleLine(true);
+        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        box.addView(server);
+        box.addView(token);
+        new AlertDialog.Builder(this)
+            .setTitle("Command center")
+            .setView(box)
+            .setPositiveButton("Save", (dialog, which) -> {
+                String typed = token.getText().toString();
+                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
+                try {
+                    Login next = Login.of(server.getText().toString(), typed);
+                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
+                    login = next;
+                    places = null;
+                    prefs().edit().putString("login", next.toJson()).apply();
+                    say("Saved: " + next.host());
+                } catch (IllegalArgumentException e) {
+                    say(e.getMessage());
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    /** A result: its name, then rating, price and kind, then how far and whether it is open. */
+    private final class ResultAdapter extends BaseAdapter {
+
+        @Override
+        public int getCount() {
+            return results.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return results.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(int position, View convert, ViewGroup parent) {
+            LinearLayout row = (LinearLayout) convert;
+            if (row == null) {
+                int padH = getResources().getDimensionPixelSize(R.dimen.pad_h);
+                int padV = dp(5);
+                row = vertical();
+                row.setPadding(padH, padV, padH, padV);
+                row.addView(line(R.dimen.text_name, R.color.text, true));
+                row.addView(line(R.dimen.text_meta, R.color.text_muted, false));
+                row.addView(line(R.dimen.text_meta, R.color.text_muted, false));
+            }
+            Place place = results.get(position);
+            ((TextView) row.getChildAt(0)).setText(place.name());
+            TextView summary = (TextView) row.getChildAt(1);
+            summary.setText(place.summary());
+            summary.setVisibility(place.summary().length() == 0 ? View.GONE : View.VISIBLE);
+            String status = place.status(System.currentTimeMillis());
+            String distance = place.distanceFrom(searchedNear);
+            TextView last = (TextView) row.getChildAt(2);
+            last.setText(distance.length() == 0 ? status : distance + " · " + status);
+            Boolean open = place.openNow();
+            last.setTextColor(color(open == null ? R.color.text_muted : open ? R.color.open : R.color.closed));
+            if (picking && position == picked) row.setBackgroundResource(R.drawable.row_focus);
+            else row.setBackgroundColor(color(R.color.row));
+            return row;
+        }
+
+        private TextView line(int size, int textColor, boolean bold) {
+            TextView view = new TextView(MainActivity.this);
+            view.setTextColor(color(textColor));
+            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(size));
+            if (bold) view.setTypeface(Typeface.DEFAULT_BOLD);
+            view.setSingleLine(true);
+            view.setEllipsize(TextUtils.TruncateAt.END);
+            return view;
+        }
+    }
+}

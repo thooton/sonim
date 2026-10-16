@@ -1,6 +1,5 @@
-package com.source.xp3.net;
+package com.xp3.common;
 
-import com.xp3.common.Json;
 import java.net.URI;
 import java.util.Locale;
 import java.util.Map;
