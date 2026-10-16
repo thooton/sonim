@@ -323,7 +323,7 @@ final class Download {
                 final Books.Page shown = found;
                 final String said = found.books.isEmpty()
                     ? "Nothing found for \"" + query + "\"."
-                    : note + "Page " + found.page + " of " + found.pages + ": Down picks, OK downloads.";
+                    : note + "Page " + found.page + " of " + found.pages + ".";
                 MAIN.post(new Runnable() {
                     @Override
                     public void run() {

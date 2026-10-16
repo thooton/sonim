@@ -148,12 +148,8 @@ public final class MainActivity extends Activity implements Download.Listener {
         if (page == null || page.books.isEmpty()) picking = false;
 
         String status = Download.status();
-        if (status.length() == 0) {
-            if (!login.ready()) status = "No command center: Menu → Command center.";
-            else if (books()) status = "OK searches for books.";
-            else status = "OK downloads into Music.";
-        }
-        statusView.setText(status);
+        if (status.length() == 0 && !login.ready()) status = "No command center: Menu → Command center.";
+        say(status);
 
         boolean list = books() && page != null;
         resultList.setVisibility(list ? View.VISIBLE : View.GONE);
@@ -183,6 +179,12 @@ public final class MainActivity extends Activity implements Download.Listener {
             });
         }
         query.setEnabled(!running);
+    }
+
+    /** The line under the box; it takes no room while there is nothing to say. */
+    private void say(String text) {
+        statusView.setText(text);
+        statusView.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
     }
 
     private void showMode() {
@@ -229,7 +231,7 @@ public final class MainActivity extends Activity implements Download.Listener {
             return;
         }
         if (text.startsWith("-")) {
-            statusView.setText("A name can't start with \"-\".");
+            say("A name can't start with \"-\".");
             return;
         }
         if (needStorage(new Runnable() { public void run() { begin(); } })) return;
@@ -252,7 +254,7 @@ public final class MainActivity extends Activity implements Download.Listener {
         if (Download.running() || page == null || !login.ready()) return;
         int next = page.page + step;
         if (next < 1 || next > page.pages) {
-            statusView.setText(next < 1 ? "This is the first page." : "This is the last page.");
+            say(next < 1 ? "This is the first page." : "This is the last page.");
             return;
         }
         Download.search(this, login, page.query, next, page.format);
@@ -275,7 +277,7 @@ public final class MainActivity extends Activity implements Download.Listener {
         if (granted && then != null) {
             then.run();
         } else if (!granted) {
-            statusView.setText("Source needs storage access to save into the Music and Books folders.");
+            say("Source needs storage access to save into the Music and Books folders.");
         }
     }
 
@@ -409,7 +411,7 @@ public final class MainActivity extends Activity implements Download.Listener {
                 actions.add(new Runnable() {
                     public void run() {
                         prefs().edit().putBoolean("any_format", !any).apply();
-                        statusView.setText(any ? "Searches look for EPUBs first." : "Searches show every format.");
+                        say(any ? "Searches look for EPUBs first." : "Searches show every format.");
                     }
                 });
                 if (page != null) {
@@ -454,7 +456,7 @@ public final class MainActivity extends Activity implements Download.Listener {
     }
 
     private void relogin() {
-        statusView.setText("Reconnecting…");
+        say("Reconnecting…");
         final Login using = login;
         new Thread(new Runnable() {
             @Override
@@ -470,7 +472,7 @@ public final class MainActivity extends Activity implements Download.Listener {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        statusView.setText(shown);
+                        say(shown);
                     }
                 });
             }
@@ -507,9 +509,9 @@ public final class MainActivity extends Activity implements Download.Listener {
                         if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
                         login = next;
                         prefs().edit().putString("login", next.toJson()).apply();
-                        statusView.setText("Saved: " + next.host());
+                        say("Saved: " + next.host());
                     } catch (IllegalArgumentException e) {
-                        statusView.setText(e.getMessage());
+                        say(e.getMessage());
                     }
                 }
             })
