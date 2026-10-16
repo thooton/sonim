@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The launcher mark without its square: a notification icon is only a mask. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#FFFFFF" android:pathData="M6,21h12l3,3h21v18h-36z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M24,4a12,12 0,0 1,12 12h-3.5a8.5,8.5 0,0 0,-17 0h-3.5a12,12 0,0 1,12 -12zM24,10a6,6 0,0 1,6 6h-3.5a2.5,2.5 0,0 0,-5 0h-3.5a6,6 0,0 1,6 -6z" />
+</vector>
