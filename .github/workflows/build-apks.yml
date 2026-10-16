@@ -24,6 +24,7 @@ jobs:
         include:
           - app: books
             dir: books/android
+            selftest: true
           - app: canvas
             dir: canvas/android
           - app: charge
@@ -39,6 +40,9 @@ jobs:
             dir: installer/android
           - app: list
             dir: list/android
+          - app: serve
+            dir: serve/android
+            selftest: true
           - app: source
             dir: source/android
             selftest: true
@@ -66,9 +70,9 @@ jobs:
         if: matrix.app == 'charge'
         run: echo '{"refreshToken":"ci-placeholder"}' > charge/android/.tokens.json
 
-      # Delta, Source and the Updater keep their protocol and parsing code in
-      # a plain Java :core with its own runner. CI has no logins, so the APKs
-      # it builds carry none.
+      # Books, Delta, Serve, Source and the Updater keep their parsing and
+      # protocol code in a plain Java :core with its own runner. CI has no
+      # logins, so the APKs it builds carry none.
       - name: Self-test
         if: matrix.selftest
         working-directory: ${{ matrix.dir }}
