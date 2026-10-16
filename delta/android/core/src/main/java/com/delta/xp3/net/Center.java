@@ -3,6 +3,8 @@ package com.delta.xp3.net;
 import com.delta.xp3.data.Chat;
 import com.delta.xp3.data.RemoteFile;
 
+import com.xp3.common.Http;
+import com.xp3.common.Json;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -10,7 +12,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -195,12 +196,9 @@ public final class Center implements EventSource {
             .method("PUT")
             .header("Content-Type", "application/octet-stream")
             .timeout(120000);
-        Http.Response response = http.upload(request, in, length, new Http.Sending() {
-            @Override
-            public void sent(long done, long total) throws IOException {
-                if (progress.cancelled()) throw new Cancelled();
-                progress.progress(done, total);
-            }
+        Http.Response response = http.upload(request, in, length, (done, total) -> {
+            if (progress.cancelled()) throw new Cancelled();
+            progress.progress(done, total);
         });
         if (response.status() == 409) return false;
         if (response.status() == 413) throw new IOException("That file is too big for the command center.");
@@ -229,12 +227,7 @@ public final class Center implements EventSource {
         } catch (RuntimeException e) {
             throw new IOException("The command center sent an unreadable session list");
         }
-        Collections.sort(chats, new Comparator<Chat>() {
-            @Override
-            public int compare(Chat a, Chat b) {
-                return a.updated == b.updated ? 0 : a.updated > b.updated ? -1 : 1;
-            }
-        });
+        Collections.sort(chats, (a, b) -> a.updated == b.updated ? 0 : a.updated > b.updated ? -1 : 1);
         return chats;
     }
 

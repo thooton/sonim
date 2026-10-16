@@ -1,8 +1,5 @@
 // Signs every Gradle app in this repository, debug and release alike, with
-// the shared key beside this file. Each app applies it after its android
-// block:
-//
-//     apply from: rootProject.file("../../signing/signing.gradle")
+// the shared key beside this file. gradle/app.gradle applies it to each app.
 //
 // Android only installs an update signed by the same key as the installed
 // copy, and the copies on the phone were all signed with debug.keystore. So

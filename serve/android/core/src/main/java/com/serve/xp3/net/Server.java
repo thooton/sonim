@@ -81,12 +81,7 @@ public final class Server {
             throw new IOException("Port " + port + " is in use", e);
         }
         listener = socket;
-        Thread accepting = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                accept();
-            }
-        }, "serve-accept");
+        Thread accepting = new Thread(() -> accept(), "serve-accept");
         accepting.setDaemon(true);
         accepting.start();
     }
@@ -124,15 +119,12 @@ public final class Server {
                 return;
             }
             open.add(client);
-            Thread thread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        connection(client);
-                    } finally {
-                        open.remove(client);
-                        closeQuietly(client);
-                    }
+            Thread thread = new Thread(() -> {
+                try {
+                    connection(client);
+                } finally {
+                    open.remove(client);
+                    closeQuietly(client);
                 }
             }, "serve-client");
             thread.setDaemon(true);

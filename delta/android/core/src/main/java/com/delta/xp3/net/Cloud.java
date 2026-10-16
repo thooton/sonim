@@ -3,12 +3,13 @@ package com.delta.xp3.net;
 import com.delta.xp3.data.Chat;
 import com.delta.xp3.data.Setup;
 
+import com.xp3.common.Http;
+import com.xp3.common.Json;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -91,12 +92,7 @@ public final class Cloud implements EventSource {
             if (updated == 0) updated = Json.instant(session, "created_at");
             chats.add(new Chat(id, Json.text(session, "title"), Json.text(session, "worker_status"), updated));
         }
-        Collections.sort(chats, new Comparator<Chat>() {
-            @Override
-            public int compare(Chat a, Chat b) {
-                return a.updated == b.updated ? 0 : a.updated > b.updated ? -1 : 1;
-            }
-        });
+        Collections.sort(chats, (a, b) -> a.updated == b.updated ? 0 : a.updated > b.updated ? -1 : 1);
         return chats;
     }
 

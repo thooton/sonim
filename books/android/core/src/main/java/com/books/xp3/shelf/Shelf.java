@@ -3,18 +3,12 @@ package com.books.xp3.shelf;
 import com.books.xp3.book.Book;
 import com.books.xp3.book.Epub;
 import com.books.xp3.book.PlainText;
+import com.xp3.common.Disk;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -40,7 +34,6 @@ public final class Shelf {
     private static final String HEADER = "books-shelf 1";
     private static final int MAX_DEPTH = 5;
     private static final int MAX_FILES = 5000;
-    private static final Charset UTF8 = Charset.forName("UTF-8");
 
     /** One book on the shelf. */
     public static final class Entry {
@@ -176,13 +169,10 @@ public final class Shelf {
     public synchronized List<Entry> books() {
         List<Entry> out = new ArrayList<Entry>();
         for (Entry entry : entries.values()) if (entry.present) out.add(entry);
-        Collections.sort(out, new Comparator<Entry>() {
-            @Override
-            public int compare(Entry a, Entry b) {
-                if (a.opened != b.opened) return a.opened > b.opened ? -1 : 1;
-                int byTitle = a.displayTitle().compareToIgnoreCase(b.displayTitle());
-                return byTitle != 0 ? byTitle : a.path.compareTo(b.path);
-            }
+        Collections.sort(out, (a, b) -> {
+            if (a.opened != b.opened) return a.opened > b.opened ? -1 : 1;
+            int byTitle = a.displayTitle().compareToIgnoreCase(b.displayTitle());
+            return byTitle != 0 ? byTitle : a.path.compareTo(b.path);
         });
         return out;
     }
@@ -260,7 +250,7 @@ public final class Shelf {
 
     private synchronized void load() {
         entries.clear();
-        String text = read(index);
+        String text = Disk.read(index, 8 * 1024 * 1024);
         if (text == null) return;
         String[] lines = text.split("\n");
         if (lines.length == 0 || !lines[0].equals(HEADER)) return;
@@ -299,7 +289,12 @@ public final class Shelf {
                 .append(entry.length).append('\t')
                 .append(entry.opened).append('\n');
         }
-        return write(index, out.toString());
+        try {
+            Disk.write(index, out.toString(), false);
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     static String escape(String value) {
@@ -331,40 +326,5 @@ public final class Shelf {
             else out.append(next);
         }
         return out.toString();
-    }
-
-    private static String read(File file) {
-        if (!file.isFile() || file.length() > 8 * 1024 * 1024) return null;
-        try {
-            InputStream in = new FileInputStream(file);
-            try {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buffer = new byte[8192];
-                for (int n; (n = in.read(buffer)) > 0; ) out.write(buffer, 0, n);
-                return new String(out.toByteArray(), UTF8);
-            } finally {
-                in.close();
-            }
-        } catch (IOException e) {
-            return null;
-        }
-    }
-
-    private static boolean write(File file, String text) {
-        File temp = new File(file.getPath() + ".tmp");
-        try {
-            OutputStream out = new FileOutputStream(temp);
-            try {
-                out.write(text.getBytes(UTF8));
-                out.flush();
-                if (out instanceof FileOutputStream) ((FileOutputStream) out).getFD().sync();
-            } finally {
-                out.close();
-            }
-            return temp.renameTo(file);
-        } catch (IOException e) {
-            temp.delete();
-            return false;
-        }
     }
 }

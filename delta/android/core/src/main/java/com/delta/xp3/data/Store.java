@@ -1,18 +1,13 @@
 package com.delta.xp3.data;
 
 import com.delta.xp3.net.Config;
-import com.delta.xp3.net.Json;
+import com.xp3.common.Disk;
+import com.xp3.common.Json;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -224,13 +219,10 @@ public final class Store {
         File[] files = folder.listFiles();
         Set<String> pictured = new HashSet<String>();
         if (files == null) return pictured;
-        Arrays.sort(files, new Comparator<File>() {
-            @Override
-            public int compare(File a, File b) {
-                long x = a.lastModified();
-                long y = b.lastModified();
-                return x == y ? 0 : x > y ? -1 : 1;
-            }
+        Arrays.sort(files, (a, b) -> {
+            long x = a.lastModified();
+            long y = b.lastModified();
+            return x == y ? 0 : x > y ? -1 : 1;
         });
         int kept = 0;
         for (File file : files) {
@@ -363,63 +355,10 @@ public final class Store {
      */
 
     private synchronized String read(String name) {
-        File file = new File(directory, name);
-        if (!file.isFile() || file.length() == 0 || file.length() > MAX_FILE) return null;
-        InputStream in = null;
-        try {
-            in = new FileInputStream(file);
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int count;
-            while ((count = in.read(buffer)) >= 0) out.write(buffer, 0, count);
-            return new String(out.toByteArray(), "UTF-8");
-        } catch (IOException e) {
-            return null;
-        } finally {
-            close(in);
-        }
+        return Disk.read(new File(directory, name), MAX_FILE);
     }
 
     private synchronized void write(String name, String content, boolean secret) throws IOException {
-        File target = new File(directory, name);
-        File parent = target.getParentFile();
-        if (!parent.isDirectory() && !parent.mkdirs()) {
-            throw new IOException("Could not open the app's storage");
-        }
-        File temporary = new File(parent, target.getName() + ".tmp");
-        OutputStream out = null;
-        try {
-            out = new FileOutputStream(temporary);
-            out.write(content.getBytes("UTF-8"));
-            out.flush();
-            if (out instanceof FileOutputStream) ((FileOutputStream) out).getFD().sync();
-        } finally {
-            close(out);
-        }
-        if (secret) {
-            // The app's own directory is already private, but a file holding a
-            // login should not be readable even if the directory's mode is
-            // ever loosened by a backup or a restore.
-            temporary.setReadable(false, false);
-            temporary.setReadable(true, true);
-            temporary.setWritable(false, false);
-            temporary.setWritable(true, true);
-        }
-        if (!temporary.renameTo(target)) {
-            // Some filesystems will not replace an existing file on rename.
-            if (!target.delete() || !temporary.renameTo(target)) {
-                temporary.delete();
-                throw new IOException("Could not save to the app's storage");
-            }
-        }
-    }
-
-    private static void close(java.io.Closeable stream) {
-        if (stream == null) return;
-        try {
-            stream.close();
-        } catch (IOException ignored) {
-            // A close that fails on a stream already written is not a new failure.
-        }
+        Disk.write(new File(directory, name), content, secret);
     }
 }

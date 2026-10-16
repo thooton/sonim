@@ -19,40 +19,37 @@ final class ChatListView extends ListView {
     private boolean pinNextLayout;
     private boolean watchingPreDraw;
     private final ViewTreeObserver.OnPreDrawListener applyBottomPin =
-        new ViewTreeObserver.OnPreDrawListener() {
-        @Override
-        public boolean onPreDraw() {
-            if (!pinnedToBottom && !pinNextLayout) {
-                stopWatchingPreDraw();
-                return true;
-            }
+        () -> {
+        if (!pinnedToBottom && !pinNextLayout) {
+            stopWatchingPreDraw();
+            return true;
+        }
 
-            int target = getCount() - 1;
-            if (target < 0) {
-                pinNextLayout = false;
-                if (!pinnedToBottom) stopWatchingPreDraw();
-                return true;
-            }
-            View row = getChildAt(target - getFirstVisiblePosition());
-            if (row == null) {
-                setSelection(target);
-                pinNextLayout = true;
-                return false;
-            }
+        int target = getCount() - 1;
+        if (target < 0) {
+            pinNextLayout = false;
+            if (!pinnedToBottom) stopWatchingPreDraw();
+            return true;
+        }
+        View row = getChildAt(target - getFirstVisiblePosition());
+        if (row == null) {
+            setSelection(target);
+            pinNextLayout = true;
+            return false;
+        }
 
-            int desiredTop = getHeight() - getPaddingBottom() - row.getHeight();
-            if (row.getTop() != desiredTop) {
-                pinNextLayout = true;
-                setSelectionFromTop(target, desiredTop);
-                // Do not display the top-aligned intermediate state. The
-                // selection request lays out again with the measured offset.
-                return false;
-            } else {
-                pinNextLayout = false;
-                if (!hasFocus()) row.setSelected(false);
-                if (!pinnedToBottom) stopWatchingPreDraw();
-                return true;
-            }
+        int desiredTop = getHeight() - getPaddingBottom() - row.getHeight();
+        if (row.getTop() != desiredTop) {
+            pinNextLayout = true;
+            setSelectionFromTop(target, desiredTop);
+            // Do not display the top-aligned intermediate state. The
+            // selection request lays out again with the measured offset.
+            return false;
+        } else {
+            pinNextLayout = false;
+            if (!hasFocus()) row.setSelected(false);
+            if (!pinnedToBottom) stopWatchingPreDraw();
+            return true;
         }
     };
 

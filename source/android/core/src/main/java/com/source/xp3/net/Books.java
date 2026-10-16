@@ -1,5 +1,7 @@
 package com.source.xp3.net;
 
+import com.xp3.common.Http;
+import com.xp3.common.Json;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -229,14 +231,12 @@ public final class Books {
         form.add(new String[] {"limit", "20"});
         form.add(new String[] {"page", String.valueOf(page)});
         if (format != null) form.add(new String[] {"extensions[]", format.toUpperCase(Locale.US)});
-        Map<String, Object> result = attempt(new Call<Map<String, Object>>() {
-            public Map<String, Object> run() throws IOException, InterruptedException {
-                Map<String, Object> r = api("POST", "/eapi/book/search", form);
-                if (!ok(r.get("success"))) {
-                    throw new IOException(first(flex(r.get("error")), "The search failed."));
-                }
-                return r;
+        Map<String, Object> result = attempt(() -> {
+            Map<String, Object> r = api("POST", "/eapi/book/search", form);
+            if (!ok(r.get("success"))) {
+                throw new IOException(first(flex(r.get("error")), "The search failed."));
             }
+            return r;
         });
         List<Book> books = new ArrayList<Book>();
         for (Object each : Json.children(result, "books")) {
@@ -255,11 +255,7 @@ public final class Books {
      * different one with that name gets " (2)".
      */
     public Saved download(final Book book, final File folder, final Progress progress) throws IOException, InterruptedException {
-        return attempt(new Call<Saved>() {
-            public Saved run() throws IOException, InterruptedException {
-                return fetch(book, folder, progress);
-            }
-        });
+        return attempt(() -> fetch(book, folder, progress));
     }
 
     private Saved fetch(Book book, File folder, Progress progress) throws IOException, InterruptedException {

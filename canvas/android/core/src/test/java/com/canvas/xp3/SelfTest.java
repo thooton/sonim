@@ -2,6 +2,7 @@ package com.canvas.xp3;
 
 import com.canvas.xp3.data.DataTests;
 import com.canvas.xp3.net.NetTests;
+import com.xp3.common.Check;
 
 /**
  * Everything in :core, checked on a desktop JVM.

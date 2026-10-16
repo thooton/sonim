@@ -1,7 +1,7 @@
 package com.delta.xp3;
 
 import com.delta.xp3.net.EventSource;
-import com.delta.xp3.net.Http;
+import com.xp3.common.Http;
 import com.delta.xp3.net.Sse;
 
 import java.io.IOException;
@@ -59,12 +59,7 @@ final class Link implements Runnable {
         final Http.Stream stream = current;
         thread.interrupt();
         if (stream == null) return;
-        Thread closer = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                stream.close();
-            }
-        }, "cloud-link-close");
+        Thread closer = new Thread(() -> stream.close(), "cloud-link-close");
         closer.setDaemon(true);
         closer.start();
     }

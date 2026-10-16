@@ -1,0 +1,102 @@
+import groovy.json.JsonSlurper
+
+// Bakes a deployment's login into an app, for apps on one person's phone.
+//
+// Nobody wants to type a 49-character token on a T9 keypad, so Canvas, Charge,
+// Delta and Source ship already signed in. The values are read at build time
+// from files beside the app (all gitignored) and written as constants into a
+// generated class, <package>.Bundled, under build/. Nothing secret is ever
+// committed, and a checkout without those files (CI, any other machine) builds
+// an app with empty constants.
+//
+// The APK that comes out contains live credentials: treat it like a password.
+//
+// In an app's build.gradle:
+//
+//     apply from: rootProject.file("gradle/bundled.gradle")
+//     bundled("com.example.xp3") { [NAME: "value", COUNT: 3L] }
+//
+// The closure runs at build time, not at configuration time, and its map
+// becomes the class's constants: a String or a long each.
+
+ext.bundled = { String javaPackage, Closure<Map> values ->
+    def output = layout.buildDirectory.dir("generated/bundled")
+    def generate = tasks.register("generateBundled") {
+        description = "Bakes this deployment's login into the APK."
+        outputs.dir(output)
+        // Cheap enough to redo every build, which saves listing every file
+        // and environment variable it might read as an input.
+        outputs.upToDateWhen { false }
+        doLast {
+            def constants = values().collect { name, value ->
+                value instanceof Number
+                    ? "    public static final long $name = ${value}L;"
+                    : "    public static final String $name = \"${javaLiteral(value)}\";"
+            }
+            def dir = new File(output.get().asFile, javaPackage.replace(".", "/"))
+            dir.mkdirs()
+            new File(dir, "Bundled.java").text = """package $javaPackage;
+
+/** Baked in at build time. GENERATED: do not edit, commit or print. */
+public final class Bundled {
+    private Bundled() {}
+${constants.join("\n")}
+}
+"""
+        }
+    }
+    android.sourceSets.main.java.srcDir output
+    tasks.named("preBuild") { dependsOn generate }
+}
+
+static String javaLiteral(Object value) {
+    return String.valueOf(value ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+}
+
+static String sha256(String text) {
+    byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(text.getBytes("UTF-8"))
+    return digest.collect { String.format("%02x", it & 0xff) }.join()
+}
+
+// The command center Delta and Source both sign in to, as [server, token,
+// revision]: all "" when there is none, or when it is not https, which is
+// refused. The revision identifies the login without exposing it, so an app
+// can adopt a bundled login once per build that carries a new one.
+//
+// Looked for in order: -Pdelta.center=<file>, delta-center.json in the app's
+// directory, the delta CLI's own config ($XDG_CONFIG_HOME/delta/config.json,
+// usually ~/.config/delta/config.json), and last, only when
+// `fromEnvironment`, the DELTA_SERVER and DELTA_TOKEN environment variables,
+// which an agent's sandbox signs the CLI in with. The files are
+// {"server": "...", "token": "..."}.
+ext.deltaCenter = { boolean fromEnvironment ->
+    def none = [server: "", token: "", revision: ""]
+    def configHome = System.getenv("XDG_CONFIG_HOME") ?: "${System.getProperty("user.home")}/.config"
+    def candidates = project.hasProperty("delta.center")
+        ? [file(project.property("delta.center"))]
+        : [file("../../delta-center.json"), file("$configHome/delta/config.json")]
+    def found = candidates.find { it.isFile() }
+    def center = found ? new JsonSlurper().parse(found) : [:]
+    def from = found.toString()
+    if (fromEnvironment && !(center.server && center.token)
+        && System.getenv("DELTA_SERVER") && System.getenv("DELTA_TOKEN")) {
+        center = [server: System.getenv("DELTA_SERVER"), token: System.getenv("DELTA_TOKEN")]
+        from = "DELTA_SERVER and DELTA_TOKEN"
+    }
+    if (!(center.server && center.token)) {
+        logger.lifecycle("Bundled login: no command center found")
+        return none
+    }
+    def server = center.server.toString()
+    def token = center.token.toString()
+    if (!server.toLowerCase().startsWith("https://")) {
+        logger.warn("Bundled login: the command center in $from is not https; left out")
+        return none
+    }
+    logger.lifecycle("Bundled login: command center from $from")
+    return [server: server, token: token, revision: sha256(server + "\n" + token)]
+}

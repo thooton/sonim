@@ -21,8 +21,7 @@ The bar shows what OK fetches: **Song**, **Album** or **Book**. Left and Right s
 ## Build
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRelease
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :source:core:selfTest :source:app:assembleRelease
 ```
 
 The command center login is baked in at build time, as in the Delta app: `-Pdelta.center=<file>`, else `delta-center.json` beside `android/`, else the CLI's `~/.config/delta/config.json`, else the `DELTA_SERVER` and `DELTA_TOKEN` environment variables of an agent's sandbox. A build without one keeps an installed copy's login; Menu → Command center sets one by hand. The APK contains a live token, so treat it like a password; it is gitignored.

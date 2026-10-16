@@ -2,39 +2,19 @@ plugins {
     id "com.android.application"
 }
 
-// One dependency, and it is the other half of this repository. Nothing third
-// party: no AndroidX, no Material components. Everything this module draws is
-// a View from android.widget. That is what keeps a debug APK for a 240x320
-// phone small and dependency-free, just like the Todo and Tesla apps that
-// share this build style.
-dependencies {
-    implementation project(":core")
-}
+apply from: rootProject.file("gradle/app.gradle")
 
 android {
     namespace "com.flashcards.xp3"
-    compileSdk 35
-    buildToolsVersion "35.0.1"
 
     defaultConfig {
         applicationId "com.flashcards.xp3"
-        minSdk 27
-        targetSdk 27
-        versionCode 1
-        versionName "1.0.0"
-    }
-
-    // Targets the XP3's own Android 8.1 on purpose; this is not for Play.
-    lint {
-        disable "ExpiredTargetSdkVersion"
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        versionCode 2
+        versionName "1.0.1"
     }
 }
 
-// Debug and release builds alike are signed with the shared key, which the
-// copies on the phone were signed with too (see that file).
-apply from: rootProject.file("../../signing/signing.gradle")
+dependencies {
+    implementation project(":flashcards:core")
+    implementation project(":common:ui")
+}

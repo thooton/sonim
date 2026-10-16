@@ -1,5 +1,7 @@
 package com.canvas.xp3.net;
 
+import com.xp3.common.Http;
+import com.xp3.common.Json;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Locale;
@@ -34,12 +36,7 @@ public final class RemoteCookies {
     private long fetchedAt;
 
     public RemoteCookies(Config config, Http http) {
-        this(config.cookieService(), config.cookieToken(), http, new LongSupplier() {
-            @Override
-            public long getAsLong() {
-                return System.nanoTime();
-            }
-        });
+        this(config.cookieService(), config.cookieToken(), http, () -> System.nanoTime());
     }
 
     RemoteCookies(URI url, String token, Http http, LongSupplier nanoTime) {

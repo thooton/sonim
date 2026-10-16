@@ -1,7 +1,10 @@
 *.apk
+*.apk.idsig
 *.class
 bin/
 build/
 .gradle/
-android/local.properties
+local.properties
+.idea/
+*.iml
 /sssssssssssssssssssssssssssssssssssssssssssssssssss

@@ -1,14 +1,10 @@
 package com.list.xp3.data;
 
-import com.list.xp3.net.Json;
+import com.xp3.common.Disk;
+import com.xp3.common.Json;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -94,53 +90,10 @@ public final class Store {
      */
 
     private synchronized String read(String name) {
-        File file = new File(directory, name);
-        if (!file.isFile() || file.length() == 0 || file.length() > MAX_FILE) return null;
-        InputStream in = null;
-        try {
-            in = new FileInputStream(file);
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int count;
-            while ((count = in.read(buffer)) >= 0) out.write(buffer, 0, count);
-            return new String(out.toByteArray(), "UTF-8");
-        } catch (IOException e) {
-            return null;
-        } finally {
-            close(in);
-        }
+        return Disk.read(new File(directory, name), MAX_FILE);
     }
 
     private synchronized void write(String name, String content) throws IOException {
-        if (!directory.isDirectory() && !directory.mkdirs()) {
-            throw new IOException("Could not open the app's storage");
-        }
-        File target = new File(directory, name);
-        File temporary = new File(directory, name + ".tmp");
-        OutputStream out = null;
-        try {
-            out = new FileOutputStream(temporary);
-            out.write(content.getBytes("UTF-8"));
-            out.flush();
-            if (out instanceof FileOutputStream) ((FileOutputStream) out).getFD().sync();
-        } finally {
-            close(out);
-        }
-        if (!temporary.renameTo(target)) {
-            // Some filesystems will not replace an existing file on rename.
-            if (!target.delete() || !temporary.renameTo(target)) {
-                temporary.delete();
-                throw new IOException("Could not save to the app's storage");
-            }
-        }
-    }
-
-    private static void close(java.io.Closeable stream) {
-        if (stream == null) return;
-        try {
-            stream.close();
-        } catch (IOException ignored) {
-            // A close that fails on a stream already written is not a new failure.
-        }
+        Disk.write(new File(directory, name), content, false);
     }
 }

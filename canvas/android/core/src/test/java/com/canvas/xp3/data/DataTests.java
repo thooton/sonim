@@ -1,10 +1,10 @@
 package com.canvas.xp3.data;
 
-import com.canvas.xp3.Check;
-import com.canvas.xp3.TestServer;
+import com.xp3.common.Check;
+import com.xp3.common.TestServer;
 import com.canvas.xp3.net.Canvas;
 import com.canvas.xp3.net.Config;
-import com.canvas.xp3.net.Json;
+import com.xp3.common.Json;
 import com.canvas.xp3.net.NetTests;
 
 import java.io.File;
@@ -21,41 +21,13 @@ public final class DataTests {
     private DataTests() {}
 
     public static void run(final Check check) {
-        check.run("dates", new Check.Body() {
-            public void run() {
-                dates(check);
-            }
-        });
-        check.run("state", new Check.Body() {
-            public void run() {
-                state(check);
-            }
-        });
-        check.run("sections", new Check.Body() {
-            public void run() {
-                sections(check);
-            }
-        });
-        check.run("mapping", new Check.Body() {
-            public void run() {
-                mapping(check);
-            }
-        });
-        check.run("html", new Check.Body() {
-            public void run() {
-                html(check);
-            }
-        });
-        check.run("store", new Check.Body() {
-            public void run() throws Exception {
-                store(check);
-            }
-        });
-        check.run("sync", new Check.Body() {
-            public void run() throws Exception {
-                sync(check);
-            }
-        });
+        check.run("dates", () -> dates(check));
+        check.run("state", () -> state(check));
+        check.run("sections", () -> sections(check));
+        check.run("mapping", () -> mapping(check));
+        check.run("html", () -> html(check));
+        check.run("store", () -> store(check));
+        check.run("sync", () -> sync(check));
     }
 
     private static final long DAY = 24L * 60L * 60L * 1000L;
@@ -388,28 +360,26 @@ public final class DataTests {
     }
 
     private static void sync(Check check) throws Exception {
-        TestServer server = new TestServer(new TestServer.Handler() {
-            public TestServer.Reply handle(TestServer.Request request) {
-                if (request.path.startsWith("/cookie")) {
-                    return TestServer.Reply.json("{\"cookie\":\"canvas_session=abc\"}");
-                }
-                // One assignment is a longer path than the list, so it is
-                // matched first: /courses/1/assignments/11 contains the other.
-                if (request.path.contains("/assignments/11")) {
-                    return TestServer.Reply.json("{\"id\":11,\"name\":\"Lab 3\","
-                        + "\"description\":\"<p>Read <strong>chapter 4</strong>.</p>\"}");
-                }
-                if (request.path.contains("/courses/1/assignments")) {
-                    return TestServer.Reply.json("["
-                        + "{\"id\":11,\"name\":\"Lab 3\",\"due_at\":\"2026-09-10T06:59:00Z\","
-                        + "\"points_possible\":20,\"submission\":{\"workflow_state\":\"unsubmitted\"}},"
-                        + "{\"id\":12,\"name\":\"Draft\",\"published\":false}]");
-                }
-                if (request.path.contains("/courses/2/assignments")) {
-                    return TestServer.Reply.of(403, "application/json", "{}");
-                }
-                return TestServer.Reply.json("[{\"id\":1,\"name\":\"Bio\"},{\"id\":2,\"name\":\"Locked\"}]");
+        TestServer server = new TestServer(request -> {
+            if (request.path.startsWith("/cookie")) {
+                return TestServer.Reply.json("{\"cookie\":\"canvas_session=abc\"}");
             }
+            // One assignment is a longer path than the list, so it is
+            // matched first: /courses/1/assignments/11 contains the other.
+            if (request.path.contains("/assignments/11")) {
+                return TestServer.Reply.json("{\"id\":11,\"name\":\"Lab 3\","
+                    + "\"description\":\"<p>Read <strong>chapter 4</strong>.</p>\"}");
+            }
+            if (request.path.contains("/courses/1/assignments")) {
+                return TestServer.Reply.json("["
+                    + "{\"id\":11,\"name\":\"Lab 3\",\"due_at\":\"2026-09-10T06:59:00Z\","
+                    + "\"points_possible\":20,\"submission\":{\"workflow_state\":\"unsubmitted\"}},"
+                    + "{\"id\":12,\"name\":\"Draft\",\"published\":false}]");
+            }
+            if (request.path.contains("/courses/2/assignments")) {
+                return TestServer.Reply.of(403, "application/json", "{}");
+            }
+            return TestServer.Reply.json("[{\"id\":1,\"name\":\"Bio\"},{\"id\":2,\"name\":\"Locked\"}]");
         });
         try {
             Canvas canvas = NetTests.canvasFor(server.uri("/"), server.uri("/cookie"));

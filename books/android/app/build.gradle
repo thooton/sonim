@@ -2,34 +2,18 @@ plugins {
     id "com.android.application"
 }
 
-// One dependency, and it is the other half of this repository. Nothing third
-// party: no AndroidX, no Material components, no EPUB, XML or font library.
+apply from: rootProject.file("gradle/app.gradle")
+
 // Pages are laid out by the platform's own StaticLayout and drawn by one
 // custom View; the fonts are plain TTF assets.
-//
-// :core is the Android-free half: reading EPUB and plain text into
-// paragraphs, and the library index, plain Java so it can be tested on a
-// desktop JVM.
-dependencies {
-    implementation project(":core")
-}
 
 android {
     namespace "com.books.xp3"
-    compileSdk 35
-    buildToolsVersion "35.0.1"
 
     defaultConfig {
         applicationId "com.books.xp3"
-        minSdk 27
-        targetSdk 27
-        versionCode 1
-        versionName "1.0.0"
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        versionCode 2
+        versionName "1.0.1"
     }
 
     // The fonts are already compressed glyph outlines; leaving them stored
@@ -37,13 +21,9 @@ android {
     androidResources {
         noCompress "ttf"
     }
-
-    // API 27 is the phone's own version; this app is never going to Play.
-    lint {
-        disable "ExpiredTargetSdkVersion"
-    }
 }
 
-// Debug and release builds alike are signed with the shared key, which the
-// copies on the phone were signed with too (see that file).
-apply from: rootProject.file("../../signing/signing.gradle")
+dependencies {
+    implementation project(":books:core")
+    implementation project(":common:ui")
+}

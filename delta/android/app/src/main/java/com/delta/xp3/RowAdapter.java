@@ -9,6 +9,8 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.xp3.common.ui.SelectableAdapter;
+
 /**
  * The Chats, Files and Accounts lists: a name, a quiet line under it (two on
  * Accounts), and a short value on the right ("Working", "On phone"). Rows are named by a key rather than

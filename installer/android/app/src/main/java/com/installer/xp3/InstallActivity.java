@@ -76,12 +76,7 @@ public final class InstallActivity extends Activity {
         };
         registerReceiver(receiver, new IntentFilter(ACTION_STATUS));
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                commit(uri, expected);
-            }
-        }, "installer-commit").start();
+        new Thread(() -> commit(uri, expected), "installer-commit").start();
     }
 
     /** Streams the APK into a session and commits it. Off the main thread. */
@@ -118,12 +113,7 @@ public final class InstallActivity extends Activity {
                 } catch (RuntimeException ignored) {
                 }
             }
-            main.post(new Runnable() {
-                @Override
-                public void run() {
-                    fail(reason(e));
-                }
-            });
+            main.post(() -> fail(reason(e)));
         }
     }
 

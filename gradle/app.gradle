@@ -1,0 +1,34 @@
+// What every app shares. Each app's build.gradle applies this right after its
+// plugins block and then says only what is its own: namespace, applicationId,
+// version and dependencies.
+//
+// Nothing third party, in any app: no AndroidX, no Material components, no
+// JSON, HTTP or Markdown library. Everything drawn is a View from
+// android.widget and everything fetched goes through java.net, which is what
+// keeps the code in an APK for a 240x320 phone down to tens of kilobytes. The
+// only dependencies are the app's own :core and the shared code in common/.
+
+android {
+    compileSdk 35
+    buildToolsVersion "35.0.1"
+
+    defaultConfig {
+        // API 27 is the phone's own version (Android 8.1); none of this is
+        // going to Play.
+        minSdk 27
+        targetSdk 27
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lint {
+        disable "ExpiredTargetSdkVersion"
+    }
+}
+
+// Debug and release builds alike are signed with the shared key, which the
+// copies on the phone were signed with too (see that file).
+apply from: rootProject.file("signing/signing.gradle")

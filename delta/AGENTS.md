@@ -13,8 +13,8 @@ The phone end of Delta (https://github.com/thooton/delta): a small,
 dependency-free Android client for cloud agent sessions and for the
 Delta command center, for the Sonim XP3. It replaced `cloud` (one session) and
 `downloader` (fetch and install an APK). It is a sibling of `../list`,
-`../canvas` and `../charge`, and shares their constraints and much of their
-code (HTTP, JSON, cloud OAuth, chat views, Markdown, tabs).
+`../canvas` and `../charge`, and shares their constraints and, through
+`../common`, much of their code (HTTP, JSON, Markdown, tabs, row highlight).
 
 - Target: 240x320 mdpi, portrait, d-pad/keypad-driven. Not touch-first.
 - Platform Android only: no AndroidX, Material, Compose, or third-party
@@ -48,7 +48,7 @@ example the tabs, or what happens to a pushed file), update `delta help` in
 `MainActivity` has four tabs, laid out like Charge's and Canvas's: a
 non-focusable tab bar, with left and right switching tabs on their first press
 only. In the composer, left and right move the cursor until it reaches an end
-of the text (`cursorOwns`, as in Canvas).
+of the text (`Tabs.cursorOwns` in `common/ui`, as in Canvas).
 
 - **Chats**: `Backend.sessions()`: `Cloud.sessions()` for every cloud
   account (see Cloud accounts), merged newest first, each `Chat` tagged with
@@ -245,15 +245,16 @@ the two in step.
 
 ## Layout
 
-- `android/core`: `net/` (`Http`, `Json`, `Config`, `CloudAuth`, `Sse`,
-  `EventSource`, `Cloud`, `Center`) and `data/` (`Entry`, `Transcript`, `Store`, `Chat`,
-  `RemoteFile`, `Setup`, `Attached`, `Carry`, `Queued`, `Folders`). Tests in `src/test` run via `:core:selfTest` with
-  the tiny `Check` harness and loopback `TestServer`.
+- `android/core`: `net/` (`Config`, `CloudAuth`, `Sse`, `EventSource`,
+  `Cloud`, `Center`) and `data/` (`Entry`, `Transcript`, `Store`, `Chat`,
+  `RemoteFile`, `Setup`, `Attached`, `Carry`, `Queued`, `Folders`), over the
+  shared `Http` and `Json` in `../common/core`. Tests in `src/test` run via
+  `:core:selfTest` with the shared `Check` harness and loopback `TestServer`.
 - `android/app`: `MainActivity` (tabs, screens, keys, menus, intents),
   `Backend` (the only bridge to disk and network), `Link` (the reconnecting
   stream thread), `Pictures`, `CaptureProvider`, `ShareProvider`, `Apks`, and
   the views: `ChatAdapter`/`ChatListView` (the transcript), `RowAdapter` (Chats
-  and Files), `Markdown`.
+  and Files). `Markdown` is shared, in `../common/ui`.
 
 ## UI rules
 
@@ -265,18 +266,17 @@ the two in step.
   `showContextMenu(x, y)` on the list at the row's point, never on the row
   itself, and never through the no-argument `showContextMenu()`. A tab with no
   list opens it on its focusable message view.
-- Rows paint their own highlight (`SelectableAdapter`); the ListView selector
+- Rows paint their own highlight (`SelectableAdapter`, `common/ui`); the ListView selector
   is transparent.
 - Back cancels a running download while on Files.
-- In the Move to folder dialogs, Back goes up a level instead of closing
-  (`setOnKeyListener`, acting on the release).
+- In the Move to folder and upload dialogs, Back goes up a level instead of
+  closing (`listDialog`, acting on the release).
 
 ## Build and validation
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :app:assembleDebug
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :delta:core:selfTest
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :delta:app:assembleDebug
 ```
 
 There are no UI automation tests. Key, focus, and popup changes need manual
@@ -287,8 +287,9 @@ checks on the handset.
 There is no in-app cloud sign-in, by design: the cloud logins are on the
 command center (see Cloud accounts). `android/app/build.gradle` bakes in
 only the command center (`-Pdelta.center`, `../delta-center.json`, the CLI's
-`~/.config/delta/config.json`), into a generated `Defaults.java` under
-`android/app/build/` with a revision marker. A build without one, such as a
+`~/.config/delta/config.json`; see `deltaCenter` in `../gradle/bundled.gradle`),
+into a generated `Bundled.java` under `android/app/build/` with a revision
+marker. A build without one, such as a
 CI build or one made in an agent's sandbox, installs over a configured copy
 and keeps its login. Never print, commit, or attach the config files, the
 generated source, or any APK.

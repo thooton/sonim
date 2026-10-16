@@ -16,8 +16,7 @@ The project requires JDK 21, Android SDK Platform 35, Build Tools 35.0.1, and a
 private `android/.tokens.json` containing a Tesla refresh token.
 
 ```bash
-cd android
-./gradlew :app:assembleRelease
+./gradlew :charge:app:assembleRelease
 ```
 
 This writes the signed, optimized APK to

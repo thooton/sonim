@@ -1,6 +1,5 @@
 package com.flashcards.xp3;
 
-import android.app.Activity;
 import android.content.res.AssetManager;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.Typeface;
@@ -9,18 +8,19 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.BaseAdapter;
-import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 
-import com.flashcards.xp3.algo.Scheduler;
+import com.flashcards.xp3.algo.ReviewSession;
 import com.flashcards.xp3.data.Deck;
 import com.flashcards.xp3.data.DeckCard;
 import com.flashcards.xp3.data.Store;
+import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Tabs;
+import com.xp3.common.ui.Ui;
 
 import io.github.openspacedrepetition.State;
 
@@ -53,11 +53,10 @@ import java.util.List;
  * the Todo and Tesla apps; everything else on the study screen is owned by
  * {@link ReviewPane} (which reads OK and the 1..4 numpad keys).
  */
-public final class MainActivity extends Activity {
+public final class MainActivity extends BaseActivity {
 
     private static final int TAB_DECKS = 0;
     private static final int TAB_REVIEW = 1;
-    private static final int TABS = 2;
 
     /** The bundled decks, in the order they appear in the Decks list. */
     private static final String[][] DECK_ASSETS = {
@@ -65,13 +64,13 @@ public final class MainActivity extends Activity {
     };
 
     private FrameLayout content;
-    private Button[] tabButtons;
+    private Tabs tabs;
     private int currentTab = TAB_DECKS;
 
     private final List<LoadedDeck> decks = new ArrayList<>();
     private int activeDeck = 0;
     private ReviewPane reviewPane;
-    private Scheduler scheduler;
+    private ReviewSession session;
 
     private static final class LoadedDeck {
         final String name;
@@ -97,19 +96,7 @@ public final class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         content = findViewById(R.id.content);
-        tabButtons = new Button[]{
-            findViewById(R.id.tab_decks),
-            findViewById(R.id.tab_review),
-        };
-        for (int i = 0; i < tabButtons.length; i++) {
-            final int tab = i;
-            tabButtons[i].setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    showTab(tab, true);
-                }
-            });
-        }
+        tabs = new Tabs(this, tab -> showTab(tab, true), R.id.tab_decks, R.id.tab_review);
 
         loadDecks();
         if (decks.isEmpty()) {
@@ -204,26 +191,17 @@ public final class MainActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         // First press only, and not when a text field owns the keys.
-        if (event.getAction() == KeyEvent.ACTION_DOWN
-            && event.getRepeatCount() == 0
-            && !(getCurrentFocus() instanceof android.widget.EditText)) {
-            if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_LEFT) {
-                showTab((currentTab + TABS - 1) % TABS, true);
-                return true;
-            }
-            if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                showTab((currentTab + 1) % TABS, true);
-                return true;
-            }
+        int next = tabs.step(event, getCurrentFocus(), currentTab);
+        if (next >= 0) {
+            showTab(next, true);
+            return true;
         }
         return super.dispatchKeyEvent(event);
     }
 
     private void showTab(int tab, boolean focusContent) {
         currentTab = tab;
-        for (int i = 0; i < tabButtons.length; i++) {
-            tabButtons[i].setSelected(i == tab);
-        }
+        tabs.mark(tab);
         if (tab == TAB_DECKS) renderDecks();
         else renderReview();
     }
@@ -235,23 +213,13 @@ public final class MainActivity extends Activity {
     private void renderReview() {
         if (reviewPane == null) {
             if (activeDeck >= 0 && activeDeck < decks.size()) {
-                scheduler = new Scheduler(decks.get(activeDeck).deck);
-                reviewPane = new ReviewPane(this, scheduler, new ReviewPane.Listener() {
-                    @Override
-                    public void onRated() {
-                        persist();
-                    }
-                });
+                session = new ReviewSession(decks.get(activeDeck).deck);
+                reviewPane = new ReviewPane(this, session, () -> persist());
             } else {
-                reviewPane = new ReviewPane(this, new Scheduler(emptyDeck()), new ReviewPane.Listener() {
-                    @Override
-                    public void onRated() {
-                        persist();
-                    }
-                });
+                reviewPane = new ReviewPane(this, new ReviewSession(emptyDeck()), () -> persist());
             }
         }
-        replaceContent(reviewPane);
+        Ui.fill(content, reviewPane);
         reviewPane.requestFocus();
     }
 
@@ -269,28 +237,22 @@ public final class MainActivity extends Activity {
         list.setDivider(new ColorDrawable(color(R.color.divider)));
         list.setDividerHeight(1);
         list.setSelector(new ColorDrawable(color(R.color.focus_fill)));
-        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                switchDeck(position);
-            }
+        list.setOnItemClickListener((parent, view, position, id) -> {
+            switchDeck(position);
         });
-        list.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View view, int keyCode, KeyEvent event) {
-                if (event.getAction() != KeyEvent.ACTION_UP) return false;
-                boolean ok = keyCode == KeyEvent.KEYCODE_DPAD_CENTER
-                    || keyCode == KeyEvent.KEYCODE_ENTER
-                    || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER;
-                int at = ((ListView) view).getSelectedItemPosition();
-                if (ok && at >= 0 && at < decks.size()) {
-                    switchDeck(at);
-                    return true;
-                }
-                return false;
+        list.setOnKeyListener((view, keyCode, event) -> {
+            if (event.getAction() != KeyEvent.ACTION_UP) return false;
+            boolean ok = keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+                || keyCode == KeyEvent.KEYCODE_ENTER
+                || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER;
+            int at = ((ListView) view).getSelectedItemPosition();
+            if (ok && at >= 0 && at < decks.size()) {
+                switchDeck(at);
+                return true;
             }
+            return false;
         });
-        replaceContent(list);
+        Ui.fill(content, list);
         list.requestFocus();
     }
 
@@ -364,27 +326,8 @@ public final class MainActivity extends Activity {
             activeDeck = index;
             // The study screen starts a fresh session on the new deck.
             reviewPane = null;
-            scheduler = null;
+            session = null;
         }
         showTab(TAB_REVIEW, true);
-    }
-
-    private void replaceContent(View view) {
-        content.removeAllViews();
-        content.addView(
-            view,
-            new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        );
-    }
-
-    private int color(int res) {
-        return getColor(res);
-    }
-
-    private int dp(int n) {
-        return Math.round(getResources().getDisplayMetrics().density * n);
     }
 }
