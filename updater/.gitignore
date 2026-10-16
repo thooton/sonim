@@ -1,0 +1,6 @@
+*.apk
+*.class
+bin/
+build/
+.gradle/
+android/local.properties
