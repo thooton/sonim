@@ -674,6 +674,7 @@ public final class MainActivity extends BaseActivity {
         // read on a keypad without tabbing through it.
         scroll.setFocusable(true);
         scroll.setFocusableInTouchMode(true);
+        scroll.setDefaultFocusHighlightEnabled(false);
         scroll.setBackgroundColor(color(R.color.grouped_page));
         LinearLayout root = vertical();
         root.setPadding(0, 0, 0, dp(8));

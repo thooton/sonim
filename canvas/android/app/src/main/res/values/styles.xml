@@ -5,13 +5,15 @@
         <item name="android:colorPrimary">@color/primary</item>
         <item name="android:colorPrimaryDark">@color/primary_dark</item>
         <item name="android:colorAccent">@color/focus_rule</item>
-        <item name="android:colorControlHighlight">@color/press_fill</item>
+        <item name="android:colorControlHighlight">@color/highlight</item>
         <item name="android:navigationBarColor">@color/primary_dark</item>
         <item name="android:statusBarColor">@color/primary_dark</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowBackground">@color/page</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:alertDialogTheme">@style/FamilyDialog</item>
+        <item name="android:popupMenuStyle">@style/FamilyPopupMenu</item>
+        <item name="android:contextPopupMenuStyle">@style/FamilyPopupMenu</item>
     </style>
 
     <style name="TabButton">

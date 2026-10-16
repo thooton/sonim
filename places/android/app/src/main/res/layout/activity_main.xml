@@ -74,6 +74,7 @@
     <!-- One place, in place of the results: its name and summary, then its
          facts on cards, built by render(). -->
     <ScrollView
+        android:defaultFocusHighlightEnabled="false"
         android:id="@+id/detail"
         android:layout_width="match_parent"
         android:layout_height="0dp"

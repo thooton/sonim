@@ -75,6 +75,7 @@
              monospace face, so it reads as a record rather than as the
              screen's content. -->
         <ScrollView
+        android:defaultFocusHighlightEnabled="false"
             android:id="@+id/scroll"
             android:layout_width="match_parent"
             android:layout_height="match_parent"

@@ -5,7 +5,7 @@
 <resources>
     <style name="FamilyDialog" parent="android:style/Theme.Material.Light.Dialog.Alert">
         <item name="android:colorAccent">@color/focus_rule</item>
-        <item name="android:colorControlHighlight">@color/press_fill</item>
+        <item name="android:colorControlHighlight">@color/highlight</item>
         <item name="android:windowBackground">@drawable/family_dialog</item>
         <item name="android:colorBackground">@color/row</item>
         <item name="android:buttonBarButtonStyle">@style/FamilyDialogButton</item>
@@ -18,9 +18,15 @@
         <item name="android:textSize">14sp</item>
     </style>
 
-    <!-- The highlight a stock menu or dialog list puts on the item the d-pad
-         is on, in the app's hue rather than the platform's grey. An app's
-         theme names it as its android:colorControlHighlight. -->
+    <!-- Popup and context menus, rounded to match FamilyDialog. An app opts
+         in with android:popupMenuStyle and android:contextPopupMenuStyle. -->
+    <style name="FamilyPopupMenu" parent="android:style/Widget.Material.Light.PopupMenu">
+        <item name="android:popupBackground">@drawable/family_popup</item>
+        <item name="android:popupElevation">6dp</item>
+        <!-- Over the row it is about, as the platform's own context menu sits,
+             so it has the screen below the row to grow into. -->
+        <item name="android:overlapAnchor">true</item>
+    </style>
 
     <!-- A tab in the family's tab bar. -->
     <style name="FamilyTab">

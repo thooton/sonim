@@ -18,6 +18,9 @@
     <color name="focus_fill">#EAF5EF</color>
     <color name="focus_rule">#1D6A45</color>
     <color name="press_fill">#D3E9DC</color>
+    <!-- The platform's highlight (a stock menu's item under the d-pad, a
+         press): the accent, faint enough that what it covers stays legible. -->
+    <color name="highlight">#241D6A45</color>
 
     <color name="text">#1B1B1D</color>
     <color name="text_muted">#5E6A64</color>

@@ -49,9 +49,14 @@ they look the way they do. Charge and Books keep their own looks.
    assignment, Serve) sits on `grouped_page` with its facts on white
    `family_card`s, 6dp from the edges, a muted label over each value.
 
-Stock dialogs and menus use `FamilyDialog` (rounded, sentence-case buttons
-in the accent) and the theme's `colorControlHighlight` set to `press_fill`,
-so the item under the d-pad is washed in the app's hue.
+Stock dialogs use `FamilyDialog` (rounded, sentence-case buttons in the
+accent) and popup and context menus `FamilyPopupMenu` (rounded, over the row
+they are about). The theme's `colorControlHighlight` is `highlight`, the
+accent at about 14% opacity, so the item under the d-pad is washed in the
+app's hue without hiding anything. A view that takes the focus only so keys
+land somewhere (a `ScrollView`, an empty state) turns off the platform's
+default focus highlight (`defaultFocusHighlightEnabled="false"`), which
+would otherwise lay that wash over the whole page.
 
 ## The palettes
 

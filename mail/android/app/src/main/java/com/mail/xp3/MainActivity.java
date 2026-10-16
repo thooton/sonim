@@ -17,6 +17,7 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.LeadingMarginSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.TypefaceSpan;
 import android.util.TypedValue;
@@ -462,12 +463,18 @@ public final class MainActivity extends BaseActivity {
             if (first < 0 && message.unread()) first = i;
             out.append("\n\n");
             starts.add(out.length());
+            Avatar avatar = new Avatar(message.sender(), dp(26), dp(8), color(R.color.focus_fill), color(R.color.focus_rule));
+            int name = out.length();
             span(out, message.sender(), new TypefaceSpan("sans-serif-medium"));
             if (message.draft()) span(out, "  Draft", new ForegroundColorSpan(color(R.color.draft)));
             out.append('\n');
+            out.setSpan(avatar, name, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            int date = out.length();
             span(out, longDate(message.time()) + recipients(message), new ForegroundColorSpan(color(R.color.text_muted)),
                 new RelativeSizeSpan(0.88f));
-            out.append("\n\n");
+            out.append('\n');
+            out.setSpan(new LeadingMarginSpan.Standard(avatar.margin()), date, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            out.append('\n');
             if (partial) {
                 span(out, message.snippet(), new ForegroundColorSpan(color(R.color.text_muted)));
                 continue;
