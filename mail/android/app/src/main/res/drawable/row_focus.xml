@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The picked result, as the sibling apps mark a focused row: a pale
+     fill with rules along the top and bottom edges only. The side edges of the
+     stroke are pushed outside the bounds by the negative insets. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><color android:color="@color/focus_fill" /></item>
+    <item android:left="-4dp" android:right="-4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent" />
+            <stroke android:width="@dimen/focus_rule" android:color="@color/focus_rule" />
+        </shape>
+    </item>
+</layer-list>
