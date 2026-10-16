@@ -72,8 +72,9 @@
             android:textSize="@dimen/text_log" />
     </ScrollView>
 
-    <!-- Book results, in place of the log while finding books. The highlight
-         is drawn by the adapter, since the typing box keeps the focus. -->
+    <!-- Search results, songs, albums or books, in place of the log. The
+         highlight is drawn by the adapter, since the typing box keeps the
+         focus. -->
     <ListView
         android:id="@+id/results"
         android:layout_width="match_parent"

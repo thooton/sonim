@@ -8,13 +8,19 @@ It used to be called Music (`com.music.xp3`).
 
 ## How it works
 
-Music speaks the command center's music routes exactly as `delta music` does
-(`cmd/delta/music.go`, `cmd/delta-cc/music_run.go` in thooton/delta), with
-the delta token: `POST /music` streams JSON lines (`stdout`, `stderr`, `{}`
-keepalives, then `done` with `error`, `job`, `files`); `GET /music-jobs/{id}`
-is the job's files as a tar (Go's archive/tar, so PAX names); `DELETE
-/music-jobs/{id}` removes it; `POST /music-login` is re-login. If the routes
-change there, change `Music` here and keep its test in step.
+Music speaks the command center's music routes (`cmd/delta-cc/music_run.go`
+in thooton/delta), with the delta token. Unlike `delta music`, which takes
+the best match by name, it lets the user choose: `POST /music-search` streams
+JSON lines (`stdout`, `stderr`, `{}` keepalives, then `done` with `error`
+and `results`, every result that meets the command center's music config,
+best first by its preferences); `POST /music` with `{"link"}`, a result's
+`slsk://` link, downloads that one, streaming the same way and ending with
+`done` (`error`, `job`, `files`); `GET /music-jobs/{id}` is the job's files as
+a tar (Go's archive/tar, so PAX names); `DELETE /music-jobs/{id}` removes it;
+`POST /music-login` is re-login. The command center doesn't white-label
+these routes, and the app doesn't either: the user sees the engine's log,
+Soulseek, and who shares each result. Keep it that way. If the routes change
+there, change `Music` here and keep its test in step.
 
 Books work as `delta books` does (`cmd/delta/books.go`, `books_source.go`,
 `cmd/delta-cc/books.go`): the book source's account lives on the command
@@ -28,12 +34,12 @@ client changes, change `Books` here and keep its test in step.
 
 - `android/core`: `net/` — over the shared `Http`, `Json` and `Login` (the
   command center address and token, validated as Delta's `Config` does;
-  `../common/core`): `Music` (the music routes), `Books` (the book source client and file
+  `../common/core`): `Music` (the music routes, and the results' wording), `Books` (the book source client and file
   names), `Tar` (a minimal reader), `Names` (makes job paths safe under the
   Music folder). Tests in `src/test` run via `:core:selfTest`.
-- `android/app`: `MainActivity` (the one screen: modes, keys, book results,
-  menu, login dialog), `Download` (the single running music download, book
-  search or book download, kept outside the activity under a partial wake
+- `android/app`: `MainActivity` (the one screen: modes, keys, music and book
+  results, menu, login dialog), `Download` (the single running music search
+  or download, book search or book download, kept outside the activity under a partial wake
   lock; music goes straight into shared `Music/` through `.part` files,
   books into shared `Books/`, and both are handed to the media scanner).
 
