@@ -14,8 +14,8 @@ Two fields:
 - **Find**: what to look for: a kind of place or a name.
 
 OK in Near moves to Find; OK in Find searches. Each result shows its name,
-its rating, price and kind, and how far it is from Near and whether it is
-open now, in green or red. Pick one with OK to see everything Google has on
+its street address and town, its rating, price and kind, and how far it is
+from Near and whether it is open now, in green or red. Pick one with OK to see everything Google has on
 it: address, phone, website, the week's hours (and happy hour and the like),
 price range, what it offers, payment, parking, wheelchair access, fuel
 prices, summaries and reviews.

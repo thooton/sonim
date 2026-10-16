@@ -22,7 +22,9 @@ import java.util.Map;
  * Field masks decide what Google bills, and these are the CLI's: a search asks
  * for nothing past the Enterprise tier (ratings and opening hours need it), a
  * place's details add reviews and the other Atmosphere fields, and looking up
- * where to search near asks only for Pro fields.
+ * where to search near asks only for Pro fields. A search also asks for the
+ * short address, for the results list; it is a Pro field, so the search still
+ * bills as Enterprise.
  */
 public final class Places {
 
@@ -35,7 +37,7 @@ public final class Places {
     static final String LOCATE_FIELDS = "places.id,places.displayName,places.formattedAddress,places.location";
 
     static final String SEARCH_FIELDS = "places.id,places.displayName,places.primaryTypeDisplayName,"
-        + "places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,"
+        + "places.formattedAddress,places.shortFormattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,"
         + "places.businessStatus,places.utcOffsetMinutes,places.currentOpeningHours.openNow,"
         + "places.currentOpeningHours.nextOpenTime,places.currentOpeningHours.nextCloseTime,nextPageToken";
 
