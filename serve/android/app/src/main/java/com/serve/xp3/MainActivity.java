@@ -8,6 +8,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.KeyEvent;
+import android.view.View;
 import android.widget.TextView;
 import com.serve.xp3.net.Addresses;
 import com.serve.xp3.net.Server;
@@ -34,6 +35,7 @@ public final class MainActivity extends Activity implements ServeService.Listene
     private TextView addressView;
     private TextView othersView;
     private TextView statusView;
+    private View statusRule;
     private File folder;
     private Runnable whenAllowed;
 
@@ -50,6 +52,7 @@ public final class MainActivity extends Activity implements ServeService.Listene
         addressView = (TextView) findViewById(R.id.address);
         othersView = (TextView) findViewById(R.id.others);
         statusView = (TextView) findViewById(R.id.status);
+        statusRule = findViewById(R.id.status_rule);
         String saved = prefs().getString("folder", "");
         folder = saved.length() == 0 ? null : new File(saved);
     }
@@ -94,13 +97,15 @@ public final class MainActivity extends Activity implements ServeService.Listene
         addressView.setTextColor(getResources().getColor(running ? R.color.text : R.color.text_muted));
 
         String error = ServeService.error();
-        if (error.length() > 0 && !running) {
-            statusView.setText(error);
-        } else if (folder == null) {
-            statusView.setText("OK chooses a folder to serve.");
-        } else {
-            statusView.setText(running ? "OK stops. Menu for more." : "OK starts serving. Menu for more.");
-        }
+        problem(error.length() > 0 && !running ? error : null);
+    }
+
+    /** Shows what went wrong at the foot of the screen; null hides it. */
+    private void problem(String text) {
+        int visibility = text == null ? View.GONE : View.VISIBLE;
+        statusView.setText(text);
+        statusView.setVisibility(visibility);
+        statusRule.setVisibility(visibility);
     }
 
     /** "Phone/Music", "SD card/DCIM": the folder under the storage it is on. */
@@ -145,10 +150,9 @@ public final class MainActivity extends Activity implements ServeService.Listene
     private void begin() {
         if (!allowed(new Runnable() { public void run() { begin(); } })) return;
         if (!folder.isDirectory()) {
-            statusView.setText("That folder is gone. Choose another.");
+            problem("That folder is gone. Choose another.");
             return;
         }
-        statusView.setText("Starting…");
         ServeService.start(this, folder);
     }
 
@@ -176,7 +180,7 @@ public final class MainActivity extends Activity implements ServeService.Listene
         if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
             if (then != null) then.run();
         } else {
-            statusView.setText("Serve needs storage access to read the folder.");
+            problem("Serve needs storage access to read the folder.");
         }
     }
 
