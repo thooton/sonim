@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- For the XP3's 240x320 mdpi panel, matching the sibling apps' bar. -->
+    <dimen name="bar_height">36dp</dimen>
+    <dimen name="pad_h">10dp</dimen>
+    <dimen name="text_title">15sp</dimen>
+    <dimen name="text_state">13sp</dimen>
+    <dimen name="text_label">11sp</dimen>
+    <dimen name="text_value">14sp</dimen>
+    <dimen name="text_address">16sp</dimen>
+    <dimen name="text_status">12sp</dimen>
+</resources>
