@@ -1,0 +1,6 @@
+// The Gmail client, MIME and HTML reading, and the composer's message.
+apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    api project(":common:core")
+}

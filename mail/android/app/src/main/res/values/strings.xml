@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mail</string>
+    <string name="label_to">To</string>
+    <string name="label_cc">Cc</string>
+    <string name="label_subject">Subj</string>
+    <string name="hint_to">Address, or Menu → Add recipient</string>
+    <string name="hint_subject">Subject</string>
+    <string name="hint_body">Message</string>
+</resources>

@@ -1,0 +1,3 @@
+# The command center login gradle/bundled.gradle bakes into the APK, so every
+# APK is ignored too, at the root.
+delta-center.json
