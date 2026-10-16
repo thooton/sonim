@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Music</string>
-    <string name="song">Song</string>
-    <string name="album">Album</string>
-    <string name="hint_song">Artist - Title</string>
-    <string name="hint_album">Artist - Album</string>
-</resources>

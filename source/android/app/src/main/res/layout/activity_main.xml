@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/page"
+    android:orientation="vertical">
+
+    <!-- The bar names the app and, on the right, what OK will fetch (a song,
+         an album or a book): left and right switch it while the box is empty. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/bar_height"
+        android:background="@color/primary"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/pad_h"
+        android:paddingRight="@dimen/pad_h">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/app_name" android:textColor="@color/on_primary" android:textSize="@dimen/text_title" android:textStyle="bold" />
+        <TextView android:id="@+id/mode" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/on_primary" android:textSize="@dimen/text_mode" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/query"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="6dp"
+        android:layout_marginRight="6dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/edittext_border"
+        android:imeOptions="actionGo|flagNoExtractUi"
+        android:inputType="textCapWords"
+        android:maxLines="2"
+        android:paddingBottom="7dp"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
+        android:paddingTop="7dp"
+        android:textColor="@color/input_text"
+        android:textColorHint="@color/input_hint"
+        android:textSize="@dimen/text_input" />
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="4dp"
+        android:paddingLeft="@dimen/pad_h"
+        android:paddingRight="@dimen/pad_h"
+        android:paddingTop="5dp"
+        android:textColor="@color/text"
+        android:textSize="@dimen/text_status" />
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" />
+
+    <ScrollView
+        android:id="@+id/scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/row"
+        android:focusable="false"
+        android:scrollbarStyle="outsideOverlay">
+        <TextView
+            android:id="@+id/log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:paddingBottom="6dp"
+            android:paddingLeft="@dimen/pad_h"
+            android:paddingRight="@dimen/pad_h"
+            android:paddingTop="4dp"
+            android:textColor="@color/text_muted"
+            android:textSize="@dimen/text_log" />
+    </ScrollView>
+
+    <!-- Book results, in place of the log while finding books. The highlight
+         is drawn by the adapter, since the typing box keeps the focus. -->
+    <ListView
+        android:id="@+id/results"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/row"
+        android:divider="@color/divider"
+        android:dividerHeight="1dp"
+        android:focusable="false"
+        android:scrollbarStyle="outsideOverlay"
+        android:visibility="gone" />
+</LinearLayout>
