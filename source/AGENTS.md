@@ -26,10 +26,9 @@ do. Search, download link and download are the source's own `/eapi` endpoints,
 with the CLI's headers, cookies, redirects and domain selection; if the CLI's
 client changes, change `Books` here and keep its test in step.
 
-- `android/core`: `net/` — over the shared `Http` and `Json`
-  (`../common/core`): `Login` (the
-  command center address and token, validated as Delta's `Config` does),
-  `Music` (the music routes), `Books` (the book source client and file
+- `android/core`: `net/` — over the shared `Http`, `Json` and `Login` (the
+  command center address and token, validated as Delta's `Config` does;
+  `../common/core`): `Music` (the music routes), `Books` (the book source client and file
   names), `Tar` (a minimal reader), `Names` (makes job paths safe under the
   Music folder). Tests in `src/test` run via `:core:selfTest`.
 - `android/app`: `MainActivity` (the one screen: modes, keys, book results,

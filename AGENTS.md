@@ -50,8 +50,8 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
   are a plain `SelfTest` main class, `com.<app>.xp3.SelfTest`, run by
   `:core:selfTest`; there is no test framework.
 - `gradle/bundled.gradle`: bakes a deployment's login into an app as a
-  generated `Bundled` class (Canvas, Charge, Delta, Source). The files it reads
-  are gitignored, and CI has none, so its APKs carry no login.
+  generated `Bundled` class (Canvas, Charge, Delta, Places, Source). The
+  files it reads are gitignored, and CI has none, so its APKs carry no login.
 
 ## Shared code
 
@@ -59,8 +59,9 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
 
 - `common/core` (plain Java, `com.xp3.common`): `Json` (strict codec), `Http`
   (deadlines, bounded bodies, no redirects), `Disk` (whole-file reads and
-  atomic writes); and, as test fixtures, `Check` (the test harness) and
-  `TestServer` (a loopback HTTP server).
+  atomic writes), `Login` (the command center address and delta token, as
+  Source and Places sign in); and, as test fixtures, `Check` (the test
+  harness) and `TestServer` (a loopback HTTP server).
 - `common/ui` (Android, `com.xp3.common.ui`): `BaseActivity` (`dp`, `color`,
   `toast`, `alert`, `vertical`, `text`, `listDialog`), `Ui` (workers, `fill`,
   `weighted`, `isOk`, `onSelect`), `Tabs` (tab bar with d-pad cycling),

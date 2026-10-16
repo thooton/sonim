@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Places</string>
+    <string name="label_near">Near</string>
+    <string name="label_find">Find</string>
+    <string name="hint_near">City, zip or address</string>
+    <string name="hint_find">Coffee, pharmacy, a name…</string>
+</resources>

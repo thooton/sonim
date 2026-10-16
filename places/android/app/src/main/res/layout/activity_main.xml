@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/page"
+    android:orientation="vertical">
+
+    <!-- The bar names the app and, on the right, which result is picked. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/bar_height"
+        android:background="@color/primary"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/pad_h"
+        android:paddingRight="@dimen/pad_h">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/app_name" android:textColor="@color/on_primary" android:textSize="@dimen/text_title" android:textStyle="bold" />
+        <TextView android:id="@+id/count" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/on_primary_dim" android:textSize="@dimen/text_count" />
+    </LinearLayout>
+
+    <!-- Where to search near (kept between searches), then what to find.
+         Hidden while a place's details fill the screen. -->
+    <LinearLayout
+        android:id="@+id/form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="6dp"
+        android:paddingRight="6dp"
+        android:paddingTop="5dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:layout_width="@dimen/label_width" android:layout_height="wrap_content" android:text="@string/label_near" android:textColor="@color/text_muted" android:textSize="@dimen/text_label" />
+            <EditText
+                android:id="@+id/near"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/edittext_border"
+                android:hint="@string/hint_near"
+                android:imeOptions="actionNext|flagNoExtractUi"
+                android:inputType="textCapWords|textPostalAddress"
+                android:maxLines="1"
+                android:paddingBottom="5dp"
+                android:paddingLeft="7dp"
+                android:paddingRight="7dp"
+                android:paddingTop="5dp"
+                android:textColor="@color/input_text"
+                android:textColorHint="@color/input_hint"
+                android:textSize="@dimen/text_input" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:layout_width="@dimen/label_width" android:layout_height="wrap_content" android:text="@string/label_find" android:textColor="@color/text_muted" android:textSize="@dimen/text_label" />
+            <EditText
+                android:id="@+id/query"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/edittext_border"
+                android:hint="@string/hint_find"
+                android:imeOptions="actionSearch|flagNoExtractUi"
+                android:inputType="textCapSentences"
+                android:maxLines="1"
+                android:paddingBottom="5dp"
+                android:paddingLeft="7dp"
+                android:paddingRight="7dp"
+                android:paddingTop="5dp"
+                android:textColor="@color/input_text"
+                android:textColorHint="@color/input_hint"
+                android:textSize="@dimen/text_input" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="4dp"
+        android:paddingLeft="@dimen/pad_h"
+        android:paddingRight="@dimen/pad_h"
+        android:paddingTop="4dp"
+        android:textColor="@color/text"
+        android:textSize="@dimen/text_status" />
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" />
+
+    <!-- The results. The highlight is drawn by the adapter, since a typing
+         box keeps the focus. -->
+    <ListView
+        android:id="@+id/results"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/row"
+        android:divider="@color/divider"
+        android:dividerHeight="1dp"
+        android:focusable="false"
+        android:scrollbarStyle="outsideOverlay" />
+
+    <!-- One place's details, in place of the results. -->
+    <ScrollView
+        android:id="@+id/detail"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/row"
+        android:focusable="false"
+        android:scrollbarStyle="outsideOverlay"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/detail_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:lineSpacingExtra="1dp"
+            android:paddingBottom="8dp"
+            android:paddingLeft="@dimen/pad_h"
+            android:paddingRight="@dimen/pad_h"
+            android:paddingTop="6dp"
+            android:textColor="@color/text"
+            android:textSize="@dimen/text_detail" />
+    </ScrollView>
+</LinearLayout>

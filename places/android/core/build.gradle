@@ -1,0 +1,6 @@
+// The Places API client, the command center's key, and how a place reads.
+apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    api project(":common:core")
+}

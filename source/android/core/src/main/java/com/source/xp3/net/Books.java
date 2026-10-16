@@ -2,6 +2,7 @@ package com.source.xp3.net;
 
 import com.xp3.common.Http;
 import com.xp3.common.Json;
+import com.xp3.common.Login;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
