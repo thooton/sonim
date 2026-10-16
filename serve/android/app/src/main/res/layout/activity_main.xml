@@ -34,12 +34,15 @@
         <TextView android:id="@+id/others" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text_muted" android:textSize="@dimen/text_status" />
     </LinearLayout>
 
-    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" />
+    <!-- Only there when something went wrong: the port is taken, storage
+         access was refused, the folder has gone. -->
+    <View android:id="@+id/status_rule" android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" android:visibility="gone" />
 
     <TextView
         android:id="@+id/status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:visibility="gone"
         android:paddingBottom="6dp"
         android:paddingLeft="@dimen/pad_h"
         android:paddingRight="@dimen/pad_h"

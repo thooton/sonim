@@ -26,6 +26,7 @@
         android:layout_marginLeft="6dp"
         android:layout_marginRight="6dp"
         android:layout_marginTop="6dp"
+        android:layout_marginBottom="5dp"
         android:background="@drawable/edittext_border"
         android:imeOptions="actionGo|flagNoExtractUi"
         android:inputType="textCapWords"
@@ -45,7 +46,6 @@
         android:paddingBottom="4dp"
         android:paddingLeft="@dimen/pad_h"
         android:paddingRight="@dimen/pad_h"
-        android:paddingTop="5dp"
         android:textColor="@color/text"
         android:textSize="@dimen/text_status" />
 

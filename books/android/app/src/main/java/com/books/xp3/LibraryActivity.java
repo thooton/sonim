@@ -6,11 +6,11 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Environment;
-import android.view.ContextMenu;
+import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 
 import com.books.xp3.shelf.Shelf;
 import com.xp3.common.ui.BaseActivity;
@@ -22,22 +22,27 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 /**
- * The library: every .epub and .txt on the phone and its SD card, the book
- * last read first.
+ * The library: every .epub and .txt in the Books folder of the phone and of
+ * its SD card, the book last read first.
  *
  * Keys: Up and Down choose, OK opens, Menu marks a book read or unread or
  * looks for new books.
  */
-public final class LibraryActivity extends BaseActivity {
+public final class LibraryActivity extends BaseActivity implements ListPanel.Listener {
 
     private static final int ASK_STORAGE = 1;
+    private static final String BOOKS = "Books";
     private static final int MENU_UNREAD = 1;
     private static final int MENU_FINISHED = 2;
     private static final int MENU_REFRESH = 3;
 
     private Shelf shelf;
     private Covers covers;
+    private FrameLayout root;
     private LibraryView view;
+    /** The Menu key's sheet, over the bottom of the list while it is open. */
+    private ListPanel menu;
+    private boolean menuOpen;
     private final ExecutorService scans = Ui.worker("books-scan");
     private final ExecutorService coverLoads = Ui.worker("books-covers");
     private boolean scanning;
@@ -50,9 +55,15 @@ public final class LibraryActivity extends BaseActivity {
         super.onCreate(state);
         shelf = Shared.shelf(this);
         covers = new Covers(this);
+        root = new FrameLayout(this);
         view = new LibraryView(this);
-        setContentView(view);
-        registerForContextMenu(view);
+        root.addView(view, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        menu = new ListPanel(this);
+        menu.setListener(this);
+        menu.setVisibility(View.GONE);
+        root.addView(menu, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, Gravity.BOTTOM));
+        setContentView(root);
         if (!allowed()) {
             view.setMessage("Find your books", "Books needs to read the phone\u2019s storage to find them.\nPress OK to allow.");
             requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, ASK_STORAGE);
@@ -62,6 +73,8 @@ public final class LibraryActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // Night Shift is set in the reader, and warms the library too.
+        NightShift.apply(root, new Settings(this).nightShift);
         if (!allowed()) return;
         List<Shelf.Entry> known = shelf.books();
         if (!known.isEmpty()) show(known);
@@ -113,18 +126,22 @@ public final class LibraryActivity extends BaseActivity {
         if (books.isEmpty()) {
             view.setBooks(books);
             view.setMessage("No books yet",
-                "Copy .epub or .txt files to the phone or its SD card, into Books or any folder, and they will show up here.");
+                "Copy .epub or .txt files into the Books folder on the phone or its SD card, and they will show up here.");
             return;
         }
         view.setBooks(books);
         loadCovers(books);
     }
 
-    /** Internal storage, and the root of each SD card. */
+    /**
+     * The only places books are looked for: the Books folder at the top of
+     * the phone's storage (beside Pictures and Music), and the one at the top
+     * of each SD card.
+     */
     private List<File> roots() {
         List<File> roots = new ArrayList<File>();
         File main = Environment.getExternalStorageDirectory();
-        if (main != null) roots.add(main);
+        if (main != null) roots.add(new File(main, BOOKS));
         File[] volumes = getExternalFilesDirs(null);
         if (volumes != null) {
             for (File dir : volumes) {
@@ -134,7 +151,7 @@ public final class LibraryActivity extends BaseActivity {
                 if (cut <= 0) continue;
                 File root = new File(path.substring(0, cut));
                 if (main != null && root.getAbsolutePath().equals(main.getAbsolutePath())) continue;
-                roots.add(root);
+                roots.add(new File(root, BOOKS));
             }
         }
         return roots;
@@ -160,6 +177,17 @@ public final class LibraryActivity extends BaseActivity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (menuOpen) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                menu.move(-1);
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                menu.move(1);
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) return true;
+        }
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_UP:
                 view.move(-1);
@@ -190,10 +218,14 @@ public final class LibraryActivity extends BaseActivity {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
-                if (event.isTracking() && !event.isCanceled()) ok();
+                if (!event.isTracking() || event.isCanceled()) return true;
+                if (menuOpen) menu.activate();
+                else ok();
                 return true;
             case KeyEvent.KEYCODE_MENU:
-                if (event.isTracking() && !event.isCanceled()) showMenu();
+                if (!event.isTracking() || event.isCanceled()) return true;
+                if (menuOpen) closeMenu();
+                else showMenu();
                 return true;
             default:
                 return super.onKeyUp(keyCode, event);
@@ -217,30 +249,48 @@ public final class LibraryActivity extends BaseActivity {
     }
 
     // ------------------------------------------------------------------
-    // The Menu key: the platform's own popup, beside the chosen book
+    // The Menu key: an action sheet for the chosen book
     // ------------------------------------------------------------------
 
+    /*
+     * Drawn by the app rather than the platform's popup, which is a window of
+     * its own that Night Shift's filter cannot reach.
+     */
     private void showMenu() {
         if (!allowed()) return;
         menuBook = view.hasBooks() ? view.focused() : null;
-        float y = menuBook != null ? view.focusedBottom() : view.getHeight() / 2f;
-        view.showContextMenu(view.getWidth() / 4f, Math.min(y, view.getHeight() - 1));
-    }
-
-    @Override
-    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo info) {
-        int order = 0;
+        List<ListPanel.Row> rows = new ArrayList<ListPanel.Row>();
         if (menuBook != null) {
-            if (!menuBook.isNew()) menu.add(Menu.NONE, MENU_UNREAD, order++, "Mark as Unread");
-            if (!menuBook.finished() && menuBook.length > 0) menu.add(Menu.NONE, MENU_FINISHED, order++, "Mark as Finished");
+            if (!menuBook.isNew()) rows.add(new ListPanel.Row(MENU_UNREAD, ListPanel.PLAIN, "Mark as Unread"));
+            if (!menuBook.finished() && menuBook.length > 0) {
+                rows.add(new ListPanel.Row(MENU_FINISHED, ListPanel.PLAIN, "Mark as Finished"));
+            }
         }
-        menu.add(Menu.NONE, MENU_REFRESH, order, "Look for New Books");
+        rows.add(new ListPanel.Row(MENU_REFRESH, ListPanel.PLAIN, "Look for New Books"));
+        menu.show(menuBook != null ? menuBook.displayTitle() : "Library", true, rows, 0);
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) menu.getLayoutParams();
+        params.height = menu.sheetHeight(root.getHeight());
+        menu.setLayoutParams(params);
+        menu.setVisibility(View.VISIBLE);
+        menuOpen = true;
+    }
+
+    private void closeMenu() {
+        menuOpen = false;
+        menu.setVisibility(View.GONE);
     }
 
     @Override
-    public boolean onContextItemSelected(MenuItem item) {
+    public void onBackPressed() {
+        if (menuOpen) closeMenu();
+        else super.onBackPressed();
+    }
+
+    @Override
+    public void onActivate(ListPanel.Row row) {
         Shelf.Entry book = menuBook;
-        switch (item.getItemId()) {
+        closeMenu();
+        switch (row.id) {
             case MENU_UNREAD:
                 if (book != null) shelf.forget(book.path);
                 break;
@@ -249,13 +299,17 @@ public final class LibraryActivity extends BaseActivity {
                 break;
             case MENU_REFRESH:
                 scan();
-                return true;
+                return;
             default:
-                return false;
+                return;
         }
         Shared.save(shelf);
         show(shelf.books());
-        return true;
+    }
+
+    @Override
+    public void onAdjust(ListPanel.Row row, int delta) {
+        // The sheet has nothing to adjust.
     }
 
     @Override
