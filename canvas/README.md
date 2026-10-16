@@ -7,9 +7,8 @@ It keeps assignments available offline and groups them into Assigned, Missing, a
 ## Build and test
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRelease
-adb install -r app/build/outputs/apk/release/app-release.apk
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :canvas:core:selfTest :canvas:app:assembleRelease
+adb install -r canvas/android/app/build/outputs/apk/release/app-release.apk
 ```
 
 ## Setup

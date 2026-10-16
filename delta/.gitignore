@@ -1,14 +1,5 @@
-# An assembled APK has this deployment's live cloud login and command center
-# token baked into it by :app:generateDefaults. Anything holding the file can
-# spend the subscription and run code on the command center, so it is built
-# locally and never committed.
-*.apk
+# Credentials kept beside the app. gradle/bundled.gradle bakes the command
+# center into the APK, so every APK is ignored too, at the root.
 cloud-auth.json
 auth.json
 delta-center.json
-
-*.class
-bin/
-build/
-.gradle/
-android/local.properties

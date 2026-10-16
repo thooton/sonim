@@ -2,7 +2,6 @@ package com.canvas.xp3.data;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -144,14 +143,11 @@ public final class Todos {
     private void sortByDue(Section section, final boolean ascending) {
         Collections.sort(
             section.items,
-            new Comparator<Assignment>() {
-                @Override
-                public int compare(Assignment left, Assignment right) {
-                    long a = left.due == null ? 0L : left.due.longValue();
-                    long b = right.due == null ? 0L : right.due.longValue();
-                    int order = a < b ? -1 : a > b ? 1 : 0;
-                    return ascending ? order : -order;
-                }
+            (left, right) -> {
+                long a = left.due == null ? 0L : left.due.longValue();
+                long b = right.due == null ? 0L : right.due.longValue();
+                int order = a < b ? -1 : a > b ? 1 : 0;
+                return ascending ? order : -order;
             }
         );
     }

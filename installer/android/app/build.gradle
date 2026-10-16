@@ -2,31 +2,17 @@ plugins {
     id "com.android.application"
 }
 
-// No dependencies at all: two activities and a device-admin receiver.
+apply from: rootProject.file("gradle/app.gradle")
+
+// Two activities and a device-admin receiver. It recognises the apps it will
+// install for by the shared signing key gradle/app.gradle applies.
+
 android {
     namespace "com.installer.xp3"
-    compileSdk 35
-    buildToolsVersion "35.0.1"
 
     defaultConfig {
         applicationId "com.installer.xp3"
-        minSdk 27
-        targetSdk 27
-        versionCode 2
-        versionName "1.0.1"
-    }
-
-    // Targets the XP3's own Android 8.1 on purpose; this is not for Play.
-    lint {
-        disable "ExpiredTargetSdkVersion"
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        versionCode 3
+        versionName "1.0.2"
     }
 }
-
-// Signed with the shared key, which is also how InstallActivity recognises
-// the apps it will install for.
-apply from: rootProject.file("../../signing/signing.gradle")

@@ -1,7 +1,9 @@
 package com.canvas.xp3.net;
 
-import com.canvas.xp3.Check;
-import com.canvas.xp3.TestServer;
+import com.xp3.common.Check;
+import com.xp3.common.Http;
+import com.xp3.common.Json;
+import com.xp3.common.TestServer;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -18,51 +20,15 @@ public final class NetTests {
     private NetTests() {}
 
     public static void run(final Check check) {
-        check.run("json", new Check.Body() {
-            public void run() {
-                json(check);
-            }
-        });
-        check.run("cookies", new Check.Body() {
-            public void run() {
-                cookies(check);
-            }
-        });
-        check.run("config", new Check.Body() {
-            public void run() {
-                config(check);
-            }
-        });
-        check.run("origins", new Check.Body() {
-            public void run() {
-                origins(check);
-            }
-        });
-        check.run("cookie service", new Check.Body() {
-            public void run() throws Exception {
-                cookieService(check);
-            }
-        });
-        check.run("canvas paging", new Check.Body() {
-            public void run() throws Exception {
-                paging(check);
-            }
-        });
-        check.run("canvas auth", new Check.Body() {
-            public void run() throws Exception {
-                auth(check);
-            }
-        });
-        check.run("canvas ids", new Check.Body() {
-            public void run() {
-                ids(check);
-            }
-        });
-        check.run("canvas due", new Check.Body() {
-            public void run() throws Exception {
-                due(check);
-            }
-        });
+        check.run("json", () -> json(check));
+        check.run("cookies", () -> cookies(check));
+        check.run("config", () -> config(check));
+        check.run("origins", () -> origins(check));
+        check.run("cookie service", () -> cookieService(check));
+        check.run("canvas paging", () -> paging(check));
+        check.run("canvas auth", () -> auth(check));
+        check.run("canvas ids", () -> ids(check));
+        check.run("canvas due", () -> due(check));
     }
 
     // ------------------------------------------------------------------
@@ -82,73 +48,41 @@ public final class NetTests {
         check.ok("flag helper is false for absent", !Json.flag(parsed, "nope"));
         check.same("child of absent is empty", 0, Json.child(parsed, "nope").size());
 
-        check.fails("duplicate keys refused", new Check.Body() {
-            public void run() {
-                Json.parse("{\"a\":1,\"a\":2}");
-            }
+        check.fails("duplicate keys refused", () -> {
+            Json.parse("{\"a\":1,\"a\":2}");
         });
-        check.fails("trailing content refused", new Check.Body() {
-            public void run() {
-                Json.parse("{} x");
-            }
+        check.fails("trailing content refused", () -> {
+            Json.parse("{} x");
         });
-        check.fails("raw control character refused", new Check.Body() {
-            public void run() {
-                Json.parse("\"a\nb\"");
-            }
+        check.fails("raw control character refused", () -> {
+            Json.parse("\"a\nb\"");
         });
-        check.fails("unterminated string refused", new Check.Body() {
-            public void run() {
-                Json.parse("\"abc");
-            }
+        check.fails("unterminated string refused", () -> {
+            Json.parse("\"abc");
         });
-        check.fails("leading zero refused", new Check.Body() {
-            public void run() {
-                Json.parse("01");
-            }
+        check.fails("leading zero refused", () -> {
+            Json.parse("01");
         });
-        check.fails("bad escape refused", new Check.Body() {
-            public void run() {
-                Json.parse("\"\\q\"");
-            }
+        check.fails("bad escape refused", () -> {
+            Json.parse("\"\\q\"");
         });
-        check.fails("non-finite refused", new Check.Body() {
-            public void run() {
-                Json.write(Double.valueOf(Double.NaN));
-            }
-        });
-        check.fails("unsupported type refused", new Check.Body() {
-            public void run() {
-                Json.write(new Object());
-            }
-        });
+        check.fails("non-finite refused", () -> Json.write(Double.valueOf(Double.NaN)));
+        check.fails("unsupported type refused", () -> Json.write(new Object()));
         StringBuilder deep = new StringBuilder();
         for (int i = 0; i < 200; i++) deep.append('[');
         final String nested = deep.toString();
-        check.fails("depth limit", new Check.Body() {
-            public void run() {
-                Json.parse(nested);
-            }
-        });
+        check.fails("depth limit", () -> Json.parse(nested));
     }
 
     private static void cookies(Check check) {
         check.same("plain pair", "a=b; c=d", Cookies.parse("  a=b; c=d "));
         check.same("header prefix stripped", "a=b", Cookies.parse("Cookie: a=b"));
-        check.fails("empty refused", new Check.Body() {
-            public void run() {
-                Cookies.parse("");
-            }
+        check.fails("empty refused", () -> Cookies.parse(""));
+        check.fails("valueless refused", () -> {
+            Cookies.parse("novalue");
         });
-        check.fails("valueless refused", new Check.Body() {
-            public void run() {
-                Cookies.parse("novalue");
-            }
-        });
-        check.fails("newline refused", new Check.Body() {
-            public void run() {
-                Cookies.parse("a=b\nc=d");
-            }
+        check.fails("newline refused", () -> {
+            Cookies.parse("a=b\nc=d");
         });
     }
 
@@ -178,30 +112,20 @@ public final class NetTests {
         check.same("an old model login is ignored", "https://canvas.asu.edu", old.get(Config.CANVAS_URL));
         check.ok("and not written back", !old.toJson().contains("openai"));
 
-        check.fails("plain http refused", new Check.Body() {
-            public void run() {
-                Config.blank().with(Config.CANVAS_URL, "http://canvas.asu.edu");
-            }
+        check.fails("plain http refused", () -> {
+            Config.blank().with(Config.CANVAS_URL, "http://canvas.asu.edu");
         });
-        check.fails("a path refused", new Check.Body() {
-            public void run() {
-                Config.blank().with(Config.CANVAS_URL, "https://canvas.asu.edu/courses");
-            }
+        check.fails("a path refused", () -> {
+            Config.blank().with(Config.CANVAS_URL, "https://canvas.asu.edu/courses");
         });
-        check.fails("cookie url must end in /cookie", new Check.Body() {
-            public void run() {
-                Config.blank().with(Config.COOKIE_URL, "https://edit.example.org/api/");
-            }
+        check.fails("cookie url must end in /cookie", () -> {
+            Config.blank().with(Config.COOKIE_URL, "https://edit.example.org/api/");
         });
-        check.fails("short token refused", new Check.Body() {
-            public void run() {
-                Config.blank().with(Config.COOKIE_TOKEN, "short");
-            }
+        check.fails("short token refused", () -> {
+            Config.blank().with(Config.COOKIE_TOKEN, "short");
         });
-        check.fails("bad timezone refused", new Check.Body() {
-            public void run() {
-                Config.blank().with(Config.TIMEZONE, "Mars/Olympus");
-            }
+        check.fails("bad timezone refused", () -> {
+            Config.blank().with(Config.TIMEZONE, "Mars/Olympus");
         });
         check.same("timezone is used", "America/Phoenix",
             Config.blank().with(Config.TIMEZONE, "America/Phoenix").zone().getId());
@@ -209,40 +133,26 @@ public final class NetTests {
 
     private static void origins(final Check check) {
         final URI base = URI.create("https://canvas.asu.edu/");
-        check.run("pagination guard", new Check.Body() {
-            public void run() throws Exception {
-                Canvas.validatePage(base, URI.create("https://canvas.asu.edu/api/v1/courses?page=2"));
-            }
+        check.run("pagination guard", () -> {
+            Canvas.validatePage(base, URI.create("https://canvas.asu.edu/api/v1/courses?page=2"));
         });
-        check.fails("another host refused", new Check.Body() {
-            public void run() throws Exception {
-                Canvas.validatePage(base, URI.create("https://evil.example.com/api/v1/courses"));
-            }
+        check.fails("another host refused", () -> {
+            Canvas.validatePage(base, URI.create("https://evil.example.com/api/v1/courses"));
         });
-        check.fails("plain http refused", new Check.Body() {
-            public void run() throws Exception {
-                Canvas.validatePage(base, URI.create("http://canvas.asu.edu/api/v1/courses"));
-            }
+        check.fails("plain http refused", () -> {
+            Canvas.validatePage(base, URI.create("http://canvas.asu.edu/api/v1/courses"));
         });
-        check.fails("outside the api refused", new Check.Body() {
-            public void run() throws Exception {
-                Canvas.validatePage(base, URI.create("https://canvas.asu.edu/login"));
-            }
+        check.fails("outside the api refused", () -> {
+            Canvas.validatePage(base, URI.create("https://canvas.asu.edu/login"));
         });
-        check.fails("credentials in the url refused", new Check.Body() {
-            public void run() throws Exception {
-                Canvas.validatePage(base, URI.create("https://a:b@canvas.asu.edu/api/v1/courses"));
-            }
+        check.fails("credentials in the url refused", () -> {
+            Canvas.validatePage(base, URI.create("https://a:b@canvas.asu.edu/api/v1/courses"));
         });
-        check.fails("escaped traversal refused", new Check.Body() {
-            public void run() throws Exception {
-                Canvas.validatePage(base, URI.create("https://canvas.asu.edu/api/v1/%2e%2e/login"));
-            }
+        check.fails("escaped traversal refused", () -> {
+            Canvas.validatePage(base, URI.create("https://canvas.asu.edu/api/v1/%2e%2e/login"));
         });
-        check.fails("unnormalized refused", new Check.Body() {
-            public void run() throws Exception {
-                Canvas.validatePage(base, URI.create("https://canvas.asu.edu/api/v1/../api/v1/courses"));
-            }
+        check.fails("unnormalized refused", () -> {
+            Canvas.validatePage(base, URI.create("https://canvas.asu.edu/api/v1/../api/v1/courses"));
         });
     }
 
@@ -253,19 +163,13 @@ public final class NetTests {
     private static void cookieService(Check check) throws Exception {
         final AtomicInteger calls = new AtomicInteger();
         final AtomicLong clock = new AtomicLong();
-        TestServer server = new TestServer(new TestServer.Handler() {
-            public TestServer.Reply handle(TestServer.Request request) {
-                calls.incrementAndGet();
-                return TestServer.Reply.json(COOKIE_BODY);
-            }
+        TestServer server = new TestServer(request -> {
+            calls.incrementAndGet();
+            return TestServer.Reply.json(COOKIE_BODY);
         });
         try {
             RemoteCookies cookies = new RemoteCookies(server.uri("/cookie"), TOKEN, new Http(),
-                new LongSupplier() {
-                    public long getAsLong() {
-                        return clock.get();
-                    }
-                });
+                () -> clock.get());
             check.same("fetches the cookie", "canvas_session=abc; _csrf=d", cookies.fetch());
             cookies.fetch();
             check.same("cached", 1, calls.get());
@@ -300,28 +204,20 @@ public final class NetTests {
     }
 
     private static Check.Body fetching(final TestServer.Reply reply) {
-        return new Check.Body() {
-            public void run() throws Exception {
-                TestServer server = new TestServer(new TestServer.Handler() {
-                    public TestServer.Reply handle(TestServer.Request request) {
-                        return reply;
-                    }
-                });
-                try {
-                    new RemoteCookies(server.uri("/cookie"), TOKEN, new Http(), nowNanos()).fetch();
-                } finally {
-                    server.close();
-                }
+        return () -> {
+            TestServer server = new TestServer(request -> {
+                return reply;
+            });
+            try {
+                new RemoteCookies(server.uri("/cookie"), TOKEN, new Http(), nowNanos()).fetch();
+            } finally {
+                server.close();
             }
         };
     }
 
     private static LongSupplier nowNanos() {
-        return new LongSupplier() {
-            public long getAsLong() {
-                return System.nanoTime();
-            }
-        };
+        return () -> System.nanoTime();
     }
 
     /**
@@ -333,10 +229,8 @@ public final class NetTests {
      */
     public static Canvas canvasFor(URI base, URI cookieUrl) {
         return new Canvas(base, new RemoteCookies(cookieUrl, TOKEN, new Http(), nowNanos()),
-            new Http(), new Canvas.Sleeper() {
-                public void sleep(long milliseconds) {
-                    // The retry schedule is under test, not the wall clock.
-                }
+            new Http(), milliseconds -> {
+                // The retry schedule is under test, not the wall clock.
             });
     }
 
@@ -346,17 +240,15 @@ public final class NetTests {
 
     private static void paging(Check check) throws Exception {
         final AtomicInteger pages = new AtomicInteger();
-        TestServer server = new TestServer(new TestServer.Handler() {
-            public TestServer.Reply handle(TestServer.Request request) {
-                if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
-                if (request.path.contains("page=2")) {
-                    pages.incrementAndGet();
-                    return TestServer.Reply.json("[{\"id\":2,\"name\":\"Chem\",\"secret\":\"drop me\"}]");
-                }
+        TestServer server = new TestServer(request -> {
+            if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
+            if (request.path.contains("page=2")) {
                 pages.incrementAndGet();
-                return TestServer.Reply.json("[{\"id\":1,\"name\":\"Bio\"}]")
-                    .header("Link: <" + request.path.split("\\?")[0] + "?page=2>; rel=\"next\"");
+                return TestServer.Reply.json("[{\"id\":2,\"name\":\"Chem\",\"secret\":\"drop me\"}]");
             }
+            pages.incrementAndGet();
+            return TestServer.Reply.json("[{\"id\":1,\"name\":\"Bio\"}]")
+                .header("Link: <" + request.path.split("\\?")[0] + "?page=2>; rel=\"next\"");
         });
         try {
             List<Object> courses = canvas(server).courses(true);
@@ -371,36 +263,24 @@ public final class NetTests {
             server.close();
         }
 
-        TestServer cycle = new TestServer(new TestServer.Handler() {
-            public TestServer.Reply handle(TestServer.Request request) {
-                if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
-                return TestServer.Reply.json("[]").header("Link: <" + request.path + ">; rel=\"next\"");
-            }
+        TestServer cycle = new TestServer(request -> {
+            if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
+            return TestServer.Reply.json("[]").header("Link: <" + request.path + ">; rel=\"next\"");
         });
         try {
             final Canvas client = canvas(cycle);
-            check.fails("a Link cycle is caught", "cycle", new Check.Body() {
-                public void run() throws Exception {
-                    client.courses(true);
-                }
-            });
+            check.fails("a Link cycle is caught", "cycle", () -> client.courses(true));
         } finally {
             cycle.close();
         }
 
-        TestServer away = new TestServer(new TestServer.Handler() {
-            public TestServer.Reply handle(TestServer.Request request) {
-                if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
-                return TestServer.Reply.json("[]").header("Link: <https://evil.example.com/api/v1/x>; rel=\"next\"");
-            }
+        TestServer away = new TestServer(request -> {
+            if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
+            return TestServer.Reply.json("[]").header("Link: <https://evil.example.com/api/v1/x>; rel=\"next\"");
         });
         try {
             final Canvas client = canvas(away);
-            check.fails("a Link off-origin is refused", "outside the configured", new Check.Body() {
-                public void run() throws Exception {
-                    client.courses(true);
-                }
-            });
+            check.fails("a Link off-origin is refused", "outside the configured", () -> client.courses(true));
         } finally {
             away.close();
         }
@@ -408,14 +288,12 @@ public final class NetTests {
 
     private static void auth(Check check) throws Exception {
         final AtomicInteger attempts = new AtomicInteger();
-        TestServer recovering = new TestServer(new TestServer.Handler() {
-            public TestServer.Reply handle(TestServer.Request request) {
-                if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
-                if (attempts.incrementAndGet() == 1) {
-                    return TestServer.Reply.of(401, "application/json", "{\"status\":\"unauthenticated\"}");
-                }
-                return TestServer.Reply.json("[{\"id\":1,\"name\":\"Bio\"}]");
+        TestServer recovering = new TestServer(request -> {
+            if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
+            if (attempts.incrementAndGet() == 1) {
+                return TestServer.Reply.of(401, "application/json", "{\"status\":\"unauthenticated\"}");
             }
+            return TestServer.Reply.json("[{\"id\":1,\"name\":\"Bio\"}]");
         });
         try {
             check.same("a stale cookie is retried through", 1, canvas(recovering).courses(true).size());
@@ -424,77 +302,59 @@ public final class NetTests {
             recovering.close();
         }
 
-        TestServer expired = new TestServer(new TestServer.Handler() {
-            public TestServer.Reply handle(TestServer.Request request) {
-                if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
-                return TestServer.Reply.of(401, "application/json", "{}");
-            }
+        TestServer expired = new TestServer(request -> {
+            if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
+            return TestServer.Reply.of(401, "application/json", "{}");
         });
         try {
             final Canvas client = canvas(expired);
-            check.fails("it gives up rather than hanging", "would not accept the session", new Check.Body() {
-                public void run() throws Exception {
-                    client.courses(true);
-                }
+            check.fails("it gives up rather than hanging", "would not accept the session", () -> {
+                client.courses(true);
             });
         } finally {
             expired.close();
         }
 
-        TestServer login = new TestServer(new TestServer.Handler() {
-            public TestServer.Reply handle(TestServer.Request request) {
-                if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
-                return TestServer.Reply.of(200, "text/html", "<html>Log in</html>");
-            }
+        TestServer login = new TestServer(request -> {
+            if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
+            return TestServer.Reply.of(200, "text/html", "<html>Log in</html>");
         });
         try {
             final Canvas client = canvas(login);
-            check.fails("a login page is not data", "login page", new Check.Body() {
-                public void run() throws Exception {
-                    client.courses(true);
-                }
-            });
+            check.fails("a login page is not data", "login page", () -> client.courses(true));
         } finally {
             login.close();
         }
 
-        TestServer forbidden = new TestServer(new TestServer.Handler() {
-            public TestServer.Reply handle(TestServer.Request request) {
-                if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
-                return TestServer.Reply.of(403, "application/json", "{\"secret\":\"do not echo me\"}");
-            }
+        TestServer forbidden = new TestServer(request -> {
+            if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
+            return TestServer.Reply.of(403, "application/json", "{\"secret\":\"do not echo me\"}");
         });
         try {
             final Canvas client = canvas(forbidden);
-            check.fails("403 is explained without its body", "not permitted", new Check.Body() {
-                public void run() throws Exception {
-                    client.courses(true);
-                }
-            });
+            check.fails("403 is explained without its body", "not permitted", () -> client.courses(true));
         } finally {
             forbidden.close();
         }
     }
 
     private static void due(Check check) throws Exception {
-        TestServer server = new TestServer(new TestServer.Handler() {
-            public TestServer.Reply handle(TestServer.Request request) {
-                if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
-                if (request.path.contains("/courses/1/assignments")) {
-                    return TestServer.Reply.json("["
-                        + "{\"id\":11,\"name\":\"Late lab\",\"due_at\":\"2026-09-02T06:59:00Z\","
-                        + "\"submission\":{\"workflow_state\":\"unsubmitted\",\"missing\":true}},"
-                        + "{\"id\":12,\"name\":\"Handed in\",\"due_at\":\"2026-09-03T06:59:00Z\","
-                        + "\"submission\":{\"workflow_state\":\"submitted\",\"submitted_at\":\"2026-09-01T00:00:00Z\"}},"
-                        + "{\"id\":13,\"name\":\"Personal date\",\"due_at\":\"2026-09-30T06:59:00Z\","
-                        + "\"submission\":{\"cached_due_date\":\"2026-09-04T06:59:00Z\"}},"
-                        + "{\"id\":14,\"name\":\"No date\"}]");
-                }
-                if (request.path.contains("/courses/2/assignments")) {
-                    return TestServer.Reply.of(403, "application/json", "{}");
-                }
-                return TestServer.Reply.json("[{\"id\":1,\"name\":\"Bio\"},{\"id\":2,\"name\":\"Locked\"}]");
+        TestServer server = new TestServer(request -> {
+            if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
+            if (request.path.contains("/courses/1/assignments")) {
+                return TestServer.Reply.json("["
+                    + "{\"id\":11,\"name\":\"Late lab\",\"due_at\":\"2026-09-02T06:59:00Z\","
+                    + "\"submission\":{\"workflow_state\":\"unsubmitted\",\"missing\":true}},"
+                    + "{\"id\":12,\"name\":\"Handed in\",\"due_at\":\"2026-09-03T06:59:00Z\","
+                    + "\"submission\":{\"workflow_state\":\"submitted\",\"submitted_at\":\"2026-09-01T00:00:00Z\"}},"
+                    + "{\"id\":13,\"name\":\"Personal date\",\"due_at\":\"2026-09-30T06:59:00Z\","
+                    + "\"submission\":{\"cached_due_date\":\"2026-09-04T06:59:00Z\"}},"
+                    + "{\"id\":14,\"name\":\"No date\"}]");
             }
+            if (request.path.contains("/courses/2/assignments")) {
+                return TestServer.Reply.of(403, "application/json", "{}");
+            }
+            return TestServer.Reply.json("[{\"id\":1,\"name\":\"Bio\"},{\"id\":2,\"name\":\"Locked\"}]");
         });
         try {
             Map<String, Object> result = Json.object(canvas(server).due(
@@ -524,20 +384,14 @@ public final class NetTests {
     private static void ids(Check check) {
         Map<String, Object> args = Json.object(Json.parse("{\"a\":12,\"b\":0,\"c\":\"x\",\"d\":1.5}"));
         check.same("an id passes through", "12", Canvas.id(args, "a"));
-        check.fails("zero is not an id", new Check.Body() {
-            public void run() {
-                Canvas.id(Json.object(Json.parse("{\"a\":0}")), "a");
-            }
+        check.fails("zero is not an id", () -> {
+            Canvas.id(Json.object(Json.parse("{\"a\":0}")), "a");
         });
-        check.fails("a word is not an id", new Check.Body() {
-            public void run() {
-                Canvas.id(Json.object(Json.parse("{\"a\":\"1\"}")), "a");
-            }
+        check.fails("a word is not an id", () -> {
+            Canvas.id(Json.object(Json.parse("{\"a\":\"1\"}")), "a");
         });
-        check.fails("a fraction is not an id", new Check.Body() {
-            public void run() {
-                Canvas.id(Json.object(Json.parse("{\"a\":1.5}")), "a");
-            }
+        check.fails("a fraction is not an id", () -> {
+            Canvas.id(Json.object(Json.parse("{\"a\":1.5}")), "a");
         });
     }
 }

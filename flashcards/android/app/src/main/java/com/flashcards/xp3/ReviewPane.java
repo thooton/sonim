@@ -10,7 +10,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.flashcards.xp3.algo.Scheduler;
+import com.flashcards.xp3.algo.ReviewSession;
 import com.flashcards.xp3.data.DeckCard;
 
 /**
@@ -30,7 +30,7 @@ public final class ReviewPane extends LinearLayout {
         void onRated();
     }
 
-    private final Scheduler scheduler;
+    private final ReviewSession session;
     private final Listener listener;
 
     private boolean revealed;
@@ -41,9 +41,9 @@ public final class ReviewPane extends LinearLayout {
     private final ScrollView cardScroll;
     private final LinearLayout chipsRow;
 
-    public ReviewPane(Context context, Scheduler scheduler, Listener listener) {
+    public ReviewPane(Context context, ReviewSession session, Listener listener) {
         super(context);
-        this.scheduler = scheduler;
+        this.session = session;
         this.listener = listener;
 
         setOrientation(VERTICAL);
@@ -112,7 +112,7 @@ public final class ReviewPane extends LinearLayout {
 
     /** Serves the first card (building the first group), or says the deck is empty. */
     private void showFirst() {
-        DeckCard card = scheduler.next();
+        DeckCard card = session.next();
         if (card == null) showIdle();
         else showCard(card);
     }
@@ -147,7 +147,7 @@ public final class ReviewPane extends LinearLayout {
         cardScroll.scrollTo(0, 0);
         keyView.setTextSize(16);
         keyView.setMaxLines(5);
-        keyView.setText(scheduler.hasCards() ? "Nothing to review yet." : "This deck is empty.");
+        keyView.setText(session.hasCards() ? "Nothing to review yet." : "This deck is empty.");
         keyView.setVisibility(View.VISIBLE);
         valueView.setVisibility(View.GONE);
         auxView.setVisibility(View.GONE);
@@ -156,7 +156,7 @@ public final class ReviewPane extends LinearLayout {
 
     private void reveal() {
         if (revealed) return;
-        DeckCard card = scheduler.current();
+        DeckCard card = session.current();
         if (card == null) return;
         revealed = true;
         showAnswer(card);
@@ -220,8 +220,8 @@ public final class ReviewPane extends LinearLayout {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (event.getRepeatCount() == 0
             && nextKey(keyCode)
-            && scheduler.current() != null
-            && scheduler.current().isNew()) {
+            && session.current() != null
+            && session.current().isNew()) {
             rateAndAdvance(1);
             return true;
         }
@@ -247,7 +247,7 @@ public final class ReviewPane extends LinearLayout {
             || keyCode == KeyEvent.KEYCODE_ENTER
             || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
             if (!revealed) {
-                if (scheduler.current() == null) showFirst();
+                if (session.current() == null) showFirst();
                 else reveal();
                 return true;
             }
@@ -257,7 +257,7 @@ public final class ReviewPane extends LinearLayout {
         // either the top-row codes or the numpad variants.
         if (gradeKey(keyCode)) {
             if (!revealed) return true; // keys do nothing before the answer is shown
-            if (scheduler.current() != null && scheduler.current().isNew()) return true;
+            if (session.current() != null && session.current().isNew()) return true;
             rateAndAdvance(gradeOf(keyCode));
             return true;
         }
@@ -288,9 +288,9 @@ public final class ReviewPane extends LinearLayout {
 
     private void rateAndAdvance(int rating) {
         long now = System.currentTimeMillis() / 1000L;
-        scheduler.rate(rating, now);
+        session.rate(rating, now);
         listener.onRated();
-        DeckCard next = scheduler.next();
+        DeckCard next = session.next();
         if (next == null) showIdle();
         else showCard(next);
     }

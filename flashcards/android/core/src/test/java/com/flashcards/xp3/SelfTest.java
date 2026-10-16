@@ -1,5 +1,7 @@
 package com.flashcards.xp3;
 
+import com.xp3.common.Check;
+
 /**
  * Everything in :core, checked on a desktop JVM.
  *

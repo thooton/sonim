@@ -3,7 +3,6 @@ package com.teslacharge.xp3.data;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;

@@ -1,7 +1,6 @@
 package com.books.xp3;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -14,6 +13,8 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import com.books.xp3.shelf.Shelf;
+import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Ui;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -27,7 +28,7 @@ import java.util.concurrent.ExecutorService;
  * Keys: Up and Down choose, OK opens, Menu marks a book read or unread or
  * looks for new books.
  */
-public final class LibraryActivity extends Activity implements ListPanel.Listener {
+public final class LibraryActivity extends BaseActivity implements ListPanel.Listener {
 
     private static final int ASK_STORAGE = 1;
     private static final String BOOKS = "Books";
@@ -42,8 +43,8 @@ public final class LibraryActivity extends Activity implements ListPanel.Listene
     /** The Menu key's sheet, over the bottom of the list while it is open. */
     private ListPanel menu;
     private boolean menuOpen;
-    private final ExecutorService scans = Shared.single("books-scan");
-    private final ExecutorService coverLoads = Shared.single("books-covers");
+    private final ExecutorService scans = Ui.worker("books-scan");
+    private final ExecutorService coverLoads = Ui.worker("books-covers");
     private boolean scanning;
     /** Set when a book is opened, so the list comes back with it on top. */
     private boolean returning;
@@ -111,19 +112,13 @@ public final class LibraryActivity extends Activity implements ListPanel.Listene
         if (scanning) return;
         scanning = true;
         final List<File> roots = roots();
-        scans.execute(new Runnable() {
-            @Override
-            public void run() {
-                final List<Shelf.Entry> found = shelf.scan(roots);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        scanning = false;
-                        if (isFinishing()) return;
-                        show(found);
-                    }
-                });
-            }
+        scans.execute(() -> {
+            final List<Shelf.Entry> found = shelf.scan(roots);
+            runOnUiThread(() -> {
+                scanning = false;
+                if (isFinishing()) return;
+                show(found);
+            });
         });
     }
 
@@ -168,18 +163,10 @@ public final class LibraryActivity extends Activity implements ListPanel.Listene
         if (wanted.isEmpty()) return;
         final int width = view.coverWidth;
         final int height = view.coverHeight;
-        coverLoads.execute(new Runnable() {
-            @Override
-            public void run() {
-                for (final Shelf.Entry book : wanted) {
-                    final Bitmap bitmap = covers.load(book, width, height);
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            view.setCover(book.path, bitmap);
-                        }
-                    });
-                }
+        coverLoads.execute(() -> {
+            for (final Shelf.Entry book : wanted) {
+                final Bitmap bitmap = covers.load(book, width, height);
+                runOnUiThread(() -> view.setCover(book.path, bitmap));
             }
         });
     }

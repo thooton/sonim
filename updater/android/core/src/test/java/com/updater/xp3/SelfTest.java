@@ -1,13 +1,13 @@
 package com.updater.xp3;
 
 import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.updater.xp3.core.Catalog;
 import com.updater.xp3.core.Releases;
 import com.updater.xp3.core.Status;
 import com.updater.xp3.core.Version;
 
+import com.xp3.common.Check;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -24,30 +24,10 @@ public final class SelfTest {
 
     public static void main(String[] args) throws Exception {
         final Check check = new Check();
-        check.run("Version", new Check.Body() {
-            @Override
-            public void run() {
-                versions(check);
-            }
-        });
-        check.run("Catalog", new Check.Body() {
-            @Override
-            public void run() {
-                catalog(check);
-            }
-        });
-        check.run("Status", new Check.Body() {
-            @Override
-            public void run() {
-                status(check);
-            }
-        });
-        check.run("Releases", new Check.Body() {
-            @Override
-            public void run() throws Exception {
-                releases(check);
-            }
-        });
+        check.run("Version", () -> versions(check));
+        check.run("Catalog", () -> catalog(check));
+        check.run("Status", () -> status(check));
+        check.run("Releases", () -> releases(check));
         if (!check.report()) System.exit(1);
     }
 
@@ -99,23 +79,20 @@ public final class SelfTest {
         final byte[] apk = new byte[300 * 1024];
         for (int i = 0; i < apk.length; i++) apk[i] = (byte) i;
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/", new HttpHandler() {
-            @Override
-            public void handle(HttpExchange exchange) throws IOException {
-                String path = exchange.getRequestURI().getPath();
-                if (path.equals("/latest/versions.txt")) {
-                    send(exchange, 200, "list = 1.0.1\nnew = 2.0.0\n".getBytes("UTF-8"));
-                } else if (path.equals("/latest/packages.txt")) {
-                    send(exchange, 200, "list = com.list.xp3\nnew = com.new.xp3\n".getBytes("UTF-8"));
-                } else if (path.equals("/latest/list.apk")) {
-                    // As GitHub does: the file itself is somewhere else.
-                    exchange.getResponseHeaders().set("Location", "/files/list.apk");
-                    send(exchange, 302, new byte[0]);
-                } else if (path.equals("/files/list.apk")) {
-                    send(exchange, 200, apk);
-                } else {
-                    send(exchange, 404, "Not Found".getBytes("UTF-8"));
-                }
+        server.createContext("/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            if (path.equals("/latest/versions.txt")) {
+                send(exchange, 200, "list = 1.0.1\nnew = 2.0.0\n".getBytes("UTF-8"));
+            } else if (path.equals("/latest/packages.txt")) {
+                send(exchange, 200, "list = com.list.xp3\nnew = com.new.xp3\n".getBytes("UTF-8"));
+            } else if (path.equals("/latest/list.apk")) {
+                // As GitHub does: the file itself is somewhere else.
+                exchange.getResponseHeaders().set("Location", "/files/list.apk");
+                send(exchange, 302, new byte[0]);
+            } else if (path.equals("/files/list.apk")) {
+                send(exchange, 200, apk);
+            } else {
+                send(exchange, 404, "Not Found".getBytes("UTF-8"));
             }
         });
         server.start();
@@ -130,23 +107,17 @@ public final class SelfTest {
 
             final File to = new File(dir, "list.apk");
             final long[] last = {-1, -1};
-            releases.download("list.apk", to, new Releases.Progress() {
-                @Override
-                public void update(long done, long total) {
-                    last[0] = done;
-                    last[1] = total;
-                }
+            releases.download("list.apk", to, (done, total) -> {
+                last[0] = done;
+                last[1] = total;
             });
             check.ok("downloaded through the redirect", java.util.Arrays.equals(apk, Files.readAllBytes(to.toPath())));
             check.same("progress reached the end", Long.valueOf(apk.length), Long.valueOf(last[0]));
             check.same("progress knew the total", Long.valueOf(apk.length), Long.valueOf(last[1]));
             check.ok("no part file left", !new File(dir, "list.apk.part").exists());
 
-            check.fails("missing file", "has no gone.apk", new Check.Body() {
-                @Override
-                public void run() throws Exception {
-                    releases.download("gone.apk", new File(to.getParentFile(), "gone.apk"), null);
-                }
+            check.fails("missing file", "has no gone.apk", () -> {
+                releases.download("gone.apk", new File(to.getParentFile(), "gone.apk"), null);
             });
             check.ok("failed download leaves nothing", !new File(dir, "gone.apk").exists()
                 && !new File(dir, "gone.apk.part").exists());

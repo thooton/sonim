@@ -1,6 +1,5 @@
 package com.books.xp3;
 
-import android.app.Activity;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.Gravity;
@@ -14,6 +13,8 @@ import com.books.xp3.book.Book;
 import com.books.xp3.book.Section;
 import com.books.xp3.book.TocEntry;
 import com.books.xp3.shelf.Shelf;
+import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Ui;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -37,7 +38,7 @@ import java.util.concurrent.ExecutorService;
  * kept with those either side of it, so turning into the next section is as
  * quick as turning a page within one.
  */
-public final class ReaderActivity extends Activity implements PageView.SizeListener, ListPanel.Listener {
+public final class ReaderActivity extends BaseActivity implements PageView.SizeListener, ListPanel.Listener {
 
     static final String EXTRA_PATH = "path";
 
@@ -88,13 +89,10 @@ public final class ReaderActivity extends Activity implements PageView.SizeListe
     /** A page turn is waiting for a layout; further turns wait for it. */
     private boolean waiting;
 
-    private final ExecutorService worker = Shared.single("books-layout");
+    private final ExecutorService worker = Ui.worker("books-layout");
     private final Handler handler = new Handler();
-    private final Runnable sleep = new Runnable() {
-        @Override
-        public void run() {
-            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        }
+    private final Runnable sleep = () -> {
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     };
 
     @Override
@@ -123,31 +121,25 @@ public final class ReaderActivity extends Activity implements PageView.SizeListe
             return;
         }
         final File file = new File(path);
-        worker.execute(new Runnable() {
-            @Override
-            public void run() {
-                Book loaded = null;
-                String problem = null;
-                try {
-                    loaded = Shelf.open(file);
-                } catch (Exception | OutOfMemoryError e) {
-                    problem = e.getMessage();
-                }
-                final Book result = loaded;
-                final String error = problem;
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (isFinishing()) return;
-                        if (result == null) {
-                            pageView.showMessage("This book can\u2019t be opened");
-                            if (error != null) toast(error);
-                            return;
-                        }
-                        opened(result);
-                    }
-                });
+        worker.execute(() -> {
+            Book loaded = null;
+            String problem = null;
+            try {
+                loaded = Shelf.open(file);
+            } catch (Exception | OutOfMemoryError e) {
+                problem = e.getMessage();
             }
+            final Book result = loaded;
+            final String error = problem;
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (result == null) {
+                    pageView.showMessage("This book can\u2019t be opened");
+                    if (error != null) flash(error);
+                    return;
+                }
+                opened(result);
+            });
         });
     }
 
@@ -224,19 +216,16 @@ public final class ReaderActivity extends Activity implements PageView.SizeListe
     private void goTo(final long target, final boolean last) {
         final int index = book.sectionAt(target);
         waiting = true;
-        laid(index, new Laid() {
-            @Override
-            public void ready(Pages pages) {
-                waiting = false;
-                sectionIndex = index;
-                current = pages;
-                Section section = pages.section;
-                if (last || target >= book.length) page = pages.count() - 1;
-                else page = pages.pageOf((int) Math.max(0, target - section.start));
-                showPage();
-                prefetch(index - 1);
-                prefetch(index + 1);
-            }
+        laid(index, pages -> {
+            waiting = false;
+            sectionIndex = index;
+            current = pages;
+            Section section = pages.section;
+            if (last || target >= book.length) page = pages.count() - 1;
+            else page = pages.pageOf((int) Math.max(0, target - section.start));
+            showPage();
+            prefetch(index - 1);
+            prefetch(index + 1);
         });
     }
 
@@ -272,21 +261,15 @@ public final class ReaderActivity extends Activity implements PageView.SizeListe
         final int margin = dp(Settings.MARGINS[settings.margins]);
         final int w = width;
         final int h = height;
-        worker.execute(new Runnable() {
-            @Override
-            public void run() {
-                final Pages pages = Pages.build(getAssets(), section, key, font, size, justify, spacing, margin, w, h);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        List<Laid> waiters = building.remove(job);
-                        if (gen != generation || isFinishing()) return;
-                        cache.put(Integer.valueOf(index), pages);
-                        trim(index);
-                        if (waiters != null) for (Laid laid : waiters) laid.ready(pages);
-                    }
-                });
-            }
+        worker.execute(() -> {
+            final Pages pages = Pages.build(getAssets(), section, key, font, size, justify, spacing, margin, w, h);
+            runOnUiThread(() -> {
+                List<Laid> waiting = building.remove(job);
+                if (gen != generation || isFinishing()) return;
+                cache.put(Integer.valueOf(index), pages);
+                trim(index);
+                if (waiting != null) for (Laid laid : waiting) laid.ready(pages);
+            });
         });
     }
 
@@ -435,7 +418,7 @@ public final class ReaderActivity extends Activity implements PageView.SizeListe
             case KeyEvent.KEYCODE_POUND:
                 if (event.getRepeatCount() == 0) {
                     setNightShift(!settings.nightShift);
-                    toast(settings.nightShift ? "Night Shift on" : "Night Shift off");
+                    flash(settings.nightShift ? "Night Shift on" : "Night Shift off");
                 }
                 return true;
             case KeyEvent.KEYCODE_STAR:
@@ -656,11 +639,7 @@ public final class ReaderActivity extends Activity implements PageView.SizeListe
      * Notices are drawn on the page rather than shown as toasts: a toast is
      * a window of the system's, which Night Shift's filter cannot reach.
      */
-    private void toast(String text) {
+    private void flash(String text) {
         pageView.flash(text);
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

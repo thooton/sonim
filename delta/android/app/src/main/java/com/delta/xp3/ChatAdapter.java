@@ -10,6 +10,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.delta.xp3.data.Entry;
+import com.xp3.common.ui.Markdown;
+import com.xp3.common.ui.SelectableAdapter;
 
 import java.util.ArrayList;
 import java.util.List;

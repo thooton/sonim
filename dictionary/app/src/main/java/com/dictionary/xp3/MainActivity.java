@@ -71,13 +71,10 @@ public class MainActivity extends Activity {
                 if (searching()) lookUp(s.toString());
             }
         });
-        search.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(TextView view, int actionId, KeyEvent event) {
-                if (actionId != EditorInfo.IME_ACTION_SEARCH) return false;
-                closeSearch();
-                return true;
-            }
+        search.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId != EditorInfo.IME_ACTION_SEARCH) return false;
+            closeSearch();
+            return true;
         });
 
         // Open where the reader left off.

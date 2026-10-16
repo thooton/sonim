@@ -1,7 +1,5 @@
 package com.updater.xp3;
 
-import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -17,28 +15,24 @@ import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.FrameLayout;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.updater.xp3.core.Catalog;
 import com.updater.xp3.core.Releases;
 import com.updater.xp3.core.Status;
 import com.updater.xp3.core.Version;
+import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Ui;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * Every app in the latest release, against the copy on this phone.
@@ -50,7 +44,7 @@ import java.util.concurrent.ThreadFactory;
  * into the app's own files, check the APK is the app it claims to be, hand it
  * to Installer, then the next.
  */
-public final class MainActivity extends Activity {
+public final class MainActivity extends BaseActivity {
 
     /** Menu item ids. The menu is rebuilt on every opening. */
     private static final int MENU_UPDATE = 1;
@@ -79,20 +73,9 @@ public final class MainActivity extends Activity {
     private static final long SETTLE_MS = 2500;
 
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final ExecutorService checks = pool("updater-check");
-    private final ExecutorService downloads = pool("updater-download");
+    private final ExecutorService checks = Ui.worker("updater-check");
+    private final ExecutorService downloads = Ui.worker("updater-download");
     private final Releases releases = new Releases();
-
-    private static ExecutorService pool(final String name) {
-        return Executors.newSingleThreadExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable runnable) {
-                Thread thread = new Thread(runnable, name);
-                thread.setDaemon(true);
-                return thread;
-            }
-        });
-    }
 
     // ------------------------------------------------------------------
     // State
@@ -145,12 +128,9 @@ public final class MainActivity extends Activity {
 
         // APKs a previous run left behind. Queued first on the download
         // thread, so it is done before any download starts.
-        downloads.execute(new Runnable() {
-            @Override
-            public void run() {
-                File[] stale = ApkProvider.folder(MainActivity.this).listFiles();
-                if (stale != null) for (File file : stale) file.delete();
-            }
+        downloads.execute(() -> {
+            File[] stale = ApkProvider.folder(MainActivity.this).listFiles();
+            if (stale != null) for (File file : stale) file.delete();
         });
         render();
         check();
@@ -172,11 +152,8 @@ public final class MainActivity extends Activity {
 
     /** Runs on the main thread, unless the activity has gone by then. */
     private void post(final Runnable runnable) {
-        main.post(new Runnable() {
-            @Override
-            public void run() {
-                if (!isDestroyed()) runnable.run();
-            }
+        main.post(() -> {
+            if (!isDestroyed()) runnable.run();
         });
     }
 
@@ -188,32 +165,23 @@ public final class MainActivity extends Activity {
         if (checking) return;
         checking = true;
         render();
-        checks.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    final List<Catalog.Entry> found = releases.catalog();
-                    post(new Runnable() {
-                        @Override
-                        public void run() {
-                            checking = false;
-                            checkError = null;
-                            catalog = found;
-                            render();
-                        }
-                    });
-                } catch (final IOException e) {
-                    post(new Runnable() {
-                        @Override
-                        public void run() {
-                            checking = false;
-                            checkError = message(e);
-                            // With a list already showing, keep it and say so.
-                            if (catalog != null) toast("Couldn't check: " + checkError);
-                            render();
-                        }
-                    });
-                }
+        checks.execute(() -> {
+            try {
+                final List<Catalog.Entry> found = releases.catalog();
+                post(() -> {
+                    checking = false;
+                    checkError = null;
+                    catalog = found;
+                    render();
+                });
+            } catch (final IOException e) {
+                post(() -> {
+                    checking = false;
+                    checkError = message(e);
+                    // With a list already showing, keep it and say so.
+                    if (catalog != null) toast("Couldn't check: " + checkError);
+                    render();
+                });
             }
         });
     }
@@ -232,12 +200,9 @@ public final class MainActivity extends Activity {
             Status status = Status.of(info != null, here, entry.version);
             rows.add(new AppAdapter.Row(entry, label, here, status, activity(entry)));
         }
-        Collections.sort(rows, new Comparator<AppAdapter.Row>() {
-            @Override
-            public int compare(AppAdapter.Row a, AppAdapter.Row b) {
-                int c = rank(a.status) - rank(b.status);
-                return c != 0 ? c : a.label.compareToIgnoreCase(b.label);
-            }
+        Collections.sort(rows, (a, b) -> {
+            int c = rank(a.status) - rank(b.status);
+            return c != 0 ? c : a.label.compareToIgnoreCase(b.label);
         });
         return rows;
     }
@@ -313,35 +278,21 @@ public final class MainActivity extends Activity {
         list.setItemsCanFocus(false);
         list.setFocusable(true);
         list.setFocusableInTouchMode(true);
-        list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                adapter.trackSelectedPosition(position);
-                selectedName = adapter.getItem(position).entry.name;
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+        Ui.onSelect(list, position -> {
+            adapter.trackSelectedPosition(position);
+            selectedName = adapter.getItem(position).entry.name;
         });
-        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                adapter.setSelectedPosition(position);
-                selectedName = adapter.getItem(position).entry.name;
-                showMenu();
-            }
+        list.setOnItemClickListener((parent, view, position, id) -> {
+            adapter.setSelectedPosition(position);
+            selectedName = adapter.getItem(position).entry.name;
+            showMenu();
         });
         // Sonim firmware reports OK as DPAD_CENTER or ENTER. Its release, or
         // holding it, opens the menu; arrows stay with ListView.
-        list.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View view, int keyCode, KeyEvent event) {
-                return isOk(keyCode) && okOpensMenu(event);
-            }
-        });
+        list.setOnKeyListener((view, keyCode, event) -> Ui.isOk(keyCode) && okOpensMenu(event));
         messageView = null;
         listView = list;
-        replaceContent(list);
+        Ui.fill(content, list);
     }
 
     /** Checking, the reason a check failed, or an empty release. */
@@ -360,25 +311,14 @@ public final class MainActivity extends Activity {
             // Focusable so keys land somewhere and the menu has an anchor.
             view.setFocusable(true);
             view.setFocusableInTouchMode(true);
-            view.setOnKeyListener(new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View v, int keyCode, KeyEvent event) {
-                    return isOk(keyCode) && okOpensMenu(event);
-                }
-            });
+            view.setOnKeyListener((v, keyCode, event) -> Ui.isOk(keyCode) && okOpensMenu(event));
             listView = null;
             adapter = null;
             messageView = view;
-            replaceContent(view);
+            Ui.fill(content, view);
         }
         messageView.setText(text);
         messageView.requestFocus();
-    }
-
-    private void replaceContent(View view) {
-        content.removeAllViews();
-        content.addView(view, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
     // ------------------------------------------------------------------
@@ -413,12 +353,6 @@ public final class MainActivity extends Activity {
             if (open) showMenu();
         }
         return true;
-    }
-
-    private static boolean isOk(int keyCode) {
-        return keyCode == KeyEvent.KEYCODE_DPAD_CENTER
-            || keyCode == KeyEvent.KEYCODE_ENTER
-            || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER;
     }
 
     /*
@@ -586,43 +520,28 @@ public final class MainActivity extends Activity {
         job = next;
         next.activity = "Downloading…";
         final File apk = ApkProvider.file(this, next.entry);
-        downloads.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    apk.getParentFile().mkdirs();
-                    releases.download(next.entry.apk(), apk, new Releases.Progress() {
-                        @Override
-                        public void update(long done, long total) {
-                            if (total <= 0) return;
-                            final int percent = (int) (done * 100 / total);
-                            if (percent == next.percent) return;
-                            next.percent = percent;
-                            post(new Runnable() {
-                                @Override
-                                public void run() {
-                                    if (job != next) return;
-                                    next.activity = "Downloading " + percent + "%";
-                                    render();
-                                }
-                            });
-                        }
+        downloads.execute(() -> {
+            try {
+                apk.getParentFile().mkdirs();
+                releases.download(next.entry.apk(), apk, (done, total) -> {
+                    if (total <= 0) return;
+                    final int percent = (int) (done * 100 / total);
+                    if (percent == next.percent) return;
+                    next.percent = percent;
+                    post(() -> {
+                        if (job != next) return;
+                        next.activity = "Downloading " + percent + "%";
+                        render();
                     });
-                    post(new Runnable() {
-                        @Override
-                        public void run() {
-                            downloaded(next, apk);
-                        }
-                    });
-                } catch (final IOException e) {
-                    post(new Runnable() {
-                        @Override
-                        public void run() {
-                            done(next);
-                            alert(failure(next), message(e));
-                        }
-                    });
-                }
+                });
+                post(() -> {
+                    downloaded(next, apk);
+                });
+            } catch (final IOException e) {
+                post(() -> {
+                    done(next);
+                    alert(failure(next), message(e));
+                });
             }
         });
     }
@@ -703,16 +622,13 @@ public final class MainActivity extends Activity {
             // No word: the system installer's Cancel, or Installer replacing
             // itself (Android stops it before it can answer). The phone's
             // copy says which, once Android has finished with it.
-            main.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    if (isDestroyed() || job != done) return;
-                    if (replaced(done)) {
-                        succeeded(done);
-                    } else {
-                        done(done);
-                        toast(failure(done));
-                    }
+            main.postDelayed(() -> {
+                if (isDestroyed() || job != done) return;
+                if (replaced(done)) {
+                    succeeded(done);
+                } else {
+                    done(done);
+                    toast(failure(done));
                 }
             }, SETTLE_MS);
         }
@@ -786,21 +702,5 @@ public final class MainActivity extends Activity {
 
     private static String message(IOException e) {
         return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-    }
-
-    private void alert(String title, String message) {
-        new AlertDialog.Builder(this)
-            .setTitle(title)
-            .setMessage(message)
-            .setPositiveButton("OK", null)
-            .show();
-    }
-
-    private void toast(String value) {
-        Toast.makeText(this, value, Toast.LENGTH_SHORT).show();
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

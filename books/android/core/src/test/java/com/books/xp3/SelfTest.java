@@ -2,6 +2,7 @@ package com.books.xp3;
 
 import com.books.xp3.book.BookTests;
 import com.books.xp3.shelf.ShelfTests;
+import com.xp3.common.Check;
 
 /**
  * Everything in :core, checked on a desktop JVM.

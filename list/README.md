@@ -5,9 +5,8 @@ A simple ordered checklist for the XP3's 240x320 screen, d-pad, and keypad. It h
 ## Build and test
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRelease
-adb install -r app/build/outputs/apk/release/app-release.apk
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :list:core:selfTest :list:app:assembleRelease
+adb install -r list/android/app/build/outputs/apk/release/app-release.apk
 ```
 
 ## Controls

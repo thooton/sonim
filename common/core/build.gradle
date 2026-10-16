@@ -1,0 +1,13 @@
+// Plain Java the apps share: the JSON codec, the HTTP client, safe file
+// writes, and (as test fixtures) the tests' Check and TestServer. Held to the
+// same rules as an app's :core (see gradle/core.gradle); the apps' own tests
+// exercise it.
+plugins {
+    id "java-library"
+    id "java-test-fixtures"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 8
+}

@@ -1,6 +1,6 @@
 package com.books.xp3.book;
 
-import com.books.xp3.Check;
+import com.xp3.common.Check;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -16,36 +16,11 @@ public final class BookTests {
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
     public static void run(final Check check) {
-        check.run("markup", new Check.Body() {
-            @Override
-            public void run() {
-                markup(check);
-            }
-        });
-        check.run("html", new Check.Body() {
-            @Override
-            public void run() {
-                html(check);
-            }
-        });
-        check.run("sections", new Check.Body() {
-            @Override
-            public void run() {
-                sections(check);
-            }
-        });
-        check.run("epub", new Check.Body() {
-            @Override
-            public void run() throws Exception {
-                epub(check);
-            }
-        });
-        check.run("plain text", new Check.Body() {
-            @Override
-            public void run() {
-                plainText(check);
-            }
-        });
+        check.run("markup", () -> markup(check));
+        check.run("html", () -> html(check));
+        check.run("sections", () -> sections(check));
+        check.run("epub", () -> epub(check));
+        check.run("plain text", () -> plainText(check));
     }
 
     private static void markup(Check check) {
@@ -263,12 +238,7 @@ public final class BookTests {
             FileOutputStream out = new FileOutputStream(junk);
             out.write("not a zip".getBytes(UTF8));
             out.close();
-            check.fails("not a zip", "Not an EPUB", new Check.Body() {
-                @Override
-                public void run() throws Exception {
-                    Epub.read(junk);
-                }
-            });
+            check.fails("not a zip", "Not an EPUB", () -> Epub.read(junk));
         } finally {
             File[] files = dir.listFiles();
             if (files != null) for (File f : files) f.delete();

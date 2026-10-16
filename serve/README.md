@@ -15,6 +15,5 @@ Serving runs in the background with a notification, which has a **Stop** button,
 ## Build
 
 ```bash
-cd android
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :core:selfTest :app:assembleRelease
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew :serve:core:selfTest :serve:app:assembleRelease
 ```

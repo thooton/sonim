@@ -2,34 +2,19 @@ plugins {
     id "com.android.application"
 }
 
-dependencies {
-    implementation project(":core")
-}
+apply from: rootProject.file("gradle/app.gradle")
 
 android {
     namespace "com.serve.xp3"
-    compileSdk 35
-    buildToolsVersion "35.0.1"
 
     defaultConfig {
         applicationId "com.serve.xp3"
-        minSdk 27
-        targetSdk 27
-        versionCode 1
-        versionName "1.0.0"
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-
-    // API 27 is the phone's own version; this app is never going to Play.
-    lint {
-        disable "ExpiredTargetSdkVersion"
+        versionCode 2
+        versionName "1.0.1"
     }
 }
 
-// Debug and release builds alike are signed with the shared key, which the
-// copies on the phone were signed with too (see that file).
-apply from: rootProject.file("../../signing/signing.gradle")
+dependencies {
+    implementation project(":serve:core")
+    implementation project(":common:ui")
+}

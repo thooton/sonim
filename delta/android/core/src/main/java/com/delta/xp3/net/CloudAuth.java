@@ -45,22 +45,12 @@ public final class CloudAuth {
 
     /** The tokens of the account `account`, from the command center. */
     public static CloudAuth of(final Center center, final String account) {
-        return new CloudAuth(new Source() {
-            @Override
-            public Grant fetch(String refused) throws IOException, InterruptedException {
-                return center.token(account, refused);
-            }
-        });
+        return new CloudAuth(refused -> center.token(account, refused));
     }
 
     /** Always the same token, which never expires. */
     public static CloudAuth fixed(final String token) {
-        return new CloudAuth(new Source() {
-            @Override
-            public Grant fetch(String refused) {
-                return new Grant(token, 0);
-            }
-        });
+        return new CloudAuth(refused -> new Grant(token, 0));
     }
 
     /** The bearer token, fetching a new one first if it is due to expire or was refused. */

@@ -1,9 +1,7 @@
 package com.canvas.xp3;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ClipboardManager;
-import android.content.DialogInterface;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -26,7 +24,6 @@ import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Dates;
@@ -34,6 +31,10 @@ import com.canvas.xp3.data.Section;
 import com.canvas.xp3.data.Sync;
 import com.canvas.xp3.data.Todos;
 import com.canvas.xp3.net.Config;
+import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Markdown;
+import com.xp3.common.ui.Tabs;
+import com.xp3.common.ui.Ui;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,8 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * Three lists, a detail page, a settings page, and the keys that move between
@@ -59,7 +58,7 @@ import java.util.concurrent.ThreadFactory;
  * behind Backend, runs on the work executor below, and comes back through the
  * main thread's handler.
  */
-public final class MainActivity extends Activity {
+public final class MainActivity extends BaseActivity {
 
     /**
      * The first three line up with Assignment's own state constants on
@@ -70,7 +69,6 @@ public final class MainActivity extends Activity {
     private static final int ASSIGNED = 0;
     private static final int MISSING = 1;
     private static final int DONE = 2;
-    private static final int TABS = 3;
 
     private static final String REFRESH = "Refresh from Canvas";
     private static final String SETTINGS = "Settings";
@@ -95,7 +93,7 @@ public final class MainActivity extends Activity {
     private Backend backend;
     private FrameLayout content;
     private View tabBar;
-    private Button[] tabs;
+    private Tabs tabs;
     private int currentTab = ASSIGNED;
 
     /**
@@ -107,18 +105,7 @@ public final class MainActivity extends Activity {
      * on "Fetching the instructions" for the whole of that sync for no reason
      * other than the shape of the queue.
      */
-    private final ExecutorService work = pool("canvas-work", 2);
-
-    private static ExecutorService pool(final String name, int threads) {
-        return Executors.newFixedThreadPool(threads, new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable runnable) {
-                Thread thread = new Thread(runnable, name);
-                thread.setDaemon(true);
-                return thread;
-            }
-        });
-    }
+    private final ExecutorService work = Ui.workers("canvas-work", 2);
 
     /** What the last sync produced, from the network or read back off disk. */
     private Sync.Result snapshot;
@@ -178,22 +165,7 @@ public final class MainActivity extends Activity {
 
         content = findViewById(R.id.content);
         tabBar = findViewById(R.id.tab_bar);
-        tabs = new Button[] {
-            findViewById(R.id.tab_assigned),
-            findViewById(R.id.tab_missing),
-            findViewById(R.id.tab_done),
-        };
-        for (int i = 0; i < tabs.length; i++) {
-            final int tab = i;
-            tabs[i].setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        showTab(tab, true);
-                    }
-                }
-            );
-        }
+        tabs = new Tabs(this, tab -> showTab(tab, true), R.id.tab_assigned, R.id.tab_missing, R.id.tab_done);
         showTab(ASSIGNED, false);
         refreshIfStale();
     }
@@ -224,7 +196,7 @@ public final class MainActivity extends Activity {
         openWork = null;
         settingsOpen = false;
         tabBar.setVisibility(View.VISIBLE);
-        for (int i = 0; i < tabs.length; i++) tabs[i].setSelected(i == tab);
+        tabs.mark(tab);
         renderList(tab, focusContent, null);
     }
 
@@ -254,8 +226,8 @@ public final class MainActivity extends Activity {
         if (sections.isEmpty() || shouldShowWholeTabEmpty(state)) {
             listAdapter = null;
             listView = null;
-            root.addView(emptyMessage(emptyText(state)), weighted());
-            replaceContent(root);
+            root.addView(emptyMessage(emptyText(state)), Ui.weighted());
+            Ui.fill(content, root);
             return;
         }
 
@@ -263,9 +235,9 @@ public final class MainActivity extends Activity {
         final AssignmentAdapter adapter = new AssignmentAdapter(this);
         adapter.replace(rows(state, sections), state, stamp);
         ListView list = listView(adapter);
-        root.addView(list, weighted());
+        root.addView(list, Ui.weighted());
         wireList(list, adapter, state);
-        replaceContent(root);
+        Ui.fill(content, root);
         listAdapter = adapter;
         listView = list;
 
@@ -377,32 +349,24 @@ public final class MainActivity extends Activity {
         syncError = null;
         redrawIfListing();
         work.execute(
-            new Runnable() {
-                @Override
-                public void run() {
-                    Sync.Result fetched = null;
-                    String failure = null;
-                    try {
-                        fetched = backend.refresh();
-                    } catch (InterruptedException stopping) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    } catch (java.io.IOException e) {
-                        failure = reason(e);
-                    } catch (RuntimeException e) {
-                        failure = "Canvas sent something this app could not read.";
-                    }
-                    final Sync.Result result = fetched;
-                    final String problem = failure;
-                    main.post(
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                synced(result, problem, announce);
-                            }
-                        }
-                    );
+            () -> {
+                Sync.Result fetched = null;
+                String failure = null;
+                try {
+                    fetched = backend.refresh();
+                } catch (InterruptedException stopping) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (java.io.IOException e) {
+                    failure = reason(e);
+                } catch (RuntimeException e) {
+                    failure = "Canvas sent something this app could not read.";
                 }
+                final Sync.Result result = fetched;
+                final String problem = failure;
+                main.post(
+                    () -> synced(result, problem, announce)
+                );
             }
         );
     }
@@ -455,12 +419,7 @@ public final class MainActivity extends Activity {
         final List<Assignment> all = new ArrayList<>(todos.all());
         final Sync.Result context = snapshot;
         work.execute(
-            new Runnable() {
-                @Override
-                public void run() {
-                    backend.saveWork(all, context);
-                }
-            }
+            () -> backend.saveWork(all, context)
         );
     }
 
@@ -569,73 +528,42 @@ public final class MainActivity extends Activity {
         final int state
     ) {
         list.setOnItemClickListener(
-            new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(
-                    AdapterView<?> parent,
-                    View view,
-                    int position,
-                    long id
-                ) {
-                    activate(adapter, state, position);
-                }
-            }
+            (parent, view, position, id) -> activate(adapter, state, position)
         );
         list.setFocusable(true);
         list.setFocusableInTouchMode(true);
         list.setOnFocusChangeListener(
-            new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View view, boolean hasFocus) {
-                    if (
-                        hasFocus &&
-                        adapter.getCount() > 0 &&
-                        adapter.getSelectedPosition() == AdapterView.INVALID_POSITION
-                    ) {
-                        int start = firstWork(adapter);
-                        adapter.setSelectedPosition(start);
-                        ((ListView) view).setSelection(start);
-                    }
-                }
-            }
-        );
-        list.setOnItemSelectedListener(
-            new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(
-                    AdapterView<?> parent,
-                    View view,
-                    int position,
-                    long id
+            (view, hasFocus) -> {
+                if (
+                    hasFocus &&
+                    adapter.getCount() > 0 &&
+                    adapter.getSelectedPosition() == AdapterView.INVALID_POSITION
                 ) {
-                    adapter.trackSelectedPosition(position);
+                    int start = firstWork(adapter);
+                    adapter.setSelectedPosition(start);
+                    ((ListView) view).setSelection(start);
                 }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
             }
         );
+        Ui.onSelect(list, position -> adapter.trackSelectedPosition(position));
         // Sonim firmware variants report the physical OK key as either
         // DPAD_CENTER or ENTER. Handle activation only; arrows stay with
         // ListView's native selection and scrolling implementation.
         list.setOnKeyListener(
-            new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View view, int keyCode, KeyEvent event) {
-                    if (
-                        event.getAction() != KeyEvent.ACTION_UP ||
-                        (keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
-                            keyCode != KeyEvent.KEYCODE_ENTER &&
-                            keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER)
-                    ) return false;
+            (view, keyCode, event) -> {
+                if (
+                    event.getAction() != KeyEvent.ACTION_UP ||
+                    (keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
+                        keyCode != KeyEvent.KEYCODE_ENTER &&
+                        keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER)
+                ) return false;
 
-                    int position = adapter.getSelectedPosition();
-                    if (position >= 0 && position < adapter.getCount()) {
-                        activate(adapter, state, position);
-                        return true;
-                    }
-                    return false;
+                int position = adapter.getSelectedPosition();
+                if (position >= 0 && position < adapter.getCount()) {
+                    activate(adapter, state, position);
+                    return true;
                 }
+                return false;
             }
         );
     }
@@ -703,40 +631,34 @@ public final class MainActivity extends Activity {
         renderDetail();
         if (!detailLoading) return;
         work.execute(
-            new Runnable() {
-                @Override
-                public void run() {
-                    String failure = null;
-                    try {
-                        backend.details(item);
-                    } catch (InterruptedException stopping) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    } catch (java.io.IOException e) {
-                        failure = reason(e);
-                    } catch (RuntimeException e) {
-                        failure = "Canvas sent instructions this app could not read.";
-                    }
-                    final String problem = failure;
-                    main.post(
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                if (isFinishing()) return;
-                                detailLoading = false;
-                                detailError = problem;
-                                // Written down so the page reads again with no
-                                // signal, from the list as it stands now rather
-                                // than as it stood when the fetch started.
-                                if (problem == null) saveWork();
-                                // Redrawn only if it is still the thing on
-                                // screen: the text is kept either way, so
-                                // backing out and opening it again is instant.
-                                if (openWork == item) renderDetail();
-                            }
-                        }
-                    );
+            () -> {
+                String failure = null;
+                try {
+                    backend.details(item);
+                } catch (InterruptedException stopping) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (java.io.IOException e) {
+                    failure = reason(e);
+                } catch (RuntimeException e) {
+                    failure = "Canvas sent instructions this app could not read.";
                 }
+                final String problem = failure;
+                main.post(
+                    () -> {
+                        if (isFinishing()) return;
+                        detailLoading = false;
+                        detailError = problem;
+                        // Written down so the page reads again with no
+                        // signal, from the list as it stands now rather
+                        // than as it stood when the fetch started.
+                        if (problem == null) saveWork();
+                        // Redrawn only if it is still the thing on
+                        // screen: the text is kept either way, so
+                        // backing out and opening it again is instant.
+                        if (openWork == item) renderDetail();
+                    }
+                );
             }
         );
     }
@@ -819,7 +741,7 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         );
-        replaceContent(scroll);
+        Ui.fill(content, scroll);
         scroll.requestFocus();
     }
 
@@ -869,50 +791,12 @@ public final class MainActivity extends Activity {
         // and right sliding to another tab underneath it would be navigation
         // by accident. Neither does a text field, where the same keys are how
         // you move through what you have typed.
-        if (
-            event.getAction() == KeyEvent.ACTION_DOWN &&
-            event.getRepeatCount() == 0 &&
-            openWork == null &&
-            !settingsOpen &&
-            !cursorOwns(event.getKeyCode())
-        ) {
-            if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_LEFT) {
-                showTab((currentTab + TABS - 1) % TABS, true);
-                return true;
-            }
-            if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                showTab((currentTab + 1) % TABS, true);
-                return true;
-            }
+        int next = openWork != null || settingsOpen ? -1 : tabs.step(event, getCurrentFocus(), currentTab);
+        if (next >= 0) {
+            showTab(next, true);
+            return true;
         }
         return super.dispatchKeyEvent(event);
-    }
-
-    /**
-     * Whether left or right belongs to a text cursor rather than to the tabs.
-     *
-     * Inside typed text it belongs to the cursor. At either end of it, it goes
-     * back to being a tab key: pressing right when the cursor is already as far right
-     * as it goes cannot mean "further right", so it can safely mean the next
-     * tab. Without that, a box with something in it is a room with no door,
-     * because the only way out would be to press up first and nothing on the
-     * screen says so.
-     *
-     * A selection counts as inside the text. So does an empty field in
-     * neither direction, since there is no cursor in it worth moving.
-     */
-    private boolean cursorOwns(int keyCode) {
-        View focus = getCurrentFocus();
-        if (!(focus instanceof EditText)) return false;
-        EditText field = (EditText) focus;
-        int length = field.getText().length();
-        if (length == 0) return false;
-        int start = field.getSelectionStart();
-        int end = field.getSelectionEnd();
-        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-            return !(start == 0 && end == 0);
-        }
-        return !(start == length && end == length);
     }
 
     @Override
@@ -973,12 +857,7 @@ public final class MainActivity extends Activity {
             .setTitle("Menu")
             .setItems(
                 labels,
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        chose(labels[which]);
-                    }
-                }
+                (dialog, which) -> chose(labels[which])
             )
             .show();
     }
@@ -1070,9 +949,9 @@ public final class MainActivity extends Activity {
         root.addView(heading("Settings"));
         root.addView(subheading(backend.canvasReady() ? "Work is set up" : "Not set up yet"));
         root.addView(divider());
-        root.addView(list, weighted());
+        root.addView(list, Ui.weighted());
         wireSettings(list, adapter);
-        replaceContent(root);
+        Ui.fill(content, root);
         settingsAdapter = adapter;
 
         int start = select >= 0 && select < adapter.getCount() ? select : 0;
@@ -1084,45 +963,22 @@ public final class MainActivity extends Activity {
     private void wireSettings(final ListView list, final SettingsAdapter adapter) {
         list.setFocusable(true);
         list.setFocusableInTouchMode(true);
-        list.setOnItemSelectedListener(
-            new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(
-                    AdapterView<?> parent,
-                    View view,
-                    int position,
-                    long id
-                ) {
-                    adapter.trackSelectedPosition(position);
-                }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
-            }
-        );
+        Ui.onSelect(list, position -> adapter.trackSelectedPosition(position));
         list.setOnItemClickListener(
-            new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                    editSetting(adapter.getItem(position), position);
-                }
-            }
+            (parent, view, position, id) -> editSetting(adapter.getItem(position), position)
         );
         list.setOnKeyListener(
-            new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View view, int keyCode, KeyEvent event) {
-                    if (
-                        event.getAction() != KeyEvent.ACTION_UP ||
-                        (keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
-                            keyCode != KeyEvent.KEYCODE_ENTER &&
-                            keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER)
-                    ) return false;
-                    int position = adapter.getSelectedPosition();
-                    if (position < 0 || position >= adapter.getCount()) return false;
-                    editSetting(adapter.getItem(position), position);
-                    return true;
-                }
+            (view, keyCode, event) -> {
+                if (
+                    event.getAction() != KeyEvent.ACTION_UP ||
+                    (keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
+                        keyCode != KeyEvent.KEYCODE_ENTER &&
+                        keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER)
+                ) return false;
+                int position = adapter.getSelectedPosition();
+                if (position < 0 || position >= adapter.getCount()) return false;
+                editSetting(adapter.getItem(position), position);
+                return true;
             }
         );
     }
@@ -1177,12 +1033,7 @@ public final class MainActivity extends Activity {
             .setView(holder)
             .setPositiveButton(
                 "Save",
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        applySetting(row.field, field.getText().toString(), position);
-                    }
-                }
+                (dialog, which) -> applySetting(row.field, field.getText().toString(), position)
             )
             .setNegativeButton("Cancel", null);
         if (clipboardHasText()) builder.setNeutralButton("Paste", null);
@@ -1210,33 +1061,27 @@ public final class MainActivity extends Activity {
          */
         field.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_ENTER_ACTION);
         field.setOnKeyListener(
-            new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View view, int keyCode, KeyEvent event) {
-                    if (
-                        keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
-                        keyCode != KeyEvent.KEYCODE_ENTER &&
-                        keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER
-                    ) return false;
-                    if (event.getAction() == KeyEvent.ACTION_UP) {
-                        dialog.dismiss();
-                        applySetting(row.field, field.getText().toString(), position);
-                    }
-                    return true;
+            (view, keyCode, event) -> {
+                if (
+                    keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
+                    keyCode != KeyEvent.KEYCODE_ENTER &&
+                    keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER
+                ) return false;
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    dialog.dismiss();
+                    applySetting(row.field, field.getText().toString(), position);
                 }
+                return true;
             }
         );
         field.setOnEditorActionListener(
-            new TextView.OnEditorActionListener() {
-                @Override
-                public boolean onEditorAction(TextView view, int actionId, KeyEvent event) {
-                    if (actionId != EditorInfo.IME_ACTION_DONE && actionId != EditorInfo.IME_ACTION_GO) {
-                        return false;
-                    }
-                    dialog.dismiss();
-                    applySetting(row.field, view.getText().toString(), position);
-                    return true;
+            (view, actionId, event) -> {
+                if (actionId != EditorInfo.IME_ACTION_DONE && actionId != EditorInfo.IME_ACTION_GO) {
+                    return false;
                 }
+                dialog.dismiss();
+                applySetting(row.field, view.getText().toString(), position);
+                return true;
             }
         );
 
@@ -1245,14 +1090,11 @@ public final class MainActivity extends Activity {
             // Wired after show() so that pasting does not also dismiss the
             // dialog, which is what a plain button listener would do.
             paste.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        CharSequence text = clipboardText();
-                        if (text == null) return;
-                        field.setText(text.toString().trim());
-                        field.setSelection(field.getText().length());
-                    }
+                view -> {
+                    CharSequence text = clipboardText();
+                    if (text == null) return;
+                    field.setText(text.toString().trim());
+                    field.setSelection(field.getText().length());
                 }
             );
         }
@@ -1263,7 +1105,7 @@ public final class MainActivity extends Activity {
         try {
             next = backend.config().with(field, value);
         } catch (IllegalArgumentException e) {
-            alert("Not saved", e.getMessage());
+            alert("Not saved", e.getMessage() == null ? "That value was not accepted." : e.getMessage());
             return;
         }
         try {
@@ -1277,12 +1119,17 @@ public final class MainActivity extends Activity {
         // it row by row.
         if (Config.CANVAS_URL.equals(field) || Config.COOKIE_URL.equals(field)
             || Config.COOKIE_TOKEN.equals(field)) {
-            snapshot = null;
-            syncError = null;
-            todos.replace(new ArrayList<Assignment>());
-            defaulted.clear();
+            forgetWork();
         }
         renderSettings(position);
+    }
+
+    /** Drops the work on screen, which belonged to the setup just replaced. */
+    private void forgetWork() {
+        snapshot = null;
+        syncError = null;
+        todos.replace(new ArrayList<Assignment>());
+        defaulted.clear();
     }
 
     /** Puts the build's own baked-in setup back. */
@@ -1296,10 +1143,7 @@ public final class MainActivity extends Activity {
             alert("Not restored", "This build's bundled setup could not be read.");
             return;
         }
-        snapshot = null;
-        syncError = null;
-        todos.replace(new ArrayList<Assignment>());
-        defaulted.clear();
+        forgetWork();
         toast("Bundled setup restored");
         renderSettings(0);
     }
@@ -1313,57 +1157,14 @@ public final class MainActivity extends Activity {
             )
             .setPositiveButton(
                 SIGN_OUT,
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        backend.signOut();
-                        snapshot = null;
-                        syncError = null;
-                        todos.replace(new ArrayList<Assignment>());
-                        defaulted.clear();
-                        renderSettings(0);
-                    }
+                (dialog, which) -> {
+                    backend.signOut();
+                    forgetWork();
+                    renderSettings(0);
                 }
             )
             .setNegativeButton("Cancel", null)
             .show();
-    }
-
-    private void alert(String title, String message) {
-        new AlertDialog.Builder(this)
-            .setTitle(title)
-            .setMessage(message == null ? "That value was not accepted." : message)
-            .setPositiveButton("OK", null)
-            .show();
-    }
-
-    // ------------------------------------------------------------------
-    // View helpers
-    // ------------------------------------------------------------------
-
-    private void replaceContent(View view) {
-        content.removeAllViews();
-        content.addView(
-            view,
-            new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        );
-    }
-
-    private LinearLayout vertical() {
-        LinearLayout view = new LinearLayout(this);
-        view.setOrientation(LinearLayout.VERTICAL);
-        return view;
-    }
-
-    private LinearLayout.LayoutParams weighted() {
-        return new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            0,
-            1
-        );
     }
 
     private ListView listView(ListAdapter adapter) {
@@ -1439,15 +1240,6 @@ public final class MainActivity extends Activity {
         return row;
     }
 
-    private TextView text(String value, int sp, int color) {
-        TextView view = new TextView(this);
-        view.setText(value);
-        view.setTextSize(sp);
-        view.setTextColor(color);
-        view.setIncludeFontPadding(false);
-        return view;
-    }
-
     private View divider() {
         View line = new View(this);
         line.setBackgroundColor(color(R.color.divider));
@@ -1458,17 +1250,5 @@ public final class MainActivity extends Activity {
             )
         );
         return line;
-    }
-
-    private void toast(String value) {
-        Toast.makeText(this, value, Toast.LENGTH_SHORT).show();
-    }
-
-    private int color(int resId) {
-        return getResources().getColor(resId);
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

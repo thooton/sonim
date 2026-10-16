@@ -8,6 +8,7 @@ import android.widget.TextView;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Dates;
+import com.xp3.common.ui.SelectableAdapter;
 
 import java.util.ArrayList;
 import java.util.List;
