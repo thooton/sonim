@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The open tab: a 3dp underline with rounded top corners, 12dp short of
+     each side of the tab so it reads as a mark under the word rather than as
+     a rule across the bar. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <layer-list>
+            <item android:gravity="bottom|fill_horizontal" android:height="@dimen/tab_underline" android:left="12dp" android:right="12dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/on_primary" />
+                    <corners android:topLeftRadius="2dp" android:topRightRadius="2dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item><color android:color="@android:color/transparent" /></item>
+</selector>

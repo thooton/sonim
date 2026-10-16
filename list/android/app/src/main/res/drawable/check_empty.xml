@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- An open task: an empty square, quiet enough that a long list of them
+<!-- An open task: an empty ring, quiet enough that a long list of them
      reads as text with a margin rather than as a form. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="18dp" android:height="18dp" android:viewportWidth="18" android:viewportHeight="18">
-    <path android:strokeColor="@color/check_box" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M2.75,2.75h12.5v12.5h-12.5z" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="16dp" android:height="16dp" android:viewportWidth="16" android:viewportHeight="16">
+    <path android:strokeColor="@color/check_box" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M8,0.75a7.25,7.25 0,1 1,0 14.5a7.25,7.25 0,1 1,0 -14.5z" />
 </vector>

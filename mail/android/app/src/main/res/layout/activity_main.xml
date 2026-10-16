@@ -15,35 +15,30 @@
         android:orientation="horizontal"
         android:paddingLeft="@dimen/pad_h"
         android:paddingRight="@dimen/pad_h">
-        <TextView android:id="@+id/title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:singleLine="true" android:text="@string/app_name" android:textColor="@color/on_primary" android:textSize="@dimen/text_title" android:textStyle="bold" />
-        <TextView android:id="@+id/count" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingLeft="6dp" android:textColor="@color/on_primary_dim" android:textSize="@dimen/text_count" />
+        <TextView android:id="@+id/title" style="@style/FamilyTitle" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/app_name" />
+        <TextView android:id="@+id/count" style="@style/FamilyTitleMeta" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingLeft="6dp" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingBottom="4dp"
+        android:includeFontPadding="false"
+        android:paddingBottom="6dp"
         android:paddingLeft="@dimen/pad_h"
         android:paddingRight="@dimen/pad_h"
-        android:paddingTop="4dp"
-        android:textColor="@color/text"
+        android:paddingTop="6dp"
+        android:textColor="@color/text_muted"
         android:textSize="@dimen/text_status"
         android:visibility="gone" />
 
-    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" />
-
-    <!-- The conversations. The highlight is drawn by the adapter. -->
+    <!-- The conversations. The focus card is drawn by the adapter. -->
     <ListView
         android:id="@+id/list"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="@color/row"
-        android:divider="@color/divider"
-        android:dividerHeight="1dp"
-        android:focusable="false"
-        android:scrollbarStyle="outsideOverlay" />
+        android:focusable="false" />
 
     <!-- One conversation, in place of the list. -->
     <ScrollView
@@ -60,31 +55,28 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:focusable="false"
-            android:lineSpacingExtra="1dp"
             android:paddingBottom="8dp"
             android:paddingLeft="@dimen/pad_h"
             android:paddingRight="@dimen/pad_h"
-            android:paddingTop="6dp"
+            android:paddingTop="9dp"
+            android:lineSpacingExtra="2dp"
             android:textColor="@color/text"
             android:textIsSelectable="false"
             android:textSize="@dimen/text_detail" />
     </ScrollView>
 
     <!-- Writing: whom to, whom to copy (shown when asked for), the subject,
-         then the message filling the rest. -->
+         then the message filling the rest. Each line is a row with a
+         hairline under it rather than a box. -->
     <LinearLayout
         android:id="@+id/compose"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:paddingLeft="6dp"
-        android:paddingRight="6dp"
-        android:paddingTop="5dp"
-        android:paddingBottom="5dp"
         android:visibility="gone">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-            <TextView android:layout_width="@dimen/label_width" android:layout_height="wrap_content" android:text="@string/label_to" android:textColor="@color/text_muted" android:textSize="@dimen/text_label" />
+        <LinearLayout style="@style/FieldRow">
+            <TextView style="@style/FieldLabel" android:text="@string/label_to" />
             <EditText
                 android:id="@+id/to"
                 style="@style/Field"
@@ -92,16 +84,16 @@
                 android:imeOptions="actionNext|flagNoExtractUi"
                 android:inputType="textEmailAddress" />
         </LinearLayout>
-        <LinearLayout android:id="@+id/cc_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
-            <TextView android:layout_width="@dimen/label_width" android:layout_height="wrap_content" android:text="@string/label_cc" android:textColor="@color/text_muted" android:textSize="@dimen/text_label" />
+        <LinearLayout android:id="@+id/cc_row" style="@style/FieldRow" android:visibility="gone">
+            <TextView style="@style/FieldLabel" android:text="@string/label_cc" />
             <EditText
                 android:id="@+id/cc"
                 style="@style/Field"
                 android:imeOptions="actionNext|flagNoExtractUi"
                 android:inputType="textEmailAddress" />
         </LinearLayout>
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:gravity="center_vertical" android:orientation="horizontal">
-            <TextView android:layout_width="@dimen/label_width" android:layout_height="wrap_content" android:text="@string/label_subject" android:textColor="@color/text_muted" android:textSize="@dimen/text_label" />
+        <LinearLayout style="@style/FieldRow">
+            <TextView style="@style/FieldLabel" android:text="@string/label_subject" />
             <EditText
                 android:id="@+id/subject"
                 style="@style/Field"
@@ -113,16 +105,19 @@
             android:id="@+id/body"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginTop="4dp"
             android:layout_weight="1"
-            android:background="@drawable/edittext_border"
+            android:background="@null"
             android:gravity="top|start"
             android:hint="@string/hint_body"
             android:imeOptions="flagNoExtractUi|flagNoEnterAction"
             android:inputType="textMultiLine|textCapSentences|textAutoCorrect"
-            android:padding="7dp"
+            android:lineSpacingExtra="2dp"
+            android:paddingBottom="8dp"
+            android:paddingLeft="@dimen/pad_h"
+            android:paddingRight="@dimen/pad_h"
+            android:paddingTop="8dp"
             android:scrollbars="vertical"
-            android:textColor="@color/input_text"
+            android:textColor="@color/text"
             android:textColorHint="@color/input_hint"
             android:textSize="@dimen/text_input" />
     </LinearLayout>

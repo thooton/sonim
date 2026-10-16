@@ -1,21 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- List's greys, with a slate band across the top. The one other colour
-         is for a row that wants something done: an update or an install. -->
-    <color name="primary">#33475B</color>
-    <color name="primary_dark">#22313F</color>
+    <!-- One slate blue in the family's four tones (DESIGN.md): the band near
+         black, the accent for focus, the version an update moves to and the
+         Update pill, a pale wash behind the focused row, and greys tinted to
+         match. The status bar is the band's own colour. -->
+    <color name="primary">#1B2633</color>
+    <color name="primary_dark">#1B2633</color>
     <color name="on_primary">#FFFFFF</color>
-    <color name="on_primary_dim">#B4C0CC</color>
+    <color name="on_primary_dim">#A8B6C6</color>
 
-    <color name="page">#FAFAFA</color>
+    <color name="page">#FFFFFF</color>
     <color name="row">#FFFFFF</color>
-    <color name="divider">#DCDCDC</color>
+    <color name="divider">#E2E8EE</color>
+    <color name="field_fill">#F0F3F6</color>
 
-    <color name="focus_fill">#E8E8E8</color>
-    <color name="focus_rule">#555555</color>
-    <color name="press_fill">#D4D4D4</color>
+    <color name="focus_fill">#EAF1F8</color>
+    <color name="focus_rule">#2B5E92</color>
+    <color name="press_fill">#D3E1EF</color>
 
-    <color name="text">#1A1A1A</color>
-    <color name="text_muted">#6E6E6E</color>
-    <color name="wanted">#1D5C96</color>
+    <color name="text">#1B1B1D</color>
+    <color name="text_muted">#616A75</color>
+    <!-- A row that wants something done: an update or an install. -->
+    <color name="wanted">#2B5E92</color>
 </resources>

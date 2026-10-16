@@ -2,8 +2,6 @@ package com.canvas.xp3;
 
 import android.app.AlertDialog;
 import android.content.ClipboardManager;
-import android.graphics.Typeface;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -32,6 +30,7 @@ import com.canvas.xp3.data.Sync;
 import com.canvas.xp3.data.Todos;
 import com.canvas.xp3.net.Config;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Family;
 import com.xp3.common.ui.Markdown;
 import com.xp3.common.ui.Tabs;
 import com.xp3.common.ui.Ui;
@@ -292,9 +291,9 @@ public final class MainActivity extends BaseActivity {
     private View statusStrip() {
         String message = statusText();
         if (message == null) return null;
-        TextView view = text(message, 10, color(R.color.text_muted));
+        TextView view = text(message, 11, color(R.color.text_muted));
         view.setBackgroundColor(color(R.color.section_fill));
-        view.setPadding(dp(10), dp(3), dp(10), dp(3));
+        view.setPadding(dp(10), dp(4), dp(10), dp(4));
         view.setSingleLine(true);
         view.setEllipsize(TextUtils.TruncateAt.END);
         return view;
@@ -675,13 +674,17 @@ public final class MainActivity extends BaseActivity {
         // read on a keypad without tabbing through it.
         scroll.setFocusable(true);
         scroll.setFocusableInTouchMode(true);
+        scroll.setBackgroundColor(color(R.color.grouped_page));
         LinearLayout root = vertical();
+        root.setPadding(0, 0, 0, dp(8));
 
         root.addView(heading(item.title));
         root.addView(subheading(item.course));
-        root.addView(divider());
 
-        root.addView(
+        // The facts on one card, the instructions on another.
+        LinearLayout facts = card();
+        root.addView(facts);
+        facts.addView(
             metric(
                 "Due",
                 item.due == null
@@ -690,7 +693,8 @@ public final class MainActivity extends BaseActivity {
                 state == MISSING ? color(R.color.overdue) : color(R.color.text)
             )
         );
-        root.addView(
+        facts.addView(divider());
+        facts.addView(
             metric(
                 "Status",
                 statusLabel(item, stamp),
@@ -700,7 +704,8 @@ public final class MainActivity extends BaseActivity {
             )
         );
         if (item.done && item.turnedIn != null) {
-            root.addView(
+            facts.addView(divider());
+            facts.addView(
                 metric(
                     "Turned in",
                     Dates.dayAndTime(item.turnedIn.longValue(), stamp),
@@ -716,14 +721,17 @@ public final class MainActivity extends BaseActivity {
                 ? Assignment.number(item.score.doubleValue())
                     + (item.points > 0 ? " of " + Assignment.number(item.points) : "")
                 : Assignment.number(item.points) + " points";
-            root.addView(metric("Score", score, color(R.color.text)));
+            facts.addView(divider());
+            facts.addView(metric("Score", score, color(R.color.text)));
         }
-        root.addView(divider());
 
+        LinearLayout body = card();
+        body.setPadding(0, dp(2), 0, dp(4));
+        root.addView(body);
         if (item.hasDetails()) {
-            new Markdown(this).into(root, item.details());
+            new Markdown(this).into(body, item.details());
         } else {
-            root.addView(
+            body.addView(
                 emptyMessage(
                     detailLoading
                         ? "Fetching the instructions…"
@@ -1173,41 +1181,52 @@ public final class MainActivity extends BaseActivity {
 
     private <T extends ListView> T configureListView(T list, ListAdapter adapter) {
         list.setAdapter(adapter);
-        // Rows paint their own focus state edge to edge. A transparent
-        // selector stops the platform highlight from drawing a second,
-        // differently shaped indicator underneath them.
-        list.setSelector(new ColorDrawable(0x00000000));
-        list.setDivider(new ColorDrawable(color(R.color.divider)));
-        list.setDividerHeight(dp(1));
-        list.setBackgroundColor(color(R.color.page));
-        list.setCacheColorHint(0x00000000);
-        list.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY);
+        // Rows paint their own focus card, so Family turns the platform
+        // selector off and insets the hairlines to the text edge.
+        Family.list(list);
         list.setItemsCanFocus(false);
         return list;
     }
 
-    /** Title of a detail screen, sitting on the row surface like a first row. */
+    /** Title of a detail screen, on the grouped page above its cards. */
     private TextView heading(String value) {
         TextView view = text(value, 16, color(R.color.text));
-        view.setTypeface(null, Typeface.BOLD);
-        view.setBackgroundColor(color(R.color.row));
-        view.setPadding(dp(10), dp(9), dp(10), dp(3));
+        view.setTypeface(Family.MEDIUM);
+        view.setPadding(dp(10), dp(10), dp(10), dp(2));
         return view;
     }
 
     private TextView subheading(String value) {
         TextView view = text(value, 12, color(R.color.text_muted));
-        view.setBackgroundColor(color(R.color.row));
-        view.setPadding(dp(10), dp(1), dp(10), dp(9));
+        view.setPadding(dp(10), dp(1), dp(10), dp(4));
         return view;
     }
 
-    /** Centred guidance for a screen that has nothing in it. */
+    /** A white card on the grouped page, holding one group of a page's facts. */
+    private LinearLayout card() {
+        LinearLayout card = vertical();
+        card.setBackgroundResource(com.xp3.common.ui.R.drawable.family_card);
+        LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        at.setMargins(dp(6), dp(6), dp(6), 0);
+        card.setLayoutParams(at);
+        return card;
+    }
+
+    /**
+     * Centred guidance for a screen that has nothing in it: the first
+     * paragraph is what is (or isn't) here, set as a title, and the rest
+     * says what to do about it.
+     */
     private TextView emptyMessage(String message) {
-        TextView view = text(message, 13, color(R.color.text_muted));
-        view.setGravity(Gravity.CENTER);
-        view.setLineSpacing(dp(3), 1f);
-        view.setPadding(dp(16), dp(16), dp(16), dp(16));
+        int cut = message.indexOf("\n\n");
+        String title = cut < 0 ? message : message.substring(0, cut);
+        String hint = cut < 0 ? null : message.substring(cut + 2);
+        if (title.endsWith(".")) title = title.substring(0, title.length() - 1);
+        TextView view = Family.empty(this, title, hint);
+        view.setBackgroundColor(0x00000000);
         return view;
     }
 
@@ -1216,9 +1235,8 @@ public final class MainActivity extends BaseActivity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setBackgroundColor(color(R.color.row));
-        row.setMinimumHeight(dp(28));
-        row.setPadding(dp(10), dp(5), dp(10), dp(5));
+        row.setMinimumHeight(dp(30));
+        row.setPadding(dp(10), dp(6), dp(10), dp(6));
 
         TextView name = text(label, 12, color(R.color.text_muted));
         name.setSingleLine(true);
@@ -1229,7 +1247,7 @@ public final class MainActivity extends BaseActivity {
 
         // Label and value are separated by colour, not weight: a page of bold
         // values has no emphasis left to give.
-        TextView amount = text(value, 12, tint);
+        TextView amount = text(value, 13, tint);
         amount.setGravity(Gravity.RIGHT);
         LinearLayout.LayoutParams right = new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -1240,15 +1258,16 @@ public final class MainActivity extends BaseActivity {
         return row;
     }
 
+    /** A hairline between the facts on a card, inset to the text edge. */
     private View divider() {
         View line = new View(this);
         line.setBackgroundColor(color(R.color.divider));
-        line.setLayoutParams(
-            new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(1)
-            )
+        LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(1)
         );
+        at.leftMargin = dp(10);
+        line.setLayoutParams(at);
         return line;
     }
 }

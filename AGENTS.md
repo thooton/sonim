@@ -68,7 +68,9 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
   `weighted`, `isOk`, `onSelect`), `Tabs` (tab bar with d-pad cycling),
   `SelectableAdapter` (rows that paint their own highlight), `Markdown`, and
   the shared tab, focus and Markdown drawables. An app's own colors and
-  dimens override the defaults in its `res/values`.
+  dimens override the defaults in its `res/values`. `Family` and the
+  `family_*` resources are the look the light apps share; see `DESIGN.md`
+  before restyling one.
 
 ## Conventions
 

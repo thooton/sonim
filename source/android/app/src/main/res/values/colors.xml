@@ -1,48 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The whole app is grey, chrome to checkbox: a neutral charcoal band
-         across the top, and focus marked by a darker grey rule rather than by
-         any hue. Colour is deliberately absent. -->
-    <color name="primary">#424242</color>
-    <color name="primary_dark">#212121</color>
+    <!-- A deep violet in the family's four tones (DESIGN.md): the band near
+         black, the accent for focus and for what is happening now, a pale
+         wash behind the picked result and the field at rest, and greys
+         tinted to match. The status bar is the band's own colour. -->
+    <color name="primary">#291741</color>
+    <color name="primary_dark">#291741</color>
     <color name="on_primary">#FFFFFF</color>
-    <color name="on_primary_dim">#A8A8A8</color>
+    <color name="on_primary_dim">#BBA9D3</color>
 
-    <color name="page">#FAFAFA</color>
+    <color name="page">#FFFFFF</color>
     <color name="row">#FFFFFF</color>
-    <color name="section_fill">#EFEFEF</color>
-    <color name="divider">#DCDCDC</color>
-    <color name="outline">#CACACA</color>
+    <color name="divider">#E7E2EF</color>
+    <color name="field_fill">#F3F0F7</color>
 
-    <!-- Focus is the one place colour is allowed to be assertive, and even
-         there it is a 2dp rule and a pale wash rather than a filled block. -->
-    <color name="focus_fill">#E8E8E8</color>
-    <color name="focus_rule">#555555</color>
-    <color name="press_fill">#D4D4D4</color>
+    <color name="focus_fill">#F2EDFA</color>
+    <color name="focus_rule">#6334A3</color>
+    <color name="press_fill">#E2D7F2</color>
 
-    <color name="text">#1A1A1A</color>
-    <color name="text_muted">#6E6E6E</color>
-    <!-- A finished item steps back rather than disappearing: the list is a
-         record of the day as much as a plan for it. -->
-    <color name="done_text">#A0A0A0</color>
-    <color name="check_box">#6E6E6E</color>
-    <color name="disabled">#F2F2F2</color>
-    <color name="disabled_text">#A0A0A0</color>
-
-    <!-- Chat is a transcript of full-width text areas: grey for the user and
-         white for the assistant. -->
-    <color name="chat_page">#FFFFFF</color>
-    <color name="bubble_you">#E6E6E6</color>
-    <color name="bubble_agent">#FFFFFF</color>
-    <color name="chat_time_agent">#99000000</color>
-    <color name="chat_time_you">#99000000</color>
-    <color name="code_fill">#F0F0F0</color>
-
-    <!-- Read off the stock Messages compose field, so the one place in this
-         app where you type looks like the place you already type on this
-         phone: 85% black text, 50% black hint, and the same 50% black in the
-         3dp rule around the box. -->
-    <color name="input_text">#D8000000</color>
-    <color name="input_hint">#7F000000</color>
-    <color name="input_border">#7F000000</color>
+    <color name="text">#1B1B1D</color>
+    <color name="text_muted">#66616F</color>
+    <color name="input_hint">#8A8590</color>
 </resources>

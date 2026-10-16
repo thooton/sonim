@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Serve</string>
+    <string name="label_folder">Folder</string>
+    <string name="hint_menu">Menu to choose another folder</string>
 </resources>

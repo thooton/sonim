@@ -4,7 +4,6 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
@@ -12,8 +11,6 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
-import android.text.style.RelativeSizeSpan;
-import android.text.style.StyleSpan;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
@@ -30,8 +27,10 @@ import com.places.xp3.net.Place;
 import com.places.xp3.net.Places;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Family;
 import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +63,7 @@ public final class MainActivity extends BaseActivity {
     private TextView statusView;
     private ListView resultList;
     private ScrollView detail;
-    private TextView detailText;
+    private LinearLayout detailBody;
     private final ResultAdapter adapter = new ResultAdapter();
     private final ExecutorService worker = Ui.worker("places");
 
@@ -101,8 +100,9 @@ public final class MainActivity extends BaseActivity {
         statusView = (TextView) findViewById(R.id.status);
         resultList = (ListView) findViewById(R.id.results);
         detail = (ScrollView) findViewById(R.id.detail);
-        detailText = (TextView) findViewById(R.id.detail_text);
+        detailBody = (LinearLayout) findViewById(R.id.detail_body);
         resultList.setAdapter(adapter);
+        Family.list(resultList);
 
         SharedPreferences prefs = prefs();
         login = loadLogin(prefs);
@@ -374,27 +374,87 @@ public final class MainActivity extends BaseActivity {
         open();
     }
 
+    /** The sections that share the first card: how to reach the place. */
+    private static final List<String> CONTACT = Arrays.asList("Address", "Phone", "Website", "Local time there");
+
     /**
-     * The name, large, then each section: a bold heading over its text. A
+     * The name, large, over the lines that run on from it (kind, rating,
+     * price, open or closed, how far); then the facts on cards, a muted
+     * label over each value. The ways to reach it share the first card, and
+     * every other section (hours, about, payment) has a card of its own. A
      * place that only has what the search returned shows just its first
      * lines and address, rather than "no hours" for hours not yet fetched.
      */
     private void render(Place place, boolean partial) {
-        SpannableStringBuilder out = new SpannableStringBuilder();
-        span(out, place.name(), new StyleSpan(Typeface.BOLD), new RelativeSizeSpan(1.2f));
-        for (Place.Section section : place.details(System.currentTimeMillis(), searchedNear)) {
+        detailBody.removeAllViews();
+        long now = System.currentTimeMillis();
+        LinearLayout head = vertical();
+        head.setPadding(dp(10), dp(9), dp(10), dp(3));
+        TextView name = detailLine(place.name(), R.dimen.text_detail_title, R.color.text);
+        name.setTypeface(Family.MEDIUM);
+        head.addView(name);
+        detailBody.addView(head);
+
+        LinearLayout contact = null;
+        for (Place.Section section : place.details(now, searchedNear)) {
             if (partial && section.title != null && !section.title.equals("Address")) continue;
             if (section.title == null) {
-                out.append('\n');
-                span(out, section.text, new ForegroundColorSpan(color(R.color.text_muted)));
+                // Only open-or-closed takes a colour, as on the result's row.
+                String status = place.status(now);
+                Boolean open = place.openNow();
+                SpannableStringBuilder lines = new SpannableStringBuilder();
+                for (String line : section.text.split("\n")) {
+                    if (lines.length() > 0) lines.append('\n');
+                    if (open != null && line.equals(status)) {
+                        span(lines, line, new ForegroundColorSpan(color(open ? R.color.open : R.color.closed)));
+                    } else {
+                        lines.append(line);
+                    }
+                }
+                TextView summary = detailLine(lines, R.dimen.text_address, R.color.text_muted);
+                summary.setPadding(0, dp(3), 0, 0);
+                summary.setLineSpacing(dp(2), 1f);
+                head.addView(summary);
                 continue;
             }
-            out.append("\n\n");
-            span(out, section.title, new StyleSpan(Typeface.BOLD), new ForegroundColorSpan(color(R.color.primary)));
-            out.append('\n').append(section.text);
+            boolean reach = CONTACT.contains(section.title);
+            LinearLayout card;
+            if (reach && contact != null) {
+                card = contact;
+                View rule = new View(this);
+                rule.setBackgroundColor(color(R.color.divider));
+                LinearLayout.LayoutParams line = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
+                line.leftMargin = dp(10);
+                card.addView(rule, line);
+            } else {
+                card = vertical();
+                card.setBackgroundResource(com.xp3.common.ui.R.drawable.family_card);
+                LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                at.setMargins(dp(6), dp(6), dp(6), 0);
+                detailBody.addView(card, at);
+                if (reach) contact = card;
+            }
+            // What Menu can act on (call it, open it) is in the accent.
+            boolean actionable = section.title.equals("Phone") || section.title.equals("Website");
+            LinearLayout fact = vertical();
+            fact.setPadding(dp(10), dp(7), dp(10), dp(8));
+            fact.addView(detailLine(section.title, R.dimen.text_detail_label, R.color.text_muted));
+            TextView value = detailLine(section.text, R.dimen.text_detail, actionable ? R.color.focus_rule : R.color.text);
+            value.setPadding(0, dp(2), 0, 0);
+            value.setLineSpacing(dp(2), 1f);
+            fact.addView(value);
+            card.addView(fact);
         }
-        detailText.setText(out);
         detail.scrollTo(0, 0);
+    }
+
+    private TextView detailLine(CharSequence text, int size, int textColor) {
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextColor(color(textColor));
+        view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(size));
+        view.setIncludeFontPadding(false);
+        return view;
     }
 
     private static void span(SpannableStringBuilder out, String text, Object... spans) {
@@ -648,8 +708,9 @@ public final class MainActivity extends BaseActivity {
             LinearLayout row = (LinearLayout) convert;
             if (row == null) {
                 int padH = getResources().getDimensionPixelSize(R.dimen.pad_h);
-                int padV = dp(5);
+                int padV = dp(7);
                 row = vertical();
+                row.setBackgroundResource(com.xp3.common.ui.R.drawable.family_pick);
                 row.setPadding(padH, padV, padH, padV);
                 row.addView(line(R.dimen.text_name, R.color.text, true, 2));
                 row.addView(line(R.dimen.text_address, R.color.text, false, 2));
@@ -668,8 +729,7 @@ public final class MainActivity extends BaseActivity {
             if (open == null) last.append(status);
             else span(last, status, new ForegroundColorSpan(color(open ? R.color.open : R.color.closed)));
             ((TextView) row.getChildAt(3)).setText(last);
-            if (picking && position == picked) row.setBackgroundResource(R.drawable.row_focus);
-            else row.setBackgroundColor(color(R.color.row));
+            row.setActivated(picking && position == picked);
             return row;
         }
 
@@ -677,8 +737,10 @@ public final class MainActivity extends BaseActivity {
             TextView view = new TextView(MainActivity.this);
             view.setTextColor(color(textColor));
             view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(size));
-            if (bold) view.setTypeface(Typeface.DEFAULT_BOLD);
+            if (bold) view.setTypeface(Family.MEDIUM);
             view.setMaxLines(lines);
+            view.setIncludeFontPadding(false);
+            view.setPadding(0, bold ? 0 : dp(2), 0, 0);
             view.setEllipsize(TextUtils.TruncateAt.END);
             return view;
         }

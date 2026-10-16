@@ -7,7 +7,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:minHeight="@dimen/row_height"
-    android:background="@drawable/focus_selector"
+    android:background="@drawable/family_focus"
     android:clickable="false"
     android:descendantFocusability="blocksDescendants"
     android:focusable="false"

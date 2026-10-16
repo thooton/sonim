@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- A status screen in the family's grouped style: the state and the
+     address on one card, since the address is what you came for; the folder
+     on another; then the button for what OK does. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/page"
     android:orientation="vertical">
 
-    <!-- The bar names the app and, on the right, whether it is serving. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="@dimen/bar_height"
@@ -14,39 +16,117 @@
         android:orientation="horizontal"
         android:paddingLeft="@dimen/pad_h"
         android:paddingRight="@dimen/pad_h">
-        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/app_name" android:textColor="@color/on_primary" android:textSize="@dimen/text_title" android:textStyle="bold" />
-        <TextView android:id="@+id/state" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/on_primary" android:textSize="@dimen/text_state" />
+        <TextView style="@style/FamilyTitle" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/app_name" />
     </LinearLayout>
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="@color/row"
-        android:orientation="vertical"
-        android:paddingLeft="@dimen/pad_h"
-        android:paddingRight="@dimen/pad_h"
-        android:paddingTop="8dp">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="FOLDER" android:textColor="@color/text_muted" android:textSize="@dimen/text_label" />
-        <TextView android:id="@+id/folder" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12dp" android:maxLines="3" android:ellipsize="start" android:textColor="@color/text" android:textSize="@dimen/text_value" />
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ADDRESS" android:textColor="@color/text_muted" android:textSize="@dimen/text_label" />
-        <TextView android:id="@+id/address" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text" android:textIsSelectable="false" android:textSize="@dimen/text_address" android:textStyle="bold" />
-        <TextView android:id="@+id/others" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text_muted" android:textSize="@dimen/text_status" />
-    </LinearLayout>
+        android:focusable="false"
+        android:scrollbarStyle="outsideOverlay">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="8dp">
 
-    <!-- Only there when something went wrong: the port is taken, storage
-         access was refused, the folder has gone. -->
-    <View android:id="@+id/status_rule" android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" android:visibility="gone" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="@dimen/card_margin"
+                android:background="@drawable/family_card"
+                android:orientation="vertical"
+                android:paddingBottom="10dp"
+                android:paddingLeft="@dimen/pad_h"
+                android:paddingRight="@dimen/pad_h"
+                android:paddingTop="9dp">
+                <TextView
+                    android:id="@+id/state"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="-3dp"
+                    android:drawablePadding="4dp"
+                    android:drawableStart="@drawable/state_dot"
+                    android:gravity="center_vertical"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/text_muted"
+                    android:textSize="@dimen/text_state" />
+                <TextView
+                    android:id="@+id/address"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="7dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/text"
+                    android:textIsSelectable="false"
+                    android:textSize="@dimen/text_address" />
+                <TextView
+                    android:id="@+id/others"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:includeFontPadding="false"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/text_muted"
+                    android:textSize="@dimen/text_status" />
+            </LinearLayout>
 
-    <TextView
-        android:id="@+id/status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="gone"
-        android:paddingBottom="6dp"
-        android:paddingLeft="@dimen/pad_h"
-        android:paddingRight="@dimen/pad_h"
-        android:paddingTop="5dp"
-        android:textColor="@color/text"
-        android:textSize="@dimen/text_status" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="@dimen/card_margin"
+                android:layout_marginRight="@dimen/card_margin"
+                android:background="@drawable/family_card"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingBottom="7dp"
+                android:paddingLeft="@dimen/pad_h"
+                android:paddingRight="@dimen/pad_h"
+                android:paddingTop="7dp">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" android:text="@string/label_folder" android:textColor="@color/text_muted" android:textSize="@dimen/text_label" />
+                    <TextView android:id="@+id/folder" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:ellipsize="start" android:includeFontPadding="false" android:maxLines="3" android:textColor="@color/text" android:textSize="@dimen/text_value" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- What OK does. Not focusable: OK is read by the activity, and the
+                 button is drawn as the focused one because it always is. -->
+            <TextView
+                android:id="@+id/action"
+                style="@style/FamilyButton"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:layout_marginLeft="@dimen/card_margin"
+                android:layout_marginRight="@dimen/card_margin"
+                android:layout_marginTop="10dp"
+                android:focusable="false" />
+
+            <TextView
+                android:id="@+id/hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_horizontal"
+                android:includeFontPadding="false"
+                android:text="@string/hint_menu"
+                android:textColor="@color/text_muted"
+                android:textSize="@dimen/text_status" />
+
+            <!-- Why serving stopped or never started: storage access was
+                 refused, the folder has gone. -->
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_horizontal"
+                android:paddingLeft="@dimen/pad_h"
+                android:paddingRight="@dimen/pad_h"
+                android:textColor="@color/problem"
+                android:textSize="@dimen/text_status"
+                android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
 </LinearLayout>

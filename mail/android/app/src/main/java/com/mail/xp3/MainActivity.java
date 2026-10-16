@@ -18,8 +18,9 @@ import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
-import android.text.style.StyleSpan;
+import android.text.style.TypefaceSpan;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -43,6 +44,7 @@ import com.mail.xp3.net.Outgoing;
 import com.mail.xp3.net.People;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Family;
 import com.xp3.common.ui.Ui;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -156,6 +158,7 @@ public final class MainActivity extends BaseActivity {
         subjectField = (EditText) findViewById(R.id.subject);
         bodyField = (EditText) findViewById(R.id.body);
         listView.setAdapter(adapter);
+        Family.list(listView);
 
         SharedPreferences prefs = prefs();
         login = loadLogin(prefs);
@@ -451,7 +454,7 @@ public final class MainActivity extends BaseActivity {
     private void render(Conversation conversation, boolean partial) {
         SpannableStringBuilder out = new SpannableStringBuilder();
         starts.clear();
-        span(out, conversation.subject(), new StyleSpan(Typeface.BOLD), new RelativeSizeSpan(1.15f));
+        span(out, conversation.subject(), new TypefaceSpan("sans-serif-medium"), new RelativeSizeSpan(1.2f));
         int first = -1;
         List<Message> messages = conversation.messages;
         for (int i = 0; i < messages.size(); i++) {
@@ -459,11 +462,11 @@ public final class MainActivity extends BaseActivity {
             if (first < 0 && message.unread()) first = i;
             out.append("\n\n");
             starts.add(out.length());
-            span(out, message.sender(), new StyleSpan(Typeface.BOLD), new ForegroundColorSpan(color(R.color.primary)));
+            span(out, message.sender(), new TypefaceSpan("sans-serif-medium"));
             if (message.draft()) span(out, "  Draft", new ForegroundColorSpan(color(R.color.draft)));
             out.append('\n');
             span(out, longDate(message.time()) + recipients(message), new ForegroundColorSpan(color(R.color.text_muted)),
-                new RelativeSizeSpan(0.92f));
+                new RelativeSizeSpan(0.88f));
             out.append("\n\n");
             if (partial) {
                 span(out, message.snippet(), new ForegroundColorSpan(color(R.color.text_muted)));
@@ -1279,19 +1282,26 @@ public final class MainActivity extends BaseActivity {
             LinearLayout row = (LinearLayout) convert;
             if (row == null) {
                 int padH = getResources().getDimensionPixelSize(R.dimen.pad_h);
-                int padV = dp(4);
+                int padV = dp(7);
                 row = vertical();
+                row.setBackgroundResource(com.xp3.common.ui.R.drawable.family_pick);
                 row.setPadding(padH, padV, padH, padV);
                 LinearLayout top = new LinearLayout(MainActivity.this);
                 top.setOrientation(LinearLayout.HORIZONTAL);
+                top.setGravity(Gravity.CENTER_VERTICAL);
                 TextView who = line(R.dimen.text_name, R.color.text);
                 top.addView(who, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
                 TextView when = line(R.dimen.text_meta, R.color.text_muted);
                 when.setPadding(dp(6), 0, 0, 0);
+                when.setCompoundDrawablePadding(dp(4));
                 top.addView(when);
                 row.addView(top);
-                row.addView(line(R.dimen.text_meta, R.color.text));
-                row.addView(line(R.dimen.text_meta, R.color.text_muted));
+                TextView subject = line(R.dimen.text_subject, R.color.text);
+                subject.setPadding(0, dp(3), 0, 0);
+                row.addView(subject);
+                TextView snippet = line(R.dimen.text_meta, R.color.text_muted);
+                snippet.setPadding(0, dp(2), 0, 0);
+                row.addView(snippet);
             }
             Conversation conversation = items.get(position);
             boolean unread = conversation.unread();
@@ -1299,22 +1309,26 @@ public final class MainActivity extends BaseActivity {
             TextView who = (TextView) top.getChildAt(0);
             String people = conversation.people(me, folder == Folder.SENT);
             who.setText(people.length() == 0 ? "(nobody)" : people);
-            who.setTypeface(unread ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            who.setTypeface(unread ? Family.MEDIUM : Typeface.DEFAULT);
             who.setTextColor(color(conversation.onlyDrafts() ? R.color.draft : R.color.text));
-            ((TextView) top.getChildAt(1)).setText(shortDate(conversation.time()));
+            // What is new carries the accent: a dot, and the time beside it.
+            TextView when = (TextView) top.getChildAt(1);
+            when.setText(shortDate(conversation.time()));
+            when.setTextColor(color(unread ? R.color.focus_rule : R.color.text_muted));
+            when.setTypeface(unread ? Family.MEDIUM : Typeface.DEFAULT);
+            when.setCompoundDrawablesRelativeWithIntrinsicBounds(unread ? getDrawable(R.drawable.unread_dot) : null, null, null, null);
 
             TextView subject = (TextView) row.getChildAt(1);
             SpannableStringBuilder line = new SpannableStringBuilder();
             if (conversation.starred()) span(line, "★ ", new ForegroundColorSpan(color(R.color.star)));
             line.append(conversation.subject());
             subject.setText(line);
-            subject.setTypeface(unread ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            subject.setTypeface(unread ? Family.MEDIUM : Typeface.DEFAULT);
 
             TextView snippet = (TextView) row.getChildAt(2);
             snippet.setText(conversation.snippet());
             snippet.setVisibility(conversation.snippet().length() == 0 ? View.GONE : View.VISIBLE);
-            if (position == picked) row.setBackgroundResource(R.drawable.row_focus);
-            else row.setBackgroundColor(color(R.color.row));
+            row.setActivated(position == picked);
             return row;
         }
 
@@ -1324,6 +1338,7 @@ public final class MainActivity extends BaseActivity {
             view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(size));
             view.setSingleLine(true);
             view.setEllipsize(TextUtils.TruncateAt.END);
+            view.setIncludeFontPadding(false);
             return view;
         }
     }

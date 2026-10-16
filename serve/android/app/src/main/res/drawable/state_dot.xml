@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The dot before the state: green with a soft ring while serving, grey
+     while not. The state is also in words beside it. -->
+<level-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:maxLevel="0">
+        <inset android:inset="3dp">
+            <shape android:shape="oval">
+                <solid android:color="@color/idle" />
+                <size android:width="8dp" android:height="8dp" />
+            </shape>
+        </inset>
+    </item>
+    <item android:maxLevel="1">
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <solid android:color="#D7F1E1" />
+                    <size android:width="14dp" android:height="14dp" />
+                </shape>
+            </item>
+            <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
+                <shape android:shape="oval">
+                    <solid android:color="@color/live" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</level-list>
