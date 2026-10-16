@@ -42,6 +42,7 @@
 
     <!-- One conversation, in place of the list. -->
     <ScrollView
+        android:defaultFocusHighlightEnabled="false"
         android:id="@+id/reader"
         android:layout_width="match_parent"
         android:layout_height="0dp"

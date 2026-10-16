@@ -68,6 +68,8 @@ public final class Family {
         int pad = Ui.dp(context, 20);
         view.setPadding(pad, pad, pad, pad);
         view.setBackgroundColor(context.getColor(R.color.row));
+        // It takes the focus so keys land somewhere; nothing on it changes.
+        view.setDefaultFocusHighlightEnabled(false);
         return view;
     }
 }

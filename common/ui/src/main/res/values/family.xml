@@ -7,6 +7,9 @@
     <!-- A soft field at rest, and the page behind grouped cards. -->
     <color name="field_fill">#F1F1F4</color>
     <color name="grouped_page">#F2F2F5</color>
+    <!-- The platform's highlight in a FamilyDialog: the item under the
+         d-pad in a stock menu or list. Translucent, so it never hides text. -->
+    <color name="highlight">#1F000000</color>
     <!-- The 1.5dp outline of a focused row, field or menu item. -->
     <dimen name="family_rule">1.5dp</dimen>
     <!-- Where every line of text starts; hairlines are inset to it. -->
