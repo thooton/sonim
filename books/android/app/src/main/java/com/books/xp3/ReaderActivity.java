@@ -135,7 +135,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
                 if (isFinishing()) return;
                 if (result == null) {
                     pageView.showMessage("This book can\u2019t be opened");
-                    if (error != null) toast(error);
+                    if (error != null) flash(error);
                     return;
                 }
                 opened(result);
@@ -418,7 +418,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
             case KeyEvent.KEYCODE_POUND:
                 if (event.getRepeatCount() == 0) {
                     setNightShift(!settings.nightShift);
-                    toast(settings.nightShift ? "Night Shift on" : "Night Shift off");
+                    flash(settings.nightShift ? "Night Shift on" : "Night Shift off");
                 }
                 return true;
             case KeyEvent.KEYCODE_STAR:
@@ -629,10 +629,17 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
         if (layout) relayout();
     }
 
+    /** The page's colours, with Night Shift warming the whole screen over them. */
     private void applyColors() {
-        boolean night = settings.nightShift;
-        pageView.setColors(
-            getResources().getColor(night ? R.color.text_night : R.color.text_day),
-            getResources().getColor(night ? R.color.text_night_dim : R.color.text_day_dim));
+        pageView.setColors(getResources().getColor(R.color.text_day), getResources().getColor(R.color.text_day_dim));
+        NightShift.apply(root, settings.nightShift);
+    }
+
+    /*
+     * Notices are drawn on the page rather than shown as toasts: a toast is
+     * a window of the system's, which Night Shift's filter cannot reach.
+     */
+    private void flash(String text) {
+        pageView.flash(text);
     }
 }

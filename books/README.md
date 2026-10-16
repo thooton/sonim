@@ -1,10 +1,10 @@
 # Books, for the Sonim XP3
 
-An e-book reader for the XP3's 240x320 screen, modelled on Apple Books in dark mode. The page is the whole screen: no status bar, no header, just the text, justified and hyphenated, on black. It reads EPUB (2 and 3) and plain text, Project Gutenberg's included. It has no network access.
+An e-book reader for the XP3's 240x320 screen, modelled on Apple Books in dark mode. The page is the whole screen: no status bar, no header, just the text, justified and hyphenated, on black, with how far through the book you are in small grey type in the bottom corner. It reads EPUB (2 and 3) and plain text, Project Gutenberg's included. It has no network access.
 
 ## Getting books onto the phone
 
-Copy `.epub` or `.txt` files anywhere on the phone or its SD card (a `Books` folder is the obvious place) with a USB cable or `adb push`:
+Books are only looked for in two places: the `Books` folder at the top of the phone's storage (beside `Pictures`, `Music` and the rest) and the `Books` folder at the top of the SD card. Subfolders inside them count; books anywhere else are ignored. Copy `.epub` or `.txt` files there with a USB cable or `adb push`:
 
 ```bash
 adb push "Some Book.epub" /sdcard/Books/
@@ -37,7 +37,7 @@ Reading:
 
 ## Themes & Settings
 
-- **Night Shift** turns the text from soft white to a warm amber for reading in the dark.
+- **Night Shift** warms the whole app toward yellow for reading in the dark: the text, the sheets, the library and the covers. Only the system's own status bar and permission dialog stay as they are.
 - **Fonts**: Charter (the face Apple Books uses), Literata, Baskerville, Inter and Atkinson Hyperlegible, each with real italics and bold.
 - **Text size**, **line spacing**, **margins**, and **justify** on or off.
 

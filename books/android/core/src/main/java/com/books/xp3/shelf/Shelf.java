@@ -18,8 +18,9 @@ import java.util.Map;
  * The library: every book found on the phone, what it is called, and how far
  * into it the reader has got.
  *
- * Books are not copied anywhere; they are read where they lie, in the shared
- * storage folders a file manager or a USB cable puts them in. What is kept
+ * Books are not copied anywhere; they are read where they lie, in the Books
+ * folders the app is given (the phone's and the SD card's), subfolders
+ * included, and nowhere else. What is kept
  * here, in the app's private directory, is a small index: each book's title
  * and author (so a scan only opens books it has not seen, or that changed)
  * and the place it was left at.
@@ -118,13 +119,14 @@ public final class Shelf {
     // ------------------------------------------------------------------
 
     /**
-     * Looks through `roots` for books, reads the title and author of any it
-     * has not seen (or that changed), and returns the library: books being
-     * read, most recent first, then the rest by title.
+     * Looks through `folders` and their subfolders for books, reads the
+     * title and author of any it has not seen (or that changed), and returns
+     * the library: books being read, most recent first, then the rest by
+     * title. A book anywhere else is not in the library.
      */
-    public List<Entry> scan(List<File> roots) {
+    public List<Entry> scan(List<File> folders) {
         List<File> found = new ArrayList<File>();
-        for (File root : roots) walk(root, 0, found);
+        for (File folder : folders) walk(folder, 0, found);
 
         synchronized (this) {
             for (Entry entry : entries.values()) entry.present = false;
@@ -200,8 +202,6 @@ public final class Shelf {
             String name = child.getName();
             if (name.startsWith(".")) continue;
             if (child.isDirectory()) {
-                // Apps' private data: large, and never where books are put.
-                if (depth == 0 && name.equals("Android")) continue;
                 walk(child, depth + 1, found);
             } else if (isBook(child) && child.length() > 0) {
                 found.add(child);

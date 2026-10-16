@@ -37,9 +37,9 @@ import java.util.List;
  */
 final class Pages {
 
-    /** Space above and below the text block, in pixels. */
+    /** Space above and below the text block, in pixels; the percentage sits in the bottom one. */
     static final int TOP = 9;
-    static final int BOTTOM = 7;
+    static final int BOTTOM = 17;
 
     final Section section;
     final String key;
