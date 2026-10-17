@@ -132,8 +132,8 @@ from Maps screenshots (`res/values/colors.xml`):
 What changes from Maps, for the keys and the screen:
 
 - **A compact list.** A result is a few lines, as Maps words them: the
-  name; "4.8 ★ (112) · $10-20 · ♿ · Cafe"; the full address, wrapped
-  rather than cut (Maps leaves it out, but on a list of branches it is what
+  name; "4.8 ★ (112) · $10-20 · ♿ · Cafe"; the address without its
+  country, wrapped rather than cut (Maps leaves it out, but on a list of branches it is what
   tells them apart); "Closed · Opens 7:00 AM · 3.5 mi". No photos and no
   chips, so two or three fit the screen and Up and Down move one place at
   a time. The picked row doesn't grow.
