@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material 3's floating action button: a rounded square, not a circle. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="@color/highlight">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/fab" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+</ripple>

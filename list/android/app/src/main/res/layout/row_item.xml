@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One line of the checklist: a ring, then the task. Text wraps to three
-     lines rather than scrolling, since a marquee on a 240px row is in motion
-     for as long as you are trying to read it. The ring is centred on the first
-     line, not the row, so a long item still reads as one tick and one task. -->
+<!-- One task: a ring (or, once done, a blue tick), the task, and the
+     outlined star Google Tasks puts at the end of every row. Text wraps to
+     three lines rather than scrolling; the ring and star sit on the first
+     line, so a long task still reads as one. The card behind it is painted
+     by ItemAdapter, since its corners depend on where in the card it is. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:minHeight="@dimen/item_min_height"
-    android:background="@drawable/family_focus"
     android:clickable="false"
     android:descendantFocusability="blocksDescendants"
     android:focusable="false"
@@ -15,9 +15,9 @@
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingLeft="@dimen/row_pad_h"
-    android:paddingRight="@dimen/row_pad_h"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp">
+    android:paddingRight="8dp"
+    android:paddingTop="9dp"
+    android:paddingBottom="9dp">
 
     <ImageView
         android:id="@+id/item_check"
@@ -25,7 +25,6 @@
         android:layout_height="@dimen/check_size"
         android:layout_gravity="top"
         android:layout_marginRight="@dimen/check_gap"
-        android:layout_marginTop="0.5dp"
         android:importantForAccessibility="no" />
 
     <TextView
@@ -33,10 +32,21 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
+        android:layout_gravity="top"
+        android:layout_marginTop="1dp"
         android:maxLines="3"
         android:ellipsize="end"
-        android:lineSpacingExtra="1dp"
+        android:lineSpacingExtra="2dp"
         android:includeFontPadding="false"
         android:textColor="@color/text"
         android:textSize="@dimen/text_item" />
+
+    <ImageView
+        android:id="@+id/item_star"
+        android:layout_width="@dimen/star_size"
+        android:layout_height="@dimen/star_size"
+        android:layout_gravity="top"
+        android:layout_marginLeft="6dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_star_border" />
 </LinearLayout>

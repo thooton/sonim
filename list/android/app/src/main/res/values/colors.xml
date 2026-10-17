@@ -1,31 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Books' warm graphite with an amber accent, in the family's four
-         tones (DESIGN.md): the band near black, the accent for focus and a
-         ticked box, a pale amber wash behind the focused row, and greys
-         tinted warm to match. The status bar is the band's own colour, so
-         the two read as one header. -->
-    <color name="primary">#23201C</color>
-    <color name="primary_dark">#23201C</color>
-    <color name="on_primary">#FFFFFF</color>
-    <color name="on_primary_dim">#C7B9A6</color>
+    <!-- Google Tasks' palette, sampled from its Play Store screenshots: a
+         blue-grey page with white cards on it, Google blue for what is
+         chosen, and Material 3's near-black and grey for text and icons.
+         The status bar is the page's own colour, with dark icons. -->
+    <color name="primary">#F0F4F9</color>
+    <color name="primary_dark">#F0F4F9</color>
+    <color name="on_primary">#1F1F1F</color>
+    <color name="on_primary_dim">#444746</color>
 
-    <color name="page">#FFFFFF</color>
+    <color name="page">#F0F4F9</color>
     <color name="row">#FFFFFF</color>
-    <color name="divider">#ECE6DE</color>
-    <color name="field_fill">#F5F1EC</color>
+    <color name="card">#FFFFFF</color>
+    <color name="divider">#E1E3E1</color>
+    <color name="field_fill">#F0F4F9</color>
 
-    <color name="focus_fill">#FBF2E5</color>
-    <color name="focus_rule">#A85C00</color>
-    <color name="press_fill">#F4E2C8</color>
-    <!-- The platform's highlight (a stock menu's item under the d-pad, a
-         press): the accent, faint enough that what it covers stays legible. -->
-    <color name="highlight">#24A85C00</color>
+    <!-- Google blue: the chosen tab, a finished task's tick, Save. -->
+    <color name="accent">#0B57D0</color>
+    <!-- The d-pad's row: Material 3's secondary container, the pale blue
+         Google's own apps put behind the chosen item. -->
+    <color name="focus_fill">#D3E3FD</color>
+    <color name="focus_rule">#0B57D0</color>
+    <color name="press_fill">#C2D7FA</color>
+    <color name="highlight">#290B57D0</color>
 
-    <color name="text">#1B1B1D</color>
-    <color name="text_muted">#6D665D</color>
-    <!-- A finished item steps back rather than disappearing: the list is a
-         record of the day as much as a plan for it. -->
-    <color name="done_text">#9C958B</color>
-    <color name="check_box">#A9A39B</color>
+    <color name="text">#1F1F1F</color>
+    <color name="text_muted">#444746</color>
+    <color name="done_text">#5E5E5E</color>
+    <color name="icon">#444746</color>
+    <color name="star_off">#C4C7C5</color>
+    <color name="check_box">#444746</color>
+    <color name="save_off">#A0A3A6</color>
+
+    <!-- The menu and the new-task sheet: Material 3's surface containers. -->
+    <color name="menu">#E9EEF6</color>
+    <color name="sheet">#F0F4F9</color>
+
+    <!-- The floating add button: primary container, with its own ink. -->
+    <color name="fab">#C2E7FF</color>
+    <color name="on_fab">#001D35</color>
 </resources>

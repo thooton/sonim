@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- An open task: an empty ring, quiet enough that a long list of them
-     reads as text with a margin rather than as a form. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="16dp" android:height="16dp" android:viewportWidth="16" android:viewportHeight="16">
-    <path android:strokeColor="@color/check_box" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M8,0.75a7.25,7.25 0,1 1,0 14.5a7.25,7.25 0,1 1,0 -14.5z" />
+<!-- An open task: Google Tasks' empty ring, a 2dp grey outline. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:strokeColor="@color/check_box" android:strokeWidth="2" android:fillColor="#00000000" android:pathData="M12,3a9,9 0,1 1,0 18a9,9 0,1 1,0 -18z" />
 </vector>

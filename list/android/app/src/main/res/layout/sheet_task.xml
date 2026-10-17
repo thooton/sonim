@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Google Tasks' new-task sheet: a borderless field with "New task" as its
+     hint, and Save in blue on the right (grey until there is a task). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingLeft="14dp"
+    android:paddingRight="10dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="4dp">
+
+    <EditText
+        android:id="@+id/sheet_field"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@null"
+        android:hint="@string/new_task"
+        android:includeFontPadding="false"
+        android:maxLines="4"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:textColor="@color/text"
+        android:textColorHint="@color/text_muted"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/sheet_save"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:layout_gravity="right"
+        android:background="?android:attr/selectableItemBackground"
+        android:focusable="true"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp"
+        android:text="@string/save"
+        android:textSize="14sp" />
+</LinearLayout>
