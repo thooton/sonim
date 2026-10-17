@@ -108,6 +108,11 @@ public final class SelfTest {
             check.same("unknown, apart", "Hours unknown|", String.join("|", place("{}").statusParts(NOON)));
             check.same("today, there", "Fri", p.today(NOON));
             check.same("short price", "$10-20", p.priceShort());
+            check.same("country left off", "2400 W Happy Valley Rd #1100, Phoenix, AZ 85085",
+                place("{\"formattedAddress\":\"2400 W Happy Valley Rd #1100, Phoenix, AZ 85085, USA\"}").localAddress());
+            check.same("postcode last, kept", "10 Downing St, London SW1A 2AA",
+                place("{\"formattedAddress\":\"10 Downing St, London SW1A 2AA\"}").localAddress());
+            check.same("one part, kept", "Tempe", place("{\"formattedAddress\":\"Tempe\"}").localAddress());
             check.same("short price, level only", "$$", place("{\"priceLevel\":\"PRICE_LEVEL_MODERATE\"}").priceShort());
             check.same("local time, elsewhere", "Fri Oct 16, 12:00 PM", p.localTime(NOON, -240));
             check.same("local time, same offset", "", p.localTime(NOON, -420));

@@ -609,7 +609,7 @@ public final class MainActivity extends BaseActivity {
         List<Choice> choices = new ArrayList<Choice>();
         if (place.phone().length() > 0) choices.add(new Choice(R.drawable.ic_call, "Call", () -> dial(place.phone())));
         if (place.address().length() > 0) {
-            choices.add(new Choice(R.drawable.ic_place, "Copy address", () -> copy("Address", place.address())));
+            choices.add(new Choice(R.drawable.ic_place, "Copy address", () -> copy("Address", place.localAddress())));
         }
         if (place.website().length() > 0) {
             choices.add(new Choice(R.drawable.ic_language, "Copy website URL", () -> copy("Website", place.website())));
@@ -750,7 +750,7 @@ public final class MainActivity extends BaseActivity {
             final Place place = current();
             if (place.phone().length() > 0) choices.add(new Choice(R.drawable.ic_call, "Call", () -> dial(place.phone())));
             if (place.address().length() > 0) {
-                choices.add(new Choice(R.drawable.ic_place, "Copy address", () -> copy("Address", place.address())));
+                choices.add(new Choice(R.drawable.ic_place, "Copy address", () -> copy("Address", place.localAddress())));
             }
             if (place.website().length() > 0) {
                 choices.add(new Choice(R.drawable.ic_language, "Copy website URL", () -> copy("Website", place.website())));
@@ -955,7 +955,7 @@ public final class MainActivity extends BaseActivity {
             }
             ((TextView) row.getChildAt(0)).setText(place.name());
             show((TextView) row.getChildAt(1), look.facts(place, true, true));
-            show((TextView) row.getChildAt(2), place.address());
+            show((TextView) row.getChildAt(2), place.localAddress());
             show((TextView) row.getChildAt(3), look.status(place, System.currentTimeMillis(), searchedNear));
             row.setBackgroundColor(color(on ? R.color.picked : R.color.page));
             return row;

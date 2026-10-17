@@ -158,7 +158,7 @@ final class PlacePage {
     /** Address, hours, website and phone, a row each after a teal icon; then the time there. */
     private void reach() {
         body.addView(rule(dp(12)));
-        if (place.address().length() > 0) info(R.drawable.ic_place, look.text(place.address(), 13f, R.color.text));
+        if (place.address().length() > 0) info(R.drawable.ic_place, look.text(place.localAddress(), 13f, R.color.text));
         if (!partial) hours();
         if (place.website().length() > 0) info(R.drawable.ic_language, look.line(host(place.website()), 13f, R.color.text));
         if (place.phone().length() > 0) info(R.drawable.ic_call, look.line(place.phone(), 13f, R.color.text));

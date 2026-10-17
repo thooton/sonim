@@ -100,6 +100,23 @@ public final class Place {
         return orEmpty(Json.text(raw, "formattedAddress"));
     }
 
+    /**
+     * The address without the country Google ends it with: "2400 W Happy
+     * Valley Rd, Phoenix, AZ 85085" for "..., AZ 85085, USA". The last part
+     * goes when it has no digits (a country never does, a postcode does)
+     * and something comes before it.
+     */
+    public String localAddress() {
+        String full = address();
+        int comma = full.lastIndexOf(", ");
+        if (comma <= 0) return full;
+        String last = full.substring(comma + 2);
+        for (int i = 0; i < last.length(); i++) {
+            if (Character.isDigit(last.charAt(i))) return full;
+        }
+        return full.substring(0, comma);
+    }
+
     /** The national number, which is what the phone dials; the international one when there is no other. */
     public String phone() {
         String phone = Json.text(raw, "nationalPhoneNumber");
