@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The Dictionary.com app's icon: its white D on its navy (ic_launcher_background). -->
+<!-- The Dictionary.com app's icon: its white D on its navy
+     (ic_launcher_background), in the rounded square the other apps' icons
+     share. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#00248B" android:pathData="M0,0h48v48h-48z" />
+    <path android:fillColor="#00248B" android:pathData="M10,4h28a6,6 0,0 1,6 6v28a6,6 0,0 1,-6 6h-28a6,6 0,0 1,-6 -6v-28a6,6 0,0 1,6 -6z" />
     <group android:translateX="8.70" android:translateY="7.5" android:scaleX="0.05455" android:scaleY="0.05455">
         <path android:fillColor="#FFFFFF" android:pathData="M277.77,4.6L9.54,2.42C8.56,2.41 7.59,2.6 6.68,2.97C5.77,3.35 4.94,3.9 4.25,4.59C3.55,5.29 3,6.12 2.62,7.03C2.24,7.94 2.05,8.91 2.05,9.9V476.65C2.05,478.11 2.43,479.54 3.15,480.8C3.87,482.06 4.91,483.11 6.16,483.84L207.31,601.48C208.32,602.07 209.46,602.38 210.62,602.38C211.78,602.38 212.92,602.07 213.93,601.49C214.93,600.91 215.77,600.07 216.35,599.06C216.93,598.04 217.24,596.9 217.24,595.73V159.27C217.24,157.78 216.84,156.32 216.09,155.03C215.33,153.75 214.24,152.69 212.94,151.98L106.01,93.1C105.13,92.61 104.44,91.82 104.08,90.86C103.72,89.91 103.71,88.86 104.05,87.9C104.38,86.94 105.04,86.13 105.92,85.61C106.79,85.09 107.81,84.9 108.81,85.07L301.72,118.37C303.49,118.67 305.1,119.59 306.26,120.97C307.41,122.35 308.05,124.1 308.04,125.9V518.83C308.04,519.92 308.27,521 308.72,521.99C309.17,522.98 309.82,523.86 310.63,524.58C311.44,525.3 312.4,525.84 313.43,526.16C314.47,526.48 315.56,526.57 316.63,526.43C459.46,510.35 556.83,409.16 558.65,268.79C560.63,111.56 445.14,6.79 277.77,4.6Z" />
     </group>
