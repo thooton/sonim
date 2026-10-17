@@ -6,40 +6,37 @@
     android:orientation="vertical">
 
     <!-- What OK will fetch, as pill tabs in a tonal track, each with the icon
-         of what it finds. They take no focus; the box keeps it, and Left and
-         Right move between them. -->
+         of what it finds beside its name (built in code). They take no focus;
+         the box keeps it, and Left and Right move between them. -->
     <LinearLayout
+        android:id="@+id/tabs"
         android:layout_width="match_parent"
         android:layout_height="@dimen/tabs_height"
-        android:layout_marginLeft="@dimen/gutter"
-        android:layout_marginRight="@dimen/gutter"
-        android:layout_marginTop="4dp"
+        android:layout_marginLeft="8dp"
+        android:layout_marginRight="8dp"
+        android:layout_marginTop="3dp"
         android:background="@drawable/tab_track"
         android:baselineAligned="false"
         android:orientation="horizontal"
-        android:padding="2dp">
-        <TextView android:id="@+id/tab_song" style="@style/Tab" android:text="@string/tab_song" />
-        <TextView android:id="@+id/tab_album" style="@style/Tab" android:text="@string/tab_album" />
-        <TextView android:id="@+id/tab_book" style="@style/Tab" android:text="@string/tab_book" />
-    </LinearLayout>
+        android:padding="3dp" />
 
     <!-- The search pill: a ring while it takes the keys. -->
     <LinearLayout
         android:id="@+id/search"
         android:layout_width="match_parent"
         android:layout_height="@dimen/search_height"
-        android:layout_marginLeft="@dimen/gutter"
-        android:layout_marginRight="@dimen/gutter"
-        android:layout_marginTop="5dp"
+        android:layout_marginLeft="8dp"
+        android:layout_marginRight="8dp"
+        android:layout_marginTop="6dp"
         android:background="@drawable/search_field"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp">
+        android:paddingLeft="11dp"
+        android:paddingRight="5dp">
         <ImageView
             android:id="@+id/search_icon"
-            android:layout_width="15dp"
-            android:layout_height="15dp"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
             android:importantForAccessibility="no"
             android:src="@drawable/ic_search"
             android:tint="@color/text_muted" />
@@ -55,8 +52,18 @@
             android:paddingLeft="7dp"
             android:paddingRight="0dp"
             android:textColor="@color/text"
-            android:textColorHint="@color/input_hint"
+            android:textColorHint="@color/text_muted"
             android:textSize="@dimen/text_input" />
+        <!-- There while there is something typed, which the clear key takes back. -->
+        <ImageView
+            android:id="@+id/search_clear"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            android:padding="4.5dp"
+            android:src="@drawable/ic_close"
+            android:tint="@color/text_muted"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- How things stand: a spinner while a search runs, the status line,
@@ -66,11 +73,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:minHeight="22dp"
         android:orientation="horizontal"
+        android:paddingBottom="4dp"
         android:paddingLeft="12dp"
-        android:paddingRight="@dimen/gutter"
-        android:paddingTop="2dp">
+        android:paddingRight="8dp"
+        android:paddingTop="7dp">
         <ProgressBar
             android:id="@+id/spinner"
             style="@android:style/Widget.Material.ProgressBar.Small"
@@ -87,6 +94,7 @@
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:singleLine="true"
+            android:fontFamily="@font/dm_sans_medium"
             android:textColor="@color/text_muted"
             android:textSize="@dimen/text_status" />
         <TextView
@@ -98,11 +106,11 @@
             android:includeFontPadding="false"
             android:paddingBottom="2dp"
             android:paddingLeft="6dp"
-            android:paddingRight="7dp"
+            android:paddingRight="6dp"
             android:paddingTop="2dp"
             android:singleLine="true"
-            android:textColor="@color/text"
-            android:textSize="10.5sp" />
+            android:textColor="@color/text_muted"
+            android:textSize="10sp" />
     </LinearLayout>
 
     <FrameLayout

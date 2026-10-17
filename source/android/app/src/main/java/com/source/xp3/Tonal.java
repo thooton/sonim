@@ -22,7 +22,17 @@ import com.xp3.common.ui.BaseActivity;
 abstract class Tonal extends BaseActivity implements Download.Listener {
 
     static final String PREFS = "source";
-    static final Typeface BOLD = Typeface.create("sans-serif", Typeface.BOLD);
+
+    /**
+     * DM Sans (res/font), in the weights the proposal's type scale uses:
+     * regular for supporting text, Medium for tabs at rest, SemiBold for
+     * labels, Bold for titles. Loaded by the first screen, before any view.
+     */
+    static Typeface FONT = Typeface.SANS_SERIF;
+    static Typeface MEDIUM = Typeface.SANS_SERIF;
+    static Typeface SEMIBOLD = Typeface.DEFAULT_BOLD;
+    static Typeface BOLD = Typeface.DEFAULT_BOLD;
+    private static boolean fontsLoaded;
 
     /** The drawn covers' tones, with the ink of their initials. */
     static final int[] COVERS = {R.color.cover_1, R.color.cover_2, R.color.cover_3, R.color.cover_4, R.color.cover_5, R.color.cover_6};
@@ -47,6 +57,7 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        loadFonts();
         Download.init(this);
         login = loadLogin(prefs());
     }
@@ -71,6 +82,15 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
     protected void onStop() {
         Download.unlisten(this);
         super.onStop();
+    }
+
+    private void loadFonts() {
+        if (fontsLoaded) return;
+        FONT = getResources().getFont(R.font.dm_sans);
+        MEDIUM = getResources().getFont(R.font.dm_sans_medium);
+        SEMIBOLD = getResources().getFont(R.font.dm_sans_semibold);
+        BOLD = getResources().getFont(R.font.dm_sans_bold);
+        fontsLoaded = true;
     }
 
     static SharedPreferences prefs(Context context) {
@@ -160,5 +180,24 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
         if (Music.ALBUM.equals(kind)) return R.drawable.ic_album;
         if (Download.BOOK.equals(kind)) return R.drawable.ic_book;
         return R.drawable.ic_music_note;
+    }
+
+    /** Text in a given face; TypefaceSpan only takes a Typeface from API 28. */
+    static final class Face extends android.text.style.MetricAffectingSpan {
+        private final android.graphics.Typeface face;
+
+        Face(android.graphics.Typeface face) {
+            this.face = face;
+        }
+
+        @Override
+        public void updateMeasureState(android.text.TextPaint paint) {
+            paint.setTypeface(face);
+        }
+
+        @Override
+        public void updateDrawState(android.text.TextPaint paint) {
+            paint.setTypeface(face);
+        }
     }
 }

@@ -181,24 +181,49 @@ public final class DetailActivity extends Tonal {
 
     /** A song: the cover over its name, its folders, its format and who shares it. */
     private void buildSong() {
-        LinearLayout.LayoutParams coverSize = new LinearLayout.LayoutParams(dp(64), dp(64));
+        LinearLayout.LayoutParams coverSize = new LinearLayout.LayoutParams(dp(76), dp(76));
         coverSize.gravity = Gravity.CENTER_HORIZONTAL;
         coverSize.topMargin = dp(4);
         page.addView(cover, coverSize);
-        TextView title = centred(name(), 15, getColor(R.color.text));
+        TextView title = centred(name(), 16, getColor(R.color.text));
         title.setTypeface(BOLD);
         title.setPadding(dp(12), dp(8), dp(12), 0);
         page.addView(title);
         String folders = hit != null ? hit.folders() : entry.folders;
         if (folders.length() > 0) {
-            TextView where = centred(folders, 11, getColor(R.color.text_muted));
-            where.setPadding(dp(12), dp(3), dp(12), 0);
+            TextView where = centred(folders, 10.5f, getColor(R.color.text_muted));
+            where.setPadding(dp(12), dp(2), dp(12), 0);
             page.addView(where);
         }
         if (hit != null) {
-            page.addView(tagLine(hit.formats(), hit.specs(), true));
+            page.addView(chips());
             page.addView(sharer());
         }
+    }
+
+    /** "MP3 · 320 kbps", "4:41", "10.8 MB": a song's facts as outlined chips, centred. */
+    private View chips() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_HORIZONTAL);
+        row.setPadding(dp(8), dp(8), dp(8), 0);
+        List<String> parts = new ArrayList<String>(java.util.Arrays.asList(hit.specs().split(" · ")));
+        parts.remove("");
+        if (hit.formats().length() > 0) {
+            if (parts.isEmpty()) parts.add(hit.formats());
+            else parts.set(0, hit.formats() + " · " + parts.get(0));
+        }
+        for (String part : parts) {
+            TextView chip = text(part, 10, getColor(R.color.text_muted));
+            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+            chip.setSingleLine(true);
+            chip.setBackgroundResource(R.drawable.chip);
+            chip.setPadding(dp(7), dp(2), dp(7), dp(2));
+            LinearLayout.LayoutParams size = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            size.setMargins(dp(2), 0, dp(2), 0);
+            row.addView(chip, size);
+        }
+        return row;
     }
 
     /** An album: its cover beside its folder, the folders above it, and its files. */
@@ -226,8 +251,9 @@ public final class DetailActivity extends Tonal {
         if (hit != null) {
             View tags = tagLine(hit.formats(), hit.specs(), false);
             page.addView(tags);
-            View who = sharer();
-            ((TextView) who).setGravity(Gravity.START);
+            LinearLayout who = (LinearLayout) sharer();
+            who.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+            who.setPadding(dp(10), dp(5), dp(12), 0);
             page.addView(who);
         }
     }
@@ -310,12 +336,17 @@ public final class DetailActivity extends Tonal {
     }
 
     /** Who shares it, how fast, and whether they have a slot free: Soulseek, undisguised. */
-    private TextView sharer() {
-        TextView who = centred(hit.source(), 11, getColor(R.color.text_muted));
-        who.setPadding(dp(10), dp(5), dp(12), 0);
+    private View sharer() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+        row.setPadding(dp(12), dp(6), dp(12), 0);
+        TextView who = text(hit.source(), 11, getColor(R.color.text_muted));
+        who.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f);
         who.setCompoundDrawablePadding(dp(3));
         who.setCompoundDrawablesRelative(icon(R.drawable.ic_person, R.color.text_muted, 11), null, null, null);
-        return who;
+        row.addView(who);
+        return row;
     }
 
     /** An album's files, numbered, with their lengths and each one's state. */
@@ -397,7 +428,8 @@ public final class DetailActivity extends Tonal {
             case Download.SAVED: {
                 List<String> files = job != null && job.state == Download.SAVED ? job.files : savedFiles();
                 String where = files.isEmpty() ? "" : files.size() == 1 ? Files.shown(files.get(0)) : Files.folderOf(files);
-                String title = job != null && job.note.length() > 0 ? job.note : "Saved";
+                String top = where.indexOf('/') > 0 ? where.substring(0, where.indexOf('/')) : "";
+                String title = job != null && job.note.length() > 0 ? job.note : top.length() > 0 ? "Saved to " + top : "Saved";
                 if (job == null && entry != null && entry.time > 0) {
                     title = "Saved " + DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(entry.time));
                 }

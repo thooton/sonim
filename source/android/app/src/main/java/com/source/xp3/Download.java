@@ -77,7 +77,8 @@ final class Download {
         final String title;
         /** The folders a music result sits in, or a book's author. */
         final String folders;
-        int state = QUEUED;
+        // Idle until queue() takes it; queue() passes over a job already waiting or running.
+        int state = IDLE;
         /** What it is doing now, while it runs. */
         String phase = "";
         long done;

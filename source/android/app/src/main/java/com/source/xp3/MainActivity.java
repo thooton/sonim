@@ -55,6 +55,7 @@ public final class MainActivity extends Tonal {
     private static final int ASK_STORAGE = 1;
     private static final String BOOK = Download.BOOK;
     private static final String[] MODES = {Music.SONG, Music.ALBUM, BOOK};
+    private static final int[] TAB_NAMES = {R.string.tab_song, R.string.tab_album, R.string.tab_book};
 
     /** What the content area shows. */
     private static final int HOME = 0;
@@ -65,7 +66,11 @@ public final class MainActivity extends Tonal {
 
     private EditText query;
     private View searchBox;
-    private TextView[] tabs;
+    private ImageView searchIcon;
+    private View searchClear;
+    private LinearLayout[] tabs;
+    private ImageView[] tabIcons;
+    private TextView[] tabLabels;
     private View header;
     private ProgressBar spinner;
     private TextView statusView;
@@ -110,11 +115,9 @@ public final class MainActivity extends Tonal {
         softKeys();
         query = (EditText) findViewById(R.id.query);
         searchBox = findViewById(R.id.search);
-        tabs = new TextView[] {
-            (TextView) findViewById(R.id.tab_song),
-            (TextView) findViewById(R.id.tab_album),
-            (TextView) findViewById(R.id.tab_book),
-        };
+        searchIcon = (ImageView) findViewById(R.id.search_icon);
+        searchClear = findViewById(R.id.search_clear);
+        buildTabs((LinearLayout) findViewById(R.id.tabs));
         header = findViewById(R.id.header);
         spinner = (ProgressBar) findViewById(R.id.spinner);
         statusView = (TextView) findViewById(R.id.status);
@@ -129,7 +132,7 @@ public final class MainActivity extends Tonal {
         resultList.setAdapter(adapter);
         resultList.setSelector(new android.graphics.drawable.ColorDrawable(0));
         resultList.setCacheColorHint(0);
-        storage = new StorageCard(this);
+        storage = new StorageCard(this, true);
         buildSkeleton();
 
         for (String m : MODES) if (m.equals(prefs().getString("mode", Music.SONG))) mode = m;
@@ -151,6 +154,7 @@ public final class MainActivity extends Tonal {
 
             @Override
             public void afterTextChanged(Editable s) {
+                searchClear.setVisibility(s.length() > 0 ? View.VISIBLE : View.GONE);
                 showKeys();
             }
         });
@@ -302,7 +306,9 @@ public final class MainActivity extends Tonal {
             }
         }
         if (screen == HOME && picked < 0) home.post(() -> home.smoothScrollTo(0, 0));
-        searchBox.setActivated(picked < 0 && !Download.searching());
+        boolean typing = picked < 0 && !Download.searching();
+        searchBox.setActivated(typing);
+        searchIcon.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(typing ? R.color.accent : R.color.text_muted)));
         showKeys();
     }
 
@@ -312,7 +318,9 @@ public final class MainActivity extends Tonal {
         String text = said;
         if (text.length() == 0 && screen != HOME && mine()) text = Download.status();
         if (text.length() == 0 && !login.ready()) text = "No command center";
-        statusView.setText(text);
+        CharSequence shown = text;
+        if (said.length() == 0 && screen == RESULTS && mine()) shown = found();
+        statusView.setText(shown);
         statusView.setTextColor(getColor(searching ? R.color.accent : R.color.text_muted));
         spinner.setVisibility(searching ? View.VISIBLE : View.GONE);
         String option = null;
@@ -342,11 +350,11 @@ public final class MainActivity extends Tonal {
             centre = "Stop";
             icon = R.drawable.ic_stop;
         } else if (picked < 0) {
-            if (query.getText().toString().trim().length() > 0) {
+            if (query.getText().toString().trim().length() == 0 && hitsBehindLog()) {
+                centre = "Results";
+            } else {
                 centre = "Search";
                 icon = R.drawable.ic_search;
-            } else if (hitsBehindLog()) {
-                centre = "Results";
             }
         } else if (screen == RESULTS) {
             String key = keyAt(picked);
@@ -405,14 +413,15 @@ public final class MainActivity extends Tonal {
         }
         if (storage.getParent() != null) ((ViewGroup) storage.getParent()).removeView(storage);
         LinearLayout.LayoutParams card = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        card.setMargins(dp(8), dp(8), dp(8), 0);
+        card.setMargins(dp(10), dp(10), dp(10), 0);
         homeList.addView(storage, card);
         pick(storage, () -> startActivity(new Intent(this, DownloadsActivity.class)), "Downloads", R.drawable.ic_download);
     }
 
     private void section(String title) {
-        TextView view = line(title, 11, getColor(R.color.text_muted));
-        view.setPadding(dp(12), dp(7), dp(12), dp(3));
+        TextView view = line(title, 10.5f, getColor(R.color.text_muted));
+        view.setTypeface(MEDIUM);
+        view.setPadding(dp(12), dp(8), dp(12), dp(4));
         homeList.addView(view);
     }
 
@@ -421,20 +430,24 @@ public final class MainActivity extends Tonal {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setBackgroundResource(R.drawable.row_pick);
-        row.setPadding(dp(12), dp(4), dp(12), dp(4));
+        row.setPadding(dp(12), 0, dp(14), 0);
+        row.setMinimumHeight(dp(34));
         ImageView icon = new ImageView(this);
         icon.setBackgroundResource(R.drawable.round_tonal);
         icon.setImageDrawable(icon(glyph(search.mode), R.color.text_muted, 12));
         icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        icon.setPadding(dp(5), dp(5), dp(5), dp(5));
-        row.addView(icon, new LinearLayout.LayoutParams(dp(22), dp(22)));
-        TextView label = line(search.query, 13, getColor(R.color.text));
+        icon.setPadding(dp(6), dp(6), dp(6), dp(6));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        TextView label = line(search.query, 12.5f, getColor(R.color.text));
         label.setId(android.R.id.text1);
         label.setTypeface(BOLD);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
-        label.setPadding(dp(10), 0, 0, 0);
+        label.setPadding(dp(8), 0, dp(6), 0);
         row.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        ImageView back = new ImageView(this);
+        back.setImageDrawable(icon(R.drawable.ic_north_west, R.color.text_muted, 12));
+        row.addView(back, new LinearLayout.LayoutParams(dp(12), dp(12)));
         pick(row, () -> {
             setMode(search.mode);
             query.setText(search.query);
@@ -605,13 +618,57 @@ public final class MainActivity extends Tonal {
 
     // ---- Modes.
 
+    /** Song, Album and Book: each a pill with its icon beside its name, centred. */
+    private void buildTabs(LinearLayout track) {
+        tabs = new LinearLayout[MODES.length];
+        tabIcons = new ImageView[MODES.length];
+        tabLabels = new TextView[MODES.length];
+        for (int i = 0; i < MODES.length; i++) {
+            LinearLayout tab = new LinearLayout(this);
+            tab.setOrientation(LinearLayout.HORIZONTAL);
+            tab.setGravity(Gravity.CENTER);
+            tab.setBackgroundResource(R.drawable.tab_pill);
+            ImageView icon = new ImageView(this);
+            tab.addView(icon, new LinearLayout.LayoutParams(dp(12), dp(12)));
+            TextView label = line(getString(TAB_NAMES[i]), 11.5f, 0);
+            label.setSingleLine(true);
+            label.setPadding(dp(4), 0, 0, 0);
+            tab.addView(label);
+            LinearLayout.LayoutParams size = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1);
+            if (i > 0) size.leftMargin = dp(2);
+            track.addView(tab, size);
+            tabs[i] = tab;
+            tabIcons[i] = icon;
+            tabLabels[i] = label;
+        }
+    }
+
+    /** "Songs · 24 found", the count in the text's own colour. */
+    private CharSequence found() {
+        String what = books() ? "Books" : Music.ALBUM.equals(mode) ? "Albums" : "Songs";
+        String count;
+        if (books()) {
+            Books.Page page = Download.results();
+            count = page == null ? "" : page.pages > 1 ? "page " + page.page + " of " + page.pages : page.books.size() + " found";
+        } else {
+            count = hitList().size() + " found";
+        }
+        android.text.SpannableStringBuilder out = new android.text.SpannableStringBuilder(what + " · ");
+        int start = out.length();
+        out.append(count);
+        out.setSpan(new android.text.style.ForegroundColorSpan(getColor(R.color.text)), start, out.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        out.setSpan(new Face(BOLD), start, out.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return out;
+    }
+
     private void showMode() {
         for (int i = 0; i < MODES.length; i++) {
             boolean on = MODES[i].equals(mode);
+            int ink = getColor(on ? R.color.on_accent_container : R.color.text_muted);
             tabs[i].setSelected(on);
-            tabs[i].setTextColor(getColor(on ? R.color.on_accent_container : R.color.text_muted));
-            tabs[i].setTypeface(on ? BOLD : android.graphics.Typeface.DEFAULT);
-            tabs[i].setCompoundDrawablesRelative(icon(glyph(MODES[i]), on ? R.color.on_accent_container : R.color.text_muted, 13), null, null, null);
+            tabLabels[i].setTextColor(ink);
+            tabLabels[i].setTypeface(on ? BOLD : MEDIUM);
+            tabIcons[i].setImageDrawable(icon(glyph(MODES[i]), on ? R.color.on_accent_container : R.color.text_muted, 12));
         }
         if (Music.ALBUM.equals(mode)) query.setHint(R.string.hint_album);
         else if (books()) query.setHint(R.string.hint_book);
@@ -650,7 +707,6 @@ public final class MainActivity extends Tonal {
         String text = query.getText().toString().trim();
         if (text.length() == 0) {
             if (hitsBehindLog()) backToResults();
-            else if (rows() > 0) movePick(1);
             return;
         }
         if (!login.ready()) {

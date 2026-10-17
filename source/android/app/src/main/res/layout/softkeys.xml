@@ -17,39 +17,39 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:fontFamily="sans-serif-medium"
+        android:fontFamily="@font/dm_sans_semibold"
         android:gravity="start"
         android:includeFontPadding="false"
         android:singleLine="true"
-        android:textColor="@color/text"
-        android:textSize="@dimen/text_label" />
+        android:textColor="@color/text_muted"
+        android:textSize="11sp" />
 
     <TextView
         android:id="@+id/key_centre"
         android:layout_width="wrap_content"
-        android:layout_height="20dp"
+        android:layout_height="19dp"
         android:background="@drawable/softkey_pill"
         android:drawablePadding="4dp"
         android:gravity="center"
         android:includeFontPadding="false"
         android:maxWidth="120dp"
-        android:paddingLeft="12dp"
-        android:paddingRight="12dp"
+        android:paddingLeft="13dp"
+        android:paddingRight="13dp"
         android:singleLine="true"
         android:ellipsize="end"
         android:textColor="@color/on_accent"
-        android:textSize="@dimen/text_label"
-        android:textStyle="bold" />
+        android:fontFamily="@font/dm_sans_bold"
+        android:textSize="11sp" />
 
     <TextView
         android:id="@+id/key_right"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:fontFamily="sans-serif-medium"
+        android:fontFamily="@font/dm_sans_semibold"
         android:gravity="end"
         android:includeFontPadding="false"
         android:singleLine="true"
-        android:textColor="@color/text"
-        android:textSize="@dimen/text_label" />
+        android:textColor="@color/text_muted"
+        android:textSize="11sp" />
 </LinearLayout>

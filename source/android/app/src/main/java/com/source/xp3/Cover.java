@@ -11,7 +11,9 @@ import com.source.xp3.net.Music;
 
 /**
  * A drawn cover, since neither Soulseek nor the book source sends artwork:
- * the name's initials on one of the cover tones, in a shape that says what
+ * the name's initials on a gradient between two of the cover tones (as the
+ * proposal's generated covers run from one container tone to another), in
+ * a shape that says what
  * it is. A song is a rounded square; an album the same square with a second
  * record behind it; a book a 2:3 cover with a darker spine. A failed
  * download's cover loses its colour, and a detail page's cover can carry a
@@ -47,6 +49,7 @@ final class Cover extends View {
         float h = getHeight();
         int tone = Monogram.tone(name, Tonal.COVERS.length);
         int fill = getContext().getColor(muted ? R.color.container_highest : Tonal.COVERS[tone]);
+        int fillTo = getContext().getColor(muted ? R.color.container_high : Tonal.COVERS[(tone + 2) % Tonal.COVERS.length]);
         int ink = getContext().getColor(muted ? R.color.text_muted : Tonal.INKS[tone]);
         float textX;
         float size;
@@ -58,39 +61,43 @@ final class Cover extends View {
                 bh = w * 3 / 2;
             }
             rect.set((w - bw) / 2, (h - bh) / 2, (w + bw) / 2, (h + bh) / 2);
-            float radius = bw * 0.1f;
-            paint.setColor(fill);
+            float radius = bw * 0.16f;
+            shade(fill, fillTo);
             canvas.drawRoundRect(rect, radius, radius, paint);
+            paint.setShader(null);
             // The spine: the cover's ink, faint, down its left edge.
             float spine = bw * 0.13f;
             canvas.save();
             canvas.clipRect(rect.left, rect.top, rect.left + spine, rect.bottom);
-            paint.setColor(ink & 0x00FFFFFF | 0x2E000000);
+            paint.setColor(0x4D000000);
             canvas.drawRoundRect(rect, radius, radius, paint);
             canvas.restore();
             textX = rect.centerX() + spine / 2;
-            size = bw * 0.4f;
+            size = bw * 0.38f;
         } else {
             float side = Math.min(w, h);
             if (Music.ALBUM.equals(kind)) {
-                float front = side * 0.86f;
+                float front = side * 0.9f;
                 float offset = side - front;
                 float left = (w - side) / 2;
                 float top = (h - side) / 2;
-                float radius = front * 0.26f;
+                float radius = front * 0.3f;
                 rect.set(left + offset, top, left + offset + front, top + front);
-                paint.setColor(getContext().getColor(R.color.cover_back));
+                // The record behind: the outline colour at 45%.
+                paint.setColor(getContext().getColor(R.color.outline) & 0x00FFFFFF | 0x73000000);
                 canvas.drawRoundRect(rect, radius, radius, paint);
                 rect.set(left, top + offset, left + front, top + offset + front);
-                paint.setColor(fill);
+                shade(fill, fillTo);
                 canvas.drawRoundRect(rect, radius, radius, paint);
-                size = front * 0.36f;
+                paint.setShader(null);
+                size = front * 0.32f;
             } else {
                 rect.set((w - side) / 2, (h - side) / 2, (w + side) / 2, (h + side) / 2);
                 float radius = side * 0.28f;
-                paint.setColor(fill);
+                shade(fill, fillTo);
                 canvas.drawRoundRect(rect, radius, radius, paint);
-                size = side * 0.36f;
+                paint.setShader(null);
+                size = side * 0.32f;
             }
             textX = rect.centerX();
         }
@@ -103,6 +110,12 @@ final class Cover extends View {
             canvas.drawText(initials, textX, baseline, paint);
         }
         if (badge == Download.SAVED || badge == Download.FAILED) drawBadge(canvas);
+    }
+
+    /** A 135 degree gradient across `rect`, as CSS draws linear-gradient(135deg, from, to). */
+    private void shade(int from, int to) {
+        paint.setColor(0xFF000000);
+        paint.setShader(new android.graphics.LinearGradient(rect.left, rect.top, rect.right, rect.bottom, from, to, android.graphics.Shader.TileMode.CLAMP));
     }
 
     /** A round badge on the cover's lower right corner, ringed in the page's colour. */

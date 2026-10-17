@@ -246,8 +246,12 @@ departs from it where the proposal does:
 - **A dark theme.** `values-night` holds Material 3's dark roles for the same
   seed. The phone has no dark setting, so Options switches it, by giving
   the app's activities a night configuration (`Tonal.attachBaseContext`).
-- **Bold, not Medium.** Row titles, tabs, page titles and the soft-key pill
-  are Roboto Bold (`Tonal.BOLD`), as the proposal's type scale has them.
+- **DM Sans, and Bold rather than Medium.** The proposal's face, bundled as
+  static instances of Google Fonts' variable DM Sans at its 14pt optical
+  size (OFL): row titles, the picked tab, page titles and the soft-key pill
+  in Bold, labels and the soft keys' sides in SemiBold, tabs at rest in
+  Medium, everything else regular (`Tonal.FONT` and the rest, and
+  `@font/dm_sans_family` in the theme).
 - **Pill tabs** in a tonal track, each with the icon of what it finds, and a
   pill search field with a search icon that rings in `accent` while it takes
   the keys.
@@ -268,7 +272,8 @@ departs from it where the proposal does:
 - **Folders always show.** A music result's folders, as the sharer named
   them, are a line of their own under its name, cut from the start so the
   deepest folders stay in view; a detail page shows them whole. Who shares
-  it, and how fast, stays on every row.
+  it stays on every row, after a short "320 · 10.8 MB" in the mockup's
+  manner; its length and the sharer's speed are on its page.
 - **Wavy means moving.** `Wavy` draws progress as a sine path whose phase
   drifts while the download runs; failed, it goes straight and still in the
   error colour.

@@ -15,7 +15,6 @@
     <color name="text_muted">#49454F</color>
     <color name="outline">#79747E</color>
     <color name="outline_variant">#CAC4D0</color>
-    <color name="input_hint">#79747E</color>
 
     <!-- primary and primaryContainer: the one key action, progress and focus
          rings; the focused row, the picked tab and tonal buttons. -->
@@ -55,8 +54,6 @@
     <color name="cover_5_ink">#2A1800</color>
     <color name="cover_6">#BCEBF0</color>
     <color name="cover_6_ink">#002022</color>
-    <!-- The record behind an album's cover. -->
-    <color name="cover_back">#D5CFDB</color>
 
     <!-- The family's names. -->
     <color name="primary">#FEF7FF</color>

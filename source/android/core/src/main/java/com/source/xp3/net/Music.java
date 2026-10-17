@@ -163,6 +163,32 @@ public final class Music {
             return bytes;
         }
 
+        /**
+         * What a row has room for beside its format tag: "320 · 8.1 MB",
+         * "2 files · 16/44.1 · 47.7 MB". The units and the length are on
+         * the result's own page.
+         */
+        public String brief() {
+            int low = Integer.MAX_VALUE;
+            int high = 0;
+            int depth = 0;
+            int rate = 0;
+            for (Track t : tracks) {
+                if (t.bitrate > 0) {
+                    low = Math.min(low, t.bitrate);
+                    high = Math.max(high, t.bitrate);
+                }
+                depth = Math.max(depth, t.bitDepth);
+                rate = Math.max(rate, t.sampleRate);
+            }
+            List<String> parts = new ArrayList<String>();
+            if (album()) parts.add(tracks.size() + (tracks.size() == 1 ? " file" : " files"));
+            if (high > 0) parts.add((low == high ? "" : low + "-") + high);
+            else if (depth > 0 && rate > 0) parts.add(depth + "/" + trim(rate / 1000.0));
+            if (bytes() > 0) parts.add(human(bytes()));
+            return join(parts, " · ");
+        }
+
         /** As meta(), without the formats, which a tag beside it shows. */
         public String specs() {
             return describe(false);
