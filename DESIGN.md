@@ -161,13 +161,12 @@ rules where Apple's page differs:
   to what it paints; a coloured tile with its initial for one that isn't on
   the phone), the name, the date of its newest change ("Today", "Yesterday",
   "Jun 15, 2019"), and on the right the capsule: UPDATE, OPEN or GET in bold
-  blue capitals on `#EFEFF4`. Under it, full width, what's new and a blue
-  "more". While an app downloads, the capsule becomes the App Store's ring
+  blue capitals on `#EFEFF4`. Under it, full width, the start of what's new
+  (no "more": What's New is in the menu). While an app downloads, the capsule becomes the App Store's ring
   with its stop square; while it waits or installs, the ring spins.
 - **Focus as a press.** The row under the d-pad greys as an iOS cell does
   while it is touched, and its capsule fills blue with white text, as the
-  button does while pressed. OK presses it. Right moves to "more" (filled the
-  same way), which opens What's New. Update All sits on the bar's right, as
+  button does while pressed. OK presses it. Update All sits on the bar's right, as
   on iOS 12, reached with Up from the top row.
 - **What's new comes from commits.** CI builds every app on each push, so
   the subject of an app's newest commit ("Mail: drop the conversation's

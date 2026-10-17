@@ -3,7 +3,8 @@
      group when it is the first in it ("Available", "Installed", "Not
      Installed"), then its icon, its name, the date of its newest change and
      on the right UPDATE, OPEN or GET (or the download ring while it is being
-     worked on); under that, full width, what's new in it and a blue "more".
+     worked on); under that, full width, the first line or two of what's new
+     in it (the whole of it is under What's New in the menu).
 
      The heading is part of the row rather than a row of its own so that list
      positions stay one per app; only the cell below it greys under the
@@ -115,38 +116,16 @@
             </FrameLayout>
         </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/app_notes_line"
+        <TextView
+            android:id="@+id/app_notes"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="7dp"
-            android:orientation="horizontal">
-            <TextView
-                android:id="@+id/app_notes"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:lineSpacingExtra="1dp"
-                android:maxLines="2"
-                android:textColor="@color/text"
-                android:textSize="@dimen/text_notes" />
-            <TextView
-                android:id="@+id/app_more"
-                android:layout_width="wrap_content"
-                android:layout_height="18dp"
-                android:layout_gravity="bottom"
-                android:layout_marginLeft="4dp"
-                android:background="@drawable/link"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:paddingLeft="5dp"
-                android:paddingRight="5dp"
-                android:singleLine="true"
-                android:text="more"
-                android:textColor="@color/link_text"
-                android:textSize="@dimen/text_notes" />
-        </LinearLayout>
+            android:ellipsize="end"
+            android:lineSpacingExtra="1dp"
+            android:maxLines="2"
+            android:textColor="@color/text"
+            android:textSize="@dimen/text_notes" />
     </LinearLayout>
 
     <View
