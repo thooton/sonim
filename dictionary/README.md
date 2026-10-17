@@ -1,16 +1,16 @@
 # Dictionary, for the Sonim XP3
 
-An offline English dictionary for the XP3's 240x320 screen and d-pad, laid out as the [Dictionary.com app](https://play.google.com/store/apps/details?id=com.dictionary) is: its search capsule, its Word of the Day card, its recent searches, and a word's page with Definitions and Thesaurus tabs. It has no permissions and no dependencies.
+An offline English dictionary for the XP3's 240x320 screen and d-pad: a home page with the Word of the Day under a search capsule, each word's page with Definitions and Thesaurus tabs, and a search with recent searches and suggestions as you type. It has no permissions and no dependencies.
 
-| Key | Home and a word's page | Searching |
-| --- | --- | --- |
-| Menu | Open the search | Close it |
-| OK | Home: open the Word of the Day. A word: say it (when the phone has text-to-speech). On the search capsule: open the search | Open the row picked, or else the best match |
-| Up / Down | Scroll; Up from the top reaches the search capsule | Move through Clear and the rows |
-| Left / Right | Definitions / Thesaurus | Move the cursor |
-| Back | Back a page; leave from home | Close it and go back to where you were |
+| Key | Home | A word's page | Searching |
+| --- | --- | --- | --- |
+| OK | Open the Word of the Day | A menu: Pronounce (read the word aloud) or Search | Open the row picked, or else the best match |
+| Menu | Open the search | Open the search | Close it |
+| Up / Down | Scroll | Scroll | Move through Clear and the rows |
+| Left / Right | | Definitions / Thesaurus | Move the cursor |
+| Back | Leave | Back a page | Close it and go back to where you were |
 
-The rows change as you type: the word's dictionary form first when that is what you typed (mice: mouse, went: go, biggest: big), then every word that begins with what you typed. Red text means nothing matches. The words you open from the search are kept as Recent Searches (Clear empties them). The Word of the Day is picked from the date, so it changes at midnight and is the same all day.
+The Word of the Day is picked from the date: a plain word of six to twelve letters with an example among its meanings, the same all day and new at midnight. The search's rows change as you type: the word's dictionary form first when that is what you typed (mice: mouse, went: go, biggest: big), then every word that begins with what you typed. Red text means nothing matches. The words you open from the search are kept as Recent Searches (Clear empties them). The Thesaurus tab is WordNet's synonyms for each meaning, and is left out for a word that has none. Pronounce uses the phone's text-to-speech, and is greyed out if the phone has none for English.
 
 ## Data
 
@@ -39,4 +39,4 @@ python3 tools/build_dict.py wordnet app/src/main/assets
 
 WordNet licence: WordNet 3.1 Copyright 2011 by Princeton University. All rights reserved. The full notice is in [WORDNET_LICENSE](WORDNET_LICENSE) and ships inside the APK.
 
-The type is IBM Plex Sans and IBM Plex Serif, the faces Dictionary.com's screenshots are set in, cut down to Latin-1 (`app/src/main/res/font`). They are under the SIL Open Font License 1.1, in [PLEX_LICENSE](PLEX_LICENSE), which also ships inside the APK.
+The type is IBM Plex Sans and IBM Plex Serif, cut down to Latin-1 (`app/src/main/res/font`). They are under the SIL Open Font License 1.1, in [PLEX_LICENSE](PLEX_LICENSE), which also ships inside the APK.

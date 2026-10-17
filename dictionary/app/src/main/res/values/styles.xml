@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Light chrome: a white status bar with dark icons, as Dictionary.com's. -->
+    <!-- Light chrome: a white status bar with dark icons. -->
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:colorPrimary">@color/page</item>
         <item name="android:colorPrimaryDark">@color/page</item>

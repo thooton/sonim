@@ -1,20 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Dictionary.com's: the app's ink and greys from its icons, its blues
-         from dictionary.com's stylesheet, the rest sampled from its Play
-         Store screenshots. -->
+    <!-- Near-black ink and cool greys on white, one blue for focus and the
+         search button, dark red for Clear, green under synonyms. -->
     <color name="page">#FFFFFF</color>
     <color name="ink">#252528</color>
     <color name="text_muted">#54525F</color>
     <color name="hint">#6E6E78</color>
     <color name="icon_faint">#CCCCD1</color>
+    <color name="icon_faint_dark">#838390</color>
     <color name="hairline">#E5E6EA</color>
     <color name="example_rule">#EBEBED</color>
     <color name="blue">#0057FF</color>
     <color name="highlight">#EBF2FF</color>
     <color name="search_button">#BDD9FF</color>
-    <color name="tab_strip">#EBEBEF</color>
-    <color name="navy">#00248B</color>
     <color name="clear">#8F1A06</color>
     <color name="synonym">#00B414</color>
     <color name="not_found">#B3261E</color>

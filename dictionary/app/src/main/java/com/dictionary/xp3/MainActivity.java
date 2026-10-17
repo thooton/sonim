@@ -22,6 +22,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -35,15 +36,14 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * The dictionary, laid out as the Dictionary.com app is.
+ * The dictionary: home, a word's page, and the search, under a search capsule.
  *
- * Home is the Word of the Day under the search capsule. Menu (or OK on the
- * capsule) opens the search, which lists recent searches and, as a query is
- * typed, the words it could mean; OK opens the one picked, or the best match.
- * A word's page has the headword and two tabs, Definitions and Thesaurus,
- * which Left and Right switch between; Up and Down scroll it, and Up from its
- * top reaches the capsule. OK says the word when the phone can speak. Back
- * goes back a page, and leaves from home.
+ * Home is the Word of the Day; OK opens it. A word's page has the headword
+ * and two tabs, Definitions and Thesaurus, which Left and Right switch
+ * between; Up and Down scroll it, and OK opens a menu to pronounce the word
+ * or search. Menu opens the search anywhere. The search lists recent searches and, as a query is typed, the
+ * words it could mean; OK opens the one picked, or the best match. Back goes
+ * back a page, and leaves from home.
  */
 public class MainActivity extends Activity {
 
@@ -61,7 +61,6 @@ public class MainActivity extends Activity {
     private int page = HOME;
     private final List<Integer> back = new ArrayList<>();
     private boolean thesaurus;
-    private boolean onCapsule;
     private boolean searching;
     private int wordOfTheDay;
 
@@ -80,16 +79,11 @@ public class MainActivity extends Activity {
     private Typeface semiboldItalic;
     private Typeface serif;
 
-    private View brand;
     private ImageView nav;
-    private View capsule;
     private EditText search;
     private ScrollView home;
-    private View wotd;
     private ScrollView entry;
     private TextView headword;
-    private ImageView speaker;
-    private ImageView wotdSpeaker;
     private TextView tabDefinitions;
     private TextView tabThesaurus;
     private TextView body;
@@ -107,16 +101,11 @@ public class MainActivity extends Activity {
         semiboldItalic = getResources().getFont(R.font.plex_sans_semibold_italic);
         serif = getResources().getFont(R.font.plex_serif_semibold);
 
-        brand = findViewById(R.id.brand);
         nav = findViewById(R.id.nav);
-        capsule = findViewById(R.id.pill);
         search = findViewById(R.id.search);
         home = findViewById(R.id.home);
-        wotd = findViewById(R.id.wotd);
         entry = findViewById(R.id.entry);
         headword = findViewById(R.id.headword);
-        speaker = findViewById(R.id.speaker);
-        wotdSpeaker = findViewById(R.id.wotd_speaker);
         tabDefinitions = findViewById(R.id.tab_definitions);
         tabThesaurus = findViewById(R.id.tab_thesaurus);
         body = findViewById(R.id.body);
@@ -156,15 +145,12 @@ public class MainActivity extends Activity {
         showWordOfTheDay();
         show();
 
-        // The speaker appears once the phone's text-to-speech says it can
-        // speak English.
+        // Pronounce works once the phone's text-to-speech says it can speak
+        // English.
         tts = new TextToSpeech(this, status -> {
-            if (status != TextToSpeech.SUCCESS || tts == null) return;
-            speaks = tts.setLanguage(Locale.US) >= TextToSpeech.LANG_AVAILABLE;
-            if (speaks) runOnUiThread(() -> {
-                wotdSpeaker.setVisibility(View.VISIBLE);
-                if (page != HOME) speaker.setVisibility(View.VISIBLE);
-            });
+            if (status == TextToSpeech.SUCCESS && tts != null) {
+                speaks = tts.setLanguage(Locale.US) >= TextToSpeech.LANG_AVAILABLE;
+            }
         });
     }
 
@@ -209,7 +195,7 @@ public class MainActivity extends Activity {
             return true;
         }
         if (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            if (first && page != HOME && !onCapsule) {
+            if (first && page != HOME) {
                 boolean right = key == KeyEvent.KEYCODE_DPAD_RIGHT;
                 if (right != thesaurus && tabThesaurus.getVisibility() == View.VISIBLE) {
                     thesaurus = right;
@@ -219,11 +205,9 @@ public class MainActivity extends Activity {
             return true;
         }
         if (isOk(key)) {
-            if (first) {
-                if (onCapsule) openSearch();
-                else if (page == HOME) open(wordOfTheDay);
-                else speak(display(page, dictionary.senses(page)));
-            }
+            // On the release, so it does not land on the menu just opened.
+            if (released && page != HOME) showActions();
+            else if (first && page == HOME) open(wordOfTheDay);
             return true;
         }
         if (key == KeyEvent.KEYCODE_MENU) {
@@ -244,26 +228,12 @@ public class MainActivity extends Activity {
             || key == KeyEvent.KEYCODE_NUMPAD_ENTER;
     }
 
-    /** Up and Down off the search: scroll, or step between the capsule and the page. */
+    /** Up and Down off the search: a screenful at a time. */
     private void move(int direction) {
-        if (onCapsule) {
-            if (direction > 0) setOnCapsule(false);
-            return;
-        }
         ScrollView scroll = page == HOME ? home : entry;
-        if (direction < 0 && scroll.getScrollY() == 0) {
-            setOnCapsule(true);
-            return;
-        }
         int line = body.getLineHeight();
         int step = Math.max(scroll.getHeight() - 2 * line, line);
         scroll.smoothScrollBy(0, direction * step);
-    }
-
-    private void setOnCapsule(boolean on) {
-        onCapsule = on;
-        capsule.setBackgroundResource(on ? R.drawable.search_pill_focused : R.drawable.search_pill);
-        wotd.setBackgroundResource(page == HOME && !on ? R.drawable.wotd_card_focused : R.drawable.wotd_card);
     }
 
     // Pages
@@ -286,16 +256,13 @@ public class MainActivity extends Activity {
     }
 
     private void show() {
-        boolean atHome = page == HOME;
-        brand.setVisibility(atHome && !searching ? View.VISIBLE : View.GONE);
-        getWindow().setStatusBarColor(getColor(atHome && !searching ? R.color.tab_strip : R.color.page));
-        nav.setImageResource(atHome && !searching ? R.drawable.ic_menu : R.drawable.ic_back);
-        home.setVisibility(atHome && !searching ? View.VISIBLE : View.GONE);
-        entry.setVisibility(!atHome && !searching ? View.VISIBLE : View.GONE);
+        // The back arrow shows only where Back has somewhere to go.
+        nav.setVisibility(searching || page != HOME ? View.VISIBLE : View.GONE);
+        home.setVisibility(page == HOME && !searching ? View.VISIBLE : View.GONE);
+        entry.setVisibility(page != HOME && !searching ? View.VISIBLE : View.GONE);
         results.setVisibility(searching ? View.VISIBLE : View.GONE);
-        setOnCapsule(false);
         if (searching) return;
-        if (atHome) {
+        if (page == HOME) {
             home.scrollTo(0, 0);
             home.requestFocus();
         } else {
@@ -308,7 +275,6 @@ public class MainActivity extends Activity {
         List<Dictionary.Sense> senses = dictionary.senses(page);
         String word = display(page, senses);
         headword.setText(word);
-        speaker.setVisibility(speaks ? View.VISIBLE : View.GONE);
         // A word WordNet gives no synonyms for has no Thesaurus tab.
         boolean any = false;
         for (Dictionary.Sense sense : senses) any |= !synonyms(word, sense).isEmpty();
@@ -316,13 +282,29 @@ public class MainActivity extends Activity {
         tabThesaurus.setVisibility(any ? View.VISIBLE : View.GONE);
         styleTab(tabDefinitions, !thesaurus);
         styleTab(tabThesaurus, thesaurus);
-        body.setText(thesaurus ? thesaurus(word, senses) : definitions(word, senses));
+        body.setText(thesaurus ? thesaurus(word, senses) : definitions(senses));
         entry.scrollTo(0, 0);
     }
 
     private void styleTab(TextView tab, boolean open) {
         tab.setTypeface(open ? semibold : sans);
         tab.setBackgroundResource(open ? R.drawable.tab_selected : 0);
+    }
+
+    /** OK on a word: a menu over the headword, to hear it or to search. */
+    private void showActions() {
+        PopupMenu menu = new PopupMenu(this, headword);
+        menu.getMenu().add(0, 1, 0, R.string.pronounce).setEnabled(speaks);
+        menu.getMenu().add(0, 2, 1, R.string.search);
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) {
+                tts.speak(headword.getText(), TextToSpeech.QUEUE_FLUSH, null, "word");
+            } else {
+                openSearch();
+            }
+            return true;
+        });
+        menu.show();
     }
 
     private void showWordOfTheDay() {
@@ -337,10 +319,6 @@ public class MainActivity extends Activity {
         pos.setTypeface(sansItalic);
         pos.setText(label(senses.get(0).pos));
         this.<TextView>findViewById(R.id.wotd_gloss).setText(definition(senses.get(0).gloss));
-    }
-
-    private void speak(String word) {
-        if (speaks && tts != null) tts.speak(word, TextToSpeech.QUEUE_FLUSH, null, "word");
     }
 
     // Search
@@ -451,7 +429,7 @@ public class MainActivity extends Activity {
         return header;
     }
 
-    /** A row as Dictionary.com lists one: an icon, the word, and an arrow, over a hairline. */
+    /** A row: an icon, the word, and an arrow, over a hairline. */
     private void addRow(int index, int icon, String typed) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
@@ -520,17 +498,13 @@ public class MainActivity extends Activity {
     // Text
 
     /**
-     * Definition for aura
-     *
      * noun
      * 1  a distinctive and pervasive quality or character; air; atmosphere:
      *    | an aura of respectability
      */
-    private CharSequence definitions(String word, List<Dictionary.Sense> senses) {
+    private CharSequence definitions(List<Dictionary.Sense> senses) {
         SpannableStringBuilder text = new SpannableStringBuilder();
         int muted = getColor(R.color.text_muted);
-        append(text, "Definition for ", new Spans.Font(sans), new ForegroundColorSpan(muted), size(11));
-        append(text, word, new Spans.Font(semibold), new ForegroundColorSpan(muted), size(11));
         char pos = 0;
         int number = 0;
         for (Dictionary.Sense sense : senses) {
