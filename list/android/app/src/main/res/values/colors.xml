@@ -15,7 +15,7 @@
     <color name="divider">#E1E3E1</color>
     <color name="field_fill">#F0F4F9</color>
 
-    <!-- Google blue: the chosen tab, a finished task's tick, Save. -->
+    <!-- Google blue: a finished task's tick, Save. -->
     <color name="accent">#0B57D0</color>
     <!-- The d-pad's row: Material 3's secondary container, the pale blue
          Google's own apps put behind the chosen item. -->
@@ -28,7 +28,6 @@
     <color name="text_muted">#444746</color>
     <color name="done_text">#5E5E5E</color>
     <color name="icon">#444746</color>
-    <color name="star_off">#C4C7C5</color>
     <color name="check_box">#444746</color>
     <color name="save_off">#A0A3A6</color>
 
@@ -36,7 +35,4 @@
     <color name="menu">#E9EEF6</color>
     <color name="sheet">#F0F4F9</color>
 
-    <!-- The floating add button: primary container, with its own ink. -->
-    <color name="fab">#C2E7FF</color>
-    <color name="on_fab">#001D35</color>
 </resources>

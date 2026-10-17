@@ -29,22 +29,21 @@ assistant's writes and are kept, tested, for any future second writer.
 
 ## Look: a copy of Google Tasks
 
-The main screen deliberately copies Google Tasks' (from its Play Store
-screenshots), not the family look in `../DESIGN.md`: "Tasks" centred on the
-#F0F4F9 page, a tab strip (starred tab, then "My Tasks" underlined in
-#0B57D0), the list as white 12dp-cornered cards, an outlined star on every
-open task, finished tasks under a foldable "Completed (n)" card with a blue
-tick and strikethrough, a #C2E7FF rounded-square add button, and a bottom
-sheet with "New task" and Save for writing. Colours are in
-`res/values/colors.xml`. The tabs, stars, sort and overflow icons are
-decoration: there is one list and no starring.
+The main screen deliberately copies Google Tasks' list (from its Play Store
+screenshots), not the family look in `../DESIGN.md`, pared down at the
+user's request to the list alone: on the #F0F4F9 page, a white
+12dp-cornered "To-do" card of open tasks, and under it a foldable
+"Completed" card (no count) whose tasks have a blue #0B57D0 tick and
+strikethrough. Writing is in a bottom sheet with "New task" and Save.
+Colours are in `res/values/colors.xml`. There is deliberately no title, tab
+strip, add button, stars, or icons beside the To-do heading.
 
 `ItemAdapter` draws both cards in one ListView: its positions are *rows*
 (heading, tasks, empty note, gap, Completed, done tasks), each holding its
 item's checklist index. Only tasks and Completed are selectable. Open tasks
 stay in checklist order; Move up/down skip finished items in between, and
 Insert below an open task puts the new one straight after it. New tasks
-from Add a task (Menu or the add button) go to the top.
+from Add a task (on Menu) go to the top.
 
 ## UI rules
 

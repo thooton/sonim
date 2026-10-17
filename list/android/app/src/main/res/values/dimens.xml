@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Google Tasks scaled to the XP3's 240x320 mdpi panel. Under the 24dp
-         status bar: a 32dp title, a 30dp tab strip, then 234dp of cards,
-         room for the list's heading and five one-line tasks. -->
-    <dimen name="tab_underline">3dp</dimen>
-
-    <dimen name="title_height">32dp</dimen>
-    <dimen name="tabs_height">30dp</dimen>
+    <!-- Google Tasks' cards scaled to the XP3's 240x320 mdpi panel. Under
+         the 24dp status bar the cards have all 296dp: the To-do heading and
+         about six one-line tasks. -->
     <dimen name="card_margin">6dp</dimen>
     <dimen name="card_radius">12dp</dimen>
     <dimen name="card_gap">6dp</dimen>
@@ -18,8 +14,4 @@
     <dimen name="text_item">14sp</dimen>
     <dimen name="check_size">18dp</dimen>
     <dimen name="check_gap">10dp</dimen>
-    <dimen name="star_size">18dp</dimen>
-
-    <dimen name="fab_size">44dp</dimen>
-    <dimen name="fab_margin">10dp</dimen>
 </resources>
