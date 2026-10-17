@@ -4,9 +4,9 @@ An offline English dictionary for the XP3's 240x320 screen and d-pad: a home pag
 
 | Key | Home | A word's page | Searching |
 | --- | --- | --- | --- |
-| OK | Open the Word of the Day | A menu: Pronounce (read the word aloud) or Search | Open the row picked, or else the best match |
-| Menu | Open the search | Open the search | Close it |
-| Up / Down | Scroll | Scroll | Move through Clear and the rows |
+| Menu | A menu: Word of the Day or Search | A menu: Pronounce (read the word aloud) or Search | Close it |
+| OK | | | Open the row picked, or else the best match |
+| Up / Down | Scroll; Up from the top moves into the search box | Scroll; Up from the top moves into the search box | Move through Clear and the rows |
 | Left / Right | | Definitions / Thesaurus | Move the cursor |
 | Back | Leave | Back a page | Close it and go back to where you were |
 
