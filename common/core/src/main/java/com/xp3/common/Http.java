@@ -366,6 +366,16 @@ public final class Http {
         }
 
         /**
+         * One response header, or "" when absent: a redirect's Location is
+         * the one a caller following it by hand needs, since redirects are
+         * never followed here.
+         */
+        public String header(String name) {
+            String value = connection.getHeaderField(name);
+            return value == null ? "" : value;
+        }
+
+        /**
          * Drops the connection first, then closes the stream. The other way
          * round, Android's HTTP stack drains whatever is left of a chunked body
          * before it lets go, which for an event stream means waiting on the

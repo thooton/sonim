@@ -2,9 +2,11 @@
 
 ## Purpose and scope
 
-This file applies to the whole repository. This is a deliberately small,
-dependency-free Android homework client for the Sonim XP3. It reads Canvas,
-caches assignments for offline use. It used to have a model-backed chat tab;
+This file applies to the whole repository. This is a dependency-free Android
+Canvas client for the Sonim XP3, built to the Week Strip design (see
+`../DESIGN.md`): the to-do week, classes, assignment pages, adding and turning
+in work, grades, comments, quizzes, notifications and reminders, all cached
+for offline use. It used to have a model-backed chat tab;
 that was removed, and `Store.forgetChat` deletes the conversation and model
 login older versions left on the phone. Do not bring a model back
 incidentally.
@@ -17,8 +19,11 @@ Preserve the product's defining constraints:
   party libraries.
 - `:core` is plain Java, compiles with `--release 8`, and must run unchanged on
   Android API 27.
-- Canvas access is read-only by construction. Never add submission, grading,
-  comment, file-upload, or arbitrary-URL capabilities as incidental changes.
+- Canvas writes are limited by construction to the student's own work: a
+  submission (text, files, URL), a private comment on it, a discussion
+  reply, a planner check mark, and a classic quiz attempt. Each is a fixed
+  route in `Canvas.java`. Never add grading, other users' data, course
+  changes, or arbitrary-URL capabilities, and never add a write incidentally.
 - Offline data and partial results are preferable to a blank screen or an
   all-or-nothing failure.
 
@@ -40,15 +45,24 @@ rationale comments beside the implementation.
   - `net/Canvas.java`, `RemoteCookies.java`, and `Cookies.java` implement
     fixed Canvas routes and short-lived cookie access over the shared bounded
     `Http` (`common/core`).
-    Some `Canvas` routes (posts, pages, grading, `due`) were the chat's and
-    are now unused by the app; they remain read-only and tested.
+    `grading`, `enrollment`, `gradingStandard` and `due` are unused leftovers
+    from the chat; they remain tested.
+  - `data/Course`, `ClassData`, `Detail`, `Draft`, `Notice`, `Prefs`,
+    `Quiz` and `Reminders` model classes, class pages, an assignment's page,
+    saved work and how it becomes one submission (`Draft.plan`),
+    notifications, settings, quizzes and reminder times.
 - `android/app`: Android UI and orchestration.
-  - `MainActivity.java` owns screens, focus, key handling, and main-thread UI
-    state.
+  - `MainActivity.java` owns the screen stack, the softkey bar, overlays,
+    key routing, sync and turn-in orchestration.
+  - Each screen is a `Screen` subclass that rebuilds its whole view from its
+    state; `MainActivity` restores focus by `Item.key` afterwards.
+  - `Look` (palette, fonts, text scale), `Views` and `Parts` (shared shapes),
+    `Item` (a focusable row and how it shows focus), `MarkText` (the
+    highlighter), `WeekStrip` and `Sheet` (menus, choices, questions) are
+    the visual system. Everything is built in code; there are no layouts.
+  - `TurnInJob` sends queued turn-ins when the phone reconnects; `Alarms`
+    posts the reminders chosen in Settings.
   - `Backend.java` is the only bridge from the UI to disk and network work.
-  - The adapters own painted selection state.
-  - Repeated row shapes are XML layouts. Screens whose contents are dynamic are
-    assembled in `MainActivity`.
   - The shared `Markdown` (`common/ui`, also used by Delta) renders the
     dialect emitted by core `Html.java`; changes to one side often require
     checking the other.
@@ -85,10 +99,14 @@ generation/version check).
   score or graded state.
 - Personal due-date overrides, including an explicit null override, have
   distinct meaning. Unpublished assignments stay hidden.
-- Sections are grouped by due date, including Done. Week boundaries and labels
-  are centralized in `Dates` and currently use Sunday-through-Saturday weeks.
-- Assignment bodies are fetched lazily. A successful sync must carry already-
-  cached details onto replacement objects before saving them.
+- Missing is grouped by week; Done by Returned, then Turned in. Week
+  boundaries are centralized in `Dates` and follow Settings (Monday, Sunday,
+  or the phone's region).
+- Assignment details are fetched lazily and kept in their own files
+  (`details/`), so a sync replacing the work list cannot drop them.
+- Drafts (`drafts/`) are saved before anything is sent; a turn-in records
+  each uploaded file's id so a retry does not resend it, and the draft is
+  deleted only once Canvas has the submission.
 - Startup shows the last good cache before fetching. One unreadable course is
   a partial sync with an `unavailable` entry, not a reason to discard all other
   courses.
@@ -104,8 +122,12 @@ failures, and persistence round trips.
 
 Treat these as code-level guarantees, not prompt suggestions:
 
-- Canvas routes are fixed in `Canvas.java`, use GET, and interpolate only
-  positive numeric IDs validated by `Canvas.id`.
+- Canvas routes are fixed in `Canvas.java` and interpolate only positive
+  numeric IDs validated by `Canvas.id` or `Canvas.number`. Writes carry the
+  session's CSRF token, are retried only after a 401, and are never resent
+  after a connection failure (a duplicate is a second attempt the teacher
+  sees). Upload storage hosts and download redirects never get the cookie
+  unless they are Canvas's own host and path.
 - Validate Canvas pagination against the configured origin and `/api/v1/`
   path. Do not follow redirects carrying credentials.
 - Both user-configured endpoints remain HTTPS-only; the manifest also disables
@@ -128,16 +150,19 @@ tests with mocks that bypass the wire format.
 Do not assume touch, a large viewport, or a software Send button. Preserve
 d-pad reachability and visible selection for every action.
 
-- The first three tab indices intentionally equal `Assignment.ASSIGNED`,
-  `MISSING`, and `DONE`.
+- The home tab indices intentionally equal `Assignment.ASSIGNED`, `MISSING`,
+  and `DONE`.
+- Yellow (`Look.mark`) means focus and nothing else. Every screen names its
+  three keys in the softkey bar. Left softkey arrives as MENU or SOFT_LEFT;
+  every right-softkey shortcut is also reachable from Options.
 - Reusable dimensions and colors belong in resources. Check every added label
   at 240px width and every screen at 320px height; one extra row is material.
 - Lists act on OK key release. Sonim firmware may report OK as either
   `KEYCODE_DPAD_CENTER` or `KEYCODE_ENTER`.
-- Let `ListView` own ordinary up/down selection and scrolling. Do not broadly
-  intercept arrow keys.
-- Left/right switches tabs, except inside a text field while the caret can
-  still move; at a text edge it returns to tab navigation.
+- Let the platform's focus search and `ScrollView` own ordinary up/down
+  movement. Screens intercept only the keys the design gives them (days,
+  tabs, pages, digits).
+- Left/right move along time on the home screen and switch tabs on a class.
 - A redraw must preserve the relevant selection, scroll anchor and focus.
 - Detail and settings screens hide or restore navigation deliberately. Back and
   Clear behavior require manual verification after related changes.

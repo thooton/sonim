@@ -36,14 +36,44 @@ public final class Sync {
     public static final class Result {
 
         public final List<Assignment> work;
+        /** Every active class, in the order the Classes screen lists them. */
+        public final List<Course> courses;
         /** Courses that could not be read, by name, for the banner. */
         public final List<String> unavailable;
         public final long fetchedAt;
 
         public Result(List<Assignment> work, List<String> unavailable, long fetchedAt) {
+            this(work, new ArrayList<Course>(), unavailable, fetchedAt);
+        }
+
+        /**
+         * The student's planner check marks: assignment id to the override
+         * that records it, and which of them are ticked. The override id is
+         * kept so unticking updates that record instead of adding another.
+         */
+        public final java.util.Map<String, String> overrides;
+        public final java.util.Set<String> checked;
+
+        public Result(List<Assignment> work, List<Course> courses, List<String> unavailable, long fetchedAt) {
+            this(work, courses, unavailable, fetchedAt, new java.util.HashMap<String, String>(),
+                new java.util.HashSet<String>());
+        }
+
+        public Result(List<Assignment> work, List<Course> courses, List<String> unavailable, long fetchedAt,
+                      java.util.Map<String, String> overrides, java.util.Set<String> checked) {
             this.work = work;
+            this.courses = courses;
             this.unavailable = unavailable;
             this.fetchedAt = fetchedAt;
+            this.overrides = overrides;
+            this.checked = checked;
+        }
+
+        public Course course(String id) {
+            for (Course course : courses) {
+                if (course.id.equals(id)) return course;
+            }
+            return null;
         }
 
         public boolean complete() {
@@ -54,8 +84,10 @@ public final class Sync {
     public Result run() throws IOException, InterruptedException {
         List<Assignment> work = new ArrayList<>();
         List<String> unavailable = new ArrayList<>();
-        for (Object entry : canvas.courses(true)) {
-            Map<String, Object> course = Json.object(entry);
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (Object entry : canvas.courses(true)) records.add(Json.object(entry));
+        List<Course> courses = courses(records);
+        for (Map<String, Object> course : records) {
             String name = courseName(course);
             String id;
             try {
@@ -64,6 +96,11 @@ public final class Sync {
                 unavailable.add(name);
                 continue;
             }
+            Course known = null;
+            for (Course candidate : courses) {
+                if (candidate.id.equals(id)) known = candidate;
+            }
+            if (known != null) name = known.title;
             try {
                 for (Object item : canvas.assignments(id)) {
                     if (work.size() >= MAX_WORK) break;
@@ -76,20 +113,57 @@ public final class Sync {
                 unavailable.add(name);
             }
         }
-        return new Result(work, unavailable, System.currentTimeMillis());
+        java.util.Map<String, String> overrides = new java.util.HashMap<>();
+        java.util.Set<String> checked = new java.util.HashSet<>();
+        try {
+            for (Object entry : canvas.plannerOverrides()) {
+                Map<String, Object> override = Json.object(entry);
+                if (!"assignment".equals(Json.text(override, "plannable_type"))) continue;
+                String assignment = optionalId(override, "plannable_id");
+                String id = optionalId(override, "id");
+                if (assignment == null || id == null) continue;
+                overrides.put(assignment, id);
+                if (Json.flag(override, "marked_complete")) checked.add(assignment);
+            }
+        } catch (IOException e) {
+            // Check marks are a convenience; the work itself is what this
+            // sync is for, and it is complete without them.
+        }
+        return new Result(work, courses, unavailable, System.currentTimeMillis(), overrides, checked);
     }
 
-    /** The instructions for one assignment, fetched when its page is opened. */
-    public String details(Assignment item) throws IOException, InterruptedException {
-        Map<String, Object> full = canvas.assignment(item.courseId, item.assignmentId);
-        String body = Html.toMarkdown(Json.text(full, "description"));
-        String locked = Json.text(full, "lock_explanation");
-        if (body.trim().length() == 0) {
-            body = locked != null ? Html.toMarkdown(locked) : "No instructions were posted.";
-        } else if (locked != null) {
-            body = Html.toMarkdown(locked) + "\n\n" + body;
+    /**
+     * The classes, each with a colour that stays put: colours are dealt out
+     * in the order of the course codes, so a sync that returns the courses in
+     * another order, or a refresh mid-term, does not repaint anything.
+     */
+    static List<Course> courses(List<Map<String, Object>> records) {
+        List<Map<String, Object>> sorted = new ArrayList<>(records);
+        java.util.Collections.sort(sorted, (left, right) -> {
+            String a = Course.split(Json.text(left, "name"), Json.text(left, "course_code"))[0];
+            String b = Course.split(Json.text(right, "name"), Json.text(right, "course_code"))[0];
+            return a.compareToIgnoreCase(b);
+        });
+        List<Course> courses = new ArrayList<>();
+        for (Map<String, Object> record : sorted) {
+            Course course = Course.from(record, courses.size() % Course.COLORS);
+            if (course != null) courses.add(course);
         }
-        return body;
+        return courses;
+    }
+
+    /** Everything about one assignment that a list leaves out, fetched when its page is opened. */
+    public Detail details(Assignment item) throws IOException, InterruptedException {
+        Map<String, Object> full = canvas.assignment(item.courseId, item.assignmentId);
+        Map<String, Object> submission;
+        try {
+            submission = canvas.submission(item.courseId, item.assignmentId);
+        } catch (IOException e) {
+            // The instructions are still worth showing without the student's
+            // own work under them; the page says the rest could not be read.
+            submission = null;
+        }
+        return Detail.from(full, submission, System.currentTimeMillis());
     }
 
     static String courseName(Map<String, Object> course) {
@@ -128,9 +202,37 @@ public final class Sync {
         Double points = Json.number(record, "points_possible");
         Double score = Json.number(submission, "score");
 
+        List<String> kinds = new ArrayList<>();
+        for (Object kind : Json.children(record, "submission_types")) {
+            if (kind instanceof String) kinds.add((String) kind);
+        }
+        String quiz = record.get("quiz_id") instanceof Number ? optionalId(record, "quiz_id") : null;
+        String topic = null;
+        Map<String, Object> discussion = Json.child(record, "discussion_topic");
+        if (discussion.get("id") instanceof Number) topic = optionalId(discussion, "id");
+        // Returned means graded with a score the student can see. Canvas
+        // withholds a score that has not been posted, so its presence is
+        // the test, and "graded" alone (a teacher mid-way through) is not.
+        boolean returned = score != null && "graded".equals(Json.text(submission, "workflow_state"));
+        Double allowed = Json.number(record, "allowed_attempts");
+        Double attempt = Json.number(submission, "attempt");
+
         return new Assignment(courseId, id, title.trim(), courseName, due,
             points == null ? 0 : points.doubleValue(), missing, done,
-            time(Json.text(submission, "submitted_at")), score, excused);
+            time(Json.text(submission, "submitted_at")), score, excused,
+            kinds, quiz, topic, returned, time(Json.text(submission, "graded_at")),
+            Json.text(submission, "grade"),
+            allowed == null || allowed.doubleValue() <= 0 ? -1 : (int) allowed.doubleValue(),
+            attempt == null ? 0 : (int) attempt.doubleValue(),
+            Json.flag(record, "locked_for_user"));
+    }
+
+    private static String optionalId(Map<String, Object> record, String key) {
+        try {
+            return Canvas.id(record, key);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /**
@@ -141,7 +243,7 @@ public final class Sync {
      * instead, and a date that fails to parse silently would move a piece of
      * work into "No due date" where nobody would look for it.
      */
-    static Long time(String value) {
+    public static Long time(String value) {
         if (value == null || value.trim().length() == 0) return null;
         try {
             return Long.valueOf(Instant.parse(value.trim()).toEpochMilli());

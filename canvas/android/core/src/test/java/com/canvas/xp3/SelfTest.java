@@ -1,7 +1,9 @@
 package com.canvas.xp3;
 
+import com.canvas.xp3.data.ClassroomTests;
 import com.canvas.xp3.data.DataTests;
 import com.canvas.xp3.net.NetTests;
+import com.canvas.xp3.net.WriteTests;
 import com.xp3.common.Check;
 
 /**
@@ -18,7 +20,9 @@ public final class SelfTest {
     public static void main(String[] args) {
         Check check = new Check();
         NetTests.run(check);
+        WriteTests.run(check);
         DataTests.run(check);
+        ClassroomTests.run(check);
         if (!check.report()) System.exit(1);
     }
 }

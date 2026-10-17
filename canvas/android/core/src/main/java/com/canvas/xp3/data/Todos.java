@@ -16,10 +16,36 @@ public final class Todos {
 
     private final List<Assignment> work = new ArrayList<>();
 
+    /**
+     * Assignment ids the student has ticked off in the planner: work with
+     * nothing to turn in, marked done by hand. They count as done here and
+     * nowhere else, since Canvas's own record of them has not changed.
+     */
+    private final java.util.Set<String> checked = new java.util.HashSet<>();
+
     /** Swaps in what a sync, or the cache read at startup, just produced. */
     public void replace(List<Assignment> next) {
         work.clear();
         if (next != null) work.addAll(next);
+    }
+
+    public void check(java.util.Collection<String> assignmentIds) {
+        checked.clear();
+        if (assignmentIds != null) checked.addAll(assignmentIds);
+    }
+
+    public boolean checked(Assignment item) {
+        return checked.contains(item.assignmentId);
+    }
+
+    public java.util.Set<String> checkedIds() {
+        return new java.util.HashSet<>(checked);
+    }
+
+    /** The item's list, counting a planner check mark as done. */
+    public int state(Assignment item, long now) {
+        if (!item.done && checked.contains(item.assignmentId)) return Assignment.DONE;
+        return item.state(now);
     }
 
     public boolean isEmpty() {
@@ -40,7 +66,7 @@ public final class Todos {
     public List<Assignment> inState(int state, long now) {
         List<Assignment> matching = new ArrayList<>();
         for (int i = 0; i < work.size(); i++) {
-            if (work.get(i).state(now) == state) matching.add(work.get(i));
+            if (state(work.get(i), now) == state) matching.add(work.get(i));
         }
         return matching;
     }
@@ -100,31 +126,90 @@ public final class Todos {
             sortByDue(earlier, false);
             collect(sections, noDate, thisWeek, lastWeek, earlier);
         } else {
-            Section noDate = new Section(Section.NO_DUE_DATE);
-            Section early = new Section(Section.DONE_EARLY);
-            Section thisWeek = new Section(Section.THIS_WEEK);
-            Section lastWeek = new Section(Section.LAST_WEEK);
-            Section earlier = new Section(Section.EARLIER);
+            // Returned work first, newest first: a grade is the news this
+            // tab exists to give. Then what is in and waiting to be graded.
+            Section returned = new Section(Section.RETURNED);
+            Section waiting = new Section(Section.TURNED_IN);
             for (Assignment item : inState(state, now)) {
-                if (item.due == null) noDate.items.add(item);
-                // Turned in on something that has not come due yet. It is
-                // grouped by that rather than by its week, because "done
-                // early" is the fact you would want back from this screen.
-                else if (item.early(now)) early.items.add(item);
-                else {
-                    int week = Dates.weeksBetween(now, item.due.longValue());
-                    if (week >= 0) thisWeek.items.add(item);
-                    else if (week == -1) lastWeek.items.add(item);
-                    else earlier.items.add(item);
-                }
+                if (item.returned || item.excused) returned.items.add(item);
+                else waiting.items.add(item);
             }
-            sortByDue(early, true);
-            sortByDue(thisWeek, false);
-            sortByDue(lastWeek, false);
-            sortByDue(earlier, false);
-            collect(sections, noDate, early, thisWeek, lastWeek, earlier);
+            sortBy(returned, item -> item.gradedAt != null ? item.gradedAt : item.turnedIn);
+            sortBy(waiting, item -> item.turnedIn != null ? item.turnedIn : item.due);
+            collect(sections, returned, waiting);
         }
         return sections;
+    }
+
+    private interface When {
+        Long of(Assignment item);
+    }
+
+    /** Newest first, with work that has no date at the end. */
+    private void sortBy(Section section, final When when) {
+        Collections.sort(section.items, (left, right) -> {
+            Long a = when.of(left);
+            Long b = when.of(right);
+            if (a == null) return b == null ? 0 : 1;
+            if (b == null) return -1;
+            return Long.compare(b.longValue(), a.longValue());
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // The week strip
+    // ------------------------------------------------------------------
+
+    /** Assigned work due on the day starting at `midnight`, earliest first. */
+    public List<Assignment> dueOn(long midnight, long now) {
+        List<Assignment> due = new ArrayList<>();
+        long end = Dates.addDays(midnight, 1);
+        for (Assignment item : inState(Assignment.ASSIGNED, now)) {
+            if (item.due != null && item.due.longValue() >= midnight && item.due.longValue() < end) due.add(item);
+        }
+        Collections.sort(due, (a, b) -> Long.compare(a.due.longValue(), b.due.longValue()));
+        return due;
+    }
+
+    /** Assigned work with no due date, which sits under every week. */
+    public List<Assignment> undated(long now) {
+        List<Assignment> found = new ArrayList<>();
+        for (Assignment item : inState(Assignment.ASSIGNED, now)) {
+            if (item.due == null) found.add(item);
+        }
+        return found;
+    }
+
+    /**
+     * The day the home screen opens on: today, unless nothing is left this
+     * week, in which case the first day with work due, wherever it falls.
+     * Opening on an empty week with work waiting the next is a screen that
+     * says "nothing" while being wrong.
+     */
+    public long openingDay(long now) {
+        long today = Dates.dayOf(now);
+        Long first = null;
+        for (Assignment item : inState(Assignment.ASSIGNED, now)) {
+            if (item.due == null) continue;
+            if (first == null || item.due.longValue() < first.longValue()) first = item.due;
+        }
+        if (first == null) return today;
+        if (Dates.weeksBetween(now, first.longValue()) <= 0) return today;
+        return Dates.dayOf(first.longValue());
+    }
+
+    /** The next or previous day with assigned work, or null. */
+    public Long dayWithWork(long midnight, int direction, long now) {
+        Long best = null;
+        for (Assignment item : inState(Assignment.ASSIGNED, now)) {
+            if (item.due == null) continue;
+            long day = Dates.dayOf(item.due.longValue());
+            if (direction > 0 ? day <= midnight : day >= midnight) continue;
+            if (best == null || (direction > 0 ? day < best.longValue() : day > best.longValue())) {
+                best = Long.valueOf(day);
+            }
+        }
+        return best;
     }
 
     private void collect(List<Section> into, Section... candidates) {
