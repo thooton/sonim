@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An app's cell: white, and grey while the d-pad is on it, as an iOS table
+     cell greys while it is touched. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true"><color android:color="@color/focus_fill" /></item>
+    <item><color android:color="@color/row" /></item>
+</selector>

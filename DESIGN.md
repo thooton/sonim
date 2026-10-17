@@ -1,7 +1,7 @@
 # The family look
 
-How the light, list-and-form apps (Canvas, List, Mail, Places, Serve, Source,
-Updater) are drawn, so they read as siblings of Charge and Books rather than
+How the light, list-and-form apps (Canvas, List, Mail, Places, Serve, Source)
+are drawn, so they read as siblings of Charge and Books rather than
 as stock Android with a coloured bar. The pieces live in `common/ui`
 (`Family`, `res/drawable/family_*`, `res/values/family*.xml`); this is why
 they look the way they do. Charge and Books keep their own looks.
@@ -81,7 +81,6 @@ would otherwise lay that wash over the whole page.
 | Places | `#0F3624` | `#A3C6B2` | `#1D6A45` | `#EAF5EF` |
 | Serve | `#0D3236` | `#9CC3C6` | `#11707A` | `#E7F4F5` |
 | Source | `#291741` | `#BBA9D3` | `#6334A3` | `#F2EDFA` |
-| Updater | `#1B2633` | `#A8B6C6` | `#2B5E92` | `#EAF1F8` |
 
 Mail's row is Thunderbird's: see below. Each pair was checked for contrast:
 the dim header text is at least 7:1 on its header, the accent at least 4.5:1
@@ -146,3 +145,33 @@ A place's own screen (`PlacePage`) takes its layout from Maps' place sheet:
   stars, Google's summary marked with the accent's sparkle, then each review
   with its writer's initial in a circle). Headings are 14sp Medium on the
   page, in line with the text on the cards.
+
+## Updater: as the App Store shows it
+
+The Updater takes its look from the App Store's Updates page, since that is
+the screen people know for keeping apps up to date. It sets aside the family
+rules where Apple's page differs:
+
+- **Apple's chrome and colours.** A near-white bar (`#F9F9F9`) with a grey
+  hairline under it and "Updates" centred in it, the status bar the same
+  colour with dark icons. Black names, iOS's secondary grey (`#8E8E93`) for
+  dates, its separator grey for hairlines (inset on both sides) and its
+  system blue (`#007AFF`) for everything that can be pressed.
+- **Large bold section headings.** Available, Installed and Not Installed,
+  at 18sp bold, as "Updated Recently" is on the App Store.
+- **Apple's rows.** A rounded-square icon (an installed app's own, cropped
+  to what it paints; a coloured tile with its initial for one that isn't on
+  the phone), the name, the date of its newest change ("Today", "Yesterday",
+  "Jun 15, 2019"), and on the right the capsule: UPDATE, OPEN or GET in bold
+  blue capitals on `#EFEFF4`. Under it, full width, what's new and a blue
+  "more". While an app downloads, the capsule becomes the App Store's ring
+  with its stop square; while it waits or installs, the ring spins.
+- **Focus as a press.** The row under the d-pad greys as an iOS cell does
+  while it is touched, and its capsule fills blue with white text, as the
+  button does while pressed. OK presses it. Right moves to "more" (filled the
+  same way), which opens What's New. Update All sits on the bar's right, as
+  on iOS 12, reached with Up from the top row.
+- **What's new comes from commits.** CI builds every app on each push, so
+  the subject of an app's newest commit ("Mail: drop the conversation's
+  position from the bar") is what's new in its APK, and its date is the
+  App Store's date. Without them the rows show the version instead.

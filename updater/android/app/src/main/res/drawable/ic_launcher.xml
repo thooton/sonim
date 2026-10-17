@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- An arrow coming down into a tray: a download that lands on the phone. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#33475B" android:pathData="M4,4h40v40h-40z" />
+<!-- An arrow coming down into a tray on the App Store's blue: a download that
+     lands on the phone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:pathData="M4,4h40v40h-40z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="24" android:startY="4" android:endX="24" android:endY="44" android:startColor="#1AC8FC" android:endColor="#1D6FF2" />
+        </aapt:attr>
+    </path>
     <path android:fillColor="#FFFFFF" android:pathData="M21,9h6v13h6l-9,10l-9,-10h6z" />
-    <path android:fillColor="#B4C0CC" android:pathData="M10,29h4v6h20v-6h4v10h-28z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M10,29h4v6h20v-6h4v10h-28z" />
 </vector>

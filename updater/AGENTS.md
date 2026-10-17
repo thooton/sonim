@@ -21,9 +21,19 @@ app as:
 - **Not installed**: no app with that package on the phone.
 - **Up to date**, or **newer than** the release (a hand-installed build).
 
-Menu, OK or holding OK opens the stock context menu beside the app (as in
-List): Update, Install, or Reinstall (for an app already current), plus
-Update all and Check again. Chosen apps go one at a time: download to
+The screen is drawn as the App Store's Updates page (see "Updater: as the App
+Store shows it" in `../DESIGN.md`): groups Available, Installed and Not
+Installed, each row with its icon, the date of its newest change, an UPDATE,
+OPEN or GET capsule and what's new. What's new is read from the repository's
+newest 100 commits (`core/Notes`, from `api.github.com`), whose subjects lead
+with the apps they change; if that fetch fails the rows show versions.
+
+OK presses the row's capsule (UPDATE and GET queue the app, OPEN launches
+it, the ring of an app still waiting takes it out of the line). Right moves
+to "more", where OK opens What's New. Update All is on the bar, Up from the
+top row. Menu or holding OK opens the stock context menu beside the app (as
+in List): Update, Get, Open, Reinstall, What's New, Update All and Check
+Again. Chosen apps go one at a time: download to
 `files/apks/<app>.apk`, check that the APK is the package the release names,
 signed with the phone's copy's key and not older than it, then hand it to
 Installer (`../installer`) through `ApkProvider` with `package` set, so
@@ -36,12 +46,14 @@ so a result with no message is settled by looking at the phone's copy
 (`lastUpdateTime` and `versionName`) a moment later. Back while working only
 sends the task to the back, so a download keeps going.
 
-- `android/core`: `Version`, `Catalog` (the two files), `Status`,
+- `android/core`: `Version`, `Catalog` (the two files), `Status`, `Notes`
+  (what's new, from commit subjects, and the App Store's dates),
   `Releases` (fetches and downloads over HttpURLConnection, following
   GitHub's redirect to its file host). Tests in `src/test` run via
   `:core:selfTest`, including a download through a local server.
-- `android/app`: `MainActivity` (the list, its keys, the menu and the
-  install queue), `AppAdapter` (rows), `ApkProvider` (serves a downloaded
+- `android/app`: `MainActivity` (the list, its keys, the menu, What's New
+  and the install queue), `AppAdapter` (rows), `ProgressRing` (the download
+  ring), `Icons` (rounded app icons), `ApkProvider` (serves a downloaded
   APK read-only to the installer).
 
 ## Build and validation

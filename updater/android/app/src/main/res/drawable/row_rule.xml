@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- A row's own hairline, which the focus card hides: the row's selected
-     state reaches it along with the rest of the row. -->
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_selected="true"><color android:color="@color/row" /></item>
-    <item><color android:color="@color/divider" /></item>
-</selector>
