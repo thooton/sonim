@@ -4,6 +4,9 @@
          and for Google. Dialing a place goes through the phone's own dialer,
          which needs no permission. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- TEMPORARY: for LocationTest, to see whether the phone can locate itself. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 

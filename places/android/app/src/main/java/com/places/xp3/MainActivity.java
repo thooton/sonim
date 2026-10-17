@@ -193,6 +193,14 @@ public final class MainActivity extends BaseActivity {
         refresh();
     }
 
+    /** TEMPORARY: see LocationTest. Runs the test once location is allowed, or says it wasn't. */
+    @Override
+    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        if (request != LocationTest.REQUEST) return;
+        if (results.length > 0 && results[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) LocationTest.start(this);
+        else toast("Location not allowed");
+    }
+
     @Override
     protected void onPause() {
         saveNear();
@@ -775,6 +783,8 @@ public final class MainActivity extends BaseActivity {
                 }));
             }
         }
+        // TEMPORARY: see LocationTest.
+        choices.add(new Choice(R.drawable.ic_place, "Test location", () -> LocationTest.start(this)));
         choices.add(new Choice(R.drawable.ic_cloud, "Command center\u2026", () -> askLogin()));
         choose(choices);
     }
