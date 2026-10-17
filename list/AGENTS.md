@@ -25,8 +25,8 @@ assistant's writes and are kept, tested, for any future second writer.
   `:core:selfTest` with the shared `Check` harness.
 - `android/app`: `MainActivity` (the list, its keys and its popup menu),
   `Backend` (the only bridge to disk; owns the shared `Checklist`) and
-  `ItemAdapter`. The bar at the top is a single, always-selected tab that
-  serves as the title.
+  `ItemAdapter`. There is no header: the list starts at the top of the
+  screen.
 
 ## UI rules
 

@@ -49,7 +49,6 @@ public final class MainActivity extends BaseActivity {
 
     private Backend backend;
     private FrameLayout content;
-    private TextView countView;
 
     private final ExecutorService saves = Ui.worker("list-save");
 
@@ -93,7 +92,6 @@ public final class MainActivity extends BaseActivity {
         content = findViewById(R.id.content);
         // Every context menu is answered here; see showMenu.
         registerForContextMenu(content);
-        countView = findViewById(R.id.count);
         renderList(true);
     }
 
@@ -104,7 +102,6 @@ public final class MainActivity extends BaseActivity {
     private void renderList(boolean focus) {
         List<Item> items = backend.checklist().items();
         LinearLayout root = vertical();
-        showCount(items);
 
         if (items.isEmpty()) {
             listAdapter = null;
@@ -158,7 +155,6 @@ public final class MainActivity extends BaseActivity {
         }
         int at = Math.max(0, Math.min(position, items.size() - 1));
         listSelection = at;
-        showCount(items);
         listAdapter.replace(items);
         listAdapter.setSelectedPosition(at);
         listView.setSelection(at);
@@ -527,14 +523,5 @@ public final class MainActivity extends BaseActivity {
         Family.list(list);
         list.setItemsCanFocus(false);
         return list;
-    }
-
-    /** The header's right side: how many items, or how many of them are done. */
-    private void showCount(List<Item> items) {
-        int done = 0;
-        for (Item item : items) if (item.done) done++;
-        if (items.isEmpty()) countView.setText("");
-        else if (done == 0) countView.setText(items.size() == 1 ? "1 item" : items.size() + " items");
-        else countView.setText(done + " of " + items.size() + " done");
     }
 }

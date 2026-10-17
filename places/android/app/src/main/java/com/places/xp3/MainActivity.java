@@ -59,7 +59,6 @@ public final class MainActivity extends BaseActivity {
     private EditText near;
     private EditText query;
     private View form;
-    private TextView countView;
     private TextView statusView;
     private ListView resultList;
     private ScrollView detail;
@@ -96,7 +95,6 @@ public final class MainActivity extends BaseActivity {
         near = (EditText) findViewById(R.id.near);
         query = (EditText) findViewById(R.id.query);
         form = findViewById(R.id.form);
-        countView = (TextView) findViewById(R.id.count);
         statusView = (TextView) findViewById(R.id.status);
         resultList = (ListView) findViewById(R.id.results);
         detail = (ScrollView) findViewById(R.id.detail);
@@ -295,7 +293,6 @@ public final class MainActivity extends BaseActivity {
         form.setVisibility(showing ? View.GONE : View.VISIBLE);
         resultList.setVisibility(showing ? View.GONE : View.VISIBLE);
         detail.setVisibility(showing ? View.VISIBLE : View.GONE);
-        countView.setText((picking || showing) && !results.isEmpty() ? (picked + 1) + "/" + results.size() : "");
         adapter.notifyDataSetChanged();
         if (!showing) {
             if (!near.hasFocus() && !query.hasFocus()) query.requestFocus();

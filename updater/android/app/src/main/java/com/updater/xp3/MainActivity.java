@@ -81,6 +81,7 @@ public final class MainActivity extends BaseActivity {
     // ------------------------------------------------------------------
 
     private FrameLayout content;
+    private View bar;
     private TextView summary;
     private ListView listView;
     private AppAdapter adapter;
@@ -121,6 +122,7 @@ public final class MainActivity extends BaseActivity {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
         content = findViewById(R.id.content);
+        bar = findViewById(R.id.bar);
         summary = findViewById(R.id.summary);
         // Every context menu is answered here; see showMenu.
         registerForContextMenu(content);
@@ -231,7 +233,9 @@ public final class MainActivity extends BaseActivity {
 
     private void render() {
         List<AppAdapter.Row> rows = rows();
-        summary.setText(summaryText(rows));
+        String text = summaryText(rows);
+        summary.setText(text);
+        bar.setVisibility(text.isEmpty() ? View.GONE : View.VISIBLE);
         if (rows.isEmpty()) {
             showMessage();
             return;

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Measured against the XP3's 240x320 mdpi panel: 24dp status bar, 36dp
-         header, leaving 260dp of content. A one-line item is 40dp, so six
-         fit with room for the edge of a seventh to say the list goes on. -->
-    <dimen name="bar_height">36dp</dimen>
+    <!-- Measured against the XP3's 240x320 mdpi panel: a 24dp status bar
+         and no header, leaving 296dp of content. A one-line item is 40dp, so
+         seven fit with room for the edge of an eighth to say the list goes
+         on. -->
     <dimen name="tab_underline">3dp</dimen>
 
     <dimen name="item_min_height">40dp</dimen>

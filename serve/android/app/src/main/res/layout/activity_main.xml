@@ -1,23 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A status screen in the family's grouped style: the state and the
      address on one card, since the address is what you came for; the folder
-     on another; then the button for what OK does. -->
+     on another; then the button for what OK does. No bar naming the app:
+     you just opened it. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/page"
     android:orientation="vertical">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/bar_height"
-        android:background="@color/primary"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingLeft="@dimen/pad_h"
-        android:paddingRight="@dimen/pad_h">
-        <TextView style="@style/FamilyTitle" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/app_name" />
-    </LinearLayout>
 
     <ScrollView
         android:defaultFocusHighlightEnabled="false"
