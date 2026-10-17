@@ -14,7 +14,9 @@ CI publishes every app to the rolling `latest` release of thooton/sonim as
 (see `../.github/workflows/build-apks.yml` and `../AGENTS.md`). On opening,
 the Updater fetches the two files from
 `https://github.com/thooton/sonim/releases/download/latest/` and lists each
-app as:
+app as (each request on a connection of its own, at a URL with a query
+never used before, so Check Again sees a release made a moment ago just as
+reopening the app does):
 
 - **Update**: on the phone with an older `versionName` (compared part by
   part, numbers as numbers: `core/Version`).
