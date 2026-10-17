@@ -170,7 +170,9 @@ public final class MainActivity extends BaseActivity {
         LinearLayout column = views.column();
         content = new FrameLayout(this);
         column.addView(content, Views.tall());
-        column.addView(softkeys(), Views.wide());
+        // The softkey bar is built but not shown: the screen's rows are
+        // worth more than the labels, and the keys still do the same things.
+        softkeys();
         root.addView(column, new FrameLayout.LayoutParams(-1, -1));
         layer = new FrameLayout(this);
         root.addView(layer, new FrameLayout.LayoutParams(-1, -1));

@@ -101,8 +101,8 @@ a calm, planner-style school app built around the week.
   something is, never its status. Nothing is red; grades never change colour.
 - **Dates, not countdowns.** "Due Tuesday, Oct 20 at 10:30", drawn beside a
   tear-off calendar page. Late work "was due" and "can still be turned in".
-- **A softkey bar on every screen** names the left softkey (Options), OK and
-  the right softkey (the screen's shortcut).
+- **No softkey bar.** The left softkey opens Options and the right one is
+  the screen's shortcut, but no bar labels them; the rows get the space.
 - **Light and dark.** In the dark theme ink and paper swap and the
   highlighter stroke drops to about 42%.
 - **Its icon** stays the ticked homework sheet.
