@@ -131,10 +131,12 @@ from Maps screenshots (`res/values/colors.xml`):
 
 What changes from Maps, for the keys and the screen:
 
-- **A compact list.** A result is three lines, as Maps words them: the
-  name; "4.8 ★ (112) · $10-20 · ♿ · Cafe"; "Closed · Opens 7:00 AM · 3.5
-  mi". No photos and no chips, so three or four fit the screen and Up and
-  Down move one place at a time. The picked row doesn't grow.
+- **A compact list.** A result is a few lines, as Maps words them: the
+  name; "4.8 ★ (112) · $10-20 · ♿ · Cafe"; the full address, wrapped
+  rather than cut (Maps leaves it out, but on a list of branches it is what
+  tells them apart); "Closed · Opens 7:00 AM · 3.5 mi". No photos and no
+  chips, so two or three fit the screen and Up and Down move one place at
+  a time. The picked row doesn't grow.
 - **One page for a place, no tabs.** Up and Down scroll it: the rating,
   kind and status; one photo; address, hours, website and phone, each
   after a teal icon; then Reviews and About under headings. The name stays

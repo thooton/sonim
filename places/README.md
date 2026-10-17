@@ -8,8 +8,8 @@ with the same delta token.
 
 It takes its look from Google Maps in its dark theme, in Google Sans, laid
 out for a d-pad: what to find in the header, filter chips under it, then
-the places found as a compact list, several to a screen, each with its
-name, rating, price, kind, whether it is open and how far. Before a search,
+the places found as a compact list, each with its name, rating, price,
+kind, full address, whether it is open and how far. Before a search,
 the recent searches are listed.
 
 - **Near** (the first chip): where to search in or close to: a city, zip
