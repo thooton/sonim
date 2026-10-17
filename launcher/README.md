@@ -1,4 +1,4 @@
-# App Drawer
+# Launcher
 
 A tiny, standalone Android 8.1 app drawer for the Sonim XP3800. On first launch it
 shows:
@@ -31,7 +31,7 @@ directory and removed automatically. The local signing key is retained in
 adb install -r AppDrawer.apk
 ```
 
-Then choose **App Drawer** as the application assigned to the programmable PTT
+Then choose **Launcher** as the application assigned to the programmable PTT
 key. The first app (Todo by default) starts selected; use Left/Right and the
 D-pad center key to launch an app. If a target package is absent, its dimmed
 slot remains visible and selecting it shows a short error instead of crashing.

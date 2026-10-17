@@ -22,7 +22,7 @@ a toast rather than crashing.
 - `AndroidManifest.xml`: package, SDK compatibility, and launcher activity.
 - `src/com/custom/appdrawer/AppDrawerActivity.java`: all application logic and
   the programmatic `GridView` UI.
-- `res/`: selector, icon, colors, dimensions, strings, and theme resources.
+- `res/`: selector, vector icon (`drawable/ic_app_drawer.xml`), colors, dimensions, strings, and theme resources.
 - `res/values-mdpi/dimens.xml`: XP3800-specific mdpi icon-size override.
 - `build.sh`: complete command-line build, alignment, signing, and verification.
 - `AppDrawer.apk`: generated signed output; it is ignored by Git.
