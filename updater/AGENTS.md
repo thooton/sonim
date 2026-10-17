@@ -33,7 +33,8 @@ with the apps they change; if that fetch fails the rows show versions.
 OK presses the row's capsule (UPDATE and GET queue the app, OPEN launches
 it, the ring of an app still waiting takes it out of the line). Right moves
 to "more", where OK opens What's New. Update All is on the bar, Up from the
-top row. Menu or holding OK opens the stock context menu beside the app (as
+top row. When a check answers (on opening or Check Again) the list goes back
+to its top row, so updates it found are in view rather than below. Menu or holding OK opens the stock context menu beside the app (as
 in List): Update, Get, Open, Reinstall, What's New, Update All and Check
 Again. Chosen apps go one at a time: download to
 `files/apks/<app>.apk`, check that the APK is the package the release names,
