@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A conversation, laid out as Thunderbird's message item: the unread dot
+     and the monogram, then who and when; the subject, with a paperclip and
+     the message count after it; the start of the latest message. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingBottom="8dp"
+    android:paddingLeft="4dp"
+    android:paddingRight="@dimen/pad_h"
+    android:paddingTop="8dp">
+
+    <View
+        android:id="@+id/dot"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_gravity="center_vertical"
+        android:layout_marginLeft="2dp"
+        android:layout_marginRight="4dp"
+        android:background="@drawable/unread_dot" />
+
+    <TextView
+        android:id="@+id/avatar"
+        style="@style/Monogram"
+        android:layout_gravity="center_vertical" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/who"
+                style="@style/RowLine"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="@dimen/text_name" />
+            <ImageView
+                android:id="@+id/star"
+                android:layout_width="13dp"
+                android:layout_height="13dp"
+                android:layout_marginLeft="4dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_star_filled" />
+            <TextView
+                android:id="@+id/when"
+                style="@style/RowLine"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="5dp"
+                android:textSize="@dimen/text_meta" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingTop="3dp">
+            <TextView
+                android:id="@+id/subject"
+                style="@style/RowLine"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="@dimen/text_subject" />
+            <ImageView
+                android:id="@+id/clip"
+                android:layout_width="13dp"
+                android:layout_height="13dp"
+                android:layout_marginLeft="4dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_attachment" />
+            <TextView
+                android:id="@+id/thread"
+                style="@style/RowLine"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="4dp"
+                android:background="@drawable/thread_badge"
+                android:minWidth="16dp"
+                android:gravity="center"
+                android:paddingBottom="1dp"
+                android:paddingLeft="4dp"
+                android:paddingRight="4dp"
+                android:paddingTop="1dp"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/snippet"
+            style="@style/RowLine"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="3dp"
+            android:textSize="@dimen/text_meta" />
+    </LinearLayout>
+</LinearLayout>

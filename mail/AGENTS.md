@@ -68,8 +68,20 @@ here and keep the test in step.
   links). Tests in `src/test` run via `:core:selfTest`, against a loopback
   server standing in for the command center, Google's token endpoint and
   Gmail.
-- `android/app`: `MainActivity` (the one screen: the list, a conversation,
-  writing, the menus, the login dialog).
+- `android/app`: `MainActivity` (the one screen: the folder pane, the
+  list, a conversation, writing, the menus and their keypad shortcuts, the
+  login dialog), `Sheet` (a screen's actions: the menu, with each one's key,
+  and the lookup by key), `Pills` (address pills in To and Cc, and the
+  reader's label tags) and `Avatar` (monogram letters). Its look is
+  Thunderbird for Android's (see "Mail" in `../DESIGN.md`): keep it so, and
+  take new icons from thunderbird-android's
+  `core/ui/legacy/designsystem/src/main/res/drawable` with the same
+  attribution comment.
+- The folder pane's counts are `Gmail.counts` (`labels/{id}` for each
+  folder's `Folder.countedLabel`: unread, or every draft), fetched beside
+  the list at most once a minute. The list's paperclip is
+  `Message.hasFiles`: a named part, or a multipart/mixed body, which is all
+  a list's metadata shows.
 
 ## Credentials
 

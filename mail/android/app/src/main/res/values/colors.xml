@@ -1,31 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- An oxblood in the family's four tones (DESIGN.md): the band near
-         black, so the screen is framed rather than alarmed; the accent for
-         focus and for what is new; a pale wash behind the picked
-         conversation; and greys tinted to match. The status bar is the
-         band's own colour. -->
-    <color name="primary">#4D1711</color>
-    <color name="primary_dark">#4D1711</color>
+    <!-- Thunderbird's light palette (thunderbird-android's Bolt theme): warm
+         greys for the chrome, white for what is unread, Thunderbird blue for
+         focus, links and what is new. Mail is the one light-chromed app of
+         the family (DESIGN.md): its bar is the surface, not a dark band. -->
+    <color name="primary">#004F9B</color>
+    <color name="primary_dark">#F1EDEC</color>
     <color name="on_primary">#FFFFFF</color>
-    <color name="on_primary_dim">#DBB3AC</color>
+    <color name="on_primary_dim">#A9C7FF</color>
 
+    <!-- The app bar and status bar (surfaceContainer), the folder pane
+         (surface), and the list: unread rows white, read ones a shade
+         greyer (surfaceContainerLow), as Thunderbird draws them. -->
+    <color name="bar">#F1EDEC</color>
+    <color name="drawer">#FCF8F8</color>
+    <color name="scrim">#66000000</color>
     <color name="page">#FFFFFF</color>
     <color name="row">#FFFFFF</color>
-    <color name="divider">#EFE6E4</color>
-    <color name="field_fill">#F6F0EF</color>
+    <color name="row_read">#F6F3F2</color>
+    <color name="divider">#E2DEDD</color>
+    <color name="field_fill">#F1EDEC</color>
+    <color name="grouped_page">#F6F3F2</color>
 
-    <color name="focus_fill">#FCEFEC</color>
-    <color name="focus_rule">#A12C1D</color>
-    <color name="press_fill">#F4D9D4</color>
-    <!-- The platform's highlight (a stock menu's item under the d-pad, a
-         press): the accent, faint enough that what it covers stays legible. -->
-    <color name="highlight">#24A12C1D</color>
+    <color name="focus_fill">#E4EDF8</color>
+    <color name="focus_rule">#004F9B</color>
+    <color name="press_fill">#CFDFF2</color>
+    <!-- The platform's highlight (a menu's item under the d-pad, a press). -->
+    <color name="highlight">#24004F9B</color>
 
-    <color name="text">#1B1B1D</color>
-    <color name="text_muted">#6F6563</color>
-    <color name="input_hint">#8E8482</color>
-    <!-- A star, and a draft not yet sent. -->
+    <!-- Thunderbird's secondary container: the folder under the d-pad, and
+         people's monograms (its 15% wash behind the letter). -->
+    <color name="pill">#2E61A0</color>
+    <color name="pill_wash">#DCE6F3</color>
+    <color name="avatar_fill">#E0E7F1</color>
+
+    <!-- A note under the bar: Thunderbird's info container. -->
+    <color name="info_fill">#F0F8FF</color>
+    <color name="info_text">#004F9B</color>
+
+    <color name="text">#1C1B1B</color>
+    <color name="text_read">#45474A</color>
+    <color name="text_muted">#636569</color>
+    <color name="input_hint">#85878A</color>
+    <color name="icon">#45474A</color>
+    <!-- A star, and a draft not yet sent (or an address that isn't one). -->
     <color name="star">#C58A00</color>
     <color name="draft">#B3261E</color>
 </resources>

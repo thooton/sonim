@@ -112,6 +112,10 @@ public final class SelfTest {
             check.same("file id", "ANGjdJ8", content.attachments.get(0).id);
             check.same("inline image", "img1", content.attachments.get(1).contentId);
             check.same("links", "https://shop.example", content.links().get(0)[1]);
+            check.ok("files seen", rich.hasFiles() && !plain.hasFiles());
+            Message listed = message("m3", "t1", Arrays.asList("INBOX"), "Shop <deals@shop.example>", "me@gmail.com", "Sale", TUESDAY,
+                Json.map("mimeType", "multipart/mixed", "headers", Json.list()));
+            check.ok("files seen in a list's metadata", listed.hasFiles());
         });
         check.run("conversations", () -> {
             Conversation c = conversation("t1",
@@ -123,6 +127,10 @@ public final class SelfTest {
             check.same("latest skips drafts", "c", c.latest().id);
             check.same("people", "Jane, me, Draft (4)", c.people(ME, false));
             check.same("sent shows whom", "To: jane@x.com", c.people(ME, true));
+            check.same("names alone", "Jane, me, Draft", c.names(ME, false));
+            check.same("counted", "INBOX", Folder.INBOX.countedLabel());
+            check.same("not counted", null, Folder.SENT.countedLabel());
+            check.ok("drafts counted whole", Folder.DRAFTS.countsAll() && !Folder.SPAM.countsAll());
             check.ok("unread", c.unread());
             check.ok("has a draft", c.draft() != null && !c.onlyDrafts());
             check.ok("in the inbox", Folder.INBOX.holds(c));
@@ -251,6 +259,8 @@ public final class SelfTest {
             if (path.equals(me + "/threads/t1/modify")) return TestServer.Reply.json("{}");
             if (path.equals(me + "/threads/t1/trash")) return TestServer.Reply.json("{}");
             if (path.equals(me + "/labels/INBOX")) return TestServer.Reply.json("{\"threadsUnread\":7}");
+            if (path.equals(me + "/labels/DRAFT")) return TestServer.Reply.json("{\"threadsTotal\":3,\"threadsUnread\":0}");
+            if (path.equals(me + "/labels/Label_1")) return TestServer.Reply.json("{\"threadsUnread\":2}");
             if (path.equals(me + "/labels")) {
                 return TestServer.Reply.json("{\"labels\":[{\"id\":\"INBOX\",\"name\":\"INBOX\",\"type\":\"system\"},"
                     + "{\"id\":\"Label_2\",\"name\":\"work\",\"type\":\"user\"},{\"id\":\"Label_1\",\"name\":\"Bills\",\"type\":\"user\"}]}");
@@ -287,6 +297,12 @@ public final class SelfTest {
             check.same("user labels, sorted", "Bills", labels.get(0).name);
             check.same("label id", "Label_1", labels.get(0).label);
             check.same("me", "Sam Smith", gmail.me().addresses.get(0).name);
+            Map<String, Integer> counts = gmail.counts(Arrays.asList(Folder.INBOX, Folder.SENT, Folder.DRAFTS, labels.get(0),
+                Folder.label("Label_9", "Gone")));
+            check.same("inbox count", 7, counts.get("INBOX"));
+            check.same("drafts count all", 3, counts.get("DRAFT"));
+            check.same("label count", 2, counts.get("Label_1"));
+            check.ok("a deleted label is left out", !counts.containsKey("Label_9") && counts.size() == 3);
 
             gmail.change("t1", Change.ARCHIVE);
             check.ok("archive", lastBody(server, "/threads/t1/modify").equals("{\"addLabelIds\":[],\"removeLabelIds\":[\"INBOX\"]}"));

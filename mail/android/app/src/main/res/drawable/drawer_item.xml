@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A folder in the folder pane, as Thunderbird's drawer draws one: a round
+     pill. Filled while the d-pad is on it; a pale wash on the folder open now. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_activated="true">
+        <inset android:insetLeft="6dp" android:insetRight="6dp" android:insetTop="1dp" android:insetBottom="1dp">
+            <shape android:shape="rectangle">
+                <solid android:color="@color/pill" />
+                <corners android:radius="17dp" />
+            </shape>
+        </inset>
+    </item>
+    <item android:state_selected="true">
+        <inset android:insetLeft="6dp" android:insetRight="6dp" android:insetTop="1dp" android:insetBottom="1dp">
+            <shape android:shape="rectangle">
+                <solid android:color="@color/pill_wash" />
+                <corners android:radius="17dp" />
+            </shape>
+        </inset>
+    </item>
+    <item><color android:color="@android:color/transparent" /></item>
+</selector>

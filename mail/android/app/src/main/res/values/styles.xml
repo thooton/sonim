@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Light chrome, as Thunderbird's: the bar and status bar share the warm
+         surface grey, with dark icons in the status bar. -->
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans-serif</item>
-        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorPrimary">@color/bar</item>
         <item name="android:colorPrimaryDark">@color/primary_dark</item>
         <item name="android:colorAccent">@color/focus_rule</item>
+        <item name="android:colorControlActivated">@color/focus_rule</item>
         <item name="android:colorControlHighlight">@color/highlight</item>
-        <item name="android:navigationBarColor">@color/primary_dark</item>
-        <item name="android:statusBarColor">@color/primary_dark</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/bar</item>
+        <item name="android:statusBarColor">@color/bar</item>
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowBackground">@color/page</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:alertDialogTheme">@style/FamilyDialog</item>
@@ -16,13 +19,62 @@
         <item name="android:contextPopupMenuStyle">@style/FamilyPopupMenu</item>
     </style>
 
+    <!-- The bar: the folder (or what is being written), the account under it. -->
+    <style name="BarTitle">
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="BarSubtitle">
+        <item name="android:textColor">@color/text_muted</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:paddingTop">2dp</item>
+    </style>
+
+    <!-- A count in a pill: the bar's unread, a folder's in the pane. -->
+    <style name="CountBadge">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/count_badge</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:minWidth">20dp</item>
+        <item name="android:paddingBottom">2dp</item>
+        <item name="android:paddingLeft">6dp</item>
+        <item name="android:paddingRight">6dp</item>
+        <item name="android:paddingTop">2dp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:textColor">@color/on_primary</item>
+        <item name="android:textSize">11sp</item>
+    </style>
+
+    <!-- A person's monogram: their initial in a tinted circle. -->
+    <style name="Monogram">
+        <item name="android:layout_width">@dimen/avatar</item>
+        <item name="android:layout_height">@dimen/avatar</item>
+        <item name="android:background">@drawable/avatar_circle</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textColor">@color/pill</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
     <!-- One line of the composer: its label, then the field, on a row with a
          hairline under it that takes the focus wash while the field has the
-         keys, as in the phone's own mail apps rather than as boxes on a form. -->
+         keys, as Thunderbird's compose header is laid out. -->
     <style name="FieldRow">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:minHeight">34dp</item>
+        <item name="android:minHeight">32dp</item>
         <item name="android:addStatesFromChildren">true</item>
         <item name="android:background">@drawable/family_line_field</item>
         <item name="android:gravity">center_vertical</item>
@@ -53,5 +105,12 @@
         <item name="android:textColor">@color/text</item>
         <item name="android:textColorHint">@color/input_hint</item>
         <item name="android:textSize">@dimen/text_input</item>
+    </style>
+
+    <!-- A line of a list row: one line, cut short at its end. -->
+    <style name="RowLine">
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:includeFontPadding">false</item>
     </style>
 </resources>

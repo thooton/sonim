@@ -9,6 +9,8 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -220,6 +222,41 @@ public final class Gmail {
     public int unread() throws IOException, InterruptedException {
         Double count = Json.number(get("/labels/INBOX", ""), "threadsUnread");
         return count == null ? 0 : count.intValue();
+    }
+
+    /**
+     * The folder pane's counts, by label id (see {@link Folder#countedLabel}),
+     * five at a time. A label deleted meanwhile is left out.
+     */
+    public Map<String, Integer> counts(List<Folder> folders) throws IOException, InterruptedException {
+        final Map<String, Future<Integer>> pending = new LinkedHashMap<String, Future<Integer>>();
+        for (final Folder folder : folders) {
+            final String label = folder.countedLabel();
+            if (label == null || pending.containsKey(label)) continue;
+            pending.put(label, pool.submit(() -> {
+                try {
+                    Map<String, Object> found = get("/labels/" + path(label), "");
+                    Double count = Json.number(found, folder.countsAll() ? "threadsTotal" : "threadsUnread");
+                    return count == null ? 0 : count.intValue();
+                } catch (Gone e) {
+                    return null;
+                }
+            }));
+        }
+        Map<String, Integer> out = new HashMap<String, Integer>();
+        try {
+            for (Map.Entry<String, Future<Integer>> entry : pending.entrySet()) {
+                Integer count = entry.getValue().get();
+                if (count != null) out.put(entry.getKey(), count);
+            }
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException) throw (IOException) cause;
+            throw new IOException(cause == null ? "Gmail failed." : String.valueOf(cause.getMessage()));
+        } finally {
+            for (Future<Integer> future : pending.values()) future.cancel(true);
+        }
+        return out;
     }
 
     /** The user's own labels, by name. */

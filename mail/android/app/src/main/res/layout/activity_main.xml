@@ -1,125 +1,291 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Thunderbird's phone layout on a flip phone: an app bar over the list (or
+     a conversation, or the composer), and the folder pane sliding over them
+     from the left. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/page"
-    android:orientation="vertical">
+    android:background="@color/page">
 
-    <!-- The bar names the folder (or what is being written) and, on the
-         right, which conversation is picked. -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="@dimen/bar_height"
-        android:background="@color/primary"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingLeft="@dimen/pad_h"
-        android:paddingRight="@dimen/pad_h">
-        <TextView android:id="@+id/title" style="@style/FamilyTitle" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/app_name" />
-        <TextView android:id="@+id/count" style="@style/FamilyTitleMeta" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingLeft="6dp" />
-    </LinearLayout>
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:includeFontPadding="false"
-        android:paddingBottom="6dp"
-        android:paddingLeft="@dimen/pad_h"
-        android:paddingRight="@dimen/pad_h"
-        android:paddingTop="6dp"
-        android:textColor="@color/text_muted"
-        android:textSize="@dimen/text_status"
-        android:visibility="gone" />
+        <!-- The bar: what Left (or Back) does, the folder and the account, a
+             count on the right; a thin bar along its foot while loading. -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/bar_height"
+            android:background="@color/bar">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="@dimen/pad_h"
+                android:paddingRight="@dimen/pad_h">
+                <ImageView
+                    android:id="@+id/bar_icon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_menu" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:paddingLeft="12dp">
+                    <TextView android:id="@+id/title" style="@style/BarTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/app_name" />
+                    <TextView android:id="@+id/subtitle" style="@style/BarSubtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:visibility="gone" />
+                </LinearLayout>
+                <TextView android:id="@+id/count" style="@style/CountBadge" android:layout_marginLeft="6dp" android:visibility="gone" />
+                <TextView
+                    android:id="@+id/position"
+                    style="@style/BarSubtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="6dp"
+                    android:paddingTop="0dp"
+                    android:visibility="gone" />
+                <ImageView
+                    android:id="@+id/bar_action"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_marginLeft="8dp"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+            </LinearLayout>
+            <ProgressBar
+                android:id="@+id/progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:layout_gravity="bottom"
+                android:indeterminate="true"
+                android:indeterminateTint="@color/focus_rule"
+                android:maxHeight="3dp"
+                android:minHeight="3dp"
+                android:visibility="invisible" />
+        </FrameLayout>
 
-    <!-- The conversations. The focus card is drawn by the adapter. -->
-    <ListView
-        android:id="@+id/list"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:focusable="false" />
-
-    <!-- One conversation, in place of the list. -->
-    <ScrollView
-        android:defaultFocusHighlightEnabled="false"
-        android:id="@+id/reader"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="@color/row"
-        android:focusable="false"
-        android:scrollbarStyle="outsideOverlay"
-        android:visibility="gone">
+        <!-- A note: Thunderbird's info bar. It takes no room while empty. -->
         <TextView
-            android:id="@+id/reader_text"
+            android:id="@+id/status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:focusable="false"
-            android:paddingBottom="8dp"
+            android:background="@color/info_fill"
+            android:includeFontPadding="false"
+            android:paddingBottom="6dp"
             android:paddingLeft="@dimen/pad_h"
             android:paddingRight="@dimen/pad_h"
-            android:paddingTop="9dp"
-            android:lineSpacingExtra="2dp"
-            android:textColor="@color/text"
-            android:textIsSelectable="false"
-            android:textSize="@dimen/text_detail" />
-    </ScrollView>
+            android:paddingTop="6dp"
+            android:textColor="@color/info_text"
+            android:textSize="@dimen/text_status"
+            android:visibility="gone" />
 
-    <!-- Writing: whom to, whom to copy (shown when asked for), the subject,
-         then the message filling the rest. Each line is a row with a
-         hairline under it rather than a box. -->
-    <LinearLayout
-        android:id="@+id/compose"
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <!-- The conversations. The focus card is drawn by each row. -->
+            <ListView
+                android:id="@+id/list"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:focusable="false" />
+
+            <!-- An empty folder, or one still loading: what to do next. -->
+            <LinearLayout
+                android:id="@+id/empty"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/row"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:visibility="gone">
+                <ImageView
+                    android:id="@+id/empty_icon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginBottom="10dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_inbox"
+                    android:tint="@color/input_hint" />
+                <TextView
+                    android:id="@+id/empty_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:lineSpacingExtra="5dp" />
+            </LinearLayout>
+
+            <!-- One conversation: its subject and tags, then each message. -->
+            <ScrollView
+                android:id="@+id/reader"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/row"
+                android:defaultFocusHighlightEnabled="false"
+                android:focusable="false"
+                android:scrollbarStyle="outsideOverlay"
+                android:visibility="gone">
+                <LinearLayout
+                    android:id="@+id/reader_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+
+            <!-- Writing: from whom, to whom, whom to copy (shown when asked
+                 for), the subject, any files carried over, then the message
+                 filling the rest. -->
+            <LinearLayout
+                android:id="@+id/compose"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/row"
+                android:orientation="vertical"
+                android:visibility="gone">
+                <LinearLayout android:id="@+id/from_row" style="@style/FieldRow" android:background="@color/row_read" android:minHeight="28dp">
+                    <TextView style="@style/FieldLabel" android:text="@string/label_from" />
+                    <TextView
+                        android:id="@+id/from"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:includeFontPadding="false"
+                        android:singleLine="true"
+                        android:textColor="@color/text_read"
+                        android:textSize="@dimen/text_label" />
+                </LinearLayout>
+                <LinearLayout style="@style/FieldRow">
+                    <TextView style="@style/FieldLabel" android:text="@string/label_to" />
+                    <EditText
+                        android:id="@+id/to"
+                        style="@style/Field"
+                        android:hint="@string/hint_to"
+                        android:imeOptions="actionNext|flagNoExtractUi"
+                        android:inputType="textEmailAddress" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cc_row" style="@style/FieldRow" android:visibility="gone">
+                    <TextView style="@style/FieldLabel" android:text="@string/label_cc" />
+                    <EditText
+                        android:id="@+id/cc"
+                        style="@style/Field"
+                        android:imeOptions="actionNext|flagNoExtractUi"
+                        android:inputType="textEmailAddress" />
+                </LinearLayout>
+                <LinearLayout style="@style/FieldRow">
+                    <TextView style="@style/FieldLabel" android:text="@string/label_subject" />
+                    <EditText
+                        android:id="@+id/subject"
+                        style="@style/Field"
+                        android:hint="@string/hint_subject"
+                        android:imeOptions="actionNext|flagNoExtractUi"
+                        android:inputType="textCapSentences|textAutoCorrect" />
+                </LinearLayout>
+                <TextView
+                    android:id="@+id/files"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/row_read"
+                    android:drawablePadding="6dp"
+                    
+                    android:ellipsize="end"
+                    android:gravity="center_vertical"
+                    android:includeFontPadding="false"
+                    android:paddingBottom="6dp"
+                    android:paddingLeft="@dimen/pad_h"
+                    android:paddingRight="@dimen/pad_h"
+                    android:paddingTop="6dp"
+                    android:singleLine="true"
+                    android:textColor="@color/text_read"
+                    android:textSize="@dimen/text_label"
+                    android:visibility="gone" />
+                <EditText
+                    android:id="@+id/body"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:gravity="top|start"
+                    android:hint="@string/hint_body"
+                    android:imeOptions="flagNoExtractUi|flagNoEnterAction"
+                    android:inputType="textMultiLine|textCapSentences|textAutoCorrect"
+                    android:lineSpacingExtra="2dp"
+                    android:paddingBottom="8dp"
+                    android:paddingLeft="@dimen/pad_h"
+                    android:paddingRight="@dimen/pad_h"
+                    android:paddingTop="8dp"
+                    android:scrollbars="vertical"
+                    android:textColor="@color/text"
+                    android:textColorHint="@color/input_hint"
+                    android:textSize="@dimen/text_input" />
+            </LinearLayout>
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- The folder pane, over a dimmed screen: the account, Gmail's folders,
+         the user's labels, and the command center at the foot. -->
+    <View
+        android:id="@+id/scrim"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
+        android:background="@color/scrim"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/drawer"
+        android:layout_width="@dimen/drawer_width"
+        android:layout_height="match_parent"
+        android:background="@color/drawer"
+        android:elevation="8dp"
         android:orientation="vertical"
         android:visibility="gone">
-        <LinearLayout style="@style/FieldRow">
-            <TextView style="@style/FieldLabel" android:text="@string/label_to" />
-            <EditText
-                android:id="@+id/to"
-                style="@style/Field"
-                android:hint="@string/hint_to"
-                android:imeOptions="actionNext|flagNoExtractUi"
-                android:inputType="textEmailAddress" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingBottom="10dp"
+            android:paddingLeft="14dp"
+            android:paddingRight="12dp"
+            android:paddingTop="12dp">
+            <!-- The account's colour, as Thunderbird marks each account. -->
+            <View
+                android:layout_width="3dp"
+                android:layout_height="28dp"
+                android:background="@color/focus_rule" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingLeft="10dp">
+                <TextView android:id="@+id/account_name" style="@style/BarTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="14sp" />
+                <TextView android:id="@+id/account_email" style="@style/BarSubtitle" android:layout_width="match_parent" android:layout_height="wrap_content" />
+            </LinearLayout>
         </LinearLayout>
-        <LinearLayout android:id="@+id/cc_row" style="@style/FieldRow" android:visibility="gone">
-            <TextView style="@style/FieldLabel" android:text="@string/label_cc" />
-            <EditText
-                android:id="@+id/cc"
-                style="@style/Field"
-                android:imeOptions="actionNext|flagNoExtractUi"
-                android:inputType="textEmailAddress" />
-        </LinearLayout>
-        <LinearLayout style="@style/FieldRow">
-            <TextView style="@style/FieldLabel" android:text="@string/label_subject" />
-            <EditText
-                android:id="@+id/subject"
-                style="@style/Field"
-                android:hint="@string/hint_subject"
-                android:imeOptions="actionNext|flagNoExtractUi"
-                android:inputType="textCapSentences|textAutoCorrect" />
-        </LinearLayout>
-        <EditText
-            android:id="@+id/body"
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginBottom="4dp"
+            android:background="@color/divider" />
+        <ListView
+            android:id="@+id/folders"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:background="@null"
-            android:gravity="top|start"
-            android:hint="@string/hint_body"
-            android:imeOptions="flagNoExtractUi|flagNoEnterAction"
-            android:inputType="textMultiLine|textCapSentences|textAutoCorrect"
-            android:lineSpacingExtra="2dp"
-            android:paddingBottom="8dp"
-            android:paddingLeft="@dimen/pad_h"
-            android:paddingRight="@dimen/pad_h"
-            android:paddingTop="8dp"
-            android:scrollbars="vertical"
-            android:textColor="@color/text"
-            android:textColorHint="@color/input_hint"
-            android:textSize="@dimen/text_input" />
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:focusable="false"
+            android:listSelector="@android:color/transparent"
+            android:scrollbarStyle="outsideOverlay" />
     </LinearLayout>
-</LinearLayout>
+</FrameLayout>
