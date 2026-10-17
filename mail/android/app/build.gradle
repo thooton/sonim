@@ -18,8 +18,8 @@ android {
 
     defaultConfig {
         applicationId "com.mail.xp3"
-        versionCode 6
-        versionName "1.2.2"
+        versionCode 7
+        versionName "1.2.3"
     }
 }
 
