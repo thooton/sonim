@@ -228,6 +228,9 @@ public final class MainActivity extends BaseActivity implements Download.Listene
 
     private void showMode() {
         for (int i = 0; i < MODES.length; i++) tabs[i].setSelected(MODES[i].equals(mode));
+        if (Music.ALBUM.equals(mode)) query.setHint(R.string.hint_album);
+        else if (books()) query.setHint(R.string.hint_book);
+        else query.setHint(R.string.hint_song);
     }
 
     /** Song, Album, Book and round again; `step` is 1 or -1. */
