@@ -38,11 +38,11 @@ import java.util.TimeZone;
 /**
  * The dictionary: home, a word's page, and the search, under a search capsule.
  *
- * Home is the Word of the Day. A word's page has the headword and two tabs,
+ * Home is the Word of the Day; OK opens it. A word's page has the headword and two tabs,
  * Definitions and Thesaurus, which Left and Right switch between. Up and
  * Down scroll a page, and Up from its top moves into the search box. Menu
  * opens a menu over the page: the Word of the Day or Search at home,
- * Pronounce or Search on a word. OK opens nothing on a page. The search
+ * Pronounce or Search on a word. OK opens nothing on a word. The search
  * lists recent searches and, as a query is typed, the words it could mean;
  * OK opens the one picked, or the best match. Back goes back a page, and
  * leaves from home.
@@ -206,8 +206,11 @@ public class MainActivity extends Activity {
             }
             return true;
         }
-        // OK opens nothing on a page; Menu holds what a page can do.
-        if (isOk(key)) return true;
+        // OK opens the Word of the Day at home, and nothing on a word.
+        if (isOk(key)) {
+            if (first && page == HOME) open(wordOfTheDay);
+            return true;
+        }
         if (key == KeyEvent.KEYCODE_MENU) {
             // On the release, so it does not land on the menu just opened.
             if (released) showActions();

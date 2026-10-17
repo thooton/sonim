@@ -197,8 +197,8 @@ its own:
   WordNet has synonyms: "noun *as in* gist" and the synonyms over a thick
   green (`#00B414`) rule.
 - **Menu holds the actions.** Menu opens a stock popup menu over the page
-  (Word of the Day and Search at home, Pronounce and Search on a word); OK
-  opens nothing on a page. Up from the top of a page moves into the search
+  (Word of the Day and Search at home, Pronounce and Search on a word). OK
+  opens the Word of the Day at home and nothing on a word. Up from the top of a page moves into the search
   box, as it would on any screen with a search bar above it.
 - **The search.** Recent Searches, with Clear in dark red, each row a faint
   clock, the word, and a faint arrow over an inset hairline; while typing,
