@@ -29,4 +29,8 @@
          reading at a glance. -->
     <color name="open">#1E7B34</color>
     <color name="closed">#B3261E</color>
+    <!-- A rating's stars, filled and not: the family's gold, on a grey
+         tinted to the green. -->
+    <color name="star">#C58A00</color>
+    <color name="star_empty">#D6DED9</color>
 </resources>

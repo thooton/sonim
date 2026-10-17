@@ -60,8 +60,8 @@
         android:layout_weight="1"
         android:focusable="false" />
 
-    <!-- One place, in place of the results: its name and summary, then its
-         facts on cards, built by render(). -->
+    <!-- One place, in place of the results, laid out as Google Maps lays
+         one out: built by PlacePage. -->
     <ScrollView
         android:defaultFocusHighlightEnabled="false"
         android:id="@+id/detail"
@@ -77,6 +77,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="6dp" />
+            android:paddingBottom="12dp" />
     </ScrollView>
 </LinearLayout>

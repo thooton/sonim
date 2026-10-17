@@ -30,7 +30,6 @@ import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Family;
 import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +63,7 @@ public final class MainActivity extends BaseActivity {
     private ScrollView detail;
     private LinearLayout detailBody;
     private final ResultAdapter adapter = new ResultAdapter();
+    private final PlacePage page = new PlacePage(this);
     private final ExecutorService worker = Ui.worker("places");
 
     private Login login = Login.blank();
@@ -371,87 +371,10 @@ public final class MainActivity extends BaseActivity {
         open();
     }
 
-    /** The sections that share the first card: how to reach the place. */
-    private static final List<String> CONTACT = Arrays.asList("Address", "Phone", "Website", "Local time there");
-
-    /**
-     * The name, large, over the lines that run on from it (kind, rating,
-     * price, open or closed, how far); then the facts on cards, a muted
-     * label over each value. The ways to reach it share the first card, and
-     * every other section (hours, about, payment) has a card of its own. A
-     * place that only has what the search returned shows just its first
-     * lines and address, rather than "no hours" for hours not yet fetched.
-     */
+    /** The picked place on its own screen, laid out by {@link PlacePage}, scrolled to the top. */
     private void render(Place place, boolean partial) {
-        detailBody.removeAllViews();
-        long now = System.currentTimeMillis();
-        LinearLayout head = vertical();
-        head.setPadding(dp(10), dp(9), dp(10), dp(3));
-        TextView name = detailLine(place.name(), R.dimen.text_detail_title, R.color.text);
-        name.setTypeface(Family.MEDIUM);
-        head.addView(name);
-        detailBody.addView(head);
-
-        LinearLayout contact = null;
-        for (Place.Section section : place.details(now, searchedNear)) {
-            if (partial && section.title != null && !section.title.equals("Address")) continue;
-            if (section.title == null) {
-                // Only open-or-closed takes a colour, as on the result's row.
-                String status = place.status(now);
-                Boolean open = place.openNow();
-                SpannableStringBuilder lines = new SpannableStringBuilder();
-                for (String line : section.text.split("\n")) {
-                    if (lines.length() > 0) lines.append('\n');
-                    if (open != null && line.equals(status)) {
-                        span(lines, line, new ForegroundColorSpan(color(open ? R.color.open : R.color.closed)));
-                    } else {
-                        lines.append(line);
-                    }
-                }
-                TextView summary = detailLine(lines, R.dimen.text_address, R.color.text_muted);
-                summary.setPadding(0, dp(3), 0, 0);
-                summary.setLineSpacing(dp(2), 1f);
-                head.addView(summary);
-                continue;
-            }
-            boolean reach = CONTACT.contains(section.title);
-            LinearLayout card;
-            if (reach && contact != null) {
-                card = contact;
-                View rule = new View(this);
-                rule.setBackgroundColor(color(R.color.divider));
-                LinearLayout.LayoutParams line = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
-                line.leftMargin = dp(10);
-                card.addView(rule, line);
-            } else {
-                card = vertical();
-                card.setBackgroundResource(com.xp3.common.ui.R.drawable.family_card);
-                LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                at.setMargins(dp(6), dp(6), dp(6), 0);
-                detailBody.addView(card, at);
-                if (reach) contact = card;
-            }
-            // What Menu can act on (call it, open it) is in the accent.
-            boolean actionable = section.title.equals("Phone") || section.title.equals("Website");
-            LinearLayout fact = vertical();
-            fact.setPadding(dp(10), dp(7), dp(10), dp(8));
-            fact.addView(detailLine(section.title, R.dimen.text_detail_label, R.color.text_muted));
-            TextView value = detailLine(section.text, R.dimen.text_detail, actionable ? R.color.focus_rule : R.color.text);
-            value.setPadding(0, dp(2), 0, 0);
-            value.setLineSpacing(dp(2), 1f);
-            fact.addView(value);
-            card.addView(fact);
-        }
+        page.fill(detailBody, place, partial, System.currentTimeMillis(), searchedNear);
         detail.scrollTo(0, 0);
-    }
-
-    private TextView detailLine(CharSequence text, int size, int textColor) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextColor(color(textColor));
-        view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(size));
-        view.setIncludeFontPadding(false);
-        return view;
     }
 
     private static void span(SpannableStringBuilder out, String text, Object... spans) {
