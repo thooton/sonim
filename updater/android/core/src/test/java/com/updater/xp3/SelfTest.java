@@ -3,6 +3,7 @@ package com.updater.xp3;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.updater.xp3.core.Catalog;
+import com.updater.xp3.core.Notes;
 import com.updater.xp3.core.Releases;
 import com.updater.xp3.core.Status;
 import com.updater.xp3.core.Version;
@@ -13,8 +14,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 /**
  * Everything in :core, checked on a desktop JVM: which version is newer,
@@ -27,6 +30,7 @@ public final class SelfTest {
         check.run("Version", () -> versions(check));
         check.run("Catalog", () -> catalog(check));
         check.run("Status", () -> status(check));
+        check.run("Notes", () -> notes(check));
         check.run("Releases", () -> releases(check));
         if (!check.report()) System.exit(1);
     }
@@ -75,6 +79,40 @@ public final class SelfTest {
         check.same("no versionName", Status.UPDATE, Status.of(true, null, "1.0.0"));
     }
 
+    private static final String COMMITS = "["
+        + "{\"commit\":{\"message\":\"Mail: drop the bar\\n\\nLonger body.\",\"committer\":{\"date\":\"2026-10-16T10:00:00Z\"}}},"
+        + "{\"commit\":{\"message\":\"Merge branch 'x'\",\"committer\":{\"date\":\"2026-10-15T10:00:00Z\"}}},"
+        + "{\"commit\":{\"message\":\"List, Canvas: remove the chat!\",\"committer\":{\"date\":\"2026-10-14T10:00:00Z\"}}},"
+        + "{\"commit\":{\"message\":\"Delta 1.1.0: accounts\",\"committer\":{\"date\":\"2026-10-13T10:00:00Z\"}}},"
+        + "{\"commit\":{\"message\":\"Strip text from every app\",\"committer\":{\"date\":\"2026-10-12T10:00:00Z\"}}},"
+        + "{\"commit\":{\"message\":\"Mail: older\",\"committer\":{\"date\":\"2026-10-11T10:00:00Z\"}}}"
+        + "]";
+
+    private static void notes(Check check) {
+        check.same("one", Arrays.asList("Mail"), Notes.names("Mail: x"));
+        check.same("several", Arrays.asList("List", "Canvas", "Books"), Notes.names("List, Canvas and Books: x"));
+        check.same("version dropped", Arrays.asList("Delta"), Notes.names("Delta 1.0.4: upload files"));
+        check.same("no colon", 0, Notes.names("Strip text from every app").size());
+        check.same("capital and stop", "Remove the chat.", Notes.text("List: remove the chat"));
+        check.same("own stop kept", "Done!", Notes.text("List: done!"));
+        check.same("nothing after", null, Notes.text("List:"));
+
+        Map<String, List<Notes.Note>> notes = Notes.parse(COMMITS, Arrays.asList("mail", "list", "canvas", "delta", "books"));
+        check.same("mail's two", 2, notes.get("mail").size());
+        check.same("subject only", "Drop the bar.", notes.get("mail").get(0).text);
+        check.same("newest first", "Older.", notes.get("mail").get(1).text);
+        check.same("shared commit", "Remove the chat!", notes.get("canvas").get(0).text);
+        check.same("list too", 1, notes.get("list").size());
+        check.same("delta", "Accounts.", notes.get("delta").get(0).text);
+        check.ok("unnamed apps get nothing", !notes.containsKey("books"));
+
+        TimeZone utc = TimeZone.getTimeZone("UTC");
+        long now = java.time.Instant.parse("2026-10-17T15:00:00Z").toEpochMilli();
+        check.same("today", "Today", Notes.when(now - 3600000L, now, utc));
+        check.same("yesterday", "Yesterday", Notes.when(now - 20 * 3600000L, now, utc));
+        check.same("a date", "Oct 14, 2026", Notes.when(now - 3 * 86400000L, now, utc));
+    }
+
     private static void releases(Check check) throws Exception {
         final byte[] apk = new byte[300 * 1024];
         for (int i = 0; i < apk.length; i++) apk[i] = (byte) i;
@@ -85,6 +123,8 @@ public final class SelfTest {
                 send(exchange, 200, "list = 1.0.1\nnew = 2.0.0\n".getBytes("UTF-8"));
             } else if (path.equals("/latest/packages.txt")) {
                 send(exchange, 200, "list = com.list.xp3\nnew = com.new.xp3\n".getBytes("UTF-8"));
+            } else if (path.equals("/commits")) {
+                send(exchange, 200, COMMITS.getBytes("UTF-8"));
             } else if (path.equals("/latest/list.apk")) {
                 // As GitHub does: the file itself is somewhere else.
                 exchange.getResponseHeaders().set("Location", "/files/list.apk");
@@ -98,12 +138,14 @@ public final class SelfTest {
         server.start();
         File dir = Files.createTempDirectory("updater-test").toFile();
         try {
-            final Releases releases = new Releases(
-                "http://127.0.0.1:" + server.getAddress().getPort() + "/latest");
+            String root = "http://127.0.0.1:" + server.getAddress().getPort();
+            final Releases releases = new Releases(root + "/latest", root + "/commits");
             List<Catalog.Entry> entries = releases.catalog();
             check.same("catalog size", 2, entries.size());
             check.same("catalog version", "1.0.1", entries.get(0).version);
             check.same("catalog package", "com.new.xp3", entries.get(1).packageName);
+            check.same("notes fetched", "Drop the bar.",
+                releases.notes(Arrays.asList("mail")).get("mail").get(0).text);
 
             final File to = new File(dir, "list.apk");
             final long[] last = {-1, -1};

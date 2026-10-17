@@ -1,5 +1,6 @@
 package com.updater.xp3;
 
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -8,16 +9,22 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.ContextMenu;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.updater.xp3.core.Catalog;
+import com.updater.xp3.core.Notes;
 import com.updater.xp3.core.Releases;
 import com.updater.xp3.core.Status;
 import com.updater.xp3.core.Version;
@@ -30,18 +37,23 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 
 /**
  * Every app in the latest release, against the copy on this phone.
  *
- * Opening the app reads the release's versions.txt and packages.txt and lists
- * each app as up to date, out of date (older versionName here) or not
- * installed. Menu (or OK) on an app offers Update or Install, and Reinstall
- * for one that is already current. Chosen apps go one at a time: download
- * into the app's own files, check the APK is the app it claims to be, hand it
- * to Installer, then the next.
+ * Drawn as the App Store's Updates page (DESIGN.md). Opening the app reads
+ * the release's versions.txt and packages.txt and lists each app under
+ * Available (an older versionName here), Installed or Not Installed, with
+ * what's new in it from the repository's commits. OK presses the row's
+ * button: UPDATE, GET or OPEN; on "more" (Right) it shows what's new. Update
+ * All sits in the bar, Up from the top row. Menu, or holding OK, has the rest.
+ * Chosen apps go one at a time: download into the app's own files, check the
+ * APK is the app it claims to be, hand it to Installer, then the next.
  */
 public final class MainActivity extends BaseActivity {
 
@@ -51,6 +63,8 @@ public final class MainActivity extends BaseActivity {
     private static final int MENU_REINSTALL = 3;
     private static final int MENU_UPDATE_ALL = 4;
     private static final int MENU_CHECK = 5;
+    private static final int MENU_OPEN = 6;
+    private static final int MENU_NOTES = 7;
 
     private static final int INSTALL = 1;
 
@@ -81,12 +95,16 @@ public final class MainActivity extends BaseActivity {
     // ------------------------------------------------------------------
 
     private FrameLayout content;
-    private View bar;
-    private TextView summary;
+    private TextView updateAll;
+    private ProgressRing spinner;
+    private Icons icons;
     private ListView listView;
     private AppAdapter adapter;
     /** The message shown instead of a list, which then holds focus. */
-    private TextView messageView;
+    private LinearLayout messageView;
+    private ProgressRing messageSpinner;
+    private TextView messageTitle;
+    private TextView messageDetail;
     /** The highlighted app, by its release name, kept across redraws. */
     private String selectedName;
 
@@ -94,6 +112,8 @@ public final class MainActivity extends BaseActivity {
     private List<Catalog.Entry> catalog;
     private boolean checking;
     private String checkError;
+    /** What's new in each app, by release name; empty until fetched. */
+    private Map<String, List<Notes.Note>> notes = new HashMap<>();
 
     /** One app being updated, installed or reinstalled. */
     private static final class Job {
@@ -104,6 +124,8 @@ public final class MainActivity extends BaseActivity {
         long before;
         /** Only touched on the download thread. */
         int percent = -1;
+        /** What the ring shows, on the main thread: 0 to 100, or -1 to spin. */
+        int shown = -1;
         String activity = "Waiting";
 
         Job(Catalog.Entry entry, int action, String label) {
@@ -122,8 +144,11 @@ public final class MainActivity extends BaseActivity {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
         content = findViewById(R.id.content);
-        bar = findViewById(R.id.bar);
-        summary = findViewById(R.id.summary);
+        updateAll = findViewById(R.id.update_all);
+        spinner = findViewById(R.id.spinner);
+        spinner.setShowStop(false);
+        icons = new Icons(this, 40);
+        updateAll.setOnClickListener(v -> updateAll());
         // Every context menu is answered here; see showMenu.
         registerForContextMenu(content);
 
@@ -175,6 +200,18 @@ public final class MainActivity extends BaseActivity {
                     catalog = found;
                     render();
                 });
+                // What's new is a nicety: without it the rows show versions.
+                List<String> names = new ArrayList<>();
+                for (Catalog.Entry entry : found) names.add(entry.name);
+                try {
+                    final Map<String, List<Notes.Note>> news = releases.notes(names);
+                    post(() -> {
+                        notes = news;
+                        render();
+                    });
+                } catch (IOException e) {
+                    // Kept as they were; GitHub's API allows 60 an hour.
+                }
             } catch (final IOException e) {
                 post(() -> {
                     checking = false;
@@ -199,7 +236,13 @@ public final class MainActivity extends BaseActivity {
                 : title(entry.name);
             String here = info != null ? info.versionName : null;
             Status status = Status.of(info != null, here, entry.version);
-            rows.add(new AppAdapter.Row(entry, label, here, status, activity(entry)));
+            List<Notes.Note> news = notes.get(entry.name);
+            Job working = job(entry);
+            rows.add(new AppAdapter.Row(entry, label, here, status,
+                working != null ? working.activity : null,
+                working != null ? working.shown : -1,
+                icons.of(entry.name, label, info),
+                news != null ? news : Collections.<Notes.Note>emptyList()));
         }
         Collections.sort(rows, (a, b) -> {
             int c = rank(a.status) - rank(b.status);
@@ -216,9 +259,15 @@ public final class MainActivity extends BaseActivity {
 
     /** What is being done to an app, or null. */
     private String activity(Catalog.Entry entry) {
-        if (job != null && job.entry.name.equals(entry.name)) return job.activity;
+        Job working = job(entry);
+        return working != null ? working.activity : null;
+    }
+
+    /** The app's job, running or waiting, or null. */
+    private Job job(Catalog.Entry entry) {
+        if (job != null && job.entry.name.equals(entry.name)) return job;
         for (Job waiting : queue) {
-            if (waiting.entry.name.equals(entry.name)) return waiting.activity;
+            if (waiting.entry.name.equals(entry.name)) return waiting;
         }
         return null;
     }
@@ -233,14 +282,21 @@ public final class MainActivity extends BaseActivity {
 
     private void render() {
         List<AppAdapter.Row> rows = rows();
-        String text = summaryText(rows);
-        summary.setText(text);
-        bar.setVisibility(text.isEmpty() ? View.GONE : View.VISIBLE);
+        int updates = 0;
+        for (AppAdapter.Row row : rows) {
+            if (row.status == Status.UPDATE && row.activity == null) updates++;
+        }
+        // Update All while there is anything left to update; the spinner
+        // while a check runs over a list already showing.
+        boolean hadBar = updateAll.hasFocus();
+        updateAll.setVisibility(updates > 0 ? View.VISIBLE : View.GONE);
+        spinner.setVisibility(checking && !rows.isEmpty() ? View.VISIBLE : View.GONE);
         if (rows.isEmpty()) {
             showMessage();
             return;
         }
-        boolean focus = listView == null || listView.hasFocus() || getCurrentFocus() == null;
+        boolean focus = listView == null || listView.hasFocus() || getCurrentFocus() == null
+            || (hadBar && updates == 0);
         if (listView == null) buildList();
         int at = 0;
         for (int i = 0; i < rows.size(); i++) {
@@ -256,21 +312,11 @@ public final class MainActivity extends BaseActivity {
         if (focus) listView.requestFocus();
     }
 
-    private String summaryText(List<AppAdapter.Row> rows) {
-        if (checking) return "Checking…";
-        if (catalog == null) return checkError != null ? "Offline" : "";
-        if (job != null) return "Working…";
-        int updates = 0;
-        for (AppAdapter.Row row : rows) if (row.status == Status.UPDATE) updates++;
-        if (updates == 0) return "Up to date";
-        return updates == 1 ? "1 update" : updates + " updates";
-    }
-
     private void buildList() {
         adapter = new AppAdapter(this);
         final ListView list = new ListView(this);
         list.setAdapter(adapter);
-        // Rows paint their own focus card and their own hairlines (see
+        // Rows paint their own selection and their own hairlines (see
         // row_app), so the list draws neither a selector nor dividers.
         Family.list(list);
         list.setDivider(null);
@@ -278,6 +324,7 @@ public final class MainActivity extends BaseActivity {
         list.setItemsCanFocus(false);
         list.setFocusable(true);
         list.setFocusableInTouchMode(true);
+        list.setDefaultFocusHighlightEnabled(false);
         Ui.onSelect(list, position -> {
             adapter.trackSelectedPosition(position);
             selectedName = adapter.getItem(position).entry.name;
@@ -285,34 +332,65 @@ public final class MainActivity extends BaseActivity {
         list.setOnItemClickListener((parent, view, position, id) -> {
             adapter.setSelectedPosition(position);
             selectedName = adapter.getItem(position).entry.name;
-            showMenu();
+            press();
         });
-        // Sonim firmware reports OK as DPAD_CENTER or ENTER. Its release, or
-        // holding it, opens the menu; arrows stay with ListView.
-        list.setOnKeyListener((view, keyCode, event) -> Ui.isOk(keyCode) && okOpensMenu(event));
+        // Sonim firmware reports OK as DPAD_CENTER or ENTER. Its release
+        // presses the row's button, holding it opens the menu; Right and
+        // Left move between the button and "more"; Up and Down stay with
+        // ListView, which hands Up from the top row on to Update All.
+        list.setOnKeyListener((view, keyCode, event) -> {
+            if (Ui.isOk(keyCode)) return okKey(event, this::press);
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    adapter.setMoreFocused(keyCode == KeyEvent.KEYCODE_DPAD_RIGHT);
+                }
+                return true;
+            }
+            return false;
+        });
         messageView = null;
         listView = list;
         Ui.fill(content, list);
     }
 
-    /** Checking, the reason a check failed, or an empty release. */
+    /** Checking (a spinner, as the App Store shows), the reason a check failed, or an empty release. */
     private void showMessage() {
-        CharSequence text;
-        if (checking) text = Family.emptyText(this, "Checking for updates…", null);
-        else if (checkError != null) text = Family.emptyText(this, "Couldn't check for updates", checkError);
-        else text = Family.emptyText(this, "The release lists no apps", null);
         if (messageView == null) {
-            TextView view = Family.empty(this, "", null);
+            LinearLayout view = new LinearLayout(this);
+            view.setOrientation(LinearLayout.VERTICAL);
+            view.setGravity(Gravity.CENTER);
+            view.setPadding(dp(20), dp(20), dp(20), dp(20));
+            view.setBackgroundColor(color(R.color.page));
+            messageSpinner = new ProgressRing(this);
+            messageSpinner.setShowStop(false);
+            view.addView(messageSpinner, new LinearLayout.LayoutParams(dp(26), dp(26)));
+            messageTitle = text("", 16, color(R.color.text));
+            messageTitle.setTypeface(Family.MEDIUM, android.graphics.Typeface.BOLD);
+            messageTitle.setGravity(Gravity.CENTER);
+            view.addView(messageTitle);
+            messageDetail = text("", 13, color(R.color.text_muted));
+            messageDetail.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams below = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            below.topMargin = dp(6);
+            view.addView(messageDetail, below);
             // Focusable so keys land somewhere and the menu has an anchor.
             view.setFocusable(true);
             view.setFocusableInTouchMode(true);
-            view.setOnKeyListener((v, keyCode, event) -> Ui.isOk(keyCode) && okOpensMenu(event));
+            view.setDefaultFocusHighlightEnabled(false);
+            view.setOnKeyListener((v, keyCode, event) -> Ui.isOk(keyCode) && okKey(event, this::check));
             listView = null;
             adapter = null;
             messageView = view;
             Ui.fill(content, view);
         }
-        messageView.setText(text);
+        String title = checking ? null : checkError != null ? "Cannot Check for Updates" : "No Apps";
+        String detail = checking ? null : checkError;
+        messageSpinner.setVisibility(checking ? View.VISIBLE : View.GONE);
+        messageTitle.setVisibility(title != null ? View.VISIBLE : View.GONE);
+        messageTitle.setText(title);
+        messageDetail.setVisibility(detail != null ? View.VISIBLE : View.GONE);
+        messageDetail.setText(detail);
         messageView.requestFocus();
     }
 
@@ -324,13 +402,13 @@ public final class MainActivity extends BaseActivity {
     private boolean okHeld;
 
     /**
-     * OK opens the menu on its release, or as soon as it is held. Every OK
-     * event is claimed so ListView's own long press, which would open the
-     * menu as a centred dialog, never runs, and the release that ends a hold
-     * doesn't open it a second time. A release whose press went elsewhere
-     * (the menu's own choice, a dialog's button) opens nothing.
+     * OK does `press` on its release, and opens the menu as soon as it is
+     * held. Every OK event is claimed so ListView's own long press, which
+     * would open the menu as a centred dialog, never runs, and the release
+     * that ends a hold doesn't press as well. A release whose press went
+     * elsewhere (the menu's own choice, a dialog's button) does nothing.
      */
-    private boolean okOpensMenu(KeyEvent event) {
+    private boolean okKey(KeyEvent event, Runnable press) {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             if (event.getRepeatCount() == 0) {
                 okDown = true;
@@ -342,12 +420,127 @@ public final class MainActivity extends BaseActivity {
             return true;
         }
         if (event.getAction() == KeyEvent.ACTION_UP) {
-            boolean open = okDown && !okHeld && !event.isCanceled();
+            boolean pressed = okDown && !okHeld && !event.isCanceled();
             okDown = false;
             okHeld = false;
-            if (open) showMenu();
+            if (pressed) press.run();
         }
         return true;
+    }
+
+    /**
+     * The highlighted row's button, as a tap on it in the App Store: UPDATE
+     * and GET queue the app, OPEN opens it, and the ring of an app still
+     * waiting its turn takes it out of the line. On "more", what's new.
+     */
+    private void press() {
+        AppAdapter.Row row = selectedRow();
+        if (row == null) return;
+        if (adapter.isMoreFocused()) {
+            whatsNew(row);
+        } else if (row.activity != null) {
+            Job waiting = job(row.entry);
+            if (waiting != null && waiting != job) {
+                queue.remove(waiting);
+                render();
+            }
+        } else if (row.status == Status.UPDATE) {
+            enqueue(row, MENU_UPDATE);
+        } else if (row.status == Status.INSTALL) {
+            enqueue(row, MENU_INSTALL);
+        } else {
+            open(row);
+        }
+    }
+
+    private AppAdapter.Row selectedRow() {
+        if (listView == null || adapter == null || adapter.getCount() == 0) return null;
+        int position = Math.max(0, Math.min(adapter.getSelectedPosition(), adapter.getCount() - 1));
+        return adapter.getItem(position);
+    }
+
+    private void updateAll() {
+        for (AppAdapter.Row row : rows()) {
+            if (row.status == Status.UPDATE && row.activity == null) enqueue(row, MENU_UPDATE);
+        }
+        if (listView != null) listView.requestFocus();
+    }
+
+    private void open(AppAdapter.Row row) {
+        if (row.entry.packageName.equals(getPackageName())) return;
+        Intent launch = getPackageManager().getLaunchIntentForPackage(row.entry.packageName);
+        if (launch == null) {
+            toast("Can't open " + row.label);
+            return;
+        }
+        try {
+            startActivity(launch);
+        } catch (ActivityNotFoundException e) {
+            toast("Can't open " + row.label);
+        }
+    }
+
+    /**
+     * The App Store's What's New: the app with its icon, the release's
+     * version and date, then each change with the day it landed.
+     */
+    private void whatsNew(AppAdapter.Row row) {
+        LinearLayout page = vertical();
+        page.setPadding(dp(16), dp(14), dp(16), dp(4));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView icon = new ImageView(this);
+        icon.setImageDrawable(row.icon);
+        head.addView(icon, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        LinearLayout names = vertical();
+        names.setPadding(dp(8), 0, 0, 0);
+        TextView name = text(row.label, 15, color(R.color.text));
+        name.setTypeface(Family.MEDIUM);
+        name.setMaxLines(2);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        names.addView(name);
+        String here = row.installed != null ? "This phone has " + row.installed
+            : row.status == Status.INSTALL ? "Not installed" : null;
+        if (here != null) names.addView(text(here, 12, color(R.color.text_muted)));
+        head.addView(names, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        page.addView(head);
+
+        TextView title = text("What's New", 17, color(R.color.text));
+        title.setTypeface(Family.MEDIUM, android.graphics.Typeface.BOLD);
+        title.setPadding(0, dp(12), 0, dp(4));
+        page.addView(title);
+
+        long now = System.currentTimeMillis();
+        TimeZone zone = TimeZone.getDefault();
+        LinearLayout version = new LinearLayout(this);
+        TextView number = text("Version " + row.entry.version, 12, color(R.color.text_muted));
+        version.addView(number, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        if (!row.notes.isEmpty()) {
+            version.addView(text(Notes.when(row.notes.get(0).time, now, zone), 12, color(R.color.text_muted)));
+        }
+        page.addView(version);
+
+        for (int i = 0; i < row.notes.size() && i < 10; i++) {
+            Notes.Note note = row.notes.get(i);
+            if (i > 0) {
+                TextView when = text(Notes.when(note.time, now, zone), 11, color(R.color.text_muted));
+                when.setPadding(0, dp(8), 0, 0);
+                page.addView(when);
+            }
+            TextView body = text(note.text, 13, color(R.color.text));
+            body.setPadding(0, dp(i == 0 ? 6 : 2), 0, 0);
+            body.setLineSpacing(dp(2), 1f);
+            page.addView(body);
+        }
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setDefaultFocusHighlightEnabled(false);
+        scroll.addView(page);
+        new AlertDialog.Builder(this)
+            .setView(scroll)
+            .setPositiveButton("Done", null)
+            .show();
     }
 
     /*
@@ -420,24 +613,29 @@ public final class MainActivity extends BaseActivity {
     /** Fills the menu for the highlighted app and returns the view it belongs beside. */
     private View fillMenu() {
         if (listView == null || adapter == null || adapter.getCount() == 0) {
-            if (!checking) add(MENU_CHECK, "Check again");
+            if (!checking) add(MENU_CHECK, "Check Again");
             return messageView != null ? messageView : content;
         }
         int position = Math.max(0, Math.min(adapter.getSelectedPosition(), adapter.getCount() - 1));
         AppAdapter.Row row = adapter.getItem(position);
         menuRow = row;
+        boolean self = row.entry.packageName.equals(getPackageName());
         if (row.activity == null) {
-            if (row.status == Status.INSTALL) add(MENU_INSTALL, "Install");
+            if (row.status == Status.INSTALL) add(MENU_INSTALL, "Get");
             else if (row.status == Status.UPDATE) add(MENU_UPDATE, "Update");
-            else add(MENU_REINSTALL, "Reinstall");
         }
+        if (row.status != Status.INSTALL && !self) add(MENU_OPEN, "Open");
+        if (row.activity == null && (row.status == Status.CURRENT || row.status == Status.NEWER)) {
+            add(MENU_REINSTALL, "Reinstall");
+        }
+        add(MENU_NOTES, "What's New");
         int updates = 0;
         for (int i = 0; i < adapter.getCount(); i++) {
             AppAdapter.Row other = adapter.getItem(i);
             if (other.status == Status.UPDATE && other.activity == null) updates++;
         }
-        if (updates > 1) add(MENU_UPDATE_ALL, "Update all (" + updates + ")");
-        if (!checking) add(MENU_CHECK, "Check again");
+        if (updates > 1) add(MENU_UPDATE_ALL, "Update All (" + updates + ")");
+        if (!checking) add(MENU_CHECK, "Check Again");
         View view = listView.getChildAt(position - listView.getFirstVisiblePosition());
         return view != null ? view : listView;
     }
@@ -460,9 +658,11 @@ public final class MainActivity extends BaseActivity {
         if (id == MENU_CHECK) {
             check();
         } else if (id == MENU_UPDATE_ALL) {
-            for (AppAdapter.Row row : rows()) {
-                if (row.status == Status.UPDATE && row.activity == null) enqueue(row, MENU_UPDATE);
-            }
+            updateAll();
+        } else if (id == MENU_OPEN) {
+            if (menuRow != null) open(menuRow);
+        } else if (id == MENU_NOTES) {
+            if (menuRow != null) whatsNew(menuRow);
         } else if (menuRow != null) {
             enqueue(menuRow, id);
         }
@@ -526,6 +726,7 @@ public final class MainActivity extends BaseActivity {
                     post(() -> {
                         if (job != next) return;
                         next.activity = "Downloading " + percent + "%";
+                        next.shown = percent;
                         render();
                     });
                 });
@@ -552,6 +753,7 @@ public final class MainActivity extends BaseActivity {
         PackageInfo here = installed(done.entry.packageName, 0);
         done.before = here != null ? here.lastUpdateTime : 0;
         done.activity = "Installing…";
+        done.shown = -1;
         render();
 
         Intent intent = new Intent(Intent.ACTION_INSTALL_PACKAGE)

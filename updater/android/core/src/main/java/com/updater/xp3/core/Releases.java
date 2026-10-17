@@ -8,7 +8,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The rolling `latest` release of github.com/thooton/sonim, where CI puts every
@@ -21,11 +23,15 @@ import java.util.List;
 public final class Releases {
 
     public static final String LATEST = "https://github.com/thooton/sonim/releases/download/latest/";
+    /** The repository's newest commits, where the release notes come from (see Notes). */
+    public static final String COMMITS = "https://api.github.com/repos/thooton/sonim/commits?per_page=100";
 
     private static final int CONNECT_TIMEOUT_MS = 20000;
     private static final int READ_TIMEOUT_MS = 60000;
     /** versions.txt and packages.txt are a line per app. */
     private static final int MAX_TEXT = 256 * 1024;
+    /** A hundred commits as GitHub lists them, with room to spare. */
+    private static final int MAX_COMMITS = 2 * 1024 * 1024;
     private static final long MAX_APK = 200L * 1024 * 1024;
 
     /** Told how much of a download has arrived; `total` is -1 when unknown. */
@@ -34,14 +40,16 @@ public final class Releases {
     }
 
     private final String base;
+    private final String commits;
 
     public Releases() {
-        this(LATEST);
+        this(LATEST, COMMITS);
     }
 
-    /** For the tests, which serve a release of their own. */
-    public Releases(String base) {
+    /** For the tests, which serve a release and commits of their own. */
+    public Releases(String base, String commits) {
         this.base = base.endsWith("/") ? base : base + "/";
+        this.commits = commits;
     }
 
     /** The apps in the release, sorted by name. */
@@ -49,9 +57,23 @@ public final class Releases {
         return Catalog.join(Catalog.parse(text("versions.txt")), Catalog.parse(text("packages.txt")));
     }
 
+    /** What's new in each of `apps`, newest first (see Notes). */
+    public Map<String, List<Notes.Note>> notes(Collection<String> apps) throws IOException {
+        String json = fetch(commits, "the commits", MAX_COMMITS);
+        try {
+            return Notes.parse(json, apps);
+        } catch (IllegalArgumentException e) {
+            throw new IOException("GitHub's commits were unreadable.");
+        }
+    }
+
     /** A small text file from the release. */
     public String text(String file) throws IOException {
-        HttpURLConnection connection = open(file);
+        return fetch(base + file, file, MAX_TEXT);
+    }
+
+    private String fetch(String url, String file, int max) throws IOException {
+        HttpURLConnection connection = open(url);
         try {
             InputStream in = body(connection, file);
             try {
@@ -60,7 +82,7 @@ public final class Releases {
                 int n;
                 while ((n = in.read(buffer)) != -1) {
                     out.write(buffer, 0, n);
-                    if (out.size() > MAX_TEXT) throw new IOException(file + " is far too large.");
+                    if (out.size() > max) throw new IOException(file + " is far too large.");
                 }
                 return new String(out.toByteArray(), "UTF-8");
             } finally {
@@ -79,7 +101,7 @@ public final class Releases {
      */
     public void download(String file, File to, Progress progress) throws IOException {
         File part = new File(to.getPath() + ".part");
-        HttpURLConnection connection = open(file);
+        HttpURLConnection connection = open(base + file);
         try {
             InputStream in = body(connection, file);
             long total = connection.getContentLengthLong();
@@ -114,9 +136,9 @@ public final class Releases {
         }
     }
 
-    private HttpURLConnection open(String file) throws IOException {
+    private HttpURLConnection open(String url) throws IOException {
         try {
-            HttpURLConnection connection = (HttpURLConnection) new URL(base + file).openConnection();
+            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
             connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
             connection.setReadTimeout(READ_TIMEOUT_MS);
             connection.setInstanceFollowRedirects(true);

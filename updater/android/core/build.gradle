@@ -1,2 +1,7 @@
 // The version rules and the release client.
 apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    // Json, for the commits the release notes come from.
+    implementation project(":common:core")
+}

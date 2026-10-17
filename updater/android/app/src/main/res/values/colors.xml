@@ -1,28 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- One slate blue in the family's four tones (DESIGN.md): the band near
-         black, the accent for focus, the version an update moves to and the
-         Update pill, a pale wash behind the focused row, and greys tinted to
-         match. The status bar is the band's own colour. -->
-    <color name="primary">#1B2633</color>
-    <color name="primary_dark">#1B2633</color>
-    <color name="on_primary">#FFFFFF</color>
-    <color name="on_primary_dim">#A8B6C6</color>
+    <!-- The App Store's own colours (see DESIGN.md, "Updater: as the App
+         Store shows it"): a near-white bar with a grey hairline under it,
+         white rows, black names, iOS's secondary grey, and its system blue
+         for everything that can be pressed. The status bar is the bar's own
+         colour, with dark icons. -->
+    <color name="bar">#F9F9F9</color>
+    <color name="bar_rule">#B2B2B2</color>
+    <color name="blue">#007AFF</color>
+    <!-- The grey capsule behind UPDATE, OPEN and GET. -->
+    <color name="pill">#EFEFF4</color>
+    <color name="ring_track">#D1D1D6</color>
+    <color name="separator">#C8C7CC</color>
+
+    <!-- What common/ui reads. -->
+    <color name="primary">#F9F9F9</color>
+    <color name="primary_dark">#F9F9F9</color>
+    <color name="on_primary">#000000</color>
+    <color name="on_primary_dim">#8E8E93</color>
 
     <color name="page">#FFFFFF</color>
     <color name="row">#FFFFFF</color>
-    <color name="divider">#E2E8EE</color>
-    <color name="field_fill">#F0F3F6</color>
+    <color name="divider">#C8C7CC</color>
+    <color name="field_fill">#EFEFF4</color>
 
-    <color name="focus_fill">#EAF1F8</color>
-    <color name="focus_rule">#2B5E92</color>
-    <color name="press_fill">#D3E1EF</color>
-    <!-- The platform's highlight (a stock menu's item under the d-pad, a
-         press): the accent, faint enough that what it covers stays legible. -->
-    <color name="highlight">#242B5E92</color>
+    <!-- The row under the d-pad, in iOS's cell-selection grey. -->
+    <color name="focus_fill">#E9E9EE</color>
+    <color name="focus_rule">#007AFF</color>
+    <color name="press_fill">#D9D9DE</color>
+    <color name="highlight">#22007AFF</color>
 
-    <color name="text">#1B1B1D</color>
-    <color name="text_muted">#616A75</color>
-    <!-- A row that wants something done: an update or an install. -->
-    <color name="wanted">#2B5E92</color>
+    <color name="text">#000000</color>
+    <color name="text_muted">#8E8E93</color>
 </resources>

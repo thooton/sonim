@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <dimen name="title_bar_height">36dp</dimen>
-    <dimen name="row_min_height">44dp</dimen>
+    <dimen name="bar_height">34dp</dimen>
     <dimen name="row_pad_h">10dp</dimen>
-    <dimen name="focus_rule">2dp</dimen>
-    <dimen name="text_name">13.5sp</dimen>
-    <dimen name="text_status">11.5sp</dimen>
+    <dimen name="icon">40dp</dimen>
+    <dimen name="text_name">14sp</dimen>
+    <dimen name="text_date">12sp</dimen>
+    <dimen name="text_notes">12sp</dimen>
+    <dimen name="text_section">18sp</dimen>
 </resources>

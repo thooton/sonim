@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One app: the heading of its group when it is the first in it ("Updates",
-     "Up to date", "Not installed"), then its name, where it stands ("1.0.0 →
-     1.1.0", "1.1.0", "Downloading 40%"), and on the right an Update or Install
-     pill when it wants one.
+<!-- One app, as the App Store's Updates page lists it: the heading of its
+     group when it is the first in it ("Available", "Installed", "Not
+     Installed"), then its icon, its name, the date of its newest change and
+     on the right UPDATE, OPEN or GET (or the download ring while it is being
+     worked on); under that, full width, what's new in it and a blue "more".
 
      The heading is part of the row rather than a row of its own so that list
-     positions stay one per app; only the body below it takes the focus card.
-     The list draws no dividers: each body draws its own hairline, inset to
-     the text edge, and leaves it out where a heading or the focus card
-     follows, as iOS lists do. -->
+     positions stay one per app; only the cell below it greys under the
+     d-pad. The list draws no dividers: each cell draws its own hairline,
+     inset on both sides as the App Store's are, and the last leaves it out. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -19,78 +19,141 @@
     android:focusableInTouchMode="false"
     android:orientation="vertical">
 
-    <LinearLayout
+    <TextView
         android:id="@+id/app_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:paddingBottom="2dp"
         android:paddingLeft="@dimen/row_pad_h"
         android:paddingRight="@dimen/row_pad_h"
-        android:paddingTop="10dp"
-        android:paddingBottom="3dp">
-        <TextView android:id="@+id/app_section_name" style="@style/FamilySection" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
-        <TextView android:id="@+id/app_section_count" style="@style/FamilySection" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-    </LinearLayout>
+        android:paddingTop="12dp"
+        android:singleLine="true"
+        android:textColor="@color/text"
+        android:textSize="@dimen/text_section"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:id="@+id/app_body"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="@dimen/row_min_height"
-        android:background="@drawable/family_focus"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
+        android:background="@drawable/row_body"
+        android:orientation="vertical"
+        android:paddingBottom="8dp"
         android:paddingLeft="@dimen/row_pad_h"
         android:paddingRight="@dimen/row_pad_h"
-        android:paddingTop="7dp"
-        android:paddingBottom="7dp">
+        android:paddingTop="8dp">
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-            <TextView
-                android:id="@+id/app_name"
-                android:layout_width="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/app_icon"
+                android:layout_width="@dimen/icon"
+                android:layout_height="@dimen/icon"
+                android:importantForAccessibility="no"
+                android:scaleType="fitXY" />
+
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:includeFontPadding="false"
-                android:singleLine="true"
-                android:textColor="@color/text"
-                android:textSize="@dimen/text_name" />
-            <TextView
-                android:id="@+id/app_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:ellipsize="end"
-                android:includeFontPadding="false"
-                android:singleLine="true"
-                android:textColor="@color/text_muted"
-                android:textSize="@dimen/text_status" />
+                android:layout_marginLeft="8dp"
+                android:layout_marginRight="6dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/app_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:maxLines="2"
+                    android:textColor="@color/text"
+                    android:textSize="@dimen/text_name" />
+                <TextView
+                    android:id="@+id/app_date"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:singleLine="true"
+                    android:textColor="@color/text_muted"
+                    android:textSize="@dimen/text_date" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+                <TextView
+                    android:id="@+id/app_pill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="22dp"
+                    android:background="@drawable/pill"
+                    android:fontFamily="sans-serif"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:minWidth="56dp"
+                    android:paddingLeft="10dp"
+                    android:paddingRight="10dp"
+                    android:singleLine="true"
+                    android:textColor="@color/pill_text"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold" />
+                <com.updater.xp3.ProgressRing
+                    android:id="@+id/app_ring"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:layout_marginLeft="16dp"
+                    android:layout_marginRight="16dp"
+                    android:visibility="gone" />
+            </FrameLayout>
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/app_pill"
-            android:layout_width="wrap_content"
-            android:layout_height="20dp"
-            android:layout_marginLeft="8dp"
-            android:background="@drawable/pill"
-            android:duplicateParentState="true"
-            android:fontFamily="sans-serif-medium"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:paddingLeft="8dp"
-            android:paddingRight="8dp"
-            android:textColor="@color/pill_text"
-            android:textSize="11sp" />
+        <LinearLayout
+            android:id="@+id/app_notes_line"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/app_notes"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:lineSpacingExtra="1dp"
+                android:maxLines="2"
+                android:textColor="@color/text"
+                android:textSize="@dimen/text_notes" />
+            <TextView
+                android:id="@+id/app_more"
+                android:layout_width="wrap_content"
+                android:layout_height="18dp"
+                android:layout_gravity="bottom"
+                android:layout_marginLeft="4dp"
+                android:background="@drawable/link"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:paddingLeft="5dp"
+                android:paddingRight="5dp"
+                android:singleLine="true"
+                android:text="more"
+                android:textColor="@color/link_text"
+                android:textSize="@dimen/text_notes" />
+        </LinearLayout>
     </LinearLayout>
 
     <View
         android:id="@+id/app_rule"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
+        android:layout_height="1px"
         android:layout_marginLeft="@dimen/row_pad_h"
-        android:background="@drawable/row_rule" />
+        android:layout_marginRight="@dimen/row_pad_h"
+        android:background="@color/separator" />
 </LinearLayout>
