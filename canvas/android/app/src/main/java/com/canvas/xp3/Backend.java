@@ -11,6 +11,7 @@ import com.canvas.xp3.data.Store;
 import com.canvas.xp3.data.Sync;
 import com.canvas.xp3.net.Canvas;
 import com.canvas.xp3.net.Config;
+import com.canvas.xp3.net.Parallel;
 import com.xp3.common.Http;
 import com.xp3.common.Json;
 
@@ -205,31 +206,26 @@ final class Backend {
      * A class's stream, classwork and people. Each part fails on its own:
      * a course with its People page hidden still shows its classwork.
      */
-    ClassData classData(String courseId) throws IOException, InterruptedException {
-        Canvas client = client();
-        IOException failure = null;
-        List<ClassData.Post> posts = new ArrayList<>();
-        List<ClassData.Topic> topics = new ArrayList<>();
-        List<ClassData.Person> people = new ArrayList<>();
+    ClassData classData(final String courseId) throws IOException, InterruptedException {
+        final Canvas client = client();
+        // The three parts are fetched at once; each fails on its own.
+        List<Parallel.Task<List<Object>>> parts = new ArrayList<>();
+        parts.add(() -> client.announcements(courseId));
+        parts.add(() -> client.modules(courseId));
+        parts.add(() -> client.people(courseId));
+        List<Parallel.Outcome<List<Object>>> got = Parallel.all(parts);
         ClassData old = store.classData(courseId);
-        try {
-            posts = ClassData.posts(client.announcements(courseId));
-        } catch (IOException e) {
-            failure = e;
-            if (old != null) posts = old.posts;
+        if (!got.get(0).ok() && !got.get(1).ok() && old == null) {
+            Exception error = got.get(1).error;
+            if (error instanceof IOException) throw (IOException) error;
+            throw new IOException("Canvas could not be read.");
         }
-        try {
-            topics = ClassData.topics(client.modules(courseId));
-        } catch (IOException e) {
-            failure = e;
-            if (old != null) topics = old.topics;
-        }
-        try {
-            people = ClassData.people(client.people(courseId));
-        } catch (IOException e) {
-            if (old != null) people = old.people;
-        }
-        if (failure != null && posts.isEmpty() && topics.isEmpty()) throw failure;
+        List<ClassData.Post> posts = got.get(0).ok() ? ClassData.posts(got.get(0).value)
+            : old != null ? old.posts : new ArrayList<ClassData.Post>();
+        List<ClassData.Topic> topics = got.get(1).ok() ? ClassData.topics(got.get(1).value)
+            : old != null ? old.topics : new ArrayList<ClassData.Topic>();
+        List<ClassData.Person> people = got.get(2).ok() ? ClassData.people(got.get(2).value)
+            : old != null ? old.people : new ArrayList<ClassData.Person>();
         ClassData data = new ClassData(posts, topics, people, System.currentTimeMillis());
         store.saveClassData(courseId, data);
         return data;

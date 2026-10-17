@@ -1,6 +1,7 @@
 package com.canvas.xp3.data;
 
 import com.canvas.xp3.net.Canvas;
+import com.canvas.xp3.net.Parallel;
 import com.xp3.common.Json;
 import com.canvas.xp3.net.Submissions;
 
@@ -82,41 +83,66 @@ public final class Sync {
     }
 
     public Result run() throws IOException, InterruptedException {
+        return run(System.currentTimeMillis());
+    }
+
+    /**
+     * The classes of this semester and their work, fetched a few classes at
+     * a time, with the planner's check marks fetched alongside them.
+     */
+    Result run(long now) throws IOException, InterruptedException {
         List<Assignment> work = new ArrayList<>();
         List<String> unavailable = new ArrayList<>();
-        List<Map<String, Object>> records = new ArrayList<>();
-        for (Object entry : canvas.courses(true)) records.add(Json.object(entry));
+        List<Map<String, Object>> all = new ArrayList<>();
+        for (Object entry : canvas.courses(true)) all.add(Json.object(entry));
+        List<Map<String, Object>> records = Terms.current(all, now);
         List<Course> courses = courses(records);
+
+        List<Parallel.Task<List<Object>>> tasks = new ArrayList<>();
+        final List<String> ids = new ArrayList<>();
+        final List<String> names = new ArrayList<>();
         for (Map<String, Object> course : records) {
             String name = courseName(course);
-            String id;
+            final String id;
             try {
                 id = Canvas.id(course, "id");
             } catch (RuntimeException e) {
                 unavailable.add(name);
                 continue;
             }
-            Course known = null;
             for (Course candidate : courses) {
-                if (candidate.id.equals(id)) known = candidate;
+                if (candidate.id.equals(id)) name = candidate.title;
             }
-            if (known != null) name = known.title;
+            ids.add(id);
+            names.add(name);
+            tasks.add(() -> canvas.assignments(id));
+        }
+        tasks.add(() -> canvas.plannerOverrides());
+        List<Parallel.Outcome<List<Object>>> results = Parallel.all(tasks);
+
+        for (int i = 0; i < ids.size(); i++) {
+            Parallel.Outcome<List<Object>> result = results.get(i);
+            if (!result.ok()) {
+                unavailable.add(names.get(i));
+                continue;
+            }
             try {
-                for (Object item : canvas.assignments(id)) {
+                for (Object item : result.value) {
                     if (work.size() >= MAX_WORK) break;
-                    Assignment mapped = map(id, name, Json.object(item));
+                    Assignment mapped = map(ids.get(i), names.get(i), Json.object(item));
                     if (mapped != null) work.add(mapped);
                 }
-            } catch (IOException e) {
-                unavailable.add(name);
             } catch (RuntimeException e) {
-                unavailable.add(name);
+                unavailable.add(names.get(i));
             }
         }
         java.util.Map<String, String> overrides = new java.util.HashMap<>();
         java.util.Set<String> checked = new java.util.HashSet<>();
-        try {
-            for (Object entry : canvas.plannerOverrides()) {
+        // Check marks are a convenience; the work itself is what this sync
+        // is for, and it is complete without them.
+        Parallel.Outcome<List<Object>> marks = results.get(results.size() - 1);
+        if (marks.ok()) {
+            for (Object entry : marks.value) {
                 Map<String, Object> override = Json.object(entry);
                 if (!"assignment".equals(Json.text(override, "plannable_type"))) continue;
                 String assignment = optionalId(override, "plannable_id");
@@ -125,9 +151,6 @@ public final class Sync {
                 overrides.put(assignment, id);
                 if (Json.flag(override, "marked_complete")) checked.add(assignment);
             }
-        } catch (IOException e) {
-            // Check marks are a convenience; the work itself is what this
-            // sync is for, and it is complete without them.
         }
         return new Result(work, courses, unavailable, System.currentTimeMillis(), overrides, checked);
     }
@@ -154,16 +177,22 @@ public final class Sync {
 
     /** Everything about one assignment that a list leaves out, fetched when its page is opened. */
     public Detail details(Assignment item) throws IOException, InterruptedException {
-        Map<String, Object> full = canvas.assignment(item.courseId, item.assignmentId);
-        Map<String, Object> submission;
-        try {
-            submission = canvas.submission(item.courseId, item.assignmentId);
-        } catch (IOException e) {
-            // The instructions are still worth showing without the student's
-            // own work under them; the page says the rest could not be read.
-            submission = null;
-        }
-        return Detail.from(full, submission, System.currentTimeMillis());
+        List<Parallel.Task<Map<String, Object>>> both = new ArrayList<>();
+        both.add(() -> canvas.assignment(item.courseId, item.assignmentId));
+        both.add(() -> canvas.submission(item.courseId, item.assignmentId));
+        List<Parallel.Outcome<Map<String, Object>>> got = Parallel.all(both);
+        if (!got.get(0).ok()) throw failure(got.get(0).error);
+        // The instructions are still worth showing without the student's own
+        // work under them; the page says the rest could not be read.
+        Map<String, Object> submission = got.get(1).ok() ? got.get(1).value : null;
+        return Detail.from(got.get(0).value, submission, System.currentTimeMillis());
+    }
+
+    /** A task's failure as the IOException the callers already handle. */
+    static IOException failure(Exception error) {
+        if (error instanceof IOException) return (IOException) error;
+        if (error instanceof RuntimeException) throw (RuntimeException) error;
+        return new IOException("Canvas could not be read.");
     }
 
     static String courseName(Map<String, Object> course) {

@@ -38,7 +38,6 @@ final class ViewerScreen extends Screen {
     private final String back;
     private File file;
     private String problem;
-    private int percent = -1;
     private PdfRenderer pdf;
     private ParcelFileDescriptor descriptor;
     private int page;
@@ -66,17 +65,7 @@ final class ViewerScreen extends Screen {
     }
 
     private void download() {
-        percent = 0;
-        app.background(() -> app.backend.download(ref.id, (done, total) -> {
-            if (total > 0) {
-                final int now = (int) (100 * done / total);
-                if (now != percent) app.main.post(() -> {
-                    percent = now;
-                    refresh();
-                });
-            }
-        }), (got, failure) -> {
-            percent = -1;
+        app.background(() -> app.backend.download(ref.id, null), (got, failure) -> {
             if (got != null) file = got;
             else problem = failure;
             refresh();
@@ -170,9 +159,8 @@ final class ViewerScreen extends Screen {
         wide = null;
 
         if (file == null) {
-            area.addView(parts.empty(0, problem != null ? "Couldn't download" : "Downloading",
-                problem != null ? problem : percent > 0 ? percent + "%" : "The file will stay on the phone."),
-                new FrameLayout.LayoutParams(-1, -1));
+            if (problem == null) return parts.spinner();
+            area.addView(parts.empty(0, "Couldn't download", problem), new FrameLayout.LayoutParams(-1, -1));
             return root;
         }
         String kind = kind();

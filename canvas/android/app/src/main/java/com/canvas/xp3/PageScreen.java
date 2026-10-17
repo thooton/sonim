@@ -61,6 +61,7 @@ final class PageScreen extends Screen {
     @Override
     View build() {
         Parts parts = new Parts(app);
+        if (body == null && problem == null) return parts.spinner();
         LinearLayout root = v.column();
         root.addView(parts.nav("Classwork", course), Views.wide());
         LinearLayout page = parts.page(this, root);
@@ -70,7 +71,7 @@ final class PageScreen extends Screen {
         if (body != null) {
             parts.markdown(page, body.trim().length() == 0 ? "This page is empty." : body);
         } else {
-            TextView wait = v.bodyText(problem != null ? problem : "Fetching the page…");
+            TextView wait = v.bodyText(problem);
             wait.setTextColor(look.muted);
             v.pad(wait, 12, 0, 12, 0);
             page.addView(wait, Views.wide());

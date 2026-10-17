@@ -226,31 +226,22 @@ final class Parts {
         return box;
     }
 
-    /** Grey shapes in the layout of a list, so nothing jumps when the work arrives. */
-    View skeleton() {
-        LinearLayout column = v.column();
-        v.pad(column, 12, 10, 12, 0);
-        for (int i = 0; i < 3; i++) {
-            column.addView(bar(60, 9), v.margins(new LinearLayout.LayoutParams(v.dp(60), v.dp(7)), 0, 8, 0, 6));
-            for (int j = 0; j < 2 - (i == 2 ? 1 : 0); j++) {
-                LinearLayout line = v.row();
-                line.setGravity(Gravity.TOP);
-                line.addView(bar(28, 9));
-                LinearLayout text = v.column();
-                text.addView(bar(0, 10), new LinearLayout.LayoutParams(-1, v.dp(10)));
-                text.addView(bar(0, 7), v.margins(new LinearLayout.LayoutParams(v.dp(110), v.dp(7)), 0, 4, 0, 0));
-                line.addView(text, v.margins(Views.fill(), 26, 0, 0, 0));
-                column.addView(line, v.margins(Views.wide(), 0, 6, 0, 8));
-            }
-        }
-        return column;
-    }
-
-    private View bar(int width, int height) {
-        View bar = new View(app);
-        bar.setBackground(v.round(look.paper, 4, 0, 0));
-        bar.setLayoutParams(new LinearLayout.LayoutParams(width == 0 ? -1 : v.dp(width), v.dp(height)));
-        return bar;
+    /**
+     * The one loading state: a spinner in the middle of an otherwise empty
+     * screen. A screen is either loading or whole. Half-drawn pages with a
+     * "Loading" line or grey stand-in shapes teach people to wait for the
+     * rest anyway, and then the rest jumps in under them.
+     */
+    View spinner() {
+        android.widget.FrameLayout box = new android.widget.FrameLayout(app);
+        box.setBackgroundColor(look.bg);
+        android.widget.ProgressBar wheel = new android.widget.ProgressBar(app);
+        wheel.setIndeterminate(true);
+        wheel.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(look.ink));
+        box.addView(wheel, new android.widget.FrameLayout.LayoutParams(v.dp(28), v.dp(28), Gravity.CENTER));
+        box.setFocusable(true);
+        box.setDefaultFocusHighlightEnabled(false);
+        return box;
     }
 
     /** The thin paper banner for being offline: what still works, and that work is safe. */

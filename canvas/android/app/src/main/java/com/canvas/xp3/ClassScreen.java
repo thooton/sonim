@@ -141,8 +141,8 @@ final class ClassScreen extends Screen {
 
         LinearLayout page = parts.page(this, root);
         if (data == null) {
-            page.addView(loading ? parts.skeleton() : parts.empty(0, "Couldn't open this class", problem),
-                v.margins(Views.wide(), 0, loading ? 0 : 40, 0, 0));
+            if (loading) return parts.spinner();
+            page.addView(parts.empty(0, "Couldn't open this class", problem), v.margins(Views.wide(), 0, 40, 0, 0));
             return root;
         }
         if (tab == 0) stream(parts, page);

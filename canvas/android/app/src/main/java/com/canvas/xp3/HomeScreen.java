@@ -43,6 +43,7 @@ final class HomeScreen extends Screen {
     private final List<View> headers = new ArrayList<>();
     private final List<Long> headerDays = new ArrayList<>();
     private boolean scrollToDay = true;
+    private final Runnable prebuilder = this::prebuild;
 
     HomeScreen(MainActivity app) {
         super(app);
@@ -70,30 +71,117 @@ final class HomeScreen extends Screen {
         return due.isEmpty() ? STRIP : "w:" + due.get(0).id;
     }
 
+    /** One tab's built screen, kept until what it shows changes. */
+    private static final class Built {
+        String key;
+        View root;
+        android.widget.ScrollView scroll;
+        WeekStrip strip;
+        final List<View> headers = new ArrayList<>();
+        final List<Long> headerDays = new ArrayList<>();
+    }
+
+    /**
+     * Each tab's screen, built once and reused. Switching tabs on this phone
+     * is the most common thing the app does, and building a term's worth of
+     * rows each time is what makes a tab slow to appear; a tab is rebuilt
+     * only when the work, the day, the theme or the day in view changes.
+     */
+    private final Built[] built = new Built[3];
+
+    private String key(int which, long now) {
+        StringBuilder key = new StringBuilder();
+        key.append(app.version).append('|').append(System.identityHashCode(look)).append('|')
+            .append(Dates.dayOf(now)).append('|').append(app.backend.canvasReady()).append('|')
+            .append(app.snapshot == null ? app.syncError : "ok");
+        if (which == Assignment.ASSIGNED) key.append('|').append(weekStart).append('|').append(selected);
+        return key.toString();
+    }
+
     @Override
     View build() {
-        Parts parts = new Parts(app);
         long now = System.currentTimeMillis();
         if (!chosen) {
             selected = app.todos.openingDay(now);
             weekStart = Dates.weekOf(selected);
             chosen = app.snapshot != null;
         }
+        // First launch, nothing saved yet: the whole screen waits.
+        if (app.backend.canvasReady() && app.snapshot == null && app.syncing) return new Parts(app).spinner();
+        Built tabView = built[tab];
+        String key = key(tab, now);
+        if (tabView == null || !key.equals(tabView.key)) {
+            tabView = make(tab, now);
+            tabView.key = key;
+            built[tab] = tabView;
+        }
+        use(tabView);
+        return tabView.root;
+    }
+
+    private void use(Built b) {
+        if (b.root.getParent() instanceof android.view.ViewGroup) {
+            ((android.view.ViewGroup) b.root.getParent()).removeView(b.root);
+        }
+        scroll = b.scroll;
+        strip = b.strip;
+        headers.clear();
+        headers.addAll(b.headers);
+        headerDays.clear();
+        headerDays.addAll(b.headerDays);
+    }
+
+    /** Builds the other tabs ahead, one per pass of the main thread, so switching to them is instant. */
+    private void prebuild() {
+        if (app.top() != this || app.overlayOpen()) return;
+        if (app.snapshot == null) return;
+        long now = System.currentTimeMillis();
+        for (int t = 0; t < 3; t++) {
+            if (t == tab) continue;
+            String key = key(t, now);
+            if (built[t] != null && key.equals(built[t].key)) continue;
+            int was = tab;
+            android.widget.ScrollView keepScroll = scroll;
+            WeekStrip keepStrip = strip;
+            List<View> keepHeaders = new ArrayList<>(headers);
+            List<Long> keepDays = new ArrayList<>(headerDays);
+            tab = t;
+            Built b = make(t, now);
+            b.key = key;
+            built[t] = b;
+            tab = was;
+            scroll = keepScroll;
+            strip = keepStrip;
+            headers.clear();
+            headers.addAll(keepHeaders);
+            headerDays.clear();
+            headerDays.addAll(keepDays);
+            app.main.post(this::prebuild);
+            return;
+        }
+    }
+
+    private Built make(int which, long now) {
+        Parts parts = new Parts(app);
+        Built b = new Built();
+        scroll = null;
+        strip = null;
         headers.clear();
         headerDays.clear();
 
         LinearLayout root = v.column();
+        b.root = root;
         root.addView(tabs(), Views.wide());
 
-        boolean loading = app.snapshot == null && app.syncing;
-        if (tab == Assignment.ASSIGNED) {
+        List<Assignment> assigned = app.todos.inState(Assignment.ASSIGNED, now);
+        if (which == Assignment.ASSIGNED) {
             Item holder = new Item(app, STRIP, "View day", this::enterDay);
-            strip = new WeekStrip(app, look);
-            holder.addView(strip, Views.wide());
-            holder.painter = strip::focus;
+            final WeekStrip days = new WeekStrip(app, look);
+            strip = days;
+            holder.addView(days, Views.wide());
+            holder.painter = days::focus;
             int todayColumn = Dates.weekOf(now) == weekStart ? Dates.column(now) : -1;
-            strip.week(weekStart, Dates.column(selected), todayColumn);
-            strip.skeleton(loading);
+            days.week(weekStart, Dates.column(selected), todayColumn);
             boolean weekEmpty = true;
             for (int i = 0; i < 7; i++) {
                 List<Integer> colors = new ArrayList<>();
@@ -101,35 +189,30 @@ final class HomeScreen extends Screen {
                     colors.add(Integer.valueOf(look.course(color(item))));
                     weekEmpty = false;
                 }
-                strip.dots(i, colors);
+                days.dots(i, colors);
             }
             if (weekEmpty && undatedHere(now).isEmpty()) holder.ok = "Today";
             root.addView(holder, Views.wide());
-            root.addView(v.hairline());
-        } else {
-            root.addView(v.hairline());
         }
+        root.addView(v.hairline());
 
         if (!app.backend.canvasReady()) {
             root.addView(parts.empty(0, "Canvas isn't set up",
                 "Open Options, then Settings, then Account, to sign in."), Views.tall());
-            return root;
-        }
-        if (loading) {
-            root.addView(parts.skeleton(), Views.tall());
-            return root;
-        }
-        if (app.snapshot == null && app.syncError != null) {
+        } else if (app.snapshot == null && app.syncError != null) {
             root.addView(parts.empty(0, "Couldn't reach Canvas", app.syncError + " Press Options, then Refresh."),
                 Views.tall());
-            return root;
+        } else {
+            LinearLayout list = parts.page(this, root);
+            if (which == Assignment.ASSIGNED) assigned(parts, list, now, root);
+            else if (which == Assignment.MISSING) missing(parts, list, now);
+            else done(parts, list, now);
         }
-
-        LinearLayout list = parts.page(this, root);
-        if (tab == Assignment.ASSIGNED) assigned(parts, list, now, root);
-        else if (tab == Assignment.MISSING) missing(parts, list, now);
-        else done(parts, list, now);
-        return root;
+        b.scroll = scroll;
+        b.strip = strip;
+        b.headers.addAll(headers);
+        b.headerDays.addAll(headerDays);
+        return b;
     }
 
     private int color(Assignment item) {
@@ -313,6 +396,14 @@ final class HomeScreen extends Screen {
 
     @Override
     void shown() {
+        app.main.removeCallbacks(prebuilder);
+        app.main.postDelayed(prebuilder, 300);
+        if (tab != Assignment.ASSIGNED && scrollToDay && scroll != null) {
+            scrollToDay = false;
+            final android.widget.ScrollView page = scroll;
+            page.post(() -> page.scrollTo(0, 0));
+            return;
+        }
         if (!scrollToDay || scroll == null) return;
         scrollToDay = false;
         for (int i = 0; i < headers.size(); i++) {
