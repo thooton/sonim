@@ -24,17 +24,27 @@ again on the next request, in case it was replaced.
 - **Find** is a Text Search, `pageSize` 20, with a 5 km `locationBias`
   circle around Near: a preference, not a limit. Down past the last result
   asks for the next page with Google's `pageToken`.
+- **Filters**: Open now and Top rated add Text Search's `openNow` and
+  `minRating` (4.5); the next page is asked for with the same ones.
 - **A place** is `GET /places/{id}` with the CLI's details mask: contact
   details, hours (this week, usual, and secondary such as happy hour),
   price, Google's summaries, amenities, payment, parking, accessibility,
-  fuel prices and up to 5 reviews. Fetched details are kept in memory by id.
+  fuel prices and up to 5 reviews, plus the photos. Fetched details are
+  kept in memory by id.
+- **A photo** is `GET /{photo name}/media` with `skipHttpRedirect=true`
+  (the shared `Http` follows no redirects), then the image from the
+  address Google answers, which needs no key. Each is billed (Place
+  Photos), so only a place's first photo is shown, on its page, fetched at
+  240px and kept in memory by `Photos`.
 
 Field masks decide what Google bills, so keep them the CLI's: search asks
 for nothing past the Enterprise tier, only a place's details ask for
-reviews and the other Atmosphere fields. The additions are `priceRange` and
-`accessibilityOptions.wheelchairAccessibleEntrance` in the search mask, for
-the results list: an Enterprise and a Pro field, so the search still bills
-as Enterprise. If the CLI's masks or wording
+reviews and the other Atmosphere fields. The additions are `priceRange`,
+`accessibilityOptions.wheelchairAccessibleEntrance`, the phone numbers,
+`websiteUri` and `photos` in the search mask, so a place's page has its
+photo, number and website before its details come: Enterprise and Pro
+fields, so the search still bills as Enterprise; and `photos` in the
+details mask. If the CLI's masks or wording
 change, change `Places` and `Place` here and keep the test in step.
 
 Times are shown in the place's own offset (`utcOffsetMinutes`). The dash
@@ -49,11 +59,14 @@ ranges use one too: the app writes no en or em dashes of its own.
   `Anchor` (where to search near, distances). Tests in `src/test` run via
   `:core:selfTest`, against a loopback server standing in for both the
   command center and Google.
-- `android/app`: `MainActivity` (the one screen: the two fields, the
-  results, a place's details, the keys, the menu, the login dialog) and
-  `PlacePage` (a place's details, laid out as Google Maps lays out a place;
-  see `../DESIGN.md`), with `Stars` (a rating's stars, partly filled) and
-  `Flow` (chips that wrap).
+- `android/app`: `MainActivity` (the one screen: the header, the filter
+  chips, the compact results or recent searches, the keys, OK's and Menu's
+  lists of choices with icons, the login dialog), `PlacePage` (a place, on
+  one scrolling page under a name that shrinks), `Look` (Maps' dark look in
+  code: Google Sans, round buttons, rounded photos, the lines of facts),
+  `Photos` (fetching and keeping photos) and `Stars` (a rating's stars,
+  partly filled). The look is Google
+  Maps' dark theme; see `../DESIGN.md`.
 
 ## Credentials
 

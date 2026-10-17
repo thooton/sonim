@@ -1,80 +1,145 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/page"
-    android:orientation="vertical">
+    android:background="@color/page">
 
-    <!-- Where to search near (kept between searches), then what to find:
-         soft fields with their labels inside, so the typed text starts on
-         the same 10dp edge as the results. Hidden while a place's details
-         fill the screen. -->
+    <!-- The search, as Google Maps' results sheet shows it: what was searched
+         with a round clear button, a hairline, the filter chips, then the
+         results parted by hairlines (or, before a search, the recent
+         ones). -->
     <LinearLayout
-        android:id="@+id/form"
+        android:id="@+id/search"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingLeft="4dp"
-        android:paddingRight="4dp"
-        android:paddingTop="6dp">
-        <LinearLayout style="@style/LabelledField">
-            <TextView style="@style/FieldLabel" android:text="@string/label_near" />
-            <EditText
-                android:id="@+id/near"
-                style="@style/FieldText"
-                android:imeOptions="actionNext|flagNoExtractUi"
-                android:inputType="textCapWords|textPostalAddress" />
-        </LinearLayout>
-        <LinearLayout style="@style/LabelledField" android:layout_marginTop="4dp">
-            <TextView style="@style/FieldLabel" android:text="@string/label_find" />
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:addStatesFromChildren="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="@dimen/edge"
+            android:paddingRight="8dp">
+            <ImageView
+                android:id="@+id/lead"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginRight="10dp"
+                android:importantForAccessibility="no" />
             <EditText
                 android:id="@+id/query"
-                style="@style/FieldText"
+                style="@style/HeaderField"
+                android:hint="@string/hint_query"
                 android:imeOptions="actionSearch|flagNoExtractUi"
                 android:inputType="textCapSentences" />
+            <EditText
+                android:id="@+id/near"
+                style="@style/HeaderField"
+                android:hint="@string/hint_near"
+                android:imeOptions="actionDone|flagNoExtractUi"
+                android:inputType="textCapWords|textPostalAddress"
+                android:visibility="gone" />
+            <ImageView
+                android:id="@+id/clear"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginLeft="6dp"
+                android:importantForAccessibility="no"
+                android:padding="6dp"
+                android:src="@drawable/ic_close" />
         </LinearLayout>
-    </LinearLayout>
 
-    <!-- What the search found, or is doing. No bar naming the app above the
-         fields: you just opened it. -->
-    <TextView
-        android:id="@+id/status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:includeFontPadding="false"
-        android:paddingBottom="5dp"
-        android:paddingLeft="@dimen/pad_h"
-        android:paddingRight="@dimen/pad_h"
-        android:paddingTop="7dp"
-        android:textColor="@color/text_muted"
-        android:textSize="@dimen/text_status" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="2dp">
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/hairline" />
+            <ProgressBar
+                android:id="@+id/progress"
+                style="@android:style/Widget.Material.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:indeterminate="true"
+                android:indeterminateTint="@color/accent"
+                android:minHeight="2dp"
+                android:visibility="gone" />
+        </FrameLayout>
 
-    <!-- The results. The focus card is drawn by the adapter, since a typing
-         box keeps the focus. -->
-    <ListView
-        android:id="@+id/results"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:focusable="false" />
-
-    <!-- One place, in place of the results, laid out as Google Maps lays
-         one out: built by PlacePage. -->
-    <ScrollView
-        android:defaultFocusHighlightEnabled="false"
-        android:id="@+id/detail"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="@color/grouped_page"
-        android:focusable="false"
-        android:scrollbarStyle="outsideOverlay"
-        android:visibility="gone">
-        <LinearLayout
-            android:id="@+id/detail_body"
+        <HorizontalScrollView
+            android:id="@+id/filters_scroll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingBottom="12dp" />
-    </ScrollView>
-</LinearLayout>
+            android:focusable="false"
+            android:scrollbars="none">
+            <LinearLayout
+                android:id="@+id/filters"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingBottom="8dp"
+                android:paddingLeft="@dimen/edge"
+                android:paddingRight="@dimen/edge"
+                android:paddingTop="8dp" />
+        </HorizontalScrollView>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+            <ListView
+                android:id="@+id/results"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:focusable="false"
+                android:scrollbars="none" />
+            <TextView
+                android:id="@+id/message"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingLeft="20dp"
+                android:paddingRight="20dp"
+                android:paddingTop="36dp"
+                android:textColor="@color/text_muted"
+                android:textSize="13sp"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- One place, over the search: its name, which shrinks as the page
+         scrolls under it, then everything about it on one page. Filled by
+         PlacePage. -->
+    <LinearLayout
+        android:id="@+id/place"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/page"
+        android:orientation="vertical"
+        android:visibility="gone">
+        <LinearLayout
+            android:id="@+id/place_head"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+        <ScrollView
+            android:id="@+id/place_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:defaultFocusHighlightEnabled="false"
+            android:focusable="false"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbarThumbVertical="@drawable/scroll_thumb">
+            <LinearLayout
+                android:id="@+id/place_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="12dp" />
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

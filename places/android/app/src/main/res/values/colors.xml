@@ -1,36 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- A map green in the family's four tones (DESIGN.md): the band near
-         black, the accent for focus and for what can be acted on (a phone
-         number, a website), a pale wash behind the picked result, and greys
-         tinted to match. The status bar is the band's own colour. -->
-    <color name="primary">#0F3624</color>
-    <color name="primary_dark">#0F3624</color>
-    <color name="on_primary">#FFFFFF</color>
-    <color name="on_primary_dim">#A3C6B2</color>
+    <!-- Google Maps' dark theme, sampled from its search results and place
+         sheet on a phone. The page is Maps' near-black sheet, parted by
+         hairlines, and the one hue is Maps' teal: a filter chip that is on
+         is a deep teal with pale teal text, and icons, links, the cursor and
+         the loading bar are the bright teal. -->
+    <color name="page">#131314</color>
+    <color name="hairline">#3E3E40</color>
+    <!-- The clear button and recent searches' clocks: Maps' grey on the sheet. -->
+    <color name="button">#303030</color>
+    <!-- A tonal card on the sheet, as Maps draws "Your visits". -->
+    <color name="card">#192123</color>
+    <color name="photo">#26282A</color>
 
-    <color name="page">#FFFFFF</color>
-    <color name="row">#FFFFFF</color>
-    <color name="divider">#E1EAE5</color>
-    <color name="field_fill">#EFF3F1</color>
-    <color name="grouped_page">#F0F4F2</color>
+    <color name="text">#E3E3E3</color>
+    <color name="text_muted">#ABABAD</color>
+    <color name="text_hint">#8E8E90</color>
 
-    <color name="focus_fill">#EAF5EF</color>
-    <color name="focus_rule">#1D6A45</color>
-    <color name="press_fill">#D3E9DC</color>
-    <!-- The platform's highlight (a stock menu's item under the d-pad, a
-         press): the accent, faint enough that what it covers stays legible. -->
-    <color name="highlight">#241D6A45</color>
+    <color name="chip">#00363F</color>
+    <color name="on_chip">#A6EEFB</color>
+    <color name="accent">#5CB8C9</color>
+    <color name="link">#7DD3E3</color>
+    <color name="filter_rule">#5C5F61</color>
 
-    <color name="text">#1B1B1D</color>
-    <color name="text_muted">#5E6A64</color>
-    <color name="input_hint">#89928D</color>
-    <!-- Open and closed, on a result's last line: the one thing worth
-         reading at a glance. -->
-    <color name="open">#1E7B34</color>
-    <color name="closed">#B3261E</color>
-    <!-- A rating's stars, filled and not: the family's gold, on a grey
-         tinted to the green. -->
-    <color name="star">#C58A00</color>
-    <color name="star_empty">#D6DED9</color>
+    <!-- The row under the d-pad: Maps has no focus, so it takes the tonal
+         card's teal, lifted; a chip under it takes a pale teal ring. -->
+    <color name="picked">#1C2B2E</color>
+    <color name="highlight">#335CB8C9</color>
+
+    <color name="open">#81C995</color>
+    <color name="closed">#F2B8B5</color>
+    <color name="star">#FFC42A</color>
+    <color name="star_empty">#5A5A5D</color>
+    <color name="wheelchair">#A8C7FA</color>
 </resources>

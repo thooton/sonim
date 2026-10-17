@@ -3,6 +3,7 @@ package com.places.xp3.net;
 import com.xp3.common.Http;
 import com.xp3.common.Json;
 import com.xp3.common.Login;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -23,8 +24,12 @@ import java.util.Map;
  * for nothing past the Enterprise tier (ratings and opening hours need it), a
  * place's details add reviews and the other Atmosphere fields, and looking up
  * where to search near asks only for Pro fields. A search also asks for the
- * price range and the wheelchair entrance, for the results list; they are
+ * price range, the wheelchair entrance, the phone number, the website and
+ * the photos, for the results list and its Call and Website chips; they are
  * Enterprise and Pro fields, so the search still bills as Enterprise.
+ *
+ * A photo is billed on its own (Place Photos), so the app asks for one only
+ * when it comes on screen, small, and keeps it in memory.
  */
 public final class Places {
 
@@ -33,6 +38,8 @@ public final class Places {
     public static final int PAGE_SIZE = 20;
     /** How hard results are pulled toward the anchor: a preference, not a limit. */
     static final int BIAS_METERS = 5000;
+    /** More than any photo scaled to fit a phone's screen. */
+    static final int MAX_PHOTO = 2000000;
 
     static final String LOCATE_FIELDS = "places.id,places.displayName,places.formattedAddress,places.location";
 
@@ -40,7 +47,8 @@ public final class Places {
         + "places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.priceRange,"
         + "places.accessibilityOptions.wheelchairAccessibleEntrance,"
         + "places.businessStatus,places.utcOffsetMinutes,places.currentOpeningHours.openNow,"
-        + "places.currentOpeningHours.nextOpenTime,places.currentOpeningHours.nextCloseTime,nextPageToken";
+        + "places.currentOpeningHours.nextOpenTime,places.currentOpeningHours.nextCloseTime,"
+        + "places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri,places.photos,nextPageToken";
 
     static final String DETAIL_FIELDS;
 
@@ -49,7 +57,7 @@ public final class Places {
             + "nationalPhoneNumber,internationalPhoneNumber,websiteUri,rating,userRatingCount,priceLevel,priceRange,"
             + "businessStatus,utcOffsetMinutes,currentOpeningHours,regularOpeningHours,currentSecondaryOpeningHours,"
             + "editorialSummary,generativeSummary.overview,reviewSummary.text,reviews,paymentOptions,parkingOptions,"
-            + "accessibilityOptions,fuelOptions");
+            + "accessibilityOptions,fuelOptions,photos");
         for (String[] feature : Place.FEATURES) fields.append(',').append(feature[0]);
         DETAIL_FIELDS = fields.toString();
     }
@@ -108,7 +116,19 @@ public final class Places {
 
     /** A Text Search, pulled toward `near` when there is one; `after` is a page's `next`, or null. */
     public Page search(String query, Anchor near, String after) throws IOException, InterruptedException {
+        return search(query, near, after, false, 0);
+    }
+
+    /**
+     * The same, narrowed as Google Maps' filter chips narrow it: to places
+     * open now, and to places rated `minRating` or more (0 for any). The
+     * next page must be asked for with the same filters.
+     */
+    public Page search(String query, Anchor near, String after, boolean openNow, double minRating)
+            throws IOException, InterruptedException {
         Map<String, Object> body = Json.map("textQuery", query.trim(), "pageSize", Integer.valueOf(PAGE_SIZE));
+        if (openNow) body.put("openNow", Boolean.TRUE);
+        if (minRating > 0) body.put("minRating", Double.valueOf(minRating));
         if (near != null) {
             Map<String, Object> point = Json.map("latitude", Double.valueOf(near.lat), "longitude", Double.valueOf(near.lng));
             body.put("locationBias", Json.map("circle", Json.map("center", point, "radius", Integer.valueOf(BIAS_METERS))));
@@ -127,6 +147,41 @@ public final class Places {
     public Place details(String id) throws IOException, InterruptedException {
         if (!id.matches("[A-Za-z0-9_-]+")) throw new IOException("That is not a place.");
         return new Place(google("/places/" + id, DETAIL_FIELDS, null));
+    }
+
+    /**
+     * One of a place's photos (a name from {@link Place#photos}), scaled by
+     * Google to fit `maxPx` square, as the bytes of an image. Google is asked
+     * for the photo's address rather than redirected to it, since the HTTP
+     * client follows no redirects; the image itself needs no key.
+     */
+    public byte[] photo(String name, int maxPx) throws IOException, InterruptedException {
+        if (!name.matches("places/[A-Za-z0-9_-]+/photos/[A-Za-z0-9_-]+")) throw new IOException("That is not a photo.");
+        Http.Response response = http.send(Http.Request.to(URI.create(google + "/" + name + "/media?maxWidthPx=" + maxPx
+                + "&maxHeightPx=" + maxPx + "&skipHttpRedirect=true"))
+            .header("X-Goog-Api-Key", key())
+            .timeout(30000));
+        if (response.status() / 100 != 2) {
+            if (response.status() == 400 || response.status() == 401 || response.status() == 403) key = null;
+            throw new IOException("Google Maps: " + problem(response));
+        }
+        String address;
+        try {
+            address = Json.string(Json.object(Json.parse(response.body())), "photoUri");
+        } catch (RuntimeException e) {
+            throw new IOException("Google Maps sent something unreadable.");
+        }
+        if (!address.startsWith("https://") && !address.startsWith(google)) throw new IOException("Google Maps sent an odd photo address.");
+        try (Http.Stream image = http.stream(Http.Request.to(URI.create(address)).timeout(30000))) {
+            if (image.status() / 100 != 2) throw new IOException("Photo: HTTP " + image.status());
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            for (int read; (read = image.stream().read(buffer)) > 0; ) {
+                if (out.size() + read > MAX_PHOTO) throw new IOException("Photo too large");
+                out.write(buffer, 0, read);
+            }
+            return out.toByteArray();
+        }
     }
 
     /** The key, from the command center the first time and from memory after. */

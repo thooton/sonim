@@ -2,92 +2,118 @@ package com.places.xp3;
 
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.InputType;
-import android.text.SpannableStringBuilder;
-import android.text.Spanned;
-import android.text.TextUtils;
-import android.text.style.ForegroundColorSpan;
-import android.text.style.ImageSpan;
-import android.text.style.TypefaceSpan;
-import android.util.TypedValue;
+import android.text.TextWatcher;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import com.places.xp3.net.Anchor;
 import com.places.xp3.net.Place;
 import com.places.xp3.net.Places;
+import com.xp3.common.Json;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
-import com.xp3.common.ui.Family;
 import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**
- * One screen: where to search near, what to find, and the places found.
+ * One screen, in Google Maps' dark look, made for a d-pad: what to find in
+ * the header, filter chips under it (where to search near, open now, top
+ * rated), and the places found as a compact list, several to a screen, each
+ * with its rating, kind, whether it is open and how far. Before a search,
+ * the recent ones.
  *
- * Near is kept between searches (and the point Google found for it, so it is
- * looked up once). OK in Near moves to Find; OK in Find searches, and the
- * results come up with the first one picked. Up and Down move through them
- * (Down past the last loads more), OK shows everything about the picked
- * place, and in there Left and Right go to the previous or next one, Call
- * dials it, and Back goes back to the list.
+ * The d-pad moves between the header, the chips and the results. Up and
+ * Down go from one to the next (Down past the last result loads more), Left
+ * and Right go along the chips, and OK does what is picked: searches,
+ * toggles a filter, or opens the place on its own page ({@link PlacePage}),
+ * where OK lists what can be done with it. Typing anywhere goes back to the
+ * header.
  */
 public final class MainActivity extends BaseActivity {
 
     private static final String PREFS = "places";
+    private static final int RECENT_KEPT = 12;
+
+    /** Where the d-pad is on the search screen. */
+    private enum Zone { QUERY, NEAR, FILTERS, LIST }
+
+    /** The filter chips, in order. */
+    private static final int FILTER_NEAR = 0;
+    private static final int FILTER_OPEN = 1;
+    private static final int FILTER_RATED = 2;
 
     /** Work for the background thread: returns what to do with its result on the main thread. */
     private interface Work {
         Runnable call() throws Exception;
     }
 
-    private EditText near;
     private EditText query;
-    private View form;
-    private TextView statusView;
-    private ListView resultList;
-    private ScrollView detail;
-    private LinearLayout detailBody;
+    private EditText near;
+    private ImageView lead;
+    private ImageView clear;
+    private ProgressBar progress;
+    private HorizontalScrollView filtersScroll;
+    private LinearLayout filters;
+    private ListView list;
+    private TextView message;
+    private View searchScreen;
+    private View placeScreen;
+    private ScrollView placeScroll;
+
+    private Look look;
+    private PlacePage page;
+    private Photos photos;
     private final ResultAdapter adapter = new ResultAdapter();
-    private final PlacePage page = new PlacePage(this);
     private final ExecutorService worker = Ui.worker("places");
 
     private Login login = Login.blank();
     private Places places;
     /** Where the last search was made near, with Google's point for it. */
     private Anchor anchor;
+    private boolean openNow;
+    private boolean topRated;
 
     /** The results so far, the search they answer, and Google's token for more. */
     private final List<Place> results = new ArrayList<Place>();
     private String searched;
     private Anchor searchedNear;
+    private boolean searchedOpen;
+    private boolean searchedRated;
     private String nextPage;
     /** Places whose details were fetched, by id, so going back and forth costs nothing. */
     private final Map<String, Place> details = new HashMap<String, Place>();
+    private final List<String> recent = new ArrayList<String>();
 
-    /** Whether the keys are moving through the results rather than typing. */
-    private boolean picking;
+    private Zone zone = Zone.QUERY;
+    private int filter;
+    /** The picked row: a result, or a recent search before there are results. */
     private int picked;
-    /** Whether the picked place's details fill the screen. */
+    /** Whether a place's sheet is up. */
     private boolean showing;
 
     private Future<?> job;
@@ -97,32 +123,43 @@ public final class MainActivity extends BaseActivity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
-        near = (EditText) findViewById(R.id.near);
+        look = new Look(this);
+        photos = new Photos(() -> places());
         query = (EditText) findViewById(R.id.query);
-        form = findViewById(R.id.form);
-        statusView = (TextView) findViewById(R.id.status);
-        resultList = (ListView) findViewById(R.id.results);
-        detail = (ScrollView) findViewById(R.id.detail);
-        detailBody = (LinearLayout) findViewById(R.id.detail_body);
-        resultList.setAdapter(adapter);
-        Family.list(resultList);
-        // Results parted by a band of the page behind a place, as Google Maps parts them.
-        resultList.setDivider(new ColorDrawable(color(R.color.grouped_page)));
-        resultList.setDividerHeight(dp(6));
+        near = (EditText) findViewById(R.id.near);
+        lead = (ImageView) findViewById(R.id.lead);
+        clear = (ImageView) findViewById(R.id.clear);
+        progress = (ProgressBar) findViewById(R.id.progress);
+        filtersScroll = (HorizontalScrollView) findViewById(R.id.filters_scroll);
+        filters = (LinearLayout) findViewById(R.id.filters);
+        list = (ListView) findViewById(R.id.results);
+        message = (TextView) findViewById(R.id.message);
+        searchScreen = findViewById(R.id.search);
+        placeScreen = findViewById(R.id.place);
+        placeScroll = (ScrollView) findViewById(R.id.place_scroll);
+        page = new PlacePage(look, photos,
+            (LinearLayout) findViewById(R.id.place_head),
+            placeScroll,
+            (LinearLayout) findViewById(R.id.place_body));
+
+        query.setTypeface(look.regular);
+        near.setTypeface(look.regular);
+        message.setTypeface(look.regular);
+        clear.setBackground(circle(R.color.button));
+        clear.setImageTintList(ColorStateList.valueOf(color(R.color.text)));
+        list.setAdapter(adapter);
+        list.setDivider(new ColorDrawable(color(R.color.hairline)));
+        list.setDividerHeight(1);
+        list.setSelector(new ColorDrawable(0));
 
         SharedPreferences prefs = prefs();
         login = loadLogin(prefs);
         anchor = Anchor.parse(prefs.getString("anchor", ""));
         near.setText(prefs.getString("near", ""));
-        near.setSelection(near.length());
+        openNow = prefs.getBoolean("open_now", false);
+        topRated = prefs.getBoolean("top_rated", false);
+        loadRecent(prefs.getString("recent", ""));
 
-        near.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_NEXT || actionId == EditorInfo.IME_ACTION_DONE) {
-                toFind();
-                return true;
-            }
-            return false;
-        });
         query.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
                 search();
@@ -130,9 +167,29 @@ public final class MainActivity extends BaseActivity {
             }
             return false;
         });
-        if (near.length() == 0) near.requestFocus();
-        else query.requestFocus();
-        say(login.ready() ? "" : "No command center");
+        near.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_NEXT) {
+                doneNear();
+                return true;
+            }
+            return false;
+        });
+        query.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                header();
+            }
+        });
+        query.requestFocus();
+        if (!login.ready()) say("No command center");
         refresh();
     }
 
@@ -145,6 +202,7 @@ public final class MainActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         worker.shutdownNow();
+        photos.shutdown();
         super.onDestroy();
     }
 
@@ -183,19 +241,35 @@ public final class MainActivity extends BaseActivity {
         prefs().edit().putString("near", near.getText().toString().trim()).apply();
     }
 
-    private void toFind() {
-        saveNear();
-        query.requestFocus();
-        query.setSelection(query.length());
+    // ---- Recent searches ----
+
+    private void loadRecent(String saved) {
+        recent.clear();
+        try {
+            for (Object item : Json.array(Json.parse(saved))) {
+                if (item instanceof String) recent.add((String) item);
+            }
+        } catch (RuntimeException e) {
+            // None yet.
+        }
+    }
+
+    private void remember(String what) {
+        for (int i = recent.size() - 1; i >= 0; i--) {
+            if (recent.get(i).equalsIgnoreCase(what)) recent.remove(i);
+        }
+        recent.add(0, what);
+        while (recent.size() > RECENT_KEPT) recent.remove(recent.size() - 1);
+        prefs().edit().putString("recent", Json.write(new ArrayList<Object>(recent))).apply();
     }
 
     // ---- Background work ----
 
     /** Runs `work` off the main thread, in place of anything already running. */
-    private void start(String doing, final Work work) {
+    private void start(final Work work) {
         stop();
         final int mine = ++generation;
-        say(doing);
+        progress.setVisibility(View.VISIBLE);
         job = worker.submit(() -> {
             Runnable done;
             try {
@@ -203,13 +277,17 @@ public final class MainActivity extends BaseActivity {
             } catch (InterruptedException e) {
                 return;
             } catch (Exception e) {
-                final String message = e.getMessage() != null ? e.getMessage() : e.toString();
-                done = () -> say(message);
+                final String problem = e.getMessage() != null ? e.getMessage() : e.toString();
+                done = () -> {
+                    if (showing) toast(problem);
+                    else say(problem);
+                };
             }
             final Runnable then = done;
             runOnUiThread(() -> {
                 if (mine != generation) return;
                 job = null;
+                progress.setVisibility(View.GONE);
                 then.run();
             });
         });
@@ -225,42 +303,49 @@ public final class MainActivity extends BaseActivity {
         job.cancel(true);
         job = null;
         generation++;
+        progress.setVisibility(View.GONE);
     }
 
     // ---- Searching ----
 
     private void search() {
-        if (busy()) return;
-        final String what = query.getText().toString().trim();
-        if (what.length() == 0) {
-            setPicking(true);
-            return;
-        }
+        search(query.getText().toString().trim());
+    }
+
+    private void search(final String what) {
+        if (what.length() == 0) return;
         if (!login.ready()) {
             askLogin();
             return;
         }
         final String where = near.getText().toString().trim();
         saveNear();
+        remember(what);
         final Anchor known = where.length() > 0 && anchor != null && anchor.isFor(where) ? anchor : null;
         final Places client = places();
-        start(where.length() > 0 && known == null ? "Finding " + where + "…" : "Searching…", () -> {
+        final boolean open = openNow;
+        final boolean rated = topRated;
+        say("");
+        start(() -> {
             final Anchor at = where.length() == 0 ? null : known != null ? known : client.locate(where);
-            final Places.Page page = client.search(what, at, null);
+            final Places.Page found = client.search(what, at, null, open, rated ? 4.5 : 0);
             return () -> {
                 if (at != null && at != known) {
                     anchor = at;
                     prefs().edit().putString("anchor", at.toJson()).apply();
                 }
                 results.clear();
-                results.addAll(page.places);
-                searched = page.query;
-                searchedNear = page.near;
-                nextPage = page.next;
+                results.addAll(found.places);
+                searched = found.query;
+                searchedNear = found.near;
+                searchedOpen = open;
+                searchedRated = rated;
+                nextPage = found.next;
                 picked = 0;
-                showing = false;
-                picking = !results.isEmpty();
-                say(found());
+                // A filter changed from its chip keeps the d-pad on it.
+                if (zone != Zone.FILTERS) zone = results.isEmpty() ? Zone.QUERY : Zone.LIST;
+                say(results.isEmpty() ? "No results for “" + what + "”" + (at == null ? "" : " near " + at.label) : "");
+                list.setSelection(0);
                 refresh();
             };
         });
@@ -272,67 +357,213 @@ public final class MainActivity extends BaseActivity {
         final String after = nextPage;
         final String what = searched;
         final Anchor at = searchedNear;
+        final boolean open = searchedOpen;
+        final boolean rated = searchedRated;
         final Places client = places();
-        start("Loading more…", () -> {
-            final Places.Page page = client.search(what, at, after);
+        start(() -> {
+            final Places.Page found = client.search(what, at, after, open, rated ? 4.5 : 0);
             return () -> {
                 boolean wasLast = picked == results.size() - 1;
-                results.addAll(page.places);
-                nextPage = page.next;
+                results.addAll(found.places);
+                nextPage = found.next;
                 if (wasLast && picked + 1 < results.size()) picked++;
-                say(found());
                 refresh();
             };
         });
     }
 
-    /** "20+ places near Tempe, AZ, USA". */
-    private String found() {
-        String where = searchedNear == null ? "" : " near " + searchedNear.label;
-        if (results.isEmpty()) return "Nothing found" + where + ".";
-        int count = results.size();
-        return count + (nextPage != null ? "+" : "") + (count == 1 && nextPage == null ? " place" : " places") + where;
+    private void clearResults() {
+        stop();
+        results.clear();
+        nextPage = null;
+        searched = null;
+        picked = 0;
+        zone = Zone.QUERY;
+        say("");
+        refresh();
     }
 
     // ---- Showing ----
 
-    /** Puts the screen in step with the state: the form and list, or one place. */
+    /** Puts the screen in step with the state. */
     private void refresh() {
-        form.setVisibility(showing ? View.GONE : View.VISIBLE);
-        resultList.setVisibility(showing ? View.GONE : View.VISIBLE);
-        detail.setVisibility(showing ? View.VISIBLE : View.GONE);
+        searchScreen.setVisibility(showing ? View.GONE : View.VISIBLE);
+        placeScreen.setVisibility(showing ? View.VISIBLE : View.GONE);
+        header();
+        drawFilters();
         adapter.notifyDataSetChanged();
-        if (!showing) {
-            if (!near.hasFocus() && !query.hasFocus()) query.requestFocus();
-            if (picking) resultList.post(() -> resultList.smoothScrollToPosition(picked));
+        boolean empty = adapter.getCount() == 0;
+        list.setVisibility(empty ? View.GONE : View.VISIBLE);
+        message.setVisibility(message.length() > 0 && results.isEmpty() ? View.VISIBLE : View.GONE);
+        if (!showing && zone == Zone.LIST && !empty) keepInView();
+    }
+
+    /** The header: what is typed, with a lead icon that says what it is for, and the clear button. */
+    private void header() {
+        boolean editingNear = zone == Zone.NEAR;
+        query.setVisibility(editingNear ? View.GONE : View.VISIBLE);
+        near.setVisibility(editingNear ? View.VISIBLE : View.GONE);
+        EditText field = editingNear ? near : query;
+        if (!field.hasFocus()) {
+            field.requestFocus();
+            field.setSelection(field.length());
+        }
+        field.setCursorVisible(zone == Zone.QUERY || zone == Zone.NEAR);
+        int icon = editingNear ? R.drawable.ic_place : results.isEmpty() ? R.drawable.ic_search : R.drawable.ic_arrow_back;
+        lead.setImageResource(icon);
+        lead.setImageTintList(ColorStateList.valueOf(color(editingNear ? R.color.link : R.color.text_muted)));
+        clear.setVisibility(field.length() > 0 || !results.isEmpty() ? View.VISIBLE : View.INVISIBLE);
+    }
+
+    /** Where to search near, open now, top rated: Maps' filter chips, the picked one ringed. */
+    private void drawFilters() {
+        filters.removeAllViews();
+        String where = near.getText().toString().trim();
+        addFilter(where.length() == 0 ? "Anywhere" : where, R.drawable.ic_place, false, FILTER_NEAR);
+        addFilter("Open now", 0, openNow, FILTER_OPEN);
+        addFilter("Top rated", 0, topRated, FILTER_RATED);
+        if (zone == Zone.FILTERS) {
+            final View chip = filters.getChildAt(filter);
+            filtersScroll.post(() -> filtersScroll.smoothScrollTo(Math.max(0, chip.getLeft() - dp(24)), 0));
+        } else {
+            filtersScroll.post(() -> filtersScroll.smoothScrollTo(0, 0));
         }
     }
 
-    /** The line under the fields; it takes no room while there is nothing to say. */
+    private void addFilter(String label, int iconRes, boolean on, int index) {
+        boolean focused = zone == Zone.FILTERS && filter == index;
+        int ink = on ? R.color.on_chip : R.color.text;
+        TextView chip = look.text(label, 12.5f, ink);
+        chip.setTypeface(look.medium);
+        chip.setSingleLine(true);
+        chip.setMaxWidth(dp(130));
+        chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        chip.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        chip.setHeight(dp(28));
+        chip.setPadding(dp(on || iconRes != 0 ? 8 : 12), 0, dp(index == FILTER_NEAR ? 6 : 12), 0);
+        chip.setCompoundDrawablePadding(dp(4));
+        int lead = on ? R.drawable.ic_check : iconRes;
+        chip.setCompoundDrawables(lead == 0 ? null : look.icon(lead, 15, on ? R.color.on_chip : R.color.link), null,
+            index == FILTER_NEAR ? look.icon(R.drawable.ic_arrow_drop_down, 16, R.color.text_muted) : null, null);
+        int fill = on ? color(R.color.chip) : color(R.color.page);
+        chip.setBackground(look.rounded(fill, dp(8)));
+        android.graphics.drawable.GradientDrawable shape = (android.graphics.drawable.GradientDrawable) chip.getBackground();
+        if (focused) shape.setStroke(dp(2), color(R.color.on_chip));
+        else if (!on) shape.setStroke(1, color(R.color.filter_rule));
+        LinearLayout.LayoutParams at = Look.at(index == 0 ? 0 : dp(8), 0);
+        filters.addView(chip, at);
+    }
+
+    /** Below the results, or in place of them: what went wrong, or that nothing was found. */
     private void say(String text) {
-        statusView.setText(text);
-        statusView.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
+        message.setText(text);
+        message.setVisibility(text.length() > 0 && results.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
-    private void setPicking(boolean on) {
-        picking = on && !results.isEmpty();
-        if (picking) picked = Math.min(picked, results.size() - 1);
+    /** Scrolls the list so the picked row, and the picked chip in it, are in view. */
+    private void keepInView() {
+        list.post(() -> {
+            int first = list.getFirstVisiblePosition();
+            View row = list.getChildAt(picked - first);
+            if (row == null || row.getTop() < 0 || row.getBottom() > list.getHeight()) list.setSelectionFromTop(picked, 0);
+        });
+    }
+
+    /** Down: from the header to the chips to the list, and along the list. */
+    private void down() {
+        switch (zone) {
+            case QUERY:
+                zone = Zone.FILTERS;
+                break;
+            case FILTERS:
+                if (adapter.getCount() == 0) return;
+                zone = Zone.LIST;
+                picked = Math.min(picked, adapter.getCount() - 1);
+                break;
+            case LIST:
+                if (picked + 1 >= adapter.getCount()) {
+                    if (!results.isEmpty()) more();
+                    return;
+                }
+                picked++;
+                break;
+            default:
+                return;
+        }
         refresh();
     }
 
-    private void movePick(int step) {
-        int next = picked + step;
-        if (next < 0) {
-            setPicking(false);
-            return;
+    private void up() {
+        switch (zone) {
+            case FILTERS:
+                zone = Zone.QUERY;
+                break;
+            case LIST:
+                if (picked == 0) zone = Zone.FILTERS;
+                else picked--;
+                break;
+            default:
+                return;
         }
-        if (next >= results.size()) {
-            more();
-            return;
-        }
-        picked = next;
         refresh();
     }
+
+    /** Left and Right: along the chips. */
+    private void across(int step) {
+        if (zone != Zone.FILTERS) return;
+        filter = Math.max(0, Math.min(FILTER_RATED, filter + step));
+        drawFilters();
+    }
+
+    private void ok() {
+        switch (zone) {
+            case QUERY:
+                search();
+                break;
+            case NEAR:
+                doneNear();
+                break;
+            case FILTERS:
+                if (filter == FILTER_NEAR) {
+                    editNear();
+                    return;
+                }
+                if (filter == FILTER_OPEN) openNow = !openNow;
+                else topRated = !topRated;
+                prefs().edit().putBoolean("open_now", openNow).putBoolean("top_rated", topRated).apply();
+                drawFilters();
+                if (searched != null) search(searched);
+                break;
+            case LIST:
+                if (results.isEmpty()) {
+                    String again = recent.get(picked);
+                    query.setText(again);
+                    query.setSelection(query.length());
+                    search(again);
+                } else {
+                    open();
+                }
+                break;
+        }
+    }
+
+    /** Near takes the header until OK or Back. */
+    private void editNear() {
+        zone = Zone.NEAR;
+        refresh();
+        near.requestFocus();
+        near.setSelection(near.length());
+    }
+
+    private void doneNear() {
+        saveNear();
+        zone = Zone.FILTERS;
+        filter = FILTER_NEAR;
+        refresh();
+        if (searched != null) search(searched);
+    }
+
+    // ---- A place ----
 
     private Place current() {
         Place listed = results.get(picked);
@@ -340,26 +571,23 @@ public final class MainActivity extends BaseActivity {
         return full != null ? full : listed;
     }
 
-    /** The picked place's own screen: what the search knew at once, then everything. */
+    /** The picked place's own sheet: what the search knew at once, then everything. */
     private void open() {
         if (results.isEmpty()) return;
         stop();
         showing = true;
-        picking = true;
         final Place listed = results.get(picked);
         final String id = listed.id();
         boolean known = details.containsKey(id);
-        render(current(), !known);
-        say("");
+        page.show(current(), !known, System.currentTimeMillis(), searchedNear);
         refresh();
         if (known || id.length() == 0) return;
         final Places client = places();
-        start("Loading details…", () -> {
+        start(() -> {
             final Place full = client.details(id);
             return () -> {
                 details.put(id, full);
-                say("");
-                if (showing && results.get(picked) == listed) render(full, false);
+                if (showing && results.get(picked) == listed) page.update(full, System.currentTimeMillis(), searchedNear);
             };
         });
     }
@@ -367,28 +595,53 @@ public final class MainActivity extends BaseActivity {
     private void close() {
         stop();
         showing = false;
-        say(found());
         refresh();
     }
 
-    /** Left and Right, on a place's screen: the one before or after it in the results. */
-    private void step(int by) {
-        int next = picked + by;
-        if (next < 0 || next >= results.size()) return;
-        picked = next;
-        open();
+    // ---- Actions ----
+
+    /**
+     * What OK offers on a place, each after its icon: call it, copy its
+     * address, copy its website's address.
+     */
+    private void actions() {
+        final Place place = current();
+        List<Choice> choices = new ArrayList<Choice>();
+        if (place.phone().length() > 0) choices.add(new Choice(R.drawable.ic_call, "Call", () -> dial(place.phone())));
+        if (place.address().length() > 0) {
+            choices.add(new Choice(R.drawable.ic_place, "Copy address", () -> copy("Address", place.address())));
+        }
+        if (place.website().length() > 0) {
+            choices.add(new Choice(R.drawable.ic_language, "Copy website URL", () -> copy("Website", place.website())));
+        }
+        if (choices.isEmpty()) {
+            toast(busy() ? "Still loading." : "Nothing to call or copy.");
+            return;
+        }
+        choose(choices);
     }
 
-    /** The picked place on its own screen, laid out by {@link PlacePage}, scrolled to the top. */
-    private void render(Place place, boolean partial) {
-        page.fill(detailBody, place, partial, System.currentTimeMillis(), searchedNear);
-        detail.scrollTo(0, 0);
+    private void copy(String what, String text) {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        clipboard.setPrimaryClip(ClipData.newPlainText(what, text));
+        toast(what + " copied");
     }
 
-    private static void span(SpannableStringBuilder out, String text, Object... spans) {
-        int start = out.length();
-        out.append(text);
-        for (Object span : spans) out.setSpan(span, start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    /** The phone's own dialer, with the number filled in: nothing is dialled until Call is pressed there. */
+    private void dial(String phone) {
+        if (phone.length() == 0) {
+            toast("No phone number listed.");
+            return;
+        }
+        launch(Intent.ACTION_DIAL, Uri.fromParts("tel", phone, null));
+    }
+
+    private void launch(String action, Uri uri) {
+        try {
+            startActivity(new Intent(action, uri));
+        } catch (ActivityNotFoundException e) {
+            toast("Nothing on this phone can open that.");
+        }
     }
 
     // ---- Keys ----
@@ -403,75 +656,78 @@ public final class MainActivity extends BaseActivity {
             return true;
         }
         if (showing) return placeKey(event, key, down, first);
-        if (key == KeyEvent.KEYCODE_BACK && busy()) {
-            if (!down) {
-                stop();
-                say("Stopped.");
-            }
+        if (key == KeyEvent.KEYCODE_BACK) {
+            if (!down) back();
             return true;
         }
-        if (picking) return pickingKey(event, key, down, first);
         // On the press: T9 eats the first release.
         if (Ui.isOk(key)) {
-            if (first) {
-                if (near.hasFocus()) toFind();
-                else search();
-            }
-            return true;
-        }
-        if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
-            if (first) {
-                if (near.hasFocus()) toFind();
-                else setPicking(true);
-            }
-            return true;
-        }
-        if (key == KeyEvent.KEYCODE_DPAD_UP) {
-            if (first && query.hasFocus()) {
-                near.requestFocus();
-                near.setSelection(near.length());
-            }
-            return true;
-        }
-        return super.dispatchKeyEvent(event);
-    }
-
-    private boolean pickingKey(KeyEvent event, int key, boolean down, boolean first) {
-        if (Ui.isOk(key)) {
-            if (first) open();
+            if (first) ok();
             return true;
         }
         switch (key) {
-            case KeyEvent.KEYCODE_DPAD_UP:
             case KeyEvent.KEYCODE_DPAD_DOWN:
-                if (down) movePick(key == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1);
+                if (down && zone != Zone.NEAR) down();
+                return true;
+            case KeyEvent.KEYCODE_DPAD_UP:
+                if (down && zone != Zone.NEAR) up();
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
+                if (zone == Zone.QUERY || zone == Zone.NEAR) return super.dispatchKeyEvent(event);
+                if (down) across(key == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1);
                 return true;
-            case KeyEvent.KEYCODE_BACK:
-                if (!down) setPicking(false);
+            case KeyEvent.KEYCODE_CALL:
+                if (first && zone == Zone.LIST && !results.isEmpty()) dial(results.get(picked).phone());
                 return true;
             default:
-                // Anything else is typing: back to the box with it.
-                if (down && event.isPrintingKey()) setPicking(false);
+                // Anything else is typing: back to the header with it.
+                if (down && (zone == Zone.FILTERS || zone == Zone.LIST) && (event.isPrintingKey() || key == KeyEvent.KEYCODE_DEL)) {
+                    zone = Zone.QUERY;
+                    refresh();
+                }
                 return super.dispatchKeyEvent(event);
+        }
+    }
+
+    /** Back: out of Near, up to the header, then clearing the results, then out. */
+    private void back() {
+        if (busy()) {
+            stop();
+            return;
+        }
+        switch (zone) {
+            case NEAR:
+                near.setText(prefs().getString("near", ""));
+                zone = Zone.FILTERS;
+                refresh();
+                return;
+            case FILTERS:
+            case LIST:
+                zone = Zone.QUERY;
+                refresh();
+                return;
+            default:
+                if (!results.isEmpty() || message.length() > 0) {
+                    clearResults();
+                    return;
+                }
+                finish();
         }
     }
 
     private boolean placeKey(KeyEvent event, int key, boolean down, boolean first) {
         if (Ui.isOk(key)) {
-            if (first) menu();
+            if (first) actions();
             return true;
         }
         switch (key) {
             case KeyEvent.KEYCODE_DPAD_UP:
             case KeyEvent.KEYCODE_DPAD_DOWN:
-                if (down) detail.smoothScrollBy(0, (key == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1) * dp(60));
+                if (down) placeScroll.smoothScrollBy(0, (key == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1) * dp(70));
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (first) step(key == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1);
                 return true;
             case KeyEvent.KEYCODE_CALL:
                 if (first) dial(current().phone());
@@ -480,7 +736,7 @@ public final class MainActivity extends BaseActivity {
                 if (!down) close();
                 return true;
             default:
-                // The fields are hidden: typing would land in one unseen.
+                // The header is hidden: typing would land in it unseen.
                 return event.isPrintingKey() || super.dispatchKeyEvent(event);
         }
     }
@@ -488,93 +744,94 @@ public final class MainActivity extends BaseActivity {
     // ---- Menu ----
 
     private void menu() {
-        final List<String> labels = new ArrayList<String>();
-        final List<Runnable> actions = new ArrayList<Runnable>();
-        if (busy()) {
-            labels.add("Stop");
-            actions.add(() -> {
-                stop();
-                say(showing ? "" : "Stopped.");
-            });
-        }
+        List<Choice> choices = new ArrayList<Choice>();
+        if (busy()) choices.add(new Choice(R.drawable.ic_close, "Stop", () -> stop()));
         if (showing) {
             final Place place = current();
-            if (place.phone().length() > 0) {
-                labels.add("Call " + place.phone());
-                actions.add(() -> dial(place.phone()));
+            if (place.phone().length() > 0) choices.add(new Choice(R.drawable.ic_call, "Call", () -> dial(place.phone())));
+            if (place.address().length() > 0) {
+                choices.add(new Choice(R.drawable.ic_place, "Copy address", () -> copy("Address", place.address())));
             }
             if (place.website().length() > 0) {
-                labels.add("Open website");
-                actions.add(() -> view(place.website()));
+                choices.add(new Choice(R.drawable.ic_language, "Copy website URL", () -> copy("Website", place.website())));
             }
-            if (picked + 1 < results.size()) {
-                labels.add("Next place");
-                actions.add(() -> step(1));
-            }
-            if (picked > 0) {
-                labels.add("Previous place");
-                actions.add(() -> step(-1));
-            }
-            labels.add("Back to results");
-            actions.add(() -> close());
-        } else if (!busy()) {
+            choices.add(new Choice(R.drawable.ic_arrow_back, "Back to results", () -> close()));
+        } else {
             if (query.getText().toString().trim().length() > 0) {
-                labels.add("Search");
-                actions.add(() -> search());
+                choices.add(new Choice(R.drawable.ic_search, "Search", () -> search()));
             }
-            if (nextPage != null) {
-                labels.add("More results");
-                actions.add(() -> more());
-            }
-            labels.add("Change where");
-            actions.add(() -> {
-                setPicking(false);
-                near.requestFocus();
-                near.selectAll();
-            });
-            if (!results.isEmpty()) {
-                labels.add("Clear results");
-                actions.add(() -> {
-                    results.clear();
-                    nextPage = null;
-                    picking = false;
-                    say("");
+            if (nextPage != null) choices.add(new Choice(R.drawable.ic_expand_more, "More results", () -> more()));
+            choices.add(new Choice(R.drawable.ic_place, "Change where", () -> {
+                filter = FILTER_NEAR;
+                editNear();
+            }));
+            if (!results.isEmpty()) choices.add(new Choice(R.drawable.ic_close, "Clear results", () -> clearResults()));
+            if (!recent.isEmpty() && results.isEmpty()) {
+                choices.add(new Choice(R.drawable.ic_history, "Clear recent searches", () -> {
+                    recent.clear();
+                    prefs().edit().remove("recent").apply();
+                    if (zone == Zone.LIST) zone = Zone.QUERY;
                     refresh();
-                });
+                }));
             }
         }
-        labels.add("Command center…");
-        actions.add(() -> askLogin());
+        choices.add(new Choice(R.drawable.ic_cloud, "Command center\u2026", () -> askLogin()));
+        choose(choices);
+    }
+
+    /** One line of a list of choices: an icon, a word, and what it does. */
+    private static final class Choice {
+        final int icon;
+        final String label;
+        final Runnable run;
+
+        Choice(int icon, String label, Runnable run) {
+            this.icon = icon;
+            this.label = label;
+            this.run = run;
+        }
+    }
+
+    /** A list of choices, each after a teal icon, in Maps' dark dialog. */
+    private void choose(final List<Choice> choices) {
+        BaseAdapter rows = new BaseAdapter() {
+            @Override
+            public int getCount() {
+                return choices.size();
+            }
+
+            @Override
+            public Object getItem(int position) {
+                return choices.get(position);
+            }
+
+            @Override
+            public long getItemId(int position) {
+                return position;
+            }
+
+            @Override
+            public View getView(int position, View convert, ViewGroup parent) {
+                TextView row = convert != null ? (TextView) convert : look.line("", 14f, R.color.text);
+                Choice choice = choices.get(position);
+                row.setText(choice.label);
+                row.setCompoundDrawables(look.icon(choice.icon, 20, R.color.link), null, null, null);
+                row.setCompoundDrawablePadding(dp(16));
+                row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                row.setMinHeight(dp(42));
+                row.setPadding(dp(18), 0, dp(16), 0);
+                return row;
+            }
+        };
         new AlertDialog.Builder(this)
-            .setItems(labels.toArray(new String[0]), (dialog, which) -> actions.get(which).run())
+            .setAdapter(rows, (dialog, which) -> choices.get(which).run.run())
             .show();
-    }
-
-    /** The phone's own dialer, with the number filled in: nothing is dialled until Call is pressed there. */
-    private void dial(String phone) {
-        if (phone.length() == 0) {
-            toast(showing && busy() ? "Still loading the details." : "No phone number listed.");
-            return;
-        }
-        launch(Intent.ACTION_DIAL, Uri.fromParts("tel", phone, null));
-    }
-
-    private void view(String address) {
-        launch(Intent.ACTION_VIEW, Uri.parse(address));
-    }
-
-    private void launch(String action, Uri uri) {
-        try {
-            startActivity(new Intent(action, uri));
-        } catch (ActivityNotFoundException e) {
-            toast("Nothing on this phone can open that.");
-        }
     }
 
     /** The fallback for a build without a bundled login. */
     private void askLogin() {
         LinearLayout box = vertical();
-        int pad = dp(12);
+        int pad = dp(16);
         box.setPadding(pad, pad / 2, pad, 0);
         final EditText server = new EditText(this);
         server.setHint("https://…");
@@ -599,38 +856,43 @@ public final class MainActivity extends BaseActivity {
                     login = next;
                     places = null;
                     prefs().edit().putString("login", next.toJson()).apply();
-                    say("Saved: " + next.host());
+                    toast("Saved: " + next.host());
+                    if (message.length() > 0) say("");
                 } catch (IllegalArgumentException e) {
-                    say(e.getMessage());
+                    toast(e.getMessage());
                 }
             })
             .setNegativeButton("Cancel", null)
             .show();
     }
 
+    private android.graphics.drawable.GradientDrawable circle(int fill) {
+        android.graphics.drawable.GradientDrawable circle = new android.graphics.drawable.GradientDrawable();
+        circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        circle.setColor(color(fill));
+        return circle;
+    }
+
     /**
-     * A result, laid out as Google Maps lays out one in its list: the name;
-     * the rating with a gold star and the count, the price range, a
-     * wheelchair in the accent when the entrance takes one, and the kind of
-     * place; the full address, since that is what tells one branch from
-     * another; then "Open" in green or "Closed" in red, when that changes,
-     * and how far. A line with nothing to say takes no room, and results are
-     * parted by a band of the grouped page, as Maps parts them.
+     * The rows under the chips. With results, each is a place in three
+     * lines, as Google Maps words them: its name; the rating with a gold
+     * star, the price, a wheelchair and the kind of place; whether it is
+     * open and how far. No photos and no chips, so several fit a screen.
+     * Before a search, the recent ones, each after a clock.
      */
     private final class ResultAdapter extends BaseAdapter {
 
-        /** Shared by every row: the star after a rating, and the wheelchair. */
-        private Drawable star;
-        private Drawable wheelchair;
+        private static final int PLACE = 0;
+        private static final int RECENT = 1;
 
         @Override
         public int getCount() {
-            return results.size();
+            return results.isEmpty() ? recent.size() : results.size();
         }
 
         @Override
         public Object getItem(int position) {
-            return results.get(position);
+            return results.isEmpty() ? recent.get(position) : results.get(position);
         }
 
         @Override
@@ -639,82 +901,66 @@ public final class MainActivity extends BaseActivity {
         }
 
         @Override
+        public int getViewTypeCount() {
+            return 2;
+        }
+
+        @Override
+        public int getItemViewType(int position) {
+            return results.isEmpty() ? RECENT : PLACE;
+        }
+
+        @Override
+        public boolean isEnabled(int position) {
+            return false;
+        }
+
+        @Override
         public View getView(int position, View convert, ViewGroup parent) {
+            boolean on = zone == Zone.LIST && position == picked && !showing;
+            if (results.isEmpty()) return recentRow(position, convert, on);
+            return placeRow(position, (LinearLayout) convert, on);
+        }
+
+        private View recentRow(int position, View convert, boolean on) {
             LinearLayout row = (LinearLayout) convert;
             if (row == null) {
-                int padH = getResources().getDimensionPixelSize(R.dimen.pad_h);
-                row = vertical();
-                row.setBackgroundResource(com.xp3.common.ui.R.drawable.family_pick);
-                row.setPadding(padH, dp(8), padH, dp(9));
-                row.addView(line(R.dimen.text_name, R.color.text, true, 2));
-                row.addView(line(R.dimen.text_meta, R.color.text_muted, false, 1));
-                row.addView(line(R.dimen.text_meta, R.color.text_muted, false, 3));
-                row.addView(line(R.dimen.text_meta, R.color.text_muted, false, 2));
+                row = look.horizontal();
+                row.setPadding(dp(12), dp(8), dp(12), dp(8));
+                row.addView(look.round(R.drawable.ic_history, 28, 16, R.color.button, R.color.text_muted));
+                TextView label = look.line("", 14f, R.color.text);
+                LinearLayout.LayoutParams beside = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+                beside.leftMargin = dp(12);
+                row.addView(label, beside);
             }
-            Place place = results.get(position);
-            ((TextView) row.getChildAt(0)).setText(place.name());
-            show((TextView) row.getChildAt(1), facts(place));
-            show((TextView) row.getChildAt(2), place.address());
-            show((TextView) row.getChildAt(3), status(place, System.currentTimeMillis()));
-            row.setActivated(picking && position == picked);
+            ((TextView) row.getChildAt(1)).setText(recent.get(position));
+            row.setBackgroundColor(color(on ? R.color.picked : R.color.page));
             return row;
         }
 
-        /** "4.8 ★ (112) · $10-20 · ♿ · Cafe": the rating in the text colour, the rest muted. */
-        private CharSequence facts(Place place) {
-            SpannableStringBuilder out = new SpannableStringBuilder();
-            if (place.ratingCount() > 0) {
-                if (star == null) star = new Stars(1, 1, dp(10), 0, color(R.color.star), color(R.color.star_empty));
-                span(out, String.format(Locale.US, "%.1f", place.rating()), new ForegroundColorSpan(color(R.color.text)));
-                out.append(' ');
-                span(out, " ", new ImageSpan(star, ImageSpan.ALIGN_BASELINE));
-                out.append(String.format(Locale.US, " (%,d)", place.ratingCount()));
+        private View placeRow(int position, LinearLayout row, boolean on) {
+            Place place = results.get(position);
+            if (row == null) {
+                row = look.vertical();
+                row.setPadding(0, dp(8), 0, dp(9));
+                TextView name = look.line("", 14.5f, R.color.text);
+                row.addView(name, edged(0));
+                row.addView(look.line("", 12f, R.color.text_muted), edged(dp(4)));
+                row.addView(look.line("", 12f, R.color.text_muted), edged(dp(3)));
             }
-            String price = place.priceShort();
-            if (price.length() > 0) dot(out).append(price);
-            if (place.wheelchairEntrance()) {
-                if (wheelchair == null) {
-                    wheelchair = getDrawable(R.drawable.ic_accessible).mutate();
-                    wheelchair.setTint(color(R.color.focus_rule));
-                    wheelchair.setBounds(0, 0, dp(12), dp(12));
-                }
-                span(dot(out), " ", new ImageSpan(wheelchair, ImageSpan.ALIGN_BASELINE));
-            }
-            if (place.type().length() > 0) dot(out).append(place.type());
-            return out;
+            ((TextView) row.getChildAt(0)).setText(place.name());
+            show((TextView) row.getChildAt(1), look.facts(place, true, true));
+            show((TextView) row.getChildAt(2), look.status(place, System.currentTimeMillis(), searchedNear));
+            row.setBackgroundColor(color(on ? R.color.picked : R.color.page));
+            return row;
         }
 
-        /** "Closed · Opens 7:00 AM · 3.4 mi": only the open-or-closed word in colour, and Medium. */
-        private CharSequence status(Place place, long now) {
-            SpannableStringBuilder out = new SpannableStringBuilder();
-            String[] parts = place.statusParts(now);
-            if (!parts[0].equals("Hours unknown")) {
-                Boolean open = place.openNow();
-                int tone = open == null ? R.color.text_muted : open ? R.color.open : R.color.closed;
-                span(out, parts[0], new ForegroundColorSpan(color(tone)), new TypefaceSpan("sans-serif-medium"));
-                if (parts[1].length() > 0) dot(out).append(parts[1]);
-            }
-            String distance = place.distanceFrom(searchedNear);
-            if (distance.length() > 0) dot(out).append(distance);
-            return out;
-        }
-
-        /** " · " between the parts of a line, none before the first. */
-        private SpannableStringBuilder dot(SpannableStringBuilder out) {
-            return out.length() == 0 ? out : out.append(" \u00b7 ");
-        }
-
-        private TextView line(int size, int textColor, boolean bold, int lines) {
-            TextView view = new TextView(MainActivity.this);
-            view.setTextColor(color(textColor));
-            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(size));
-            if (bold) view.setTypeface(Family.MEDIUM);
-            view.setMaxLines(lines);
-            view.setIncludeFontPadding(false);
-            view.setLineSpacing(dp(1), 1f);
-            view.setPadding(0, bold ? 0 : dp(4), 0, 0);
-            view.setEllipsize(TextUtils.TruncateAt.END);
-            return view;
+        private LinearLayout.LayoutParams edged(int top) {
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            params.leftMargin = dp(12);
+            params.rightMargin = dp(12);
+            params.topMargin = top;
+            return params;
         }
 
         /** A line that takes no room when there is nothing to put on it. */
