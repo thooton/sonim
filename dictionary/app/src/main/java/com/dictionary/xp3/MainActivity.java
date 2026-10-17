@@ -38,12 +38,14 @@ import java.util.TimeZone;
 /**
  * The dictionary: home, a word's page, and the search, under a search capsule.
  *
- * Home is the Word of the Day; OK opens it. A word's page has the headword
- * and two tabs, Definitions and Thesaurus, which Left and Right switch
- * between; Up and Down scroll it, and OK opens a menu to pronounce the word
- * or search. Menu opens the search anywhere. The search lists recent searches and, as a query is typed, the
- * words it could mean; OK opens the one picked, or the best match. Back goes
- * back a page, and leaves from home.
+ * Home is the Word of the Day. A word's page has the headword and two tabs,
+ * Definitions and Thesaurus, which Left and Right switch between. Up and
+ * Down scroll a page, and Up from its top moves into the search box. Menu
+ * opens a menu over the page: the Word of the Day or Search at home,
+ * Pronounce or Search on a word. OK opens nothing on a page. The search
+ * lists recent searches and, as a query is typed, the words it could mean;
+ * OK opens the one picked, or the best match. Back goes back a page, and
+ * leaves from home.
  */
 public class MainActivity extends Activity {
 
@@ -191,7 +193,7 @@ public class MainActivity extends Activity {
         }
 
         if (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN) {
-            if (down) move(key == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : -1);
+            if (down) move(key == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : -1, first);
             return true;
         }
         if (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
@@ -204,15 +206,11 @@ public class MainActivity extends Activity {
             }
             return true;
         }
-        if (isOk(key)) {
-            // On the release, so it does not land on the menu just opened.
-            if (released && page != HOME) showActions();
-            else if (first && page == HOME) open(wordOfTheDay);
-            return true;
-        }
+        // OK opens nothing on a page; Menu holds what a page can do.
+        if (isOk(key)) return true;
         if (key == KeyEvent.KEYCODE_MENU) {
-            // On the release, so it does not land on the box just opened.
-            if (released) openSearch();
+            // On the release, so it does not land on the menu just opened.
+            if (released) showActions();
             return true;
         }
         if (key == KeyEvent.KEYCODE_BACK) {
@@ -228,9 +226,17 @@ public class MainActivity extends Activity {
             || key == KeyEvent.KEYCODE_NUMPAD_ENTER;
     }
 
-    /** Up and Down off the search: a screenful at a time. */
-    private void move(int direction) {
+    /**
+     * Up and Down off the search: a screenful at a time, and Up from the top
+     * into the search box (on a fresh press, so holding Up to get to the top
+     * stops there).
+     */
+    private void move(int direction, boolean first) {
         ScrollView scroll = page == HOME ? home : entry;
+        if (direction < 0 && scroll.getScrollY() == 0) {
+            if (first) openSearch();
+            return;
+        }
         int line = body.getLineHeight();
         int step = Math.max(scroll.getHeight() - 2 * line, line);
         scroll.smoothScrollBy(0, direction * step);
@@ -291,17 +297,21 @@ public class MainActivity extends Activity {
         tab.setBackgroundResource(open ? R.drawable.tab_selected : 0);
     }
 
-    /** OK on a word: a menu over the headword, to hear it or to search. */
+    /**
+     * Menu on a page: a menu over it. At home, the Word of the Day or Search;
+     * on a word, Pronounce (greyed when the phone cannot speak) or Search.
+     */
     private void showActions() {
-        PopupMenu menu = new PopupMenu(this, headword);
-        menu.getMenu().add(0, 1, 0, R.string.pronounce).setEnabled(speaks);
-        menu.getMenu().add(0, 2, 1, R.string.search);
+        boolean atHome = page == HOME;
+        PopupMenu menu = new PopupMenu(this, atHome ? findViewById(R.id.wotd) : headword);
+        if (atHome) menu.getMenu().add(0, R.string.word_of_the_day_item, 0, R.string.word_of_the_day_item);
+        else menu.getMenu().add(0, R.string.pronounce, 0, R.string.pronounce).setEnabled(speaks);
+        menu.getMenu().add(0, R.string.search, 1, R.string.search);
         menu.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == 1) {
-                tts.speak(headword.getText(), TextToSpeech.QUEUE_FLUSH, null, "word");
-            } else {
-                openSearch();
-            }
+            int id = item.getItemId();
+            if (id == R.string.pronounce) tts.speak(headword.getText(), TextToSpeech.QUEUE_FLUSH, null, "word");
+            else if (id == R.string.word_of_the_day_item) open(wordOfTheDay);
+            else openSearch();
             return true;
         });
         menu.show();
