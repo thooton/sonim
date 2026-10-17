@@ -37,9 +37,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 
@@ -47,9 +45,9 @@ import java.util.concurrent.ExecutorService;
  * Every app in the latest release, against the copy on this phone.
  *
  * Drawn as the App Store's Updates page (DESIGN.md). Opening the app reads
- * the release's versions.txt and packages.txt and lists each app under
- * Available (an older versionName here), Installed or Not Installed, with
- * what's new in it from the repository's commits. OK presses the row's
+ * the release's manifest.json and lists each app under Available (an older
+ * versionName here), Installed or Not Installed, with what's new in it, which
+ * the manifest carries too. OK presses the row's
  * button: UPDATE, GET or OPEN. Update All sits in the bar, Up from the top
  * row. Menu, or holding OK, has the rest, What's New among it.
  * Chosen apps go one at a time: download into the app's own files, check the
@@ -118,8 +116,6 @@ public final class MainActivity extends BaseActivity {
     private List<Catalog.Entry> catalog;
     private boolean checking;
     private String checkError;
-    /** What's new in each app, by release name; empty until fetched. */
-    private Map<String, List<Notes.Note>> notes = new HashMap<>();
 
     /** One app being updated, installed or reinstalled. */
     private static final class Job {
@@ -207,18 +203,6 @@ public final class MainActivity extends BaseActivity {
                     toTop = true;
                     render();
                 });
-                // What's new is a nicety: without it the rows show versions.
-                List<String> names = new ArrayList<>();
-                for (Catalog.Entry entry : found) names.add(entry.name);
-                try {
-                    final Map<String, List<Notes.Note>> news = releases.notes(names);
-                    post(() -> {
-                        notes = news;
-                        render();
-                    });
-                } catch (IOException e) {
-                    // Kept as they were; GitHub's API allows 60 an hour.
-                }
             } catch (final IOException e) {
                 post(() -> {
                     checking = false;
@@ -240,16 +224,15 @@ public final class MainActivity extends BaseActivity {
             PackageInfo info = installed(entry.packageName, 0);
             String label = info != null
                 ? pm.getApplicationLabel(info.applicationInfo).toString()
-                : title(entry.name);
+                : entry.label;
             String here = info != null ? info.versionName : null;
             Status status = Status.of(info != null, here, entry.version);
-            List<Notes.Note> news = notes.get(entry.name);
             Job working = job(entry);
             rows.add(new AppAdapter.Row(entry, label, here, status,
                 working != null ? working.activity : null,
                 working != null ? working.shown : -1,
                 icons.of(entry.name, label, info),
-                news != null ? news : Collections.<Notes.Note>emptyList()));
+                entry.notes));
         }
         Collections.sort(rows, (a, b) -> {
             int c = rank(a.status) - rank(b.status);
@@ -277,10 +260,6 @@ public final class MainActivity extends BaseActivity {
             if (waiting.entry.name.equals(entry.name)) return waiting;
         }
         return null;
-    }
-
-    private static String title(String name) {
-        return name.isEmpty() ? name : Character.toUpperCase(name.charAt(0)) + name.substring(1);
     }
 
     // ------------------------------------------------------------------
@@ -526,7 +505,9 @@ public final class MainActivity extends BaseActivity {
         for (int i = 0; i < row.notes.size() && i < 10; i++) {
             Notes.Note note = row.notes.get(i);
             if (i > 0) {
-                TextView when = text(Notes.when(note.time, now, zone), 11, color(R.color.text_muted));
+                String day = Notes.when(note.time, now, zone);
+                TextView when = text(note.version != null ? "Version " + note.version + " · " + day : day,
+                    11, color(R.color.text_muted));
                 when.setPadding(0, dp(8), 0, 0);
                 page.addView(when);
             }
@@ -720,7 +701,7 @@ public final class MainActivity extends BaseActivity {
         downloads.execute(() -> {
             try {
                 apk.getParentFile().mkdirs();
-                releases.download(next.entry.apk(), apk, (done, total) -> {
+                releases.download(next.entry, apk, (done, total) -> {
                     if (total <= 0) return;
                     final int percent = (int) (done * 100 / total);
                     if (percent == next.percent) return;

@@ -2,6 +2,6 @@
 apply from: rootProject.file("gradle/core.gradle")
 
 dependencies {
-    // Json, for the commits the release notes come from.
+    // Json, for the release's manifest.json.
     implementation project(":common:core")
 }
