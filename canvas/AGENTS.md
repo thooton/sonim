@@ -161,8 +161,8 @@ d-pad reachability and visible selection for every action.
 
 - The home tab indices intentionally equal `Assignment.ASSIGNED`, `MISSING`,
   and `DONE`.
-- Yellow (`Look.mark`) means focus and nothing else. Every screen names its
-  three keys in the softkey bar. Left softkey arrives as MENU or SOFT_LEFT;
+- Yellow (`Look.mark`) means focus and nothing else. The softkey bar is
+  hidden (its labels are still kept up to date, unshown). Left softkey arrives as MENU or SOFT_LEFT;
   every right-softkey shortcut is also reachable from Options.
 - Reusable dimensions and colors belong in resources. Check every added label
   at 240px width and every screen at 320px height; one extra row is material.
