@@ -45,7 +45,11 @@ they look the way they do. Charge and Books keep their own looks.
 7. **Say what to do.** Empty screens use `Family.empty`: a short title and,
    under it, the key to press. A status screen shows its main action as a
    `FamilyButton`, not only in the Menu.
-8. **Grouped pages for details.** A detail or status screen (a place, an
+8. **No header names the app.** You just opened it. A header says where
+   you are or how things stand (a folder, "Up to date"), and a screen with
+   nothing like that to say has no header at all. Nor does a screen carry
+   a counter (items, results) for its own sake.
+9. **Grouped pages for details.** A detail or status screen (a place, an
    assignment, Serve) sits on `grouped_page` with its facts on white
    `family_card`s, 6dp from the edges, a muted label over each value.
 

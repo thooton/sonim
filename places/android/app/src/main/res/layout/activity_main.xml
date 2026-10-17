@@ -5,19 +5,6 @@
     android:background="@color/page"
     android:orientation="vertical">
 
-    <!-- The bar names the app and, on the right, which result is picked. -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/bar_height"
-        android:background="@color/primary"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingLeft="@dimen/pad_h"
-        android:paddingRight="@dimen/pad_h">
-        <TextView style="@style/FamilyTitle" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/app_name" />
-        <TextView android:id="@+id/count" style="@style/FamilyTitleMeta" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-    </LinearLayout>
-
     <!-- Where to search near (kept between searches), then what to find:
          soft fields with their labels inside, so the typed text starts on
          the same 10dp edge as the results. Hidden while a place's details
@@ -50,6 +37,8 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- What the search found, or is doing. No bar naming the app above the
+         fields: you just opened it. -->
     <TextView
         android:id="@+id/status"
         android:layout_width="match_parent"
