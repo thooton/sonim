@@ -105,7 +105,6 @@ public final class MainActivity extends BaseActivity {
     private TextView titleView;
     private TextView subtitleView;
     private TextView countView;
-    private TextView positionView;
     private ImageView barAction;
     private ProgressBar progress;
     private TextView statusView;
@@ -189,7 +188,6 @@ public final class MainActivity extends BaseActivity {
         titleView = (TextView) findViewById(R.id.title);
         subtitleView = (TextView) findViewById(R.id.subtitle);
         countView = (TextView) findViewById(R.id.count);
-        positionView = (TextView) findViewById(R.id.position);
         barAction = (ImageView) findViewById(R.id.bar_action);
         progress = (ProgressBar) findViewById(R.id.progress);
         statusView = (TextView) findViewById(R.id.status);
@@ -595,7 +593,6 @@ public final class MainActivity extends BaseActivity {
         String account = me != null ? me.email : login.ready() ? "Gmail" : "Not set up";
         String under = busy() ? doing : account;
         countView.setVisibility(View.GONE);
-        positionView.setVisibility(View.GONE);
         barAction.setVisibility(View.GONE);
         if (screen == WRITE) {
             String kind = writing == null ? Outgoing.NEW : writing.kind;
@@ -609,11 +606,6 @@ public final class MainActivity extends BaseActivity {
         } else if (screen == READ) {
             barIcon.setImageResource(R.drawable.ic_arrow_back);
             titleView.setText(folder.name);
-            int at = reading == null ? -1 : indexOf(reading.id);
-            if (at >= 0) {
-                positionView.setText((at + 1) + " of " + items.size() + (next != null ? "+" : ""));
-                positionView.setVisibility(View.VISIBLE);
-            }
         } else {
             barIcon.setImageResource(R.drawable.ic_menu);
             titleView.setText(folder.name);
