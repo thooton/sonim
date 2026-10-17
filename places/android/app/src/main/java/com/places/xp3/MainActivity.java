@@ -874,10 +874,10 @@ public final class MainActivity extends BaseActivity {
     }
 
     /**
-     * The rows under the chips. With results, each is a place in three
+     * The rows under the chips. With results, each is a place in a few
      * lines, as Google Maps words them: its name; the rating with a gold
-     * star, the price, a wheelchair and the kind of place; whether it is
-     * open and how far. No photos and no chips, so several fit a screen.
+     * star, the price, a wheelchair and the kind of place; its full
+     * address; whether it is open and how far. No photos and no chips, so several fit a screen.
      * Before a search, the recent ones, each after a clock.
      */
     private final class ResultAdapter extends BaseAdapter {
@@ -946,11 +946,17 @@ public final class MainActivity extends BaseActivity {
                 TextView name = look.line("", 14.5f, R.color.text);
                 row.addView(name, edged(0));
                 row.addView(look.line("", 12f, R.color.text_muted), edged(dp(4)));
+                // The whole address, wrapped rather than cut: on a list of
+                // branches it is what tells them apart.
+                TextView address = look.text("", 12f, R.color.text_muted);
+                address.setLineSpacing(dp(1), 1f);
+                row.addView(address, edged(dp(3)));
                 row.addView(look.line("", 12f, R.color.text_muted), edged(dp(3)));
             }
             ((TextView) row.getChildAt(0)).setText(place.name());
             show((TextView) row.getChildAt(1), look.facts(place, true, true));
-            show((TextView) row.getChildAt(2), look.status(place, System.currentTimeMillis(), searchedNear));
+            show((TextView) row.getChildAt(2), place.address());
+            show((TextView) row.getChildAt(3), look.status(place, System.currentTimeMillis(), searchedNear));
             row.setBackgroundColor(color(on ? R.color.picked : R.color.page));
             return row;
         }
