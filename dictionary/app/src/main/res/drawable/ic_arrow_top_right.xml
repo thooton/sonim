@@ -1,13 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The arrow on its recent searches, from the Dictionary.com app (com.dictionary 12.1.3). -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:height="20dp"
-    android:width="20dp"
-    android:viewportWidth="20"
-    android:viewportHeight="20">
-<path
-    android:fillColor="#CCCCD1"
-    android:pathData="M4.166,5.345L15.244,16.423L16.422,15.244L5.345,4.167H11.666V2.5H2.5V11.667H4.166V5.345Z"
-    android:fillType="evenOdd" />
+<!-- The arrow on a row, "north_west": Material Symbols (Apache License 2.0). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="@color/icon_faint" android:pathData="M5,15h2V8.41L18.59,20 20,18.59 8.41,7H15V5H5V15z" />
 </vector>
-

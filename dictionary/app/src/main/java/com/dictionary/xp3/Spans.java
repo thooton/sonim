@@ -10,7 +10,7 @@ import android.text.style.LeadingMarginSpan;
 import android.text.style.MetricAffectingSpan;
 import android.text.style.ReplacementSpan;
 
-/** The spans an entry is drawn with, as Dictionary.com sets its pages. */
+/** The spans an entry is drawn with. */
 final class Spans {
 
     private Spans() {}
@@ -89,7 +89,7 @@ final class Spans {
         }
     }
 
-    /** A synonym, as Thesaurus.com shows one: the word over a thick green rule. */
+    /** A synonym: the word over a thick green rule. */
     static final class Synonym extends ReplacementSpan {
         private final int rule;
         private final int drop;
