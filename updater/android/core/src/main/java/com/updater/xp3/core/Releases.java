@@ -11,6 +11,7 @@ import java.net.URL;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The rolling `latest` release of github.com/thooton/sonim, where CI puts every
@@ -18,7 +19,11 @@ import java.util.Map;
  *
  * Release files redirect from github.com to GitHub's file host, which
  * HttpURLConnection follows by itself (both are https). Nothing is cached:
- * the point of asking is to hear about a release made a minute ago.
+ * the point of asking is to hear about a release made a minute ago. So every
+ * request also opens a connection of its own (Android otherwise keeps one
+ * open per process and reuses it, which kept Check Again on the old release
+ * until the app was closed) and asks for its release file by a URL never
+ * asked for before, so nothing between here and GitHub can answer from a copy.
  */
 public final class Releases {
 
@@ -41,6 +46,8 @@ public final class Releases {
 
     private final String base;
     private final String commits;
+    /** Makes each release URL one never asked for before (see fresh). */
+    private final AtomicLong asked = new AtomicLong();
 
     public Releases() {
         this(LATEST, COMMITS);
@@ -69,7 +76,16 @@ public final class Releases {
 
     /** A small text file from the release. */
     public String text(String file) throws IOException {
-        return fetch(base + file, file, MAX_TEXT);
+        return fetch(fresh(base + file), file, MAX_TEXT);
+    }
+
+    /**
+     * `url` with a query of its own. GitHub ignores it, but it is a new
+     * address to any cache on the way, so the answer is today's.
+     */
+    private String fresh(String url) {
+        return url + (url.indexOf('?') < 0 ? "?" : "&") + "t="
+            + System.currentTimeMillis() + "-" + asked.incrementAndGet();
     }
 
     private String fetch(String url, String file, int max) throws IOException {
@@ -101,7 +117,7 @@ public final class Releases {
      */
     public void download(String file, File to, Progress progress) throws IOException {
         File part = new File(to.getPath() + ".part");
-        HttpURLConnection connection = open(base + file);
+        HttpURLConnection connection = open(fresh(base + file));
         try {
             InputStream in = body(connection, file);
             long total = connection.getContentLengthLong();
@@ -144,6 +160,9 @@ public final class Releases {
             connection.setInstanceFollowRedirects(true);
             connection.setUseCaches(false);
             connection.setRequestProperty("Cache-Control", "no-cache");
+            connection.setRequestProperty("Pragma", "no-cache");
+            // Never pooled, so the next check starts afresh as a new process would.
+            connection.setRequestProperty("Connection", "close");
             connection.setRequestProperty("User-Agent", "SonimUpdater");
             // Uncompressed, so the length GitHub gives is the file's.
             connection.setRequestProperty("Accept-Encoding", "identity");

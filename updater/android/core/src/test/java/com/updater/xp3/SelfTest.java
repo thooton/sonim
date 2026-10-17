@@ -116,10 +116,13 @@ public final class SelfTest {
     private static void releases(Check check) throws Exception {
         final byte[] apk = new byte[300 * 1024];
         for (int i = 0; i < apk.length; i++) apk[i] = (byte) i;
+        final List<String> asked = java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             String path = exchange.getRequestURI().getPath();
             if (path.equals("/latest/versions.txt")) {
+                asked.add(exchange.getRequestURI().getRawQuery() + " "
+                    + exchange.getRequestHeaders().getFirst("Connection"));
                 send(exchange, 200, "list = 1.0.1\nnew = 2.0.0\n".getBytes("UTF-8"));
             } else if (path.equals("/latest/packages.txt")) {
                 send(exchange, 200, "list = com.list.xp3\nnew = com.new.xp3\n".getBytes("UTF-8"));
@@ -144,6 +147,12 @@ public final class SelfTest {
             check.same("catalog size", 2, entries.size());
             check.same("catalog version", "1.0.1", entries.get(0).version);
             check.same("catalog package", "com.new.xp3", entries.get(1).packageName);
+            // Check Again: a URL never asked for, on a connection of its own.
+            releases.catalog();
+            check.same("asked twice", 2, asked.size());
+            check.ok("never pooled", asked.get(0).endsWith(" close") && asked.get(1).endsWith(" close"));
+            check.ok("a new URL each check", asked.get(0).startsWith("t=")
+                && !asked.get(0).equals(asked.get(1)));
             check.same("notes fetched", "Drop the bar.",
                 releases.notes(Arrays.asList("mail")).get("mail").get(0).text);
 
