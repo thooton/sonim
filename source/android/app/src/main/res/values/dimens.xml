@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- For the XP3's 240x320 mdpi panel, matching the sibling apps' bar. -->
-    <dimen name="bar_height">36dp</dimen>
-    <dimen name="tab_underline">3dp</dimen>
-    <dimen name="pad_h">10dp</dimen>
-    <dimen name="text_input">13.5sp</dimen>
-    <dimen name="text_status">11.5sp</dimen>
-    <dimen name="text_log">10.5sp</dimen>
-    <dimen name="text_meta">11.5sp</dimen>
-    <dimen name="text_book">13.5sp</dimen>
-    <dimen name="focus_rule">2dp</dimen>
+    <!-- For the XP3's 240x320 mdpi panel: the proposal's fixed heights, so
+         the list pages predictably under the d-pad. -->
+    <dimen name="tabs_height">30dp</dimen>
+    <dimen name="search_height">30dp</dimen>
+    <dimen name="softkeys_height">26dp</dimen>
+    <dimen name="gutter">6dp</dimen>
+
+    <dimen name="text_row">13sp</dimen>
+    <dimen name="text_input">13sp</dimen>
+    <dimen name="text_label">11.5sp</dimen>
+    <dimen name="text_meta">11sp</dimen>
+    <dimen name="text_status">11sp</dimen>
+    <dimen name="text_log">10sp</dimen>
+    <dimen name="text_tag">8.5sp</dimen>
 </resources>

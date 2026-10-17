@@ -5,92 +5,190 @@
     android:background="@color/page"
     android:orientation="vertical">
 
-    <!-- What OK will fetch, as tabs: left and right move between them while
-         the box is empty. They take no focus; the box keeps it. -->
+    <!-- What OK will fetch, as pill tabs in a tonal track, each with the icon
+         of what it finds. They take no focus; the box keeps it, and Left and
+         Right move between them. -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="@dimen/bar_height"
-        android:background="@color/primary"
+        android:layout_height="@dimen/tabs_height"
+        android:layout_marginLeft="@dimen/gutter"
+        android:layout_marginRight="@dimen/gutter"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/tab_track"
         android:baselineAligned="false"
-        android:orientation="horizontal">
-        <TextView android:id="@+id/tab_song" style="@style/FamilyTab" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:focusable="false" android:text="@string/tab_song" />
-        <TextView android:id="@+id/tab_album" style="@style/FamilyTab" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:focusable="false" android:text="@string/tab_album" />
-        <TextView android:id="@+id/tab_book" style="@style/FamilyTab" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:focusable="false" android:text="@string/tab_book" />
+        android:orientation="horizontal"
+        android:padding="2dp">
+        <TextView android:id="@+id/tab_song" style="@style/Tab" android:text="@string/tab_song" />
+        <TextView android:id="@+id/tab_album" style="@style/Tab" android:text="@string/tab_album" />
+        <TextView android:id="@+id/tab_book" style="@style/Tab" android:text="@string/tab_book" />
     </LinearLayout>
 
-    <!-- A soft field rather than a framed box: its text starts on the same
-         10dp edge as everything below it. -->
-    <EditText
-        android:id="@+id/query"
+    <!-- The search pill: a ring while it takes the keys. -->
+    <LinearLayout
+        android:id="@+id/search"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginLeft="4dp"
-        android:layout_marginRight="4dp"
-        android:layout_marginTop="6dp"
-        android:background="@drawable/family_field"
-        android:imeOptions="actionGo|flagNoExtractUi"
-        android:inputType="textCapWords"
-        android:maxLines="2"
-        android:minHeight="30dp"
-        android:paddingBottom="6dp"
-        android:paddingLeft="6dp"
-        android:paddingRight="6dp"
-        android:paddingTop="6dp"
-        android:textColor="@color/text"
-        android:textColorHint="@color/input_hint"
-        android:textSize="@dimen/text_input" />
+        android:layout_height="@dimen/search_height"
+        android:layout_marginLeft="@dimen/gutter"
+        android:layout_marginRight="@dimen/gutter"
+        android:layout_marginTop="5dp"
+        android:background="@drawable/search_field"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp">
+        <ImageView
+            android:id="@+id/search_icon"
+            android:layout_width="15dp"
+            android:layout_height="15dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_search"
+            android:tint="@color/text_muted" />
+        <EditText
+            android:id="@+id/query"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@null"
+            android:imeOptions="actionGo|flagNoExtractUi"
+            android:inputType="textCapWords"
+            android:maxLines="1"
+            android:paddingLeft="7dp"
+            android:paddingRight="0dp"
+            android:textColor="@color/text"
+            android:textColorHint="@color/input_hint"
+            android:textSize="@dimen/text_input" />
+    </LinearLayout>
 
-    <TextView
-        android:id="@+id/status"
+    <!-- How things stand: a spinner while a search runs, the status line,
+         and on the right what the options are set to. -->
+    <LinearLayout
+        android:id="@+id/header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:includeFontPadding="false"
-        android:paddingBottom="4dp"
-        android:paddingLeft="@dimen/pad_h"
-        android:paddingRight="@dimen/pad_h"
-        android:paddingTop="7dp"
-        android:textColor="@color/text_muted"
-        android:textSize="@dimen/text_status" />
+        android:gravity="center_vertical"
+        android:minHeight="22dp"
+        android:orientation="horizontal"
+        android:paddingLeft="12dp"
+        android:paddingRight="@dimen/gutter"
+        android:paddingTop="2dp">
+        <ProgressBar
+            android:id="@+id/spinner"
+            style="@android:style/Widget.Material.ProgressBar.Small"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginRight="6dp"
+            android:indeterminateTint="@color/accent"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:singleLine="true"
+            android:textColor="@color/text_muted"
+            android:textSize="@dimen/text_status" />
+        <TextView
+            android:id="@+id/chip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/chip"
+            android:drawablePadding="3dp"
+            android:includeFontPadding="false"
+            android:paddingBottom="2dp"
+            android:paddingLeft="6dp"
+            android:paddingRight="7dp"
+            android:paddingTop="2dp"
+            android:singleLine="true"
+            android:textColor="@color/text"
+            android:textSize="10.5sp" />
+    </LinearLayout>
 
     <FrameLayout
+        android:id="@+id/content"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:layout_marginTop="2dp">
 
-        <!-- The command center's log, as it streams: set small in a
-             monospace face, so it reads as a record rather than as the
-             screen's content. -->
+        <!-- Before a search: what is downloading, recent searches, and the
+             storage card. Built in code. -->
         <ScrollView
-        android:defaultFocusHighlightEnabled="false"
+            android:id="@+id/home"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:defaultFocusHighlightEnabled="false"
+            android:focusable="false"
+            android:scrollbars="none">
+            <LinearLayout
+                android:id="@+id/home_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="6dp" />
+        </ScrollView>
+
+        <!-- The command center's log, as it streams: Soulseek's engine as it
+             is, set small in a monospace face on a card, so it reads as a
+             record rather than as the screen's content. -->
+        <ScrollView
             android:id="@+id/scroll"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@color/row"
+            android:defaultFocusHighlightEnabled="false"
             android:focusable="false"
-            android:scrollbarStyle="outsideOverlay">
+            android:scrollbarStyle="outsideOverlay"
+            android:visibility="gone">
             <TextView
                 android:id="@+id/log"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                android:layout_marginLeft="@dimen/gutter"
+                android:layout_marginRight="@dimen/gutter"
+                android:background="@drawable/log_card"
                 android:focusable="false"
                 android:fontFamily="monospace"
                 android:lineSpacingExtra="2dp"
-                android:paddingBottom="6dp"
-                android:paddingLeft="@dimen/pad_h"
-                android:paddingRight="@dimen/pad_h"
+                android:padding="8dp"
                 android:textColor="@color/text_muted"
                 android:textSize="@dimen/text_log" />
         </ScrollView>
 
-        <!-- Search results, songs, albums or books, in place of the log. The
-             focus card is drawn by the adapter, since the typing box keeps
-             the focus. -->
+        <!-- Songs, albums or books. Rows paint their own focus, since the
+             typing box keeps the focus. -->
         <ListView
             android:id="@+id/results"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:divider="@null"
+            android:dividerHeight="0dp"
             android:focusable="false"
+            android:scrollbarStyle="outsideOverlay"
+            android:visibility="gone" />
+
+        <!-- Nothing found, or the search failed: what is so, and a next
+             step, which takes the d-pad. Built in code. -->
+        <LinearLayout
+            android:id="@+id/empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:paddingTop="10dp"
+            android:visibility="gone" />
+
+        <!-- A book search on its way: rows the shape of results. -->
+        <LinearLayout
+            android:id="@+id/skeleton"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
             android:visibility="gone" />
     </FrameLayout>
+
+    <include layout="@layout/softkeys" />
 </LinearLayout>

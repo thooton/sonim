@@ -79,9 +79,9 @@ would otherwise lay that wash over the whole page.
 | List | `#23201C` | `#C7B9A6` | `#A85C00` | `#FBF2E5` |
 | Mail | `#004F9B` | `#A9C7FF` | `#004F9B` | `#E4EDF8` |
 | Serve | `#0D3236` | `#9CC3C6` | `#11707A` | `#E7F4F5` |
-| Source | `#291741` | `#BBA9D3` | `#6334A3` | `#F2EDFA` |
+| Source | `#FEF7FF` | `#49454F` | `#6750A4` | `#EADDFF` |
 
-Mail's row is Thunderbird's: see below. Each pair was checked for contrast:
+Mail's row is Thunderbird's, and Source's is Material 3's: see below. Each pair was checked for contrast:
 the dim header text is at least 7:1 on its header, the accent at least 4.5:1
 on its wash, and muted text at least 4.8:1 on white.
 
@@ -207,3 +207,49 @@ its own:
   the same rows with a magnifier and the rest of each suggestion in
   SemiBold. The row under the d-pad is washed in a pale blue (`#EBF2FF`).
 - **Its icon.** An open book with a gold ribbon on blue.
+
+## Source: Tonal
+
+Source takes its look from the Tonal proposal: Material 3's colour roles
+generated from `#6750A4`, built around the d-pad and the soft keys. It keeps
+the family's rules on words (nothing explains itself, no em dashes) and
+departs from it where the proposal does:
+
+- **Light chrome, tonal surfaces.** No band: the status bar is the page
+  (`surface`, `#FEF7FF`) with dark icons. Colour comes from soft tinted
+  containers (`container`, `container_high`); saturated `accent` is kept for
+  the one action that matters, the centre soft key, focus rings and
+  progress. The family's names (`primary`, `focus_fill`, `row`...) are kept,
+  pointed at the matching roles, for the shared drawables and dialogs.
+- **A dark theme.** `values-night` holds Material 3's dark roles for the same
+  seed. The phone has no dark setting, so Options switches it, by giving
+  the app's activities a night configuration (`Tonal.attachBaseContext`).
+- **Bold, not Medium.** Row titles, tabs, page titles and the soft-key pill
+  are Roboto Bold (`Tonal.BOLD`), as the proposal's type scale has them.
+- **Pill tabs** in a tonal track, each with the icon of what it finds, and a
+  pill search field with a search icon that rings in `accent` while it takes
+  the keys.
+- **The soft-key bar.** Always at the foot: what Menu (the left soft key)
+  does, a filled pill saying what OK does (Search, Get, Play, Read, Retry,
+  Stop), and what Back (the right soft key) does. Labels for keys are not a
+  lesson in using the app: they name what the key does here, as a feature
+  phone's soft keys always have.
+- **State on every row.** Each result ends in `StateButton`: Get (tonal,
+  filled when the row is picked), a ring filling with the percentage, an
+  outline with a clock while queued, the success container with a tick once
+  saved, the error container with a retry arrow when it failed. The picked
+  row is a filled 14dp block of `accent_container`, not an outlined card.
+- **Drawn covers.** Soulseek and the book source send no artwork, so `Cover`
+  draws the name's initials on one of six tones: a square for a song, a
+  square with a record behind it for an album, 2:3 with a spine for a book. A
+  failed download's cover loses its colour.
+- **Folders always show.** A music result's folders, as the sharer named
+  them, are a line of their own under its name, cut from the start so the
+  deepest folders stay in view; a detail page shows them whole. Who shares
+  it, and how fast, stays on every row.
+- **Wavy means moving.** `Wavy` draws progress as a sine path whose phase
+  drifts while the download runs; failed, it goes straight and still in the
+  error colour.
+- **Never a dead end.** An empty or failed search shows what is so and a
+  next step that takes the d-pad (search albums instead, search again), with
+  the engine's last log lines below it.

@@ -95,6 +95,24 @@ public final class Books {
         }
     }
 
+    /**
+     * The results on `page` that are `book` in another format: the same
+     * title by the same author, in the page's order, `book` among them.
+     */
+    public static List<Book> formats(Page page, Book book) {
+        List<Book> out = new ArrayList<Book>();
+        String work = work(book);
+        for (Book other : page.books) {
+            if (other == book || work.length() > 1 && work.equals(work(other))) out.add(other);
+        }
+        if (!out.contains(book)) out.add(0, book);
+        return out;
+    }
+
+    private static String work(Book book) {
+        return (book.title.trim() + "\n" + book.author.trim()).toLowerCase(Locale.ROOT);
+    }
+
     /** A page of results. */
     public static final class Page {
         public final String query;

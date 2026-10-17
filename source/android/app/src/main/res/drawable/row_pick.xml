@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A row under the d-pad: a filled, rounded block of primaryContainer that
+     differs in brightness from its neighbours, so focus never rests on hue
+     alone. Activated rather than focused, since the box keeps the focus. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_activated="true">
+        <inset android:insetLeft="@dimen/gutter" android:insetRight="@dimen/gutter" android:insetTop="1dp" android:insetBottom="1dp">
+            <shape android:shape="rectangle">
+                <solid android:color="@color/accent_container" />
+                <corners android:radius="14dp" />
+            </shape>
+        </inset>
+    </item>
+    <item><color android:color="@android:color/transparent" /></item>
+</selector>
