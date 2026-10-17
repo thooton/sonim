@@ -1,6 +1,6 @@
 # The family look
 
-How the light, list-and-form apps (Canvas, List, Mail, Serve, Source)
+How the light, list-and-form apps (List, Mail, Serve, Source)
 are drawn, so they read as siblings of Charge and Books rather than
 as stock Android with a coloured bar. The pieces live in `common/ui`
 (`Family`, `res/drawable/family_*`, `res/values/family*.xml`); this is why
@@ -75,7 +75,6 @@ would otherwise lay that wash over the whole page.
 
 | App | primary | on_primary_dim | focus_rule | focus_fill |
 | --- | --- | --- | --- | --- |
-| Canvas | `#45142A` | `#D3AEBE` | `#8E1F48` | `#F9EEF3` |
 | List | `#23201C` | `#C7B9A6` | `#A85C00` | `#FBF2E5` |
 | Mail | `#004F9B` | `#A9C7FF` | `#004F9B` | `#E4EDF8` |
 | Serve | `#0D3236` | `#9CC3C6` | `#11707A` | `#E7F4F5` |
@@ -84,6 +83,29 @@ would otherwise lay that wash over the whole page.
 Mail's row is Thunderbird's, and Source's is Material 3's: see below. Each pair was checked for contrast:
 the dim header text is at least 7:1 on its header, the accent at least 4.5:1
 on its wash, and muted text at least 4.8:1 on white.
+
+## Canvas: Week Strip
+
+Canvas follows the Week Strip design proposal rather than the family look:
+a calm, planner-style school app built around the week.
+
+- **One typeface.** Bricolage Grotesque (OFL), bundled in five static
+  weights: screen titles 18sp/800, page titles 16sp/800, rows 12sp/600, body
+  10.5sp, meta 9sp, labels 8.5sp/700 in spaced capitals. Times use tabular
+  figures. Large text raises every step by 15%.
+- **Ink, paper and one yellow.** Ink `#101828` means selected (the day in
+  view, a chosen answer, the main button); the highlighter `#FFE45C` means
+  focus and nothing else, as a stroke under a title or a fill on a button,
+  day or option. Turned in is green `#05734F` on `#E3F6EF`. Course colours
+  (`#FF5A36`, `#3D5AFE`, `#00A389`, and five more) mark which class
+  something is, never its status. Nothing is red; grades never change colour.
+- **Dates, not countdowns.** "Due Tuesday, Oct 20 at 10:30", drawn beside a
+  tear-off calendar page. Late work "was due" and "can still be turned in".
+- **A softkey bar on every screen** names the left softkey (Options), OK and
+  the right softkey (the screen's shortcut).
+- **Light and dark.** In the dark theme ink and paper swap and the
+  highlighter stroke drops to about 42%.
+- **Its icon** stays the ticked homework sheet.
 
 ## Mail: Thunderbird on a flip phone
 

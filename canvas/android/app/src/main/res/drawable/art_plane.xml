@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The empty week's line drawing: a paper plane leaving a dotted trail. The
+     plane takes the view's tint; the trail is the first course colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="84dp" android:height="60dp"
+    android:viewportWidth="84" android:viewportHeight="60">
+    <path android:strokeColor="#FF000000" android:strokeWidth="2.6"
+        android:strokeLineJoin="round" android:strokeLineCap="round"
+        android:pathData="M18,26 L78,4 L56,52 L44,38 Z M44,38 L78,4 M44,38 L46,50 L52,44" />
+    <path android:strokeColor="#FFFF5A36" android:strokeWidth="2.6" android:strokeLineCap="round"
+        android:pathData="M4,50 L5,50 M11,47 L12,47 M18,46 L19,46 M25,47 L26,47" />
+</vector>

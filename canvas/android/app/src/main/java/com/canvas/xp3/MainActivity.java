@@ -1,1264 +1,761 @@
 package com.canvas.xp3;
 
-import android.app.AlertDialog;
-import android.content.ClipboardManager;
+import android.Manifest;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.InputType;
-import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.inputmethod.EditorInfo;
-import android.widget.AdapterView;
-import android.widget.Button;
+import android.view.Window;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.ListAdapter;
-import android.widget.ListView;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.canvas.xp3.data.Assignment;
+import com.canvas.xp3.data.Course;
 import com.canvas.xp3.data.Dates;
-import com.canvas.xp3.data.Section;
+import com.canvas.xp3.data.Draft;
+import com.canvas.xp3.data.Notice;
+import com.canvas.xp3.data.Prefs;
 import com.canvas.xp3.data.Sync;
 import com.canvas.xp3.data.Todos;
-import com.canvas.xp3.net.Config;
 import com.xp3.common.ui.BaseActivity;
-import com.xp3.common.ui.Family;
-import com.xp3.common.ui.Markdown;
-import com.xp3.common.ui.Tabs;
 import com.xp3.common.ui.Ui;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Three lists, a detail page, a settings page, and the keys that move between
- * them.
+ * The one activity: a stack of screens, the softkey bar under them, and
+ * whatever is sliding over them.
  *
- * Views are built in code rather than inflated per screen because each screen
- * is a handful of rows whose shape depends on what is in it, and a layout file
- * per state would be more XML than the states are worth. The things that
- * repeat, an assignment row, a section band and a setting, are the
- * things that do have layouts.
+ * Every screen names its three keys in the bar at the bottom, so nothing has
+ * to be guessed. The left softkey opens Options, the right one is the
+ * screen's single shortcut, and OK does what the middle of the bar says.
+ * Back goes back one screen. The XP3's own softkeys arrive as Menu and Back
+ * on some firmware and as the soft-left and soft-right codes on others, so
+ * every shortcut on the right is in Options too: nothing depends on a key the
+ * phone might not send.
  *
- * Nothing on this side of the app touches a network. Everything that does is
- * behind Backend, runs on the work executor below, and comes back through the
- * main thread's handler.
+ * The work list lives here, above the screens, because nearly every screen
+ * reads it: the home timeline, a class's grades, the assignment page.
+ * Nothing on this side touches the network; Backend does, on the workers,
+ * and results come back through the main thread's handler.
  */
 public final class MainActivity extends BaseActivity {
 
     /**
-     * The first three line up with Assignment's own state constants on
-     * purpose: a tab is a state, so the tab index is what gets handed to
-     * Todos.sections rather than a translation between two numberings that
-     * would only ever be the identity.
-     */
-    private static final int ASSIGNED = 0;
-    private static final int MISSING = 1;
-    private static final int DONE = 2;
-
-    private static final String REFRESH = "Refresh from Canvas";
-    private static final String SETTINGS = "Settings";
-    private static final String ABOUT = "About";
-
-    /**
      * How stale the list has to be before opening the app fetches a new one.
-     *
-     * Ten minutes rather than every launch: this app is opened to check one
-     * thing and closed again, often several times in a row, and a network round
-     * trip on a handset like this is slow enough to be the whole of that
-     * interaction. Assignments do not change minute to minute, and Refresh is
-     * on the menu for the times when you know something has.
+     * This app is opened to check one thing and closed again, often several
+     * times in a row, and a round trip on this network is slow enough to be
+     * the whole of that.
      */
     private static final long STALE_MS = 10L * 60L * 1000L;
 
-    /** When to start saying out loud that the list is old. */
-    private static final long OLD_MS = 2L * 60L * 60L * 1000L;
+    final Handler main = new Handler(Looper.getMainLooper());
+    final ExecutorService work = Ui.workers("canvas-work", 2);
+    Backend backend;
+    Prefs prefs;
+    private Look look;
+    private Views views;
 
-    private final Handler main = new Handler(Looper.getMainLooper());
-    private final Todos todos = new Todos();
-    private Backend backend;
+    final Todos todos = new Todos();
+    Sync.Result snapshot;
+    boolean syncing;
+    String syncError;
+    /** Pieces of work being turned in right now, and how far each has got. */
+    final Map<String, long[]> progress = new HashMap<>();
+
+    private final List<Screen> stack = new ArrayList<>();
     private FrameLayout content;
-    private View tabBar;
-    private Tabs tabs;
-    private int currentTab = ASSIGNED;
-
-    /**
-     * Two threads for work.
-     *
-     * Two rather than one because opening an assignment fetches its
-     * instructions, and a sync across a term's courses can easily run for
-     * twenty seconds: queued behind it, a page opened in the meantime would sit
-     * on "Fetching the instructions" for the whole of that sync for no reason
-     * other than the shape of the queue.
-     */
-    private final ExecutorService work = Ui.workers("canvas-work", 2);
-
-    /** What the last sync produced, from the network or read back off disk. */
-    private Sync.Result snapshot;
-    private boolean syncing;
-    /** The last sync failure, kept so the list can say why it is showing old work. */
-    private String syncError;
-
-    /** True while the settings page is filling the screen. */
-    private boolean settingsOpen;
-
-    /**
-     * The assignment filling the screen, or null when a list is showing.
-     *
-     * A detail page hides the tab bar rather than dimming it. On a 240px panel
-     * the 36dp it gives back is most of a row, and navigation you can see but
-     * cannot reach is a worse answer than navigation that has stepped out of
-     * the way and says so.
-     */
-    private Assignment openWork;
-
-    /**
-     * Which sections are expanded, keyed by tab and heading. Absent means the
-     * default, which is that a tab opens on This week and nothing else: it is
-     * the section anyone opening a homework list came to read, and the others
-     * are one press away.
-     */
-    private final Map<String, Boolean> sectionOpen = new HashMap<>();
-
-    /** Tabs that have been drawn once, so the opening-section rule is a
-     *  decision taken on arrival rather than one re-imposed on every draw. */
-    private final Set<Integer> defaulted = new HashSet<>();
-
-    /** The live work list, so a sync landing underneath can keep the highlight. */
-    private ListView listView;
-    private AssignmentAdapter listAdapter;
-    private SettingsAdapter settingsAdapter;
-
-    /** Instructions being fetched for the open assignment, and why it failed. */
-    private boolean detailLoading;
-    private String detailError;
+    private FrameLayout layer;
+    private TextView keyLeft;
+    private TextView keyCenter;
+    private TextView keyRight;
+    private View bar;
+    private Sheet.Open overlay;
+    private View focusBeforeOverlay;
+    private Runnable afterPermission;
+    private ConnectivityManager.NetworkCallback online;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        setContentView(R.layout.activity_main);
-        // Every clock time in the app follows the phone's own setting, so a
-        // due time does not read 11:59 PM on a handset whose every other
-        // screen says 23:59.
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
         Dates.setTwentyFourHour(DateFormat.is24HourFormat(this));
         backend = new Backend(getFilesDir());
-
-        // The list on disk goes up before anything is asked of the network, so
-        // the app opens on the work it knew about last time rather than on a
-        // blank screen with a spinner. A refresh then replaces it underneath.
+        prefs = backend.prefs();
+        applyWeekStart();
         snapshot = backend.cached();
-        if (snapshot != null) todos.replace(snapshot.work);
-
-        content = findViewById(R.id.content);
-        tabBar = findViewById(R.id.tab_bar);
-        tabs = new Tabs(this, tab -> showTab(tab, true), R.id.tab_assigned, R.id.tab_missing, R.id.tab_done);
-        showTab(ASSIGNED, false);
+        if (snapshot != null) {
+            todos.replace(snapshot.work);
+            todos.check(snapshot.checked);
+        }
+        theme();
+        push(new HomeScreen(this));
         refreshIfStale();
+        listenForSignal();
+        Alarms.schedule(this, backend);
     }
 
-    /**
-     * Comes back to a list that may have been left open for hours.
-     *
-     * A phone like this is closed by being put in a pocket, not by being quit,
-     * so the screen you return to is often yesterday's. The list itself is
-     * still correct, because what is missing is derived from the clock every
-     * time it is drawn, but it is worth asking Canvas again.
-     */
     @Override
     protected void onResume() {
         super.onResume();
-        // The redraw is for the dates: a list left open overnight still says
-        // "Tomorrow" against work that is now due today. Not on the first
-        // resume, which arrives moments after onCreate has just drawn it.
-        if (started && openWork == null && !settingsOpen) redrawCurrent();
+        // A phone like this is closed by being put in a pocket, so the screen
+        // you come back to is often yesterday's; what is missing is derived
+        // from the clock on every draw, and Canvas is worth asking again.
+        if (started) redraw();
         started = true;
         refreshIfStale();
+        flushQueue();
     }
 
     private boolean started;
 
-    private void showTab(int tab, boolean focusContent) {
-        currentTab = tab;
-        openWork = null;
-        settingsOpen = false;
-        tabBar.setVisibility(View.VISIBLE);
-        tabs.mark(tab);
-        renderList(tab, focusContent, null);
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (online != null) {
+            ConnectivityManager manager = getSystemService(ConnectivityManager.class);
+            try {
+                manager.unregisterNetworkCallback(online);
+            } catch (RuntimeException e) {
+                // Already gone.
+            }
+        }
+        for (Screen screen : stack) screen.closed();
+        work.shutdownNow();
     }
 
     // ------------------------------------------------------------------
-    // The three lists
+    // Look
     // ------------------------------------------------------------------
 
-    /**
-     * Draws one of the work lists.
-     *
-     * `key` is the row to leave the highlight on, named rather than numbered:
-     * "h:This week" for a heading, "w:142:9013" for a piece of work. That is
-     * how expanding a section keeps the heading you just pressed under the
-     * cursor instead of throwing the selection back to the top of a list that
-     * has just grown, and it is also what survives a sync landing underneath
-     * somebody in the middle of the list, where a row index would not. Pass
-     * null to start on the first piece of work.
-     */
-    private void renderList(final int state, boolean focusContent, String key) {
-        final long stamp = System.currentTimeMillis();
-        List<Section> sections = todos.sections(state, stamp);
+    Look look() {
+        return look;
+    }
 
-        LinearLayout root = vertical();
-        View status = statusStrip();
-        if (status != null) root.addView(status);
+    Views views() {
+        return views;
+    }
 
-        if (sections.isEmpty() || shouldShowWholeTabEmpty(state)) {
-            listAdapter = null;
-            listView = null;
-            root.addView(emptyMessage(emptyText(state)), Ui.weighted());
-            Ui.fill(content, root);
-            return;
+    /** Builds the frame in the current theme. Called again when the theme or text size changes. */
+    void theme() {
+        look = Look.of(this, prefs);
+        views = new Views(this, look);
+        getWindow().setStatusBarColor(look.bg);
+        getWindow().setNavigationBarColor(look.bg);
+        getWindow().getDecorView().setSystemUiVisibility(look.dark ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(look.bg));
+
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(look.bg);
+        LinearLayout column = views.column();
+        content = new FrameLayout(this);
+        column.addView(content, Views.tall());
+        column.addView(softkeys(), Views.wide());
+        root.addView(column, new FrameLayout.LayoutParams(-1, -1));
+        layer = new FrameLayout(this);
+        root.addView(layer, new FrameLayout.LayoutParams(-1, -1));
+        setContentView(root);
+        for (Screen screen : stack) {
+            screen.look = look;
+            screen.v = views;
         }
-
-        openSomethingFirstTime(state, sections, stamp);
-        final AssignmentAdapter adapter = new AssignmentAdapter(this);
-        adapter.replace(rows(state, sections), state, stamp);
-        ListView list = listView(adapter);
-        root.addView(list, Ui.weighted());
-        wireList(list, adapter, state);
-        Ui.fill(content, root);
-        listAdapter = adapter;
-        listView = list;
-
-        int start = indexOf(adapter, key);
-        if (start < 0) start = firstWork(adapter);
-        adapter.setSelectedPosition(start);
-        list.setSelection(start);
-        if (focusContent) list.requestFocus();
+        if (!stack.isEmpty()) show(top(), null, 0);
     }
 
-    /**
-     * Before the first successful fetch, the full-page setup, loading or error
-     * message is more useful than Assigned's deliberately empty week section.
-     */
-    private boolean shouldShowWholeTabEmpty(int state) {
-        return state == Assignment.ASSIGNED
-            && todos.isEmpty()
-            && (!backend.canvasReady() || snapshot == null);
+    private View softkeys() {
+        LinearLayout row = views.row();
+        row.setBackgroundColor(look.bg);
+        views.pad(row, 8, 0, 8, 0);
+        keyLeft = views.text("", 9.5f, look.semibold, look.muted);
+        keyCenter = views.text("", 9.5f, look.heavy, look.ink);
+        keyCenter.setGravity(Gravity.CENTER);
+        keyRight = views.text("", 9.5f, look.semibold, look.muted);
+        keyRight.setGravity(Gravity.RIGHT);
+        row.addView(keyLeft, Views.fill());
+        row.addView(keyCenter, Views.fill());
+        row.addView(keyRight, Views.fill());
+        LinearLayout holder = views.column();
+        holder.addView(views.hairline());
+        holder.addView(row, new LinearLayout.LayoutParams(-1, views.dp(18)));
+        bar = holder;
+        return holder;
     }
 
-    /** Names the highlighted row so it can be found again after a redraw. */
-    private String selectedKey() {
-        if (listAdapter == null) return null;
-        int at = listAdapter.getSelectedPosition();
-        if (at < 0 || at >= listAdapter.getCount()) return null;
-        return keyOf(listAdapter.getItem(at));
+    void applyWeekStart() {
+        if (Prefs.SUNDAY.equals(prefs.weekStart)) Dates.setWeekStart(Calendar.SUNDAY);
+        else if (Prefs.MONDAY.equals(prefs.weekStart)) Dates.setWeekStart(Calendar.MONDAY);
+        else Dates.setWeekStart(Calendar.getInstance().getFirstDayOfWeek());
     }
 
-    private static String keyOf(AssignmentAdapter.Row row) {
-        if (row.isHeader()) return "h:" + row.label;
-        return row.isEmpty() ? "e:This week" : "w:" + row.item.id;
+    void savePrefs(Prefs next) {
+        boolean restyle = !next.theme.equals(prefs.theme) || !next.textSize.equals(prefs.textSize);
+        prefs = next;
+        backend.savePrefs(next);
+        applyWeekStart();
+        Alarms.schedule(this, backend);
+        if (restyle) theme();
+        else redraw();
     }
 
-    private static int indexOf(AssignmentAdapter adapter, String key) {
-        if (key == null) return -1;
-        for (int i = 0; i < adapter.getCount(); i++) {
-            if (key.equals(keyOf(adapter.getItem(i)))) return i;
-        }
-        return -1;
+    /** A passing line at the bottom of the screen. */
+    void say(String text) {
+        toast(text);
     }
 
-    /**
-     * The line above the list, when there is something worth spending a row on.
-     *
-     * Usually there is not: a list that synced two minutes ago and got
-     * everything says so by being a list of work, and a permanent "Last updated"
-     * strip would cost a row of a screen that holds five to tell you nothing on
-     * almost every launch. It appears while updating, when an update failed,
-     * when a course could not be read, and when what is on screen is old enough
-     * that you should know before you trust it.
-     */
-    private View statusStrip() {
-        String message = statusText();
-        if (message == null) return null;
-        TextView view = text(message, 11, color(R.color.text_muted));
-        view.setBackgroundColor(color(R.color.section_fill));
-        view.setPadding(dp(10), dp(4), dp(10), dp(4));
-        view.setSingleLine(true);
-        view.setEllipsize(TextUtils.TruncateAt.END);
-        return view;
+    /** Something that went wrong, said once in the app's own dialog: what happened and what to do. */
+    void tell(String title, String message) {
+        Sheet.ask(this, title, message, "OK", "Close", () -> { });
     }
 
-    private String statusText() {
-        // With nothing set up, the empty page in the middle of the screen says
-        // it at length; a strip above it would say it twice.
-        if (!backend.canvasReady()) return null;
-        // So would a strip saying "Updating" over a page saying "Fetching".
-        // The strip is for a list that has something in it.
-        if (todos.isEmpty() && (syncing || syncError != null || snapshot == null)) return null;
-        if (syncing) return "Updating…";
-        if (syncError != null) return "Could not update";
-        if (snapshot == null) return null;
-        if (!snapshot.complete()) {
-            int count = snapshot.unavailable.size();
-            return count + (count == 1 ? " course could not be read" : " courses could not be read");
-        }
-        long stamp = System.currentTimeMillis();
-        if (stamp - snapshot.fetchedAt > OLD_MS) {
-            return "As of " + Dates.dayAndTime(snapshot.fetchedAt, stamp);
-        }
-        return null;
+    /** A preference that changes nothing on screen, such as when Notifications was last read. */
+    void savePrefsQuietly(Prefs next) {
+        prefs = next;
+        backend.savePrefs(next);
     }
 
-    // ------------------------------------------------------------------
-    // Syncing
-    // ------------------------------------------------------------------
-
-    /** Fetches only if what is on screen has had time to go wrong. */
-    private void refreshIfStale() {
-        if (!backend.canvasReady() || syncing) return;
-        long age = snapshot == null
-            ? Long.MAX_VALUE
-            : System.currentTimeMillis() - snapshot.fetchedAt;
-        if (age >= STALE_MS) refresh(false);
-    }
-
-    /**
-     * Fetches the work list. `announce` is for a refresh somebody asked for by
-     * pressing Menu, which should say something even when it succeeds; the
-     * automatic one on opening the app should not.
-     */
-    private void refresh(final boolean announce) {
-        if (syncing) return;
-        if (!backend.canvasReady()) {
-            if (announce) toast("Not set up");
-            return;
-        }
-        syncing = true;
+    /** Drops the work on screen, which belonged to the setup just replaced. */
+    void forgetWork() {
+        snapshot = null;
         syncError = null;
-        redrawIfListing();
-        work.execute(
-            () -> {
-                Sync.Result fetched = null;
-                String failure = null;
-                try {
-                    fetched = backend.refresh();
-                } catch (InterruptedException stopping) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } catch (java.io.IOException e) {
-                    failure = reason(e);
-                } catch (RuntimeException e) {
-                    failure = "Canvas sent something this app could not read.";
-                }
-                final Sync.Result result = fetched;
-                final String problem = failure;
-                main.post(
-                    () -> synced(result, problem, announce)
-                );
-            }
-        );
+        todos.replace(new ArrayList<Assignment>());
+        todos.check(null);
     }
 
-    private void synced(Sync.Result result, String problem, boolean announce) {
-        if (isFinishing()) return;
-        syncing = false;
-        if (result != null) {
-            carryDetailsForward(result.work);
-            snapshot = result;
-            syncError = null;
-            todos.replace(result.work);
-            saveWork();
-            if (announce) {
-                toast(result.complete() ? "Up to date" : "Updated, some courses unavailable");
-            }
-        } else {
-            syncError = problem;
-            // With work already on screen the strip only has room to say that
-            // something went wrong, so the reason goes past once as a toast.
-            if (!todos.isEmpty()) toast(problem);
-        }
-        redrawIfListing();
+    // ------------------------------------------------------------------
+    // The stack
+    // ------------------------------------------------------------------
+
+    Screen top() {
+        return stack.isEmpty() ? null : stack.get(stack.size() - 1);
     }
 
-    /**
-     * Moves instructions already fetched onto the records that replace them.
-     *
-     * A sync builds new Assignment objects from what Canvas sent, and Canvas
-     * does not send bodies with a list, so without this every assignment read
-     * once would go back to needing a signal the moment anything refreshed. The
-     * text is keyed by course and assignment id, which is what it was fetched
-     * against, so it cannot land on the wrong piece of work.
-     */
-    private void carryDetailsForward(List<Assignment> next) {
-        if (todos.isEmpty()) return;
-        Map<String, Assignment> known = new HashMap<>();
-        for (Assignment item : todos.all()) {
-            if (item.hasDetails()) known.put(item.id, item);
-        }
-        if (known.isEmpty()) return;
-        for (Assignment item : next) {
-            Assignment previous = known.get(item.id);
-            if (previous != null && !item.hasDetails()) item.setDetails(previous.details());
-        }
+    void push(Screen screen) {
+        screen.look = look;
+        screen.v = views;
+        stack.add(screen);
+        show(screen, null, 0);
     }
 
-    /** Writes the list down as it now stands, off the main thread. */
-    private void saveWork() {
-        final List<Assignment> all = new ArrayList<>(todos.all());
-        final Sync.Result context = snapshot;
-        work.execute(
-            () -> backend.saveWork(all, context)
-        );
+    /** Replaces the top screen, for a step that leads straight into another. */
+    void replace(Screen screen) {
+        Screen old = stack.remove(stack.size() - 1);
+        old.closed();
+        push(screen);
     }
 
-    /** Redraws a work list, and only a work list. */
-    private void redrawIfListing() {
-        if (openWork != null || settingsOpen) return;
-        renderList(currentTab, listView != null && listView.hasFocus(), selectedKey());
-    }
-
-    /** An exception as a sentence, never empty. */
-    private static String reason(Exception e) {
-        String message = e.getMessage();
-        return message == null || message.length() == 0 ? "The network could not be reached." : message;
-    }
-
-    /** Redraws whatever is on screen, keeping the highlight where it was. */
-    private void redrawCurrent() {
-        if (openWork != null) {
-            renderDetail();
-        } else if (settingsOpen) {
-            renderSettings(settingsAdapter == null ? 0 : settingsAdapter.getSelectedPosition());
-        } else {
-            renderList(currentTab, listView != null && listView.hasFocus(), selectedKey());
-        }
-    }
-
-    private List<AssignmentAdapter.Row> rows(int state, List<Section> sections) {
-        List<AssignmentAdapter.Row> rows = new ArrayList<>();
-        for (Section section : sections) {
-            boolean expanded = isOpen(state, section.label);
-            rows.add(
-                AssignmentAdapter.Row.header(
-                    section.label,
-                    section.items.size(),
-                    expanded
-                )
-            );
-            if (!expanded) continue;
-            if (Section.THIS_WEEK.equals(section.label) && section.items.isEmpty()) {
-                rows.add(AssignmentAdapter.Row.empty());
-            }
-            for (Assignment item : section.items) {
-                rows.add(AssignmentAdapter.Row.work(item));
-            }
-        }
-        return rows;
-    }
-
-    private boolean isOpen(int state, String label) {
-        Boolean stored = sectionOpen.get(state + ":" + label);
-        return stored == null ? Section.THIS_WEEK.equals(label) : stored.booleanValue();
-    }
-
-    /**
-     * Guarantees a tab opens on something, the first time it is drawn.
-     *
-     * This week is the default. Assigned makes one useful exception: on a
-     * Sunday with nothing left this week and work due tomorrow, Next week is
-     * opened so the imminent work is visible immediately. Other tabs can have
-     * no This week section, in which case their first section takes over.
-     *
-     * Once only, though. This is a decision about how a tab opens, not a rule
-     * about how it must always look, and applying it on every draw would take
-     * Collapse all away from anyone who chose it by opening a section back up
-     * underneath them.
-     */
-    private void openSomethingFirstTime(int state, List<Section> sections, long now) {
-        if (!defaulted.add(Integer.valueOf(state))) return;
-        if (state == Assignment.ASSIGNED && nextWeekStartsTomorrow(sections, now)) {
-            sectionOpen.put(state + ":" + Section.THIS_WEEK, Boolean.FALSE);
-            sectionOpen.put(state + ":" + Section.NEXT_WEEK, Boolean.TRUE);
+    void pop() {
+        if (stack.size() <= 1) {
+            finish();
             return;
         }
-        for (Section section : sections) {
-            if (isOpen(state, section.label)) return;
-        }
-        sectionOpen.put(state + ":" + sections.get(0).label, Boolean.TRUE);
+        Screen old = stack.remove(stack.size() - 1);
+        old.closed();
+        Screen under = top();
+        show(under, under.savedFocus, under.savedScroll);
     }
 
-    private boolean nextWeekStartsTomorrow(List<Section> sections, long now) {
-        Section thisWeek = null;
-        Section nextWeek = null;
-        for (Section section : sections) {
-            if (Section.THIS_WEEK.equals(section.label)) thisWeek = section;
-            if (Section.NEXT_WEEK.equals(section.label)) nextWeek = section;
-        }
-        if (thisWeek == null || !thisWeek.items.isEmpty() || nextWeek == null) return false;
-        for (Assignment item : nextWeek.items) {
-            if (item.due != null && Dates.daysBetween(now, item.due.longValue()) == 1) {
-                return true;
-            }
-        }
-        return false;
+    /** Closes the top screen and hands its result to the one underneath. */
+    void finishWith(Object value) {
+        Screen old = stack.remove(stack.size() - 1);
+        old.closed();
+        Screen under = top();
+        under.result(value);
+        show(under, under.savedFocus, under.savedScroll);
     }
 
-    private int firstWork(AssignmentAdapter adapter) {
-        for (int i = 0; i < adapter.getCount(); i++) {
-            if (adapter.getItem(i).item != null) return i;
-        }
-        return 0;
+    /** Rebuilds the top screen in place, keeping the d-pad and the scroll where they were. */
+    void redraw() {
+        Screen screen = top();
+        if (screen == null) return;
+        View focused = getCurrentFocus();
+        String key = focused instanceof Item ? ((Item) focused).key : null;
+        int y = screen.scroll == null ? 0 : screen.scroll.getScrollY();
+        if (overlay != null) return;
+        show(screen, key, y);
     }
 
-    private void wireList(
-        ListView list,
-        final AssignmentAdapter adapter,
-        final int state
-    ) {
-        list.setOnItemClickListener(
-            (parent, view, position, id) -> activate(adapter, state, position)
-        );
-        list.setFocusable(true);
-        list.setFocusableInTouchMode(true);
-        list.setOnFocusChangeListener(
-            (view, hasFocus) -> {
-                if (
-                    hasFocus &&
-                    adapter.getCount() > 0 &&
-                    adapter.getSelectedPosition() == AdapterView.INVALID_POSITION
-                ) {
-                    int start = firstWork(adapter);
-                    adapter.setSelectedPosition(start);
-                    ((ListView) view).setSelection(start);
+    private void show(final Screen screen, String key, final int y) {
+        // What the screen underneath had in focus comes back when it does.
+        Screen previous = stack.size() > 1 && stack.get(stack.size() - 1) == screen
+            ? stack.get(stack.size() - 2) : null;
+        if (previous != null && previous.savedFocus == null) {
+            View focused = getCurrentFocus();
+            if (focused instanceof Item) previous.savedFocus = ((Item) focused).key;
+            if (previous.scroll != null) previous.savedScroll = previous.scroll.getScrollY();
+        }
+        screen.scroll = null;
+        View view = screen.build();
+        content.removeAllViews();
+        content.addView(view, new FrameLayout.LayoutParams(-1, -1));
+        Item target = Screen.find(view, key);
+        if (target == null) target = Screen.find(view, screen.firstFocus());
+        if (target == null) {
+            List<Item> all = Screen.items(view);
+            if (!all.isEmpty()) target = all.get(0);
+        }
+        if (screen.scroll != null) {
+            final android.widget.ScrollView scroller = screen.scroll;
+            final Item focusAfter = target;
+            scroller.post(() -> {
+                scroller.scrollTo(0, y);
+                // The scroll comes back first, then the d-pad's item is
+                // brought into view if the old position left it off screen.
+                if (focusAfter != null && focusAfter.isFocused()) {
+                    focusAfter.requestRectangleOnScreen(
+                        new android.graphics.Rect(0, 0, focusAfter.getWidth(), focusAfter.getHeight()), true);
                 }
-            }
-        );
-        Ui.onSelect(list, position -> adapter.trackSelectedPosition(position));
-        // Sonim firmware variants report the physical OK key as either
-        // DPAD_CENTER or ENTER. Handle activation only; arrows stay with
-        // ListView's native selection and scrolling implementation.
-        list.setOnKeyListener(
-            (view, keyCode, event) -> {
-                if (
-                    event.getAction() != KeyEvent.ACTION_UP ||
-                    (keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
-                        keyCode != KeyEvent.KEYCODE_ENTER &&
-                        keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER)
-                ) return false;
-
-                int position = adapter.getSelectedPosition();
-                if (position >= 0 && position < adapter.getCount()) {
-                    activate(adapter, state, position);
-                    return true;
-                }
-                return false;
-            }
-        );
-    }
-
-    private void activate(AssignmentAdapter adapter, int state, int position) {
-        AssignmentAdapter.Row row = adapter.getItem(position);
-        if (row.isHeader()) {
-            sectionOpen.put(state + ":" + row.label, Boolean.valueOf(!row.expanded));
-            // The heading you just pressed stays under the cursor: it is named
-            // rather than numbered, so it is found again wherever it has ended
-            // up in the list that has just grown or shrunk beneath it.
-            renderList(state, true, keyOf(row));
-        } else if (!row.isEmpty()) {
-            openDetail(row.item);
+            });
         }
-    }
-
-    /**
-     * What a screen with nothing on it says.
-     *
-     * The three cheerful answers at the bottom are only true once the app knows
-     * they are: an empty Missing tab means "you are caught up" if a sync
-     * succeeded and "I have not looked yet" if one has not, and telling
-     * somebody with an unsent assignment that they have nothing missing is the
-     * worst thing this app could do.
-     */
-    private String emptyText(int state) {
-        if (!backend.canvasReady()) {
-            return "Not set up";
-        }
-        if (todos.isEmpty()) {
-            if (syncing) return "Fetching…";
-            if (syncError != null) return syncError;
-            if (snapshot == null) return "Nothing fetched yet";
-        }
-        if (state == ASSIGNED) {
-            return "Nothing assigned";
-        }
-        if (state == MISSING) {
-            return "Nothing missing";
-        }
-        return "Nothing turned in yet";
-    }
-
-    // ------------------------------------------------------------------
-    // One assignment, full screen
-    // ------------------------------------------------------------------
-
-    /**
-     * Opens one assignment, and fetches its instructions if this is the first
-     * time it has been opened.
-     *
-     * Canvas does not send an assignment's body with a list of assignments, so
-     * the alternative to fetching here is a request per row at sync time, which
-     * on a term's worth of work is a hundred requests to draw a screen of
-     * titles. The page therefore opens on what the list already knew, with the
-     * instructions arriving underneath a moment later. Once fetched they are
-     * kept, so the second reading needs no signal at all.
-     */
-    private void openDetail(final Assignment item) {
-        openWork = item;
-        tabBar.setVisibility(View.GONE);
-        detailError = null;
-        detailLoading = !item.hasDetails();
-        renderDetail();
-        if (!detailLoading) return;
-        work.execute(
-            () -> {
-                String failure = null;
-                try {
-                    backend.details(item);
-                } catch (InterruptedException stopping) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } catch (java.io.IOException e) {
-                    failure = reason(e);
-                } catch (RuntimeException e) {
-                    failure = "Canvas sent instructions this app could not read.";
-                }
-                final String problem = failure;
-                main.post(
-                    () -> {
-                        if (isFinishing()) return;
-                        detailLoading = false;
-                        detailError = problem;
-                        // Written down so the page reads again with no
-                        // signal, from the list as it stands now rather
-                        // than as it stood when the fetch started.
-                        if (problem == null) saveWork();
-                        // Redrawn only if it is still the thing on
-                        // screen: the text is kept either way, so
-                        // backing out and opening it again is instant.
-                        if (openWork == item) renderDetail();
-                    }
-                );
-            }
-        );
-    }
-
-    private void renderDetail() {
-        if (openWork == null) return;
-        Assignment item = openWork;
-        long stamp = System.currentTimeMillis();
-        int state = item.state(stamp);
-
-        ScrollView scroll = new ScrollView(this);
-        // The page scrolls with up and down before focus ever reaches the
-        // button at the foot of it, which is what lets a long assignment be
-        // read on a keypad without tabbing through it.
-        scroll.setFocusable(true);
-        scroll.setFocusableInTouchMode(true);
-        scroll.setDefaultFocusHighlightEnabled(false);
-        scroll.setBackgroundColor(color(R.color.grouped_page));
-        LinearLayout root = vertical();
-        root.setPadding(0, 0, 0, dp(8));
-
-        root.addView(heading(item.title));
-        root.addView(subheading(item.course));
-
-        // The facts on one card, the instructions on another.
-        LinearLayout facts = card();
-        root.addView(facts);
-        facts.addView(
-            metric(
-                "Due",
-                item.due == null
-                    ? "No due date"
-                    : Dates.dayAndTime(item.due.longValue(), stamp),
-                state == MISSING ? color(R.color.overdue) : color(R.color.text)
-            )
-        );
-        facts.addView(divider());
-        facts.addView(
-            metric(
-                "Status",
-                statusLabel(item, stamp),
-                state == MISSING
-                    ? color(R.color.overdue)
-                    : state == DONE ? color(R.color.due_soon) : color(R.color.text)
-            )
-        );
-        if (item.done && item.turnedIn != null) {
-            facts.addView(divider());
-            facts.addView(
-                metric(
-                    "Turned in",
-                    Dates.dayAndTime(item.turnedIn.longValue(), stamp),
-                    color(R.color.text)
-                )
-            );
-        }
-        // A score is shown whenever there is one, not only on work that counts
-        // as done: a zero entered against something never handed in is filed
-        // under Missing, and it is exactly the number you opened the page for.
-        if (item.points > 0 || item.score != null) {
-            String score = item.score != null
-                ? Assignment.number(item.score.doubleValue())
-                    + (item.points > 0 ? " of " + Assignment.number(item.points) : "")
-                : Assignment.number(item.points) + " points";
-            facts.addView(divider());
-            facts.addView(metric("Score", score, color(R.color.text)));
-        }
-
-        LinearLayout body = card();
-        body.setPadding(0, dp(2), 0, dp(4));
-        root.addView(body);
-        if (item.hasDetails()) {
-            new Markdown(this).into(body, item.details());
+        if (target != null) {
+            target.requestFocus();
+            focusMoved(target);
         } else {
-            body.addView(
-                emptyMessage(
-                    detailLoading
-                        ? "Fetching the instructions…"
-                        : detailError != null
-                            ? detailError
-                            : "No instructions were posted."
-                )
-            );
+            view.setFocusable(true);
+            view.setDefaultFocusHighlightEnabled(false);
+            view.requestFocus();
+            updateKeys(null);
         }
-
-        scroll.addView(
-            root,
-            new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        );
-        Ui.fill(content, scroll);
-        scroll.requestFocus();
-    }
-
-    private String statusLabel(Assignment item, long now) {
-        // Excused counts as done everywhere else, but on the one screen with
-        // room to say why, "Turned in" would be wrong: you did not turn it in.
-        if (item.excused) return "Excused";
-        if (item.done) return item.early(now) ? "Done early" : "Turned in";
-        if (item.state(now) == MISSING) return "Missing";
-        return "Assigned";
-    }
-
-    private void closeDetail() {
-        openWork = null;
-        showTab(currentTab, true);
-    }
-
-    private boolean clipboardHasText() {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(
-            CLIPBOARD_SERVICE
-        );
-        return (
-            clipboard != null &&
-            clipboard.hasPrimaryClip() &&
-            clipboard.getPrimaryClip().getItemCount() > 0
-        );
-    }
-
-    /** What is on the clipboard as text, or null when there is nothing usable. */
-    private CharSequence clipboardText() {
-        if (!clipboardHasText()) return null;
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        CharSequence pasted = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
-        return pasted == null || pasted.length() == 0 ? null : pasted;
+        screen.savedFocus = null;
+        screen.shown();
     }
 
     // ------------------------------------------------------------------
-    // Keys and the menu
+    // The softkey bar
     // ------------------------------------------------------------------
+
+    void focusMoved(Item item) {
+        if (overlay != null) {
+            keyCenter.setText(item.ok == null ? overlay.center : item.ok);
+            return;
+        }
+        updateKeys(item);
+    }
+
+    void updateKeys(Item item) {
+        Screen screen = top();
+        if (screen == null) return;
+        keyLeft.setText(screen.left() == null ? "" : screen.left());
+        String center = item != null && item.ok != null ? item.ok : screen.center();
+        View focused = getCurrentFocus();
+        if (focused instanceof EditText) center = screen.center();
+        keyCenter.setText(center == null ? "" : center);
+        keyRight.setText(screen.right() == null ? "" : screen.right());
+    }
+
+    void refreshKeys() {
+        View focused = getCurrentFocus();
+        updateKeys(focused instanceof Item ? (Item) focused : null);
+    }
+
+    // ------------------------------------------------------------------
+    // Overlays
+    // ------------------------------------------------------------------
+
+    void openOverlay(Sheet.Open open) {
+        if (overlay != null) closeOverlay();
+        focusBeforeOverlay = getCurrentFocus();
+        overlay = open;
+        ((ViewGroup) content).setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        layer.addView(open.view, new FrameLayout.LayoutParams(-1, -1));
+        keyLeft.setText(open.left == null ? "" : open.left);
+        keyCenter.setText(open.center == null ? "" : open.center);
+        keyRight.setText(open.right == null ? "" : open.right);
+        List<Item> items = Screen.items(open.view);
+        if (!items.isEmpty()) items.get(0).requestFocus();
+    }
+
+    void closeOverlay() {
+        if (overlay == null) return;
+        layer.removeAllViews();
+        overlay = null;
+        ((ViewGroup) content).setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+        if (focusBeforeOverlay != null && focusBeforeOverlay.isAttachedToWindow()) {
+            focusBeforeOverlay.requestFocus();
+        }
+        focusBeforeOverlay = null;
+        refreshKeys();
+    }
+
+    boolean overlayOpen() {
+        return overlay != null;
+    }
+
+    /** Options: the screen's own entries, then the app-wide ones. */
+    void showOptions() {
+        Screen screen = top();
+        List<Sheet.Choice> choices = new ArrayList<>(screen.options());
+        if (screen.globalOptions()) {
+            if (!(screen instanceof ClassesScreen)) {
+                choices.add(new Sheet.Choice("Classes", R.drawable.ic_apps, null,
+                    () -> push(new ClassesScreen(this))));
+            }
+            if (!(screen instanceof NoticesScreen)) {
+                int fresh = 0;
+                for (Notice notice : backend.cachedNotices()) {
+                    if (notice.at > prefs.noticesSeen) fresh++;
+                }
+                choices.add(new Sheet.Choice("Notifications", R.drawable.ic_bell,
+                    fresh > 0 ? fresh + " new" : null, () -> push(new NoticesScreen(this))));
+            }
+            choices.add(new Sheet.Choice("Refresh", R.drawable.ic_refresh, null, () -> refresh(true)));
+            if (!(screen instanceof SettingsScreen)) {
+                choices.add(new Sheet.Choice("Settings", R.drawable.ic_tune, null,
+                    () -> push(new SettingsScreen(this))));
+            }
+        }
+        if (choices.isEmpty()) return;
+        Sheet.menu(this, "Menu", choices);
+    }
+
+    // ------------------------------------------------------------------
+    // Keys
+    // ------------------------------------------------------------------
+
+    private static boolean isLeftSoft(int code) {
+        return code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT;
+    }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        // First press only. Auto-repeat from a held d-pad would cycle the tabs
-        // as fast as the key fires and redraw every one of them on the way.
-        //
-        // A detail page takes no part in this: with the tab bar hidden, left
-        // and right sliding to another tab underneath it would be navigation
-        // by accident. Neither does a text field, where the same keys are how
-        // you move through what you have typed.
-        int next = openWork != null || settingsOpen ? -1 : tabs.step(event, getCurrentFocus(), currentTab);
-        if (next >= 0) {
-            showTab(next, true);
+        int code = event.getKeyCode();
+        boolean up = event.getAction() == KeyEvent.ACTION_UP;
+        if (overlay != null) {
+            if (isLeftSoft(code) || code == KeyEvent.KEYCODE_BACK) {
+                if (up) closeOverlay();
+                return true;
+            }
+            if (code == KeyEvent.KEYCODE_SOFT_RIGHT) {
+                if (up && overlay.onRight != null) overlay.onRight.run();
+                return true;
+            }
+            if (overlay.key(this, event)) return true;
+            return super.dispatchKeyEvent(event);
+        }
+        Screen screen = top();
+        if (screen != null && screen.onKey(event)) return true;
+        if (isLeftSoft(code)) {
+            if (up && screen != null && screen.left() != null) showOptions();
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_SOFT_RIGHT) {
+            if (up && screen != null && screen.right() != null) screen.onRight();
+            return true;
+        }
+        // Clear backs out like Back, except in a text field, where it is how
+        // a character is deleted, as on every other screen of the phone.
+        if ((code == KeyEvent.KEYCODE_CLEAR || code == KeyEvent.KEYCODE_DEL)
+            && !(getCurrentFocus() instanceof EditText)) {
+            if (up) onBackPressed();
             return true;
         }
         return super.dispatchKeyEvent(event);
     }
 
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_MENU) {
-            showMenu();
-            return true;
-        }
-        // The XP3's clear key is the one people reach for to back out, and it
-        // arrives as either of these depending on the firmware.
-        if (
-            (keyCode == KeyEvent.KEYCODE_CLEAR || keyCode == KeyEvent.KEYCODE_DEL) &&
-            (openWork != null || settingsOpen) &&
-            !(getCurrentFocus() instanceof EditText)
-        ) {
-            if (openWork != null) closeDetail();
-            else closeSettings();
-            return true;
-        }
-        return super.onKeyDown(keyCode, event);
-    }
-
-    @Override
     public void onBackPressed() {
-        if (openWork != null) closeDetail();
-        else if (settingsOpen) closeSettings();
-        else super.onBackPressed();
+        if (overlay != null) {
+            closeOverlay();
+            return;
+        }
+        Screen screen = top();
+        if (screen != null && screen.onBack()) return;
+        pop();
     }
 
-    /**
-     * Stops the background threads when the screen goes for good.
-     *
-     * They are daemon threads, so the process would exit regardless; this is so
-     * that a sync still running against the network is not left holding a
-     * socket open behind an app somebody has closed.
-     */
+    // ------------------------------------------------------------------
+    // Permissions and other activities
+    // ------------------------------------------------------------------
+
+    /** Runs `then` once the permission is granted, asking for it first if need be. */
+    void withPermission(String permission, Runnable then) {
+        if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+            then.run();
+            return;
+        }
+        afterPermission = then;
+        requestPermissions(new String[] { permission }, 1);
+    }
+
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        work.shutdownNow();
-    }
-
-    private static final String EXPAND = "Expand all sections";
-    private static final String COLLAPSE = "Collapse all sections";
-    private static final String SIGN_OUT = "Sign out";
-    private static final String RESTORE = "Use the bundled setup";
-
-    private void showMenu() {
-        if (openWork != null || settingsOpen) return;
-        List<String> items = new ArrayList<>();
-        items.add(REFRESH);
-        items.add(EXPAND);
-        items.add(COLLAPSE);
-        items.add(SETTINGS);
-        items.add(ABOUT);
-        final String[] labels = items.toArray(new String[items.size()]);
-        new AlertDialog.Builder(this)
-            .setTitle("Menu")
-            .setItems(
-                labels,
-                (dialog, which) -> chose(labels[which])
-            )
-            .show();
-    }
-
-    /** Dispatch by label rather than by index. */
-    private void chose(String label) {
-        if (label.equals(REFRESH)) refresh(true);
-        else if (label.equals(EXPAND)) setAllSections(true);
-        else if (label.equals(COLLAPSE)) setAllSections(false);
-        else if (label.equals(SETTINGS)) openSettings();
-        else showAbout();
-    }
-
-    private void setAllSections(boolean expanded) {
-        for (Section section : todos.sections(currentTab, System.currentTimeMillis())) {
-            sectionOpen.put(
-                currentTab + ":" + section.label,
-                Boolean.valueOf(expanded)
-            );
-        }
-        renderList(currentTab, true, null);
-    }
-
-    private void showAbout() {
-        String updated = snapshot == null
-            ? "Nothing fetched yet"
-            : "Fetched " + Dates.dayAndTime(snapshot.fetchedAt, System.currentTimeMillis());
-        new AlertDialog.Builder(this)
-            .setTitle("About")
-            .setMessage(updated)
-            .setPositiveButton("OK", null)
-            .show();
-    }
-
-    // ------------------------------------------------------------------
-    // Settings
-    // ------------------------------------------------------------------
-
-    private void openSettings() {
-        settingsOpen = true;
-        openWork = null;
-        // Same reasoning as a detail page: the tab bar is 36dp of a 260dp
-        // screen, and this page is a list that wants every row it can get.
-        tabBar.setVisibility(View.GONE);
-        renderSettings(0);
-    }
-
-    private void closeSettings() {
-        settingsOpen = false;
-        settingsAdapter = null;
-        showTab(currentTab, true);
-        // Details changed here are the reason a fetch would now work.
-        refreshIfStale();
-    }
-
-    private List<SettingsAdapter.Row> settingRows() {
-        Config config = backend.config();
-        List<SettingsAdapter.Row> rows = new ArrayList<>();
-        rows.add(row(config, Config.CANVAS_URL, "Canvas address", false));
-        rows.add(row(config, Config.COOKIE_URL, "Cookie service", false));
-        rows.add(row(config, Config.COOKIE_TOKEN, "Service token", true));
-        rows.add(row(config, Config.TIMEZONE, "Time zone", false));
-        if (backend.hasBundledSetup()) {
-            rows.add(new SettingsAdapter.Row(null, RESTORE, null, false));
-        }
-        rows.add(new SettingsAdapter.Row(null, SIGN_OUT, null, false));
-        return rows;
-    }
-
-    private static SettingsAdapter.Row row(Config config, String field, String label, boolean secret) {
-        return new SettingsAdapter.Row(field, label, config.get(field), secret);
-    }
-
-    private void renderSettings(int select) {
-        final SettingsAdapter adapter = new SettingsAdapter(this);
-        adapter.replace(settingRows());
-        final ListView list = listView(adapter);
-
-        LinearLayout root = vertical();
-        root.addView(heading("Settings"));
-        root.addView(subheading(backend.canvasReady() ? "Set up" : "Not set up"));
-        root.addView(divider());
-        root.addView(list, Ui.weighted());
-        wireSettings(list, adapter);
-        Ui.fill(content, root);
-        settingsAdapter = adapter;
-
-        int start = select >= 0 && select < adapter.getCount() ? select : 0;
-        adapter.setSelectedPosition(start);
-        list.setSelection(start);
-        list.requestFocus();
-    }
-
-    private void wireSettings(final ListView list, final SettingsAdapter adapter) {
-        list.setFocusable(true);
-        list.setFocusableInTouchMode(true);
-        Ui.onSelect(list, position -> adapter.trackSelectedPosition(position));
-        list.setOnItemClickListener(
-            (parent, view, position, id) -> editSetting(adapter.getItem(position), position)
-        );
-        list.setOnKeyListener(
-            (view, keyCode, event) -> {
-                if (
-                    event.getAction() != KeyEvent.ACTION_UP ||
-                    (keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
-                        keyCode != KeyEvent.KEYCODE_ENTER &&
-                        keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER)
-                ) return false;
-                int position = adapter.getSelectedPosition();
-                if (position < 0 || position >= adapter.getCount()) return false;
-                editSetting(adapter.getItem(position), position);
-                return true;
-            }
-        );
-    }
-
-    /**
-     * Editing one setting.
-     *
-     * Paste is a button on this dialog rather than a menu item, because these
-     * are the fields nobody is going to type: a service token is 40 random
-     * characters and an API key is longer, and entering either on a keypad is
-     * the difference between an app somebody sets up and one they give up on.
-     * The intended route is a message or an email to the phone, then copy and
-     * paste. Typing still works for the short ones.
-     */
-    private void editSetting(final SettingsAdapter.Row row, final int position) {
-        if (row.field == null) {
-            if (SIGN_OUT.equals(row.label)) confirmSignOut();
-            else restoreBundledSetup();
-            return;
-        }
-
-        final EditText field = new EditText(this);
-        field.setTextSize(14);
-        field.setSingleLine(true);
-        boolean address = Config.CANVAS_URL.equals(row.field) || Config.COOKIE_URL.equals(row.field);
-        // Never CAP_SENTENCES or AUTO_CORRECT here: a key with its first letter
-        // capitalised or a hostname the keyboard has helpfully corrected is a
-        // credential that silently does not work.
-        field.setInputType(
-            InputType.TYPE_CLASS_TEXT |
-            (address
-                ? InputType.TYPE_TEXT_VARIATION_URI
-                : InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
-        );
-        field.setText(backend.config().get(row.field));
-        field.setSelection(field.getText().length());
-
-        // A bare EditText in a dialog sits flush against its edges, which at
-        // this width leaves the text touching the frame on both sides.
-        LinearLayout holder = vertical();
-        holder.setPadding(dp(12), dp(6), dp(12), dp(2));
-        holder.addView(
-            field,
-            new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        );
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
-            .setTitle(row.label)
-            .setView(holder)
-            .setPositiveButton(
-                "Save",
-                (dialog, which) -> applySetting(row.field, field.getText().toString(), position)
-            )
-            .setNegativeButton("Cancel", null);
-        if (clipboardHasText()) builder.setNeutralButton("Paste", null);
-
-        final AlertDialog dialog = builder.create();
-        dialog.show();
-
-        /*
-         * OK saves, without going near the Save button.
-         *
-         * With a keyboard up on a 320px screen the dialog's buttons are pushed
-         * off the bottom, so reaching Save means dismissing the keyboard first
-         * and then stepping down onto it: three deliberate presses to confirm a
-         * value that has already been typed.
-         *
-         * This acts on the release. A field with T9 prediction would have to
-         * use the press, because the keyboard swallows the first ENTER release
-         * to finish the word it is composing — but these fields turn
-         * prediction off, so there is never a word in the air and the release
-         * always arrives. It matters which way round: dismissing on the
-         * press leaves the release to be delivered to the settings list
-         * underneath, which reads it as OK and opens this dialog straight back
-         * up. Both halves are swallowed either way, so ENTER cannot also reach
-         * the field itself.
-         */
-        field.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_ENTER_ACTION);
-        field.setOnKeyListener(
-            (view, keyCode, event) -> {
-                if (
-                    keyCode != KeyEvent.KEYCODE_DPAD_CENTER &&
-                    keyCode != KeyEvent.KEYCODE_ENTER &&
-                    keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER
-                ) return false;
-                if (event.getAction() == KeyEvent.ACTION_UP) {
-                    dialog.dismiss();
-                    applySetting(row.field, field.getText().toString(), position);
-                }
-                return true;
-            }
-        );
-        field.setOnEditorActionListener(
-            (view, actionId, event) -> {
-                if (actionId != EditorInfo.IME_ACTION_DONE && actionId != EditorInfo.IME_ACTION_GO) {
-                    return false;
-                }
-                dialog.dismiss();
-                applySetting(row.field, view.getText().toString(), position);
-                return true;
-            }
-        );
-
-        Button paste = dialog.getButton(AlertDialog.BUTTON_NEUTRAL);
-        if (paste != null) {
-            // Wired after show() so that pasting does not also dismiss the
-            // dialog, which is what a plain button listener would do.
-            paste.setOnClickListener(
-                view -> {
-                    CharSequence text = clipboardText();
-                    if (text == null) return;
-                    field.setText(text.toString().trim());
-                    field.setSelection(field.getText().length());
-                }
-            );
+    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        Runnable then = afterPermission;
+        afterPermission = null;
+        if (then != null && results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+            then.run();
+        } else if (then != null) {
+            toast("The phone didn't allow it.");
         }
     }
 
-    private void applySetting(String field, String value, int position) {
-        Config next;
+    private ActivityResult pendingResult;
+
+    interface ActivityResult {
+        void done(int code, Intent data);
+    }
+
+    void startForResult(Intent intent, ActivityResult then) {
+        pendingResult = then;
         try {
-            next = backend.config().with(field, value);
-        } catch (IllegalArgumentException e) {
-            alert("Not saved", e.getMessage() == null ? "That value was not accepted." : e.getMessage());
-            return;
-        }
-        try {
-            backend.saveSettings(next);
-        } catch (java.io.IOException e) {
-            alert("Not saved", "Could not write to this phone's storage.");
-            return;
-        }
-        // A different Canvas account means the work on screen belongs to
-        // somebody else. Drop it rather than showing it until a sync replaces
-        // it row by row.
-        if (Config.CANVAS_URL.equals(field) || Config.COOKIE_URL.equals(field)
-            || Config.COOKIE_TOKEN.equals(field)) {
-            forgetWork();
-        }
-        renderSettings(position);
-    }
-
-    /** Drops the work on screen, which belonged to the setup just replaced. */
-    private void forgetWork() {
-        snapshot = null;
-        syncError = null;
-        todos.replace(new ArrayList<Assignment>());
-        defaulted.clear();
-    }
-
-    /** Puts the build's own baked-in setup back. */
-    private void restoreBundledSetup() {
-        try {
-            backend.restoreBundledSetup();
-        } catch (java.io.IOException e) {
-            alert("Not restored", "Could not write to this phone's storage.");
-            return;
+            startActivityForResult(intent, 2);
         } catch (RuntimeException e) {
-            alert("Not restored", "This build's bundled setup could not be read.");
+            pendingResult = null;
+            toast("This phone has no app for that.");
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int request, int code, Intent data) {
+        ActivityResult then = pendingResult;
+        pendingResult = null;
+        if (then != null) then.done(code, data);
+    }
+
+    // ------------------------------------------------------------------
+    // Background work
+    // ------------------------------------------------------------------
+
+    interface Task<T> {
+        T run() throws Exception;
+    }
+
+    interface Done<T> {
+        void done(T value, String problem);
+    }
+
+    /** Runs `task` on a worker and hands its result, or a sentence about its failure, back here. */
+    <T> void background(final Task<T> task, final Done<T> done) {
+        work.execute(() -> {
+            T value = null;
+            String problem = null;
+            try {
+                value = task.run();
+            } catch (InterruptedException stopping) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (java.io.IOException e) {
+                problem = reason(e);
+            } catch (RuntimeException e) {
+                problem = "Canvas sent something this app couldn't read.";
+            } catch (Exception e) {
+                problem = reason(e);
+            }
+            final T result = value;
+            final String failure = problem;
+            main.post(() -> {
+                if (!isFinishing()) done.done(result, failure);
+            });
+        });
+    }
+
+    static String reason(Exception e) {
+        String message = e.getMessage();
+        return message == null || message.length() == 0 ? "The network couldn't be reached." : message;
+    }
+
+    // ------------------------------------------------------------------
+    // Syncing
+    // ------------------------------------------------------------------
+
+    void refreshIfStale() {
+        if (!backend.canvasReady() || syncing) return;
+        long age = snapshot == null ? Long.MAX_VALUE : System.currentTimeMillis() - snapshot.fetchedAt;
+        if (age >= STALE_MS) refresh(false);
+    }
+
+    void refresh(final boolean announce) {
+        if (syncing) return;
+        if (!backend.canvasReady()) {
+            if (announce) toast("Canvas isn't set up. See Settings, then Account.");
             return;
         }
-        forgetWork();
-        toast("Bundled setup restored");
-        renderSettings(0);
+        syncing = true;
+        syncError = null;
+        redraw();
+        background(() -> backend.refresh(), (result, problem) -> {
+            syncing = false;
+            if (result != null) {
+                snapshot = result;
+                todos.replace(result.work);
+                todos.check(result.checked);
+                Alarms.schedule(this, backend);
+                if (announce) toast(result.complete() ? "Up to date" : "Updated. Some classes couldn't be read.");
+                refreshNotices();
+            } else {
+                syncError = problem;
+                if (!todos.isEmpty() || announce) toast(problem);
+            }
+            redraw();
+        });
     }
 
-    private void confirmSignOut() {
-        new AlertDialog.Builder(this)
-            .setTitle(SIGN_OUT)
-            .setMessage(
-                "Remove the Canvas address, the token and the saved work " +
-                "list from this phone?"
-            )
-            .setPositiveButton(
-                SIGN_OUT,
-                (dialog, which) -> {
-                    backend.signOut();
-                    forgetWork();
-                    renderSettings(0);
-                }
-            )
-            .setNegativeButton("Cancel", null)
-            .show();
+    private void refreshNotices() {
+        final Sync.Result known = snapshot;
+        background(() -> backend.notices(known), (notices, problem) -> {
+            Screen screen = top();
+            if (screen instanceof NoticesScreen) screen.refresh();
+        });
     }
 
-    private ListView listView(ListAdapter adapter) {
-        return configureListView(new ListView(this), adapter);
+    Course course(String id) {
+        return snapshot == null ? null : snapshot.course(id);
     }
 
-    private <T extends ListView> T configureListView(T list, ListAdapter adapter) {
-        list.setAdapter(adapter);
-        // Rows paint their own focus card, so Family turns the platform
-        // selector off and insets the hairlines to the text edge.
-        Family.list(list);
-        list.setItemsCanFocus(false);
-        return list;
+    Assignment assignment(String courseId, String assignmentId) {
+        return todos.byId(courseId + ":" + assignmentId);
     }
 
-    /** Title of a detail screen, on the grouped page above its cards. */
-    private TextView heading(String value) {
-        TextView view = text(value, 16, color(R.color.text));
-        view.setTypeface(Family.MEDIUM);
-        view.setPadding(dp(10), dp(10), dp(10), dp(2));
-        return view;
+    /** A record changed by something done here (a check mark), written back so it survives. */
+    void saveSnapshot() {
+        if (snapshot == null) return;
+        final Sync.Result copy = new Sync.Result(new ArrayList<>(todos.all()), snapshot.courses,
+            snapshot.unavailable, snapshot.fetchedAt, snapshot.overrides, todos.checkedIds());
+        snapshot = copy;
+        work.execute(() -> backend.save(copy));
     }
 
-    private TextView subheading(String value) {
-        TextView view = text(value, 12, color(R.color.text_muted));
-        view.setPadding(dp(10), dp(1), dp(10), dp(4));
-        return view;
-    }
+    // ------------------------------------------------------------------
+    // Turning in
+    // ------------------------------------------------------------------
 
-    /** A white card on the grouped page, holding one group of a page's facts. */
-    private LinearLayout card() {
-        LinearLayout card = vertical();
-        card.setBackgroundResource(com.xp3.common.ui.R.drawable.family_card);
-        LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        at.setMargins(dp(6), dp(6), dp(6), 0);
-        card.setLayoutParams(at);
-        return card;
+    boolean onlineNow() {
+        ConnectivityManager manager = getSystemService(ConnectivityManager.class);
+        NetworkInfo info = manager == null ? null : manager.getActiveNetworkInfo();
+        return info != null && info.isConnected();
     }
 
     /**
-     * Centred text for a screen that has nothing in it: the first paragraph
-     * is what is (or isn't) here, set as a title, and any rest is detail.
+     * Sends a draft. With no signal it is queued instead, and finishes on its
+     * own: here when the network comes back while the app is open, and from
+     * a job the phone runs on reconnecting when it is not.
      */
-    private TextView emptyMessage(String message) {
-        int cut = message.indexOf("\n\n");
-        String title = cut < 0 ? message : message.substring(0, cut);
-        String hint = cut < 0 ? null : message.substring(cut + 2);
-        if (title.endsWith(".")) title = title.substring(0, title.length() - 1);
-        TextView view = Family.empty(this, title, hint);
-        view.setBackgroundColor(0x00000000);
-        return view;
+    void turnIn(final Assignment item, final Draft draft, final List<String> extensions) {
+        turnIn(item, draft, extensions, false);
     }
 
-    /** Label left, value right: the shape every fact on a detail page takes. */
-    private View metric(String label, String value, int tint) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setMinimumHeight(dp(30));
-        row.setPadding(dp(10), dp(6), dp(10), dp(6));
-
-        TextView name = text(label, 12, color(R.color.text_muted));
-        name.setSingleLine(true);
-        row.addView(
-            name,
-            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1)
-        );
-
-        // Label and value are separated by colour, not weight: a page of bold
-        // values has no emphasis left to give.
-        TextView amount = text(value, 13, tint);
-        amount.setGravity(Gravity.RIGHT);
-        LinearLayout.LayoutParams right = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        right.leftMargin = dp(8);
-        row.addView(amount, right);
-        return row;
+    /**
+     * `quiet` is for a queued turn-in retried on its own: if it fails it
+     * simply stays queued for the next try, without a dialog each time the
+     * signal comes and goes.
+     */
+    private void turnIn(final Assignment item, final Draft draft, final List<String> extensions,
+                        final boolean quiet) {
+        if (!onlineNow()) {
+            queue(draft);
+            return;
+        }
+        if (!TurnInJob.claim(item.id)) return;
+        redraw();
+        background(() -> {
+            backend.turnIn(draft, item, extensions, (piece, done, total) -> main.post(() -> {
+                progress.put(piece, new long[] { done, total });
+                Screen screen = top();
+                if (screen instanceof AssignmentScreen) ((AssignmentScreen) screen).progress(piece);
+            }));
+            return Boolean.TRUE;
+        }, (ok, problem) -> {
+            TurnInJob.release(item.id);
+            progress.clear();
+            if (ok != null) {
+                turnedIn.put(item.id, Long.valueOf(System.currentTimeMillis()));
+                refresh(false);
+            } else if (!onlineNow() || quiet) {
+                queue(backend.draft(draft.key));
+                return;
+            } else {
+                tell("Couldn't turn in", problem + " Your work is saved on the phone. Press OK, then try again.");
+            }
+            redraw();
+        });
     }
 
-    /** A hairline between the facts on a card, inset to the text edge. */
-    private View divider() {
-        View line = new View(this);
-        line.setBackgroundColor(color(R.color.divider));
-        LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(1)
-        );
-        at.leftMargin = dp(10);
-        line.setLayoutParams(at);
-        return line;
+    boolean sending(Assignment item) {
+        return TurnInJob.active(item.id);
     }
+
+    /** When each turn-in made from this phone went through, for the stamp until the next sync. */
+    final Map<String, Long> turnedIn = new HashMap<>();
+
+    private void queue(Draft draft) {
+        try {
+            backend.saveDraft(draft.queued(true, System.currentTimeMillis()));
+        } catch (java.io.IOException e) {
+            toast("Couldn't save on the phone.");
+            return;
+        }
+        TurnInJob.schedule(this);
+        redraw();
+    }
+
+    void cancelQueued(Draft draft) {
+        try {
+            backend.saveDraft(draft.queued(false, System.currentTimeMillis()));
+        } catch (java.io.IOException e) {
+            toast("Couldn't save on the phone.");
+        }
+        redraw();
+    }
+
+    /** Sends whatever was turned in with no signal, now that there may be one. */
+    void flushQueue() {
+        if (!onlineNow() || !backend.canvasReady()) return;
+        for (Draft draft : backend.queued()) {
+            int colon = draft.key.indexOf(':');
+            if (colon < 0) continue;
+            Assignment item = assignment(draft.key.substring(0, colon), draft.key.substring(colon + 1));
+            if (item == null || TurnInJob.active(item.id)) continue;
+            List<String> extensions = new ArrayList<>();
+            com.canvas.xp3.data.Detail detail = backend.cachedDetail(item);
+            if (detail != null) extensions = detail.extensions;
+            turnIn(item, draft.queued(false, draft.savedAt), extensions, true);
+        }
+    }
+
+    private void listenForSignal() {
+        ConnectivityManager manager = getSystemService(ConnectivityManager.class);
+        if (manager == null) return;
+        online = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                main.post(() -> {
+                    flushQueue();
+                    Screen screen = top();
+                    if (screen != null) screen.refresh();
+                });
+            }
+
+            @Override
+            public void onLost(Network network) {
+                main.post(() -> {
+                    Screen screen = top();
+                    if (screen != null) screen.refresh();
+                });
+            }
+        };
+        try {
+            manager.registerDefaultNetworkCallback(online);
+        } catch (RuntimeException e) {
+            online = null;
+        }
+    }
+
+    static final String CAMERA = Manifest.permission.CAMERA;
+    static final String MICROPHONE = Manifest.permission.RECORD_AUDIO;
+    static final String STORAGE = Manifest.permission.READ_EXTERNAL_STORAGE;
 }

@@ -44,10 +44,110 @@ public final class Dates {
      */
     private static boolean twentyFourHour;
 
+    /**
+     * The day a week starts on, Calendar.MONDAY or Calendar.SUNDAY: the
+     * week strip's first column, and the line between "this week" and
+     * "next week" everywhere else, so the two never disagree.
+     */
+    private static int firstDay = Calendar.MONDAY;
+
     private Dates() {}
 
     public static void setTwentyFourHour(boolean value) {
         twentyFourHour = value;
+    }
+
+    public static void setWeekStart(int day) {
+        firstDay = day == Calendar.SUNDAY ? Calendar.SUNDAY : Calendar.MONDAY;
+    }
+
+    public static int weekStartDay() {
+        return firstDay;
+    }
+
+    /** "Tuesday, Oct 20": the due date as the assignment page states it. */
+    public static String longDay(long when) {
+        return format("EEEE, MMM d", when);
+    }
+
+    /**
+     * "10:30" for the timeline's time column, which has room for the clock
+     * and not the AM or PM; on a 12 hour phone that goes under it.
+     */
+    public static String clock(long when) {
+        return format(twentyFourHour ? "HH:mm" : "h:mm", when);
+    }
+
+    /** "AM" or "PM" on a 12 hour phone, null on a 24 hour one. */
+    public static String meridiem(long when) {
+        return twentyFourHour ? null : format("a", when);
+    }
+
+    /** "TUESDAY 20", a day's heading on the timeline. */
+    public static String dayHeading(long when) {
+        return format("EEEE d", when).toUpperCase(Locale.US);
+    }
+
+    /** "M", "T": a column's letter on the week strip. */
+    public static String initial(long when) {
+        return format("EEEEE", when);
+    }
+
+    /** "Tue, Oct 20". */
+    public static String shortDay(long when) {
+        return format("EEE, MMM d", when);
+    }
+
+    /** "TUE": the tab on the tear-off calendar page. */
+    public static String weekdayTab(long when) {
+        return format("EEE", when).toUpperCase(Locale.US);
+    }
+
+    /** "20". */
+    public static String dayOfMonth(long when) {
+        return format("d", when);
+    }
+
+    /** "Oct 19 – 25", or "Oct 26 – Nov 1" across a month's end. */
+    public static String weekRange(long weekStart) {
+        long last = addDays(weekStart, 6);
+        String from = format("MMM d", weekStart);
+        boolean sameMonth = format("MMM", weekStart).equals(format("MMM", last));
+        return from + " – " + (sameMonth ? format("d", last) : format("MMM d", last));
+    }
+
+    /** "Due Tue, Oct 20 at 10:30", the line under a title with room for one. */
+    public static String dueLine(long when) {
+        return "Due " + shortDay(when) + " at " + time(when);
+    }
+
+    /** Midnight at the start of the week `when` falls in. */
+    public static long weekOf(long when) {
+        return startOfWeek(when);
+    }
+
+    /** Midnight at the start of the day `when` falls in. */
+    public static long dayOf(long when) {
+        return startOfDay(when);
+    }
+
+    /**
+     * Midnight `days` calendar days after the day `when` falls in. Counted
+     * on the calendar rather than in milliseconds, so a daylight saving
+     * change cannot land a day an hour short of its own midnight.
+     */
+    public static long addDays(long when, int days) {
+        Calendar day = Calendar.getInstance(Locale.US);
+        day.setTimeInMillis(startOfDay(when));
+        day.add(Calendar.DAY_OF_MONTH, days);
+        return day.getTimeInMillis();
+    }
+
+    /** 0 for the week's first day through 6 for its last. */
+    public static int column(long when) {
+        Calendar day = Calendar.getInstance(Locale.US);
+        day.setTimeInMillis(when);
+        return (day.get(Calendar.DAY_OF_WEEK) - firstDay + 7) % 7;
     }
 
     /** "Today", "Thursday", "Next Thu", "Thu, Oct 3". */
@@ -89,8 +189,8 @@ public final class Dates {
 
     /**
      * Which week an instant falls in relative to now: 0 this week, 1 next
-     * week, -1 last week. Weeks run Monday to Sunday, so Sunday night is the
-     * end of "this week" and Monday morning starts the next one.
+     * week, -1 last week. Weeks run Monday to Sunday unless Settings says
+     * they start on Sunday.
      */
     public static int weeksBetween(long from, long to) {
         return (int) Math.round(
@@ -128,7 +228,7 @@ public final class Dates {
     private static long startOfWeek(long when) {
         Calendar week = Calendar.getInstance(Locale.US);
         week.setTimeInMillis(startOfDay(when));
-        int first = Calendar.MONDAY;
+        int first = firstDay;
         int shift = (week.get(Calendar.DAY_OF_WEEK) - first + 7) % 7;
         week.add(Calendar.DAY_OF_MONTH, -shift);
         return week.getTimeInMillis();

@@ -1,38 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- A wine taken from Canvas's red, in the family's four tones
-         (DESIGN.md): the band near black, so it frames the screen rather than
-         shouting; the accent for focus; a pale wash behind the focused row;
-         and greys tinted to match. The status bar is the band's own colour. -->
-    <color name="primary">#45142A</color>
-    <color name="primary_dark">#45142A</color>
-    <color name="on_primary">#FFFFFF</color>
-    <color name="on_primary_dim">#D3AEBE</color>
+    <!-- Only what the window needs before Look takes over, and what the shared
+         Markdown renderer reads. -->
     <color name="page">#FFFFFF</color>
-    <color name="row">#FFFFFF</color>
-    <color name="section_fill">#F5F1F3</color>
-    <color name="grouped_page">#F5F1F3</color>
-    <color name="divider">#EEE4E8</color>
-    <color name="outline">#D8CCD1</color>
-    <color name="field_fill">#F4EFF2</color>
-    <color name="focus_fill">#F9EEF3</color>
-    <color name="focus_rule">#8E1F48</color>
-    <color name="press_fill">#F0D9E3</color>
-    <!-- The platform's highlight (a stock menu's item under the d-pad, a
-         press): the accent, faint enough that what it covers stays legible. -->
-    <color name="highlight">#248E1F48</color>
-    <color name="text">#1B1B1D</color>
-    <color name="text_muted">#6E6469</color>
-    <!-- Overdue work, and the only bright red in the app. The chrome and focus
-         are wine, and no other text in a list is red: red words on a white
-         row still mean late, and nothing else.
-         Due-soon and done stay green, the one colour that cannot be mistaken
-         for either the chrome or a warning. -->
-    <color name="overdue">#B3261E</color>
-    <color name="due_soon">#1B7A3E</color>
-    <color name="disabled">#F2F2F2</color>
-    <color name="disabled_text">#A0A0A0</color>
-
-    <!-- The fill behind code in assignment instructions. -->
-    <color name="code_fill">#F0F0EE</color>
+    <color name="ink">#101828</color>
+    <color name="highlight">#33FFE45C</color>
+    <color name="text">#344054</color>
+    <color name="text_muted">#667085</color>
+    <color name="primary">#101828</color>
+    <color name="divider">#EAECF0</color>
+    <color name="code_fill">#F2F4F7</color>
 </resources>

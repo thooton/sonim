@@ -113,6 +113,7 @@ public final class DataTests {
         all.add(work("f", Long.valueOf(now - 5 * DAY), false, false, null));   // missing last week
         all.add(work("g", Long.valueOf(now - DAY), false, true, Double.valueOf(9)));
         all.add(work("h", Long.valueOf(now + DAY), false, true, Double.valueOf(10)));
+        all.add(work("i", Long.valueOf(now - 2 * DAY), false, true, null));
         todos.replace(all);
 
         List<Section> assigned = todos.sections(Assignment.ASSIGNED, now);
@@ -128,8 +129,15 @@ public final class DataTests {
         check.same("nothing else", 2, missing.size());
 
         List<Section> done = todos.sections(Assignment.DONE, now);
-        check.same("work done ahead of its date is early", "Done early", done.get(0).label);
-        check.same("the rest is filed by its week", "This week", done.get(1).label);
+        check.same("returned work leads Done", "Returned", done.get(0).label);
+        check.same("with both graded pieces", 2, done.get(0).items.size());
+        check.same("then what waits for a grade", "Turned in", done.get(1).label);
+        check.same("which is the ungraded one", "i", done.get(1).items.get(0).assignmentId);
+
+        todos.check(java.util.Arrays.asList("a"));
+        check.same("a planner check mark counts as done", Assignment.DONE, todos.state(all.get(0), now));
+        check.ok("and leaves Assigned", !todos.inState(Assignment.ASSIGNED, now).contains(all.get(0)));
+        todos.check(null);
 
         Todos empty = new Todos();
         empty.replace(new ArrayList<Assignment>());
@@ -290,7 +298,6 @@ public final class DataTests {
             List<Assignment> work = new ArrayList<>();
             Assignment item = new Assignment("7", "91", "Lab 3", "Biology", Long.valueOf(1757000000000L),
                 20, false, true, Long.valueOf(1756000000000L), Double.valueOf(18.5), false);
-            item.setDetails("## Do the lab");
             work.add(item);
             work.add(new Assignment("7", "92", "Essay", "Biology", null, 0, true, false, null, null,
                 false));
@@ -304,7 +311,6 @@ public final class DataTests {
             check.same("title survives", "Lab 3", first.title);
             check.same("score survives", Double.valueOf(18.5), first.score);
             check.same("due date survives", Long.valueOf(1757000000000L), first.due);
-            check.same("details survive so it reads offline", "## Do the lab", first.details());
             check.same("a null due date survives", null, read.work.get(1).due);
             check.ok("the missing flag survives", read.work.get(1).flaggedMissing);
 
@@ -393,7 +399,7 @@ public final class DataTests {
             check.ok("the time is recorded", result.fetchedAt > 0);
 
             check.same("details arrive as markdown", "Read **chapter 4**.",
-                sync.details(result.work.get(0)));
+                sync.details(result.work.get(0)).body);
         } finally {
             server.close();
         }

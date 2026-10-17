@@ -1,8 +1,8 @@
 # Canvas, for the Sonim XP3
 
-A small Canvas homework app for the Sonim XP3's 240x320 screen, d-pad, and keypad.
+Week Strip: a calm, planner-style Canvas app for the XP3's 240x320 screen, d-pad and keypad.
 
-It keeps assignments available offline and groups them into Assigned, Missing, and Done. It never submits work, posts comments, changes grades, or writes anything back to Canvas.
+The home screen is the week: Assigned work on a timeline under a strip of days, with Missing and Done beside it. Classes have Stream, Classwork, People and Grades. An assignment page shows the due date, instructions and the teacher's files. You can add typed answers, photos of paper work (saved as one PDF), audio, files and links, then turn them in. Grades, private comments, class comments, classic quizzes, notifications and opt-in reminders are all here. Everything is kept for offline use. A turn-in made with no signal waits on the phone and finishes when the phone reconnects.
 
 ## Build and test
 
@@ -13,17 +13,18 @@ adb install -r canvas/android/app/build/outputs/apk/release/app-release.apk
 
 ## Setup
 
-Open **Menu → Settings** and enter the Canvas origin, cookie-service `/cookie` URL and token, and optionally an IANA time zone.
-Canvas login cookies come from the refresher in [canvas/cookie-service](../canvas/cookie-service); they are held in memory for fifteen minutes and never saved.
+Open **Options → Settings → Account** and enter the Canvas origin, the cookie-service `/cookie` URL and its token, and optionally an IANA time zone. Canvas login cookies come from the cookie service. The app holds them in memory for fifteen minutes and never saves them.
 
 ## Controls
 
 | Key | Action |
 | --- | --- |
-| Left / Right | Change tabs |
-| Up / Down | Move the highlight or scroll a page |
-| OK | Open an assignment or toggle a section |
-| Back / Clear | Leave assignment details or settings |
-| Menu | Refresh, expand/collapse sections, open settings, or view About |
+| Left softkey (Menu) | Options for this screen |
+| OK | What the middle of the softkey bar says: Open, Select, Turn in, Send |
+| Right softkey | The screen's one shortcut (also in Options) |
+| Up / Down | Move through the list; Up from the top of the list reaches the strip, then the tabs |
+| Left / Right | Change the day, the tab or the page |
+| 1–7, 0 | Jump to a day of the week, or back to today |
+| Back / Clear | Back one screen (deletes a character in a text field) |
 
-The app stores settings and cached work only in its private app storage. Versions before this one had a chat tab; on first launch this version deletes the conversation and model login they left there. A locally built APK may contain live bundled credentials, so treat it like a password.
+What the app sends to Canvas is limited to the student's own work: submissions, comments on them, discussion replies, planner check marks and classic quiz answers. A locally built APK may contain live bundled credentials, so treat it like a password. Bricolage Grotesque is under the SIL Open Font License (`OFL.txt`).
