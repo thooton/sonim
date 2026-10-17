@@ -1,29 +1,25 @@
 package com.list.xp3;
 
-import android.app.AlertDialog;
+import android.app.Dialog;
 import android.os.Bundle;
 import android.text.Editable;
-import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.ContextMenu;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.view.inputmethod.EditorInfo;
-import android.widget.Button;
 import android.widget.EditText;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
 import com.list.xp3.data.Checklist;
 import com.list.xp3.data.Item;
 import com.xp3.common.ui.BaseActivity;
-import com.xp3.common.ui.Family;
 import com.xp3.common.ui.Ui;
 
 import java.util.ArrayList;
@@ -31,10 +27,12 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 /**
- * The checklist and the keys that edit it.
+ * The checklist and the keys that edit it, dressed as Google Tasks.
  *
- * The screen is built in code rather than inflated because it is a single
- * list. The thing that repeats, an item row, is the thing that has a layout.
+ * The screen is one layout: the title, the tab strip, the list and the add
+ * button. The list is a single ListView whose rows draw Google Tasks' two
+ * cards (ItemAdapter); its positions are rows, and each row knows the index
+ * of the item it shows.
  *
  * Everything with a disk behind it is behind Backend. The list is saved on
  * its own single thread so writes land in the order the edits were made.
@@ -49,9 +47,9 @@ public final class MainActivity extends BaseActivity {
     private static final int MENU_ADD = 5;
     private static final int MENU_MOVE_UP = 6;
     private static final int MENU_MOVE_DOWN = 7;
+    private static final int MENU_DELETE_COMPLETED = 8;
 
     private Backend backend;
-    private FrameLayout content;
 
     private final ExecutorService saves = Ui.worker("list-save");
 
@@ -61,29 +59,27 @@ public final class MainActivity extends BaseActivity {
 
     private ListView listView;
     private ItemAdapter listAdapter;
-    /** The empty-list message, which holds focus when there are no rows. */
-    private View emptyView;
-    /** The highlighted row, kept across redraws. */
-    private int listSelection;
+    /** Whether the Completed card is open. Folded, as Google Tasks starts. */
+    private boolean showCompleted;
 
     /**
-     * The press of OK that confirmed a dialog.
+     * The press of OK that confirmed the task sheet.
      *
-     * The text dialogs keep T9 prediction on, so they act on the press of OK
-     * rather than its release (the keyboard can swallow the first release
-     * while it commits a word). When the release does arrive, it arrives at
-     * the list underneath, which would read it as OK and tick the item. Its
-     * down time is the press's, so it can be recognised and ignored exactly.
+     * The sheet keeps T9 prediction on, so it acts on the press of OK rather
+     * than its release (the keyboard can swallow the first release while it
+     * commits a word). When the release does arrive, it arrives at the list
+     * underneath, which would read it as OK and tick the item. Its down time
+     * is the press's, so it can be recognised and ignored exactly.
      */
     private long consumedOkDownTime = -1;
 
     /**
-     * What the open menu is about, captured when it was opened.
-     *
-     * The item is kept as well as its position, so an edit lands on the item
-     * that was chosen even if the list has changed under the open menu.
+     * What the open menu is about, captured when it was opened: the row, the
+     * item's index and the item itself, so an edit lands on the item that was
+     * chosen even if the list has changed under the open menu.
      */
-    private int menuPosition = -1;
+    private int menuRow = -1;
+    private int menuIndex = -1;
     private Item menuItem;
 
     @Override
@@ -92,86 +88,67 @@ public final class MainActivity extends BaseActivity {
         setContentView(R.layout.activity_main);
         backend = new Backend(getFilesDir());
 
-        content = findViewById(R.id.content);
-        // Every context menu is answered here; see showMenu.
-        registerForContextMenu(content);
-        renderList(true);
+        listView = findViewById(R.id.list);
+        listAdapter = new ItemAdapter(this);
+        listView.setAdapter(listAdapter);
+        listView.setItemsCanFocus(false);
+        wireList(listView, listAdapter);
+        // Every context menu is answered here; see showMenu. The list's
+        // parent is registered, not the list, so ListView's own long press
+        // never opens one.
+        registerForContextMenu((View) listView.getParent());
+
+        findViewById(R.id.fab).setOnClickListener(view -> itemAction(MENU_ADD, -1, -1, null));
+
+        showRows(0);
+        listView.requestFocus();
     }
 
     // ------------------------------------------------------------------
     // The list
     // ------------------------------------------------------------------
 
-    private void renderList(boolean focus) {
-        List<Item> items = backend.checklist().items();
-        LinearLayout root = vertical();
+    /**
+     * Lays the rows out again and puts the highlight on the selectable row
+     * at `position`, or the nearest one to it.
+     */
+    private void showRows(int position) {
+        listAdapter.replace(backend.checklist().items(), showCompleted);
+        select(listAdapter.nearestSelectable(position));
+    }
 
-        if (items.isEmpty()) {
-            listAdapter = null;
-            listView = null;
-            TextView empty = Family.empty(this, "Nothing on the list", null);
-            // Focusable so the screen still has somewhere for keys to land,
-            // and so Menu's popup has something to sit beside.
-            empty.setFocusable(true);
-            empty.setFocusableInTouchMode(true);
-            root.addView(empty, Ui.weighted());
-            Ui.fill(content, root);
-            emptyView = empty;
-            listSelection = 0;
-            if (focus) empty.requestFocus();
-            return;
-        }
-
-        emptyView = null;
-        final ItemAdapter adapter = new ItemAdapter(this);
-        adapter.replace(items);
-        ListView list = listView(adapter);
-        root.addView(list, Ui.weighted());
-        wireList(list, adapter);
-        Ui.fill(content, root);
-        listAdapter = adapter;
-        listView = list;
-
-        int start = Math.max(0, Math.min(listSelection, items.size() - 1));
-        listSelection = start;
-        adapter.setSelectedPosition(start);
-        list.setSelection(start);
-        if (focus) list.requestFocus();
+    /** As showRows, with the highlight on the row showing item `index`. */
+    private void showItem(int index) {
+        listAdapter.replace(backend.checklist().items(), showCompleted);
+        int at = listAdapter.positionOf(index);
+        select(at >= 0 ? at : listAdapter.nearestSelectable(0));
     }
 
     /**
-     * Puts the highlight on `position` and repaints the rows in place.
-     *
-     * Used after an edit, so the row just added, edited or ticked is the one
-     * under the cursor.
+     * Highlights `position` without the list jumping: a row already on screen
+     * keeps its place, and the first task keeps the card's heading above it.
+     * (A plain setSelection would put the row at the very top, scrolling the
+     * heading away.)
      */
-    private void redrawList(int position) {
-        listSelection = position;
-        boolean focus =
-            (listView != null && listView.hasFocus()) ||
-            (emptyView != null && emptyView.hasFocus()) ||
-            getCurrentFocus() == null;
-        List<Item> items = backend.checklist().items();
-        if (listAdapter == null || listView == null || items.isEmpty()) {
-            renderList(true);
-            return;
+    private void select(int position) {
+        listAdapter.setSelectedPosition(position);
+        if (position < 0) return;
+        View row = rowView(position);
+        int top = listView.getPaddingTop();
+        if (row != null && row.getTop() >= top && row.getBottom() <= listView.getHeight()) {
+            listView.setSelectionFromTop(position, row.getTop());
+        } else if (position == 1) {
+            listView.setSelectionFromTop(position, top + getResources().getDimensionPixelSize(R.dimen.card_header_height));
+        } else {
+            listView.setSelection(position);
         }
-        int at = Math.max(0, Math.min(position, items.size() - 1));
-        listSelection = at;
-        listAdapter.replace(items);
-        listAdapter.setSelectedPosition(at);
-        listView.setSelection(at);
-        if (focus) listView.requestFocus();
     }
 
     private void wireList(final ListView list, final ItemAdapter adapter) {
         list.setFocusable(true);
         list.setFocusableInTouchMode(true);
-        Ui.onSelect(list, position -> {
-            adapter.trackSelectedPosition(position);
-            listSelection = position;
-        });
-        list.setOnItemClickListener((parent, view, position, id) -> toggle(position));
+        Ui.onSelect(list, adapter::trackSelectedPosition);
+        list.setOnItemClickListener((parent, view, position, id) -> activate(position));
         // Sonim firmware variants report the physical OK key as either
         // DPAD_CENTER or ENTER. Handle activation only; arrows stay with
         // ListView's native selection and scrolling implementation.
@@ -181,8 +158,8 @@ public final class MainActivity extends BaseActivity {
             if (event.getAction() != KeyEvent.ACTION_UP) return true;
             if (event.getDownTime() == consumedOkDownTime) return true;
             int position = adapter.getSelectedPosition();
-            if (position < 0 || position >= adapter.getCount()) return false;
-            toggle(position);
+            if (position < 0 || position >= adapter.getCount()) return true;
+            activate(position);
             return true;
         });
     }
@@ -211,52 +188,83 @@ public final class MainActivity extends BaseActivity {
 
     private boolean okHeld;
 
-    private void toggle(int position) {
-        Checklist list = backend.checklist();
-        if (position < 0 || position >= list.size()) return;
-        list.toggle(position);
-        saveList();
-        redrawList(position);
-    }
-
-    private void itemAction(int action, final int position, final Item chosen) {
-        if (action == MENU_ADD) {
-            promptText("Add item", "", text -> insertNear(-1, null, 0, text));
+    /**
+     * OK on a task ticks or unticks it, and it moves to the other card, as in
+     * Google Tasks; the highlight stays where it was, on the task that slid up
+     * into its place. OK on "Completed" folds or opens that card.
+     */
+    private void activate(int position) {
+        if (!listAdapter.isEnabled(position)) return;
+        ItemAdapter.Row row = listAdapter.getItem(position);
+        if (row.type == ItemAdapter.COMPLETED) {
+            showCompleted = !showCompleted;
+            showRows(position);
             return;
         }
-        if (locate(position, chosen) < 0) {
-            toast("That item has changed");
+        Checklist list = backend.checklist();
+        if (row.index < 0 || row.index >= list.size()) return;
+        list.toggle(row.index);
+        saveList();
+        showRows(position);
+    }
+
+    private void itemAction(int action, final int row, final int index, final Item chosen) {
+        if (action == MENU_ADD) {
+            // New tasks go to the top, as Google Tasks puts them.
+            promptText("", text -> insertNear(-1, null, 0, text));
+            return;
+        }
+        if (action == MENU_DELETE_COMPLETED) {
+            Checklist list = backend.checklist();
+            for (int i = list.size() - 1; i >= 0; i--) {
+                if (list.get(i).done) list.remove(i);
+            }
+            saveList();
+            showRows(row);
+            return;
+        }
+        if (locate(index, chosen) < 0) {
+            toast("That task has changed");
             return;
         }
         if (action == MENU_INSERT_ABOVE || action == MENU_INSERT_BELOW) {
             final int offset = action == MENU_INSERT_ABOVE ? 0 : 1;
-            promptText(action == MENU_INSERT_ABOVE ? "Insert above" : "Insert below", "", text -> {
-                insertNear(position, chosen, offset, text);
-            });
+            promptText("", text -> insertNear(index, chosen, offset, text));
         } else if (action == MENU_EDIT) {
-            promptText("Edit item", chosen.text, text -> {
-                int at = locate(position, chosen);
+            promptText(chosen.text, text -> {
+                int at = locate(index, chosen);
                 if (at < 0) {
-                    toast("That item has changed");
+                    toast("That task has changed");
                     return;
                 }
                 backend.checklist().edit(at, text);
                 saveList();
-                redrawList(at);
+                showItem(at);
             });
         } else if (action == MENU_MOVE_UP || action == MENU_MOVE_DOWN) {
-            int at = locate(position, chosen);
-            int to = action == MENU_MOVE_UP ? at - 1 : at + 1;
-            if (to < 0 || to >= backend.checklist().size()) return;
+            // Past the next open task, not the next item: finished ones in
+            // between are in the other card and do not count.
+            int at = locate(index, chosen);
+            int to = neighbour(at, action == MENU_MOVE_UP ? -1 : 1);
+            if (to < 0) return;
             backend.checklist().move(at, to);
             saveList();
-            redrawList(to);
+            showItem(to);
         } else if (action == MENU_DELETE) {
-            int at = locate(position, chosen);
-            backend.checklist().remove(at);
+            backend.checklist().remove(locate(index, chosen));
             saveList();
-            redrawList(Math.min(at, backend.checklist().size() - 1));
+            showRows(row);
         }
+    }
+
+    /** The index of the nearest item before (-1) or after (1) `at` that is as done as it is, or -1. */
+    private int neighbour(int at, int step) {
+        List<Item> items = backend.checklist().items();
+        boolean done = items.get(at).done;
+        for (int i = at + step; i >= 0 && i < items.size(); i += step) {
+            if (items.get(i).done == done) return i;
+        }
+        return -1;
     }
 
     /**
@@ -275,7 +283,7 @@ public final class MainActivity extends BaseActivity {
             return;
         }
         saveList();
-        redrawList(at);
+        showItem(at);
     }
 
     /** Where `expected` is now: at `position` if it is still there, else its first match. */
@@ -293,43 +301,35 @@ public final class MainActivity extends BaseActivity {
     }
 
     /**
-     * Asks for one item's text.
+     * Asks for one task's text, in Google Tasks' sheet: it rises from the
+     * bottom with "New task" as the hint and Save on the right.
      *
      * Prediction stays on here, unlike a password-style field: this is
      * ordinary writing and T9 is what makes it bearable. OK saves on its
-     * press: T9 can swallow the first release while it commits a word.
+     * press: T9 can swallow the first release while it commits a word. Back
+     * cancels.
      */
-    private void promptText(String title, String initial, final TextResult result) {
-        final EditText field = new EditText(this);
-        field.setTextSize(15);
-        field.setInputType(
-            InputType.TYPE_CLASS_TEXT |
-            InputType.TYPE_TEXT_FLAG_CAP_SENTENCES |
-            InputType.TYPE_TEXT_FLAG_AUTO_CORRECT
-        );
+    private void promptText(String initial, final TextResult result) {
+        final Dialog sheet = new Dialog(this, R.style.TaskSheet);
+        sheet.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        sheet.setContentView(R.layout.sheet_task);
+        Window window = sheet.getWindow();
+        window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        window.setGravity(Gravity.BOTTOM);
+
+        final EditText field = sheet.findViewById(R.id.sheet_field);
+        final TextView save = sheet.findViewById(R.id.sheet_save);
         // Single-line input so ENTER is never a newline, but wrapped so a long
-        // item can be read whole while it is being written.
+        // task can be read whole while it is being written.
         field.setHorizontallyScrolling(false);
-        field.setMaxLines(4);
         field.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_ENTER_ACTION);
         field.setText(initial);
         field.setSelection(field.getText().length());
 
-        LinearLayout holder = vertical();
-        holder.setPadding(dp(12), dp(6), dp(12), dp(2));
-        holder.addView(field, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        final AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle(title)
-            .setView(holder)
-            .setPositiveButton("Save", null)
-            .setNegativeButton("Cancel", null)
-            .create();
         final Runnable commit = () -> {
             String text = field.getText().toString().trim();
             if (text.length() == 0) return;
-            dialog.dismiss();
+            sheet.dismiss();
             try {
                 result.accept(text);
             } catch (IllegalArgumentException e) {
@@ -349,19 +349,22 @@ public final class MainActivity extends BaseActivity {
             commit.run();
             return true;
         });
-        dialog.show();
-        // Wired after show() so an empty field keeps the dialog open; Save is
-        // greyed out while there is nothing to save.
-        final Button save = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
         save.setOnClickListener(view -> commit.run());
-        save.setEnabled(field.getText().toString().trim().length() > 0);
+        // Save is greyed out while there is nothing to save.
+        final Runnable paintSave = () -> {
+            boolean ready = field.getText().toString().trim().length() > 0;
+            save.setEnabled(ready);
+            save.setTextColor(color(ready ? R.color.accent : R.color.save_off));
+        };
+        paintSave.run();
         field.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence text, int start, int before, int count) {}
             @Override public void afterTextChanged(Editable text) {
-                save.setEnabled(text.toString().trim().length() > 0);
+                paintSave.run();
             }
         });
+        sheet.show();
         field.requestFocus();
     }
 
@@ -429,33 +432,32 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void showMenu() {
-        menuPosition = -1;
+        menuRow = -1;
+        menuIndex = -1;
         menuItem = null;
         menuIds.clear();
         menuTitles.clear();
-        View anchor = listMenu(menuIds, menuTitles);
-        if (menuIds.isEmpty() || anchor == null) return;
+        View row = listMenu(menuIds, menuTitles);
+        if (menuIds.isEmpty()) return;
 
-        // The point the menu opens at, in the anchor's own coordinates: the
-        // bottom edge of an item, so it drops down just under it, a little in
-        // from the left so the item's start stays readable. A row taller than
-        // what is showing of it counts only for the visible part.
-        float x = Math.min(dp(32), anchor.getWidth() / 2f);
-        float y = anchor.getHeight();
-        if (anchor == emptyView) {
-            x = anchor.getWidth() / 4f;
-            y = anchor.getHeight() / 2f;
-        } else if (anchor.getParent() instanceof ListView) {
-            // A row is opened from its list, at the row's place in it. When
-            // the menu does not fit beside its anchor the platform scrolls
-            // the anchor's parent to make room; for a row that is the list,
-            // which would move and recycle rows under the open menu. The
-            // list's own parent is a plain layout that cannot scroll.
-            ListView list = (ListView) anchor.getParent();
-            y = Math.max(0, Math.min(anchor.getBottom(), list.getHeight()));
-            anchor = list;
+        // The menu is opened from the list, at the row's place in it: the
+        // bottom edge of the row, a little in from the left so the task's
+        // start stays readable. (When the menu does not fit beside its
+        // anchor the platform scrolls the anchor's parent to make room; for
+        // a row that is the list, which would move and recycle rows under
+        // the open menu. The list's own parent cannot scroll.) With nothing
+        // to choose, it opens over the middle of the list card.
+        float x = Math.min(dp(32), listView.getWidth() / 2f);
+        float y;
+        if (row == null) {
+            y = listView.getHeight() / 3f;
+        } else if (menuRow < 0) {
+            x = listView.getWidth() / 4f;
+            y = (row.getTop() + row.getBottom()) / 2f;
+        } else {
+            y = Math.max(0, Math.min(row.getBottom(), listView.getHeight()));
         }
-        anchor.showContextMenu(x, y);
+        listView.showContextMenu(x, y);
     }
 
     @Override
@@ -467,7 +469,7 @@ public final class MainActivity extends BaseActivity {
 
     @Override
     public boolean onContextItemSelected(MenuItem item) {
-        menuAction(item.getItemId());
+        itemAction(item.getItemId(), menuRow, menuIndex, menuItem);
         return true;
     }
 
@@ -480,23 +482,38 @@ public final class MainActivity extends BaseActivity {
         menuTitles.clear();
     }
 
-    /** Fills the menu and returns the view it belongs beside. */
+    /**
+     * Fills the menu for the highlighted row and returns that row's view (or,
+     * with nothing selectable, the empty note's), if it is on screen.
+     */
     private View listMenu(List<Integer> ids, List<String> titles) {
-        Checklist list = backend.checklist();
-        if (listView == null || listAdapter == null || list.size() == 0) {
-            add(ids, titles, MENU_ADD, "Add item");
-            return emptyView != null ? emptyView : content;
+        add(ids, titles, MENU_ADD, "Add a task");
+        int position = listAdapter.getSelectedPosition();
+        if (position < 0 || position >= listAdapter.getCount() || !listAdapter.isEnabled(position)) {
+            // Only the list's heading and its empty note: the note is row 1.
+            return rowView(1);
         }
-        menuPosition = Math.max(0, Math.min(listAdapter.getSelectedPosition(), list.size() - 1));
-        menuItem = list.get(menuPosition);
-        add(ids, titles, MENU_INSERT_ABOVE, "Insert above");
-        add(ids, titles, MENU_INSERT_BELOW, "Insert below");
-        add(ids, titles, MENU_EDIT, "Edit");
-        if (menuPosition > 0) add(ids, titles, MENU_MOVE_UP, "Move up");
-        if (menuPosition < list.size() - 1) add(ids, titles, MENU_MOVE_DOWN, "Move down");
-        add(ids, titles, MENU_DELETE, "Delete");
-        View row = rowView(listView, menuPosition);
-        return row != null ? row : listView;
+        menuRow = position;
+        ItemAdapter.Row row = listAdapter.getItem(position);
+        if (row.type == ItemAdapter.TASK) {
+            menuIndex = row.index;
+            menuItem = row.item;
+            add(ids, titles, MENU_INSERT_ABOVE, "Insert above");
+            add(ids, titles, MENU_INSERT_BELOW, "Insert below");
+            add(ids, titles, MENU_EDIT, "Edit");
+            if (listAdapter.neighbour(position, -1) >= 0) add(ids, titles, MENU_MOVE_UP, "Move up");
+            if (listAdapter.neighbour(position, 1) >= 0) add(ids, titles, MENU_MOVE_DOWN, "Move down");
+            add(ids, titles, MENU_DELETE, "Delete");
+        } else if (row.type == ItemAdapter.DONE) {
+            menuIndex = row.index;
+            menuItem = row.item;
+            add(ids, titles, MENU_EDIT, "Edit");
+            add(ids, titles, MENU_DELETE, "Delete");
+            add(ids, titles, MENU_DELETE_COMPLETED, "Delete all completed");
+        } else {
+            add(ids, titles, MENU_DELETE_COMPLETED, "Delete all completed");
+        }
+        return rowView(position);
     }
 
     private static void add(List<Integer> ids, List<String> titles, int id, String title) {
@@ -504,34 +521,8 @@ public final class MainActivity extends BaseActivity {
         titles.add(title);
     }
 
-    private static View rowView(ListView list, int position) {
-        return list.getChildAt(position - list.getFirstVisiblePosition());
-    }
-
-    private void menuAction(int id) {
-        switch (id) {
-            case MENU_ADD:
-            case MENU_INSERT_ABOVE:
-            case MENU_INSERT_BELOW:
-            case MENU_EDIT:
-            case MENU_MOVE_UP:
-            case MENU_MOVE_DOWN:
-            case MENU_DELETE:
-                itemAction(id, menuPosition, menuItem);
-                break;
-        }
-    }
-
-    private ListView listView(ListAdapter adapter) {
-        return configureListView(new ListView(this), adapter);
-    }
-
-    private <T extends ListView> T configureListView(T list, ListAdapter adapter) {
-        list.setAdapter(adapter);
-        // Rows paint their own focus card, so Family turns the platform
-        // selector off and insets the hairlines to the text edge.
-        Family.list(list);
-        list.setItemsCanFocus(false);
-        return list;
+    private View rowView(int position) {
+        if (position < 0) return null;
+        return listView.getChildAt(position - listView.getFirstVisiblePosition());
     }
 }

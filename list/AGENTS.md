@@ -25,8 +25,26 @@ assistant's writes and are kept, tested, for any future second writer.
   `:core:selfTest` with the shared `Check` harness.
 - `android/app`: `MainActivity` (the list, its keys and its popup menu),
   `Backend` (the only bridge to disk; owns the shared `Checklist`) and
-  `ItemAdapter`. There is no header: the list starts at the top of the
-  screen.
+  `ItemAdapter`.
+
+## Look: a copy of Google Tasks
+
+The main screen deliberately copies Google Tasks' (from its Play Store
+screenshots), not the family look in `../DESIGN.md`: "Tasks" centred on the
+#F0F4F9 page, a tab strip (starred tab, then "My Tasks" underlined in
+#0B57D0), the list as white 12dp-cornered cards, an outlined star on every
+open task, finished tasks under a foldable "Completed (n)" card with a blue
+tick and strikethrough, a #C2E7FF rounded-square add button, and a bottom
+sheet with "New task" and Save for writing. Colours are in
+`res/values/colors.xml`. The tabs, stars, sort and overflow icons are
+decoration: there is one list and no starring.
+
+`ItemAdapter` draws both cards in one ListView: its positions are *rows*
+(heading, tasks, empty note, gap, Completed, done tasks), each holding its
+item's checklist index. Only tasks and Completed are selectable. Open tasks
+stay in checklist order; Move up/down skip finished items in between, and
+Insert below an open task puts the new one straight after it. New tasks
+from Add a task (Menu or the add button) go to the top.
 
 ## UI rules
 
@@ -43,8 +61,10 @@ assistant's writes and are kept, tested, for any future second writer.
   land on the popup, which closes it. Passing a point is what makes Android
   draw it as a popup beside the item instead of a centred dialog; never call
   the no-argument `showContextMenu()`. Rows are rebuilt on every opening.
-  Items: Insert above, Insert below, Edit, Move up, Move down (each only
-  where possible), Delete (or Add item when empty). OK presses are claimed by
+  Items: Add a task, then on an open task Insert above, Insert below, Edit,
+  Move up, Move down (each only where possible), Delete; on a finished task
+  Edit, Delete, Delete all completed; on Completed, Delete all completed.
+  OK on Completed folds or opens it. OK presses are claimed by
   `heldForMenu` so ListView's own long press (a dialog) never runs and a
   hold's release never ticks the item. Actions re-locate the chosen item.
 
