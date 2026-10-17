@@ -1,73 +1,324 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 240x320: a search box (only while searching), the headword band, and
-     the definition filling the rest. -->
+<!-- 240x320, as Dictionary.com lays it out: its brand tabs (home only), a
+     white bar holding the search capsule, and under it one of three pages:
+     home (the Word of the Day), a word, or the search with its recent
+     searches and suggestions. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/page"
     android:orientation="vertical">
 
-    <EditText
-        android:id="@+id/search"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="4dp"
-        android:background="@drawable/search_box"
-        android:hint="@string/search_hint"
-        android:imeOptions="actionSearch|flagNoExtractUi|flagNoFullscreen"
-        android:inputType="text"
-        android:padding="8dp"
-        android:singleLine="true"
-        android:textColor="@color/text"
-        android:textSize="16sp"
-        android:visibility="gone" />
-
     <LinearLayout
+        android:id="@+id/brand"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/primary"
-        android:gravity="center_vertical"
+        android:layout_height="28dp"
+        android:background="@color/tab_strip"
         android:orientation="horizontal"
-        android:paddingLeft="10dp"
-        android:paddingTop="6dp"
-        android:paddingRight="10dp"
-        android:paddingBottom="6dp">
+        android:paddingLeft="6dp"
+        android:paddingTop="4dp"
+        android:paddingRight="6dp">
 
-        <TextView
-            android:id="@+id/word"
+        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="2"
-            android:textColor="@color/on_primary"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:background="@drawable/brand_tab"
+            android:gravity="center"
+            android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/page"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
-            android:textColor="@color/on_primary_dim"
-            android:textSize="11sp" />
+            <ImageView
+                android:layout_width="10dp"
+                android:layout_height="11dp"
+                android:layout_marginRight="4dp"
+                android:src="@drawable/logo_dcom" />
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="9dp"
+                android:adjustViewBounds="true"
+                android:src="@drawable/logo_dcom_text" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="10dp"
+                android:layout_height="11dp"
+                android:layout_marginRight="4dp"
+                android:src="@drawable/logo_tcom" />
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="9dp"
+                android:adjustViewBounds="true"
+                android:src="@drawable/logo_tcom_text" />
+        </LinearLayout>
     </LinearLayout>
 
-    <ScrollView
-        android:id="@+id/scroll"
+    <LinearLayout
+        android:id="@+id/header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/page"
+        android:elevation="3dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="6dp"
+        android:paddingTop="7dp"
+        android:paddingRight="7dp"
+        android:paddingBottom="7dp">
+
+        <ImageView
+            android:id="@+id/nav"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginRight="7dp"
+            android:src="@drawable/ic_menu" />
+
+        <FrameLayout
+            android:id="@+id/pill"
+            android:layout_width="0dp"
+            android:layout_height="28dp"
+            android:layout_weight="1"
+            android:background="@drawable/search_pill">
+
+            <EditText
+                android:id="@+id/search"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@null"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:hint="@string/search_hint"
+                android:imeOptions="actionSearch|flagNoExtractUi|flagNoFullscreen"
+                android:inputType="text"
+                android:paddingLeft="11dp"
+                android:paddingRight="32dp"
+                android:singleLine="true"
+                android:textColor="@color/ink"
+                android:textColorHint="@color/hint"
+                android:textSize="11.5sp" />
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="right"
+                android:background="@drawable/search_button"
+                android:padding="7dp"
+                android:src="@drawable/ic_search" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:scrollbarStyle="outsideOverlay">
+        android:layout_weight="1">
 
-        <TextView
-            android:id="@+id/body"
+        <!-- Home: the Word of the Day. -->
+        <ScrollView
+            android:id="@+id/home"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:lineSpacingExtra="2dp"
-            android:padding="10dp"
-            android:textColor="@color/text"
-            android:textSize="15sp" />
-    </ScrollView>
+            android:layout_height="match_parent"
+            android:defaultFocusHighlightEnabled="false"
+            android:focusable="true"
+            android:focusableInTouchMode="true">
+
+            <LinearLayout
+                android:id="@+id/wotd"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="10dp"
+                android:background="@drawable/wotd_card"
+                android:orientation="vertical"
+                android:padding="11dp">
+
+                <TextView
+                    android:id="@+id/wotd_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:letterSpacing="0.02"
+                    android:text="@string/word_of_the_day"
+                    android:textColor="@color/ink"
+                    android:textSize="10.5sp" />
+
+                <TextView
+                    android:id="@+id/wotd_date"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="@color/text_muted"
+                    android:textSize="9.5sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/wotd_word"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/ink"
+                        android:textSize="21sp" />
+
+                    <ImageView
+                        android:id="@+id/wotd_speaker"
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:layout_marginLeft="6dp"
+                        android:src="@drawable/ic_volume"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/wotd_pos"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/ink"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/wotd_gloss"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:ellipsize="end"
+                    android:lineSpacingExtra="1dp"
+                    android:maxLines="3"
+                    android:textColor="@color/ink"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/wotd_link"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/meaning_and_examples"
+                    android:textColor="@color/blue"
+                    android:textSize="11.5sp" />
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- A word: headword, tabs, and the open tab's text. -->
+        <ScrollView
+            android:id="@+id/entry"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:defaultFocusHighlightEnabled="false"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:scrollbarStyle="outsideOverlay"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingLeft="12dp"
+                    android:paddingTop="10dp"
+                    android:paddingRight="12dp"
+                    android:paddingBottom="4dp">
+
+                    <TextView
+                        android:id="@+id/headword"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:maxWidth="190dp"
+                        android:textColor="@color/ink"
+                        android:textSize="25sp" />
+
+                    <ImageView
+                        android:id="@+id/speaker"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginLeft="8dp"
+                        android:src="@drawable/ic_volume"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingLeft="4dp">
+
+                    <TextView
+                        android:id="@+id/tab_definitions"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingLeft="8dp"
+                        android:paddingTop="6dp"
+                        android:paddingRight="8dp"
+                        android:paddingBottom="6dp"
+                        android:text="@string/definitions"
+                        android:textColor="@color/ink"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tab_thesaurus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="6dp"
+                        android:paddingLeft="8dp"
+                        android:paddingTop="6dp"
+                        android:paddingRight="8dp"
+                        android:paddingBottom="6dp"
+                        android:text="@string/thesaurus"
+                        android:textColor="@color/ink"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/hairline" />
+
+                <TextView
+                    android:id="@+id/body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="1.5dp"
+                    android:paddingLeft="12dp"
+                    android:paddingTop="10dp"
+                    android:paddingRight="10dp"
+                    android:paddingBottom="14dp"
+                    android:textColor="@color/ink"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- Searching: recent searches, or suggestions as the query is typed. -->
+        <ScrollView
+            android:id="@+id/results"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:defaultFocusHighlightEnabled="false"
+            android:focusable="false"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/rows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="4dp"
+                android:paddingBottom="6dp" />
+        </ScrollView>
+    </FrameLayout>
 </LinearLayout>

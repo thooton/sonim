@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The search field under the d-pad: its outline in Dictionary.com's blue. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/page" />
+    <stroke android:width="2dp" android:color="@color/blue" />
+    <corners android:radius="100dp" />
+</shape>

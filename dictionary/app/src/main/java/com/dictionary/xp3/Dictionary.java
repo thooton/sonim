@@ -129,6 +129,51 @@ final class Dictionary {
         return -1;
     }
 
+    /**
+     * What to offer under the search box as it is typed: the word {@link #find}
+     * would open when that is a base form (mice: mouse), then the words that
+     * begin with the query, in order.
+     */
+    List<Integer> suggest(String query, int limit) {
+        String q = normalize(query);
+        List<Integer> out = new ArrayList<>();
+        if (q.isEmpty()) return out;
+        int found = find(q);
+        if (found >= 0 && !word(found).startsWith(q)) out.add(found);
+        for (int i = lowerBound(q); i < size() && out.size() < limit && word(i).startsWith(q); i++) {
+            out.add(i);
+        }
+        return out;
+    }
+
+    /**
+     * The Word of the Day for a day counted from the epoch: a plain word of
+     * six to twelve letters, not a name, with an example among its meanings,
+     * picked from the day so every day has its own and a day keeps it.
+     */
+    int wordOfTheDay(long day) {
+        long h = (day + 1) * 0x9E3779B97F4A7C15L;
+        h ^= h >>> 31;
+        int start = (int) Math.floorMod(h, (long) size());
+        for (int i = 0; i < size(); i++) {
+            int at = (start + i) % size();
+            String w = word(at);
+            if (w.length() < 6 || w.length() > 12 || (mask(at) & 7) == 0) continue;
+            boolean letters = true;
+            for (int c = 0; c < w.length() && letters; c++) letters = w.charAt(c) >= 'a' && w.charAt(c) <= 'z';
+            if (!letters) continue;
+            List<Sense> senses = senses(at);
+            boolean example = false;
+            boolean common = false;
+            for (Sense sense : senses) {
+                example |= sense.gloss.contains("; \"");
+                for (String form : sense.words) common |= form.equals(w);
+            }
+            if (example && common) return at;
+        }
+        return 0;
+    }
+
     /** The first index whose word is not before {@code word}. */
     int lowerBound(String word) {
         int low = 0;

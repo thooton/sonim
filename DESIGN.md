@@ -175,3 +175,36 @@ rules where Apple's page differs:
   the subject of an app's newest commit ("Mail: drop the conversation's
   position from the bar") is what's new in its APK, and its date is the
   App Store's date. Without them the rows show the version instead.
+
+## Dictionary: as Dictionary.com shows it
+
+Dictionary takes its look from the Dictionary.com app, since that is the
+dictionary people know, and sets the family rules aside where that app
+differs. Its icons (the D, the wordmarks, search, back, menu, the clock and
+arrow on recent searches) come from that app's APK; its blues from
+dictionary.com's stylesheet; the rest was sampled from its Play Store
+screenshots.
+
+- **Its chrome.** A white bar under a white status bar, holding a menu (home)
+  or back arrow and the search capsule: white, a 1dp ink (`#252528`) outline,
+  the round light-blue (`#BDD9FF`) search button at its end. Home has the
+  brand tabs above it on a grey strip, Dictionary.com open and Thesaurus.com
+  greyed. The capsule under the d-pad takes a 2dp blue (`#0057FF`) outline.
+- **Its type.** Headwords and parts of speech in IBM Plex Serif SemiBold,
+  everything else in IBM Plex Sans, bundled since the phone has neither.
+- **The Word of the Day card.** Blue-ruled and rounded, "WORD OF THE DAY",
+  the date in capitals, the word in Plex Sans SemiBold, and "Meaning and
+  examples" as an underlined blue link. Under the d-pad it is washed in
+  dictionary.com's highlight (`#EBF2FF`).
+- **A word's page.** The headword at 25sp with a speaker when the phone can
+  speak, then tabs (the open one SemiBold over a 2dp ink rule, a hairline
+  under the row). Definitions: "Definition for *word*" in grey, each part of
+  speech as a serif heading, senses numbered in grey in a hanging margin, and
+  examples in italics behind a pale grey rule. Thesaurus, shown only when
+  WordNet has synonyms: "noun *as in* gist" and the synonyms with
+  Thesaurus.com's thick green (`#00B414`) underline.
+- **The search.** Recent Searches, with Clear in Dictionary.com's dark red,
+  each row a faint clock, the word, and a faint arrow over an inset
+  hairline; while typing, the same rows with a magnifier and the rest of each
+  suggestion in SemiBold. The row under the d-pad is washed in the
+  highlight blue.
