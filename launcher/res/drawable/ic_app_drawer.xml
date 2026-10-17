@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A grid of apps, the first lit up as the launcher's focus starts there. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#23265C" android:pathData="M4,4h40v40h-40z" />
+    <path android:fillColor="#9599E4" android:pathData="M11,9h4a2,2 0,0 1,2,2v4a2,2 0,0 1,-2,2h-4a2,2 0,0 1,-2,-2v-4a2,2 0,0 1,2,-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M22,9h4a2,2 0,0 1,2,2v4a2,2 0,0 1,-2,2h-4a2,2 0,0 1,-2,-2v-4a2,2 0,0 1,2,-2zM33,9h4a2,2 0,0 1,2,2v4a2,2 0,0 1,-2,2h-4a2,2 0,0 1,-2,-2v-4a2,2 0,0 1,2,-2zM11,20h4a2,2 0,0 1,2,2v4a2,2 0,0 1,-2,2h-4a2,2 0,0 1,-2,-2v-4a2,2 0,0 1,2,-2zM22,20h4a2,2 0,0 1,2,2v4a2,2 0,0 1,-2,2h-4a2,2 0,0 1,-2,-2v-4a2,2 0,0 1,2,-2zM33,20h4a2,2 0,0 1,2,2v4a2,2 0,0 1,-2,2h-4a2,2 0,0 1,-2,-2v-4a2,2 0,0 1,2,-2zM11,31h4a2,2 0,0 1,2,2v4a2,2 0,0 1,-2,2h-4a2,2 0,0 1,-2,-2v-4a2,2 0,0 1,2,-2zM22,31h4a2,2 0,0 1,2,2v4a2,2 0,0 1,-2,2h-4a2,2 0,0 1,-2,-2v-4a2,2 0,0 1,2,-2zM33,31h4a2,2 0,0 1,2,2v4a2,2 0,0 1,-2,2h-4a2,2 0,0 1,-2,-2v-4a2,2 0,0 1,2,-2z" />
+</vector>

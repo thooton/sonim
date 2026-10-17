@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">App Drawer</string>
+    <string name="app_name">Launcher</string>
     <string name="todo_name">Todo</string>
     <string name="charge_name">Charge</string>
     <string name="flashcards_name">Flashcards</string>
