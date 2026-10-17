@@ -31,8 +31,8 @@ newest 100 commits (`core/Notes`, from `api.github.com`), whose subjects lead
 with the apps they change; if that fetch fails the rows show versions.
 
 OK presses the row's capsule (UPDATE and GET queue the app, OPEN launches
-it, the ring of an app still waiting takes it out of the line). Right moves
-to "more", where OK opens What's New. Update All is on the bar, Up from the
+it, the ring of an app still waiting takes it out of the line). Rows show
+the start of what's new; the whole of it is What's New in the menu. Update All is on the bar, Up from the
 top row. When a check answers (on opening or Check Again) the list goes back
 to its top row, so updates it found are in view rather than below. Menu or holding OK opens the stock context menu beside the app (as
 in List): Update, Get, Open, Reinstall, What's New, Update All and Check

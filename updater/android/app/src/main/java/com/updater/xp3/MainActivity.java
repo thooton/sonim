@@ -50,8 +50,8 @@ import java.util.concurrent.ExecutorService;
  * the release's versions.txt and packages.txt and lists each app under
  * Available (an older versionName here), Installed or Not Installed, with
  * what's new in it from the repository's commits. OK presses the row's
- * button: UPDATE, GET or OPEN; on "more" (Right) it shows what's new. Update
- * All sits in the bar, Up from the top row. Menu, or holding OK, has the rest.
+ * button: UPDATE, GET or OPEN. Update All sits in the bar, Up from the top
+ * row. Menu, or holding OK, has the rest, What's New among it.
  * Chosen apps go one at a time: download into the app's own files, check the
  * APK is the app it claims to be, hand it to Installer, then the next.
  */
@@ -344,18 +344,13 @@ public final class MainActivity extends BaseActivity {
             press();
         });
         // Sonim firmware reports OK as DPAD_CENTER or ENTER. Its release
-        // presses the row's button, holding it opens the menu; Right and
-        // Left move between the button and "more"; Up and Down stay with
-        // ListView, which hands Up from the top row on to Update All.
+        // presses the row's button, holding it opens the menu; Left and
+        // Right do nothing, so they never send focus off the list; Up and
+        // Down stay with ListView, which hands Up from the top row on to
+        // Update All.
         list.setOnKeyListener((view, keyCode, event) -> {
             if (Ui.isOk(keyCode)) return okKey(event, this::press);
-            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    adapter.setMoreFocused(keyCode == KeyEvent.KEYCODE_DPAD_RIGHT);
-                }
-                return true;
-            }
-            return false;
+            return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_DPAD_LEFT;
         });
         messageView = null;
         listView = list;
@@ -440,14 +435,12 @@ public final class MainActivity extends BaseActivity {
     /**
      * The highlighted row's button, as a tap on it in the App Store: UPDATE
      * and GET queue the app, OPEN opens it, and the ring of an app still
-     * waiting its turn takes it out of the line. On "more", what's new.
+     * waiting its turn takes it out of the line.
      */
     private void press() {
         AppAdapter.Row row = selectedRow();
         if (row == null) return;
-        if (adapter.isMoreFocused()) {
-            whatsNew(row);
-        } else if (row.activity != null) {
+        if (row.activity != null) {
             Job waiting = job(row.entry);
             if (waiting != null && waiting != job) {
                 queue.remove(waiting);

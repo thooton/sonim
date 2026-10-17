@@ -25,8 +25,7 @@ import java.util.TimeZone;
  *
  * As in List, the highlight is painted by the rows (their background is
  * opaque, so ListView's selector would be hidden), which means the adapter
- * mirrors ListView's selection. ListView still owns all d-pad movement; Right
- * and Left only move between the row's button and its "more".
+ * mirrors ListView's selection. ListView owns all d-pad movement.
  */
 final class AppAdapter extends BaseAdapter {
 
@@ -94,8 +93,6 @@ final class AppAdapter extends BaseAdapter {
     private final LayoutInflater inflater;
     private final List<Row> rows = new ArrayList<>();
     private int selectedPosition = AdapterView.INVALID_POSITION;
-    /** Whether the d-pad is on the selected row's "more" rather than its button. */
-    private boolean moreFocused;
 
     AppAdapter(Context context) {
         inflater = LayoutInflater.from(context);
@@ -104,45 +101,21 @@ final class AppAdapter extends BaseAdapter {
     void replace(List<Row> next) {
         rows.clear();
         rows.addAll(next);
-        if (moreFocused && !hasMore(selectedPosition)) moreFocused = false;
         notifyDataSetChanged();
     }
 
     void setSelectedPosition(int position) {
         selectedPosition = position;
-        moreFocused = false;
         notifyDataSetChanged();
     }
 
     /** Records ListView's native selection without causing a second layout. */
     void trackSelectedPosition(int position) {
-        if (position != selectedPosition && moreFocused) {
-            moreFocused = false;
-            selectedPosition = position;
-            notifyDataSetChanged();
-            return;
-        }
         selectedPosition = position;
     }
 
     int getSelectedPosition() {
         return selectedPosition;
-    }
-
-    /** Moves the d-pad onto the selected row's "more" (true) or back to its button. */
-    void setMoreFocused(boolean more) {
-        boolean next = more && hasMore(selectedPosition);
-        if (next == moreFocused) return;
-        moreFocused = next;
-        notifyDataSetChanged();
-    }
-
-    boolean isMoreFocused() {
-        return moreFocused;
-    }
-
-    private boolean hasMore(int position) {
-        return position >= 0 && position < rows.size() && !rows.get(position).notes.isEmpty();
     }
 
     @Override public int getCount() { return rows.size(); }
@@ -178,14 +151,11 @@ final class AppAdapter extends BaseAdapter {
         ring.setVisibility(action != null ? View.GONE : View.VISIBLE);
         if (action != null) pill.setText(action);
         else ring.setProgress(row.percent);
-        pill.setSelected(selected && !moreFocused);
+        pill.setSelected(selected);
 
-        View notesLine = view.findViewById(R.id.app_notes_line);
-        notesLine.setVisibility(row.notes.isEmpty() ? View.GONE : View.VISIBLE);
-        if (!row.notes.isEmpty()) {
-            ((TextView) view.findViewById(R.id.app_notes)).setText(row.notes.get(0).text);
-            view.findViewById(R.id.app_more).setSelected(selected && moreFocused);
-        }
+        TextView notes = view.findViewById(R.id.app_notes);
+        notes.setVisibility(row.notes.isEmpty() ? View.GONE : View.VISIBLE);
+        if (!row.notes.isEmpty()) notes.setText(row.notes.get(0).text);
 
         view.setContentDescription(row.label + ": " + row.describe());
         return view;
