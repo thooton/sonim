@@ -192,8 +192,9 @@ rules where Apple's page differs:
   while it is touched, and its capsule fills blue with white text, as the
   button does while pressed. OK presses it. Update All sits on the bar's right, as
   on iOS 12, reached with Up from the top row.
-- **What's new comes from commits.** CI builds every app on each push, so
-  the subject of an app's newest commit ("Mail: drop the conversation's
+- **What's new comes from commits.** CI builds every app on each push and
+  writes each app's newest commits into the release's manifest.json, so the
+  subject of an app's newest commit ("Mail: drop the conversation's
   position from the bar") is what's new in its APK, and its date is the
   App Store's date. Without them the rows show the version instead.
 

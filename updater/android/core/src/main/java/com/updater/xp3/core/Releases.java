@@ -8,14 +8,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Collection;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The rolling `latest` release of github.com/thooton/sonim, where CI puts every
- * app's APK beside `versions.txt` and `packages.txt`.
+ * app's APK beside `manifest.json`, which describes them all (see Catalog).
  *
  * Release files redirect from github.com to GitHub's file host, which
  * HttpURLConnection follows by itself (both are https). Nothing is cached:
@@ -28,15 +28,11 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class Releases {
 
     public static final String LATEST = "https://github.com/thooton/sonim/releases/download/latest/";
-    /** The repository's newest commits, where the release notes come from (see Notes). */
-    public static final String COMMITS = "https://api.github.com/repos/thooton/sonim/commits?per_page=100";
 
     private static final int CONNECT_TIMEOUT_MS = 20000;
     private static final int READ_TIMEOUT_MS = 60000;
-    /** versions.txt and packages.txt are a line per app. */
-    private static final int MAX_TEXT = 256 * 1024;
-    /** A hundred commits as GitHub lists them, with room to spare. */
-    private static final int MAX_COMMITS = 2 * 1024 * 1024;
+    /** The manifest: a few kilobytes per app, with room to spare. */
+    private static final int MAX_TEXT = 2 * 1024 * 1024;
     private static final long MAX_APK = 200L * 1024 * 1024;
 
     /** Told how much of a download has arrived; `total` is -1 when unknown. */
@@ -45,32 +41,25 @@ public final class Releases {
     }
 
     private final String base;
-    private final String commits;
     /** Makes each release URL one never asked for before (see fresh). */
     private final AtomicLong asked = new AtomicLong();
 
     public Releases() {
-        this(LATEST, COMMITS);
+        this(LATEST);
     }
 
-    /** For the tests, which serve a release and commits of their own. */
-    public Releases(String base, String commits) {
+    /** For the tests, which serve a release of their own. */
+    public Releases(String base) {
         this.base = base.endsWith("/") ? base : base + "/";
-        this.commits = commits;
     }
 
     /** The apps in the release, sorted by name. */
     public List<Catalog.Entry> catalog() throws IOException {
-        return Catalog.join(Catalog.parse(text("versions.txt")), Catalog.parse(text("packages.txt")));
-    }
-
-    /** What's new in each of `apps`, newest first (see Notes). */
-    public Map<String, List<Notes.Note>> notes(Collection<String> apps) throws IOException {
-        String json = fetch(commits, "the commits", MAX_COMMITS);
+        String json = text("manifest.json");
         try {
-            return Notes.parse(json, apps);
+            return Catalog.parse(json);
         } catch (IllegalArgumentException e) {
-            throw new IOException("GitHub's commits were unreadable.");
+            throw new IOException("The release's manifest is unreadable.");
         }
     }
 
@@ -112,15 +101,28 @@ public final class Releases {
     }
 
     /**
-     * Downloads a release file to `to`, through `to.part` so a cut-off
-     * download never looks finished. `to` is replaced if it exists.
+     * Downloads an app's APK to `to`, through `to.part` so a cut-off
+     * download never looks finished, and checks it against the size and
+     * SHA-256 the manifest gives. `to` is replaced if it exists.
      */
-    public void download(String file, File to, Progress progress) throws IOException {
+    public void download(Catalog.Entry entry, File to, Progress progress) throws IOException {
+        download(entry.apk(), entry.size, entry.sha256, to, progress);
+    }
+
+    /** As above, for any release file; `size` -1 and `sha256` null check nothing. */
+    public void download(String file, long size, String sha256, File to, Progress progress) throws IOException {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IOException("No SHA-256 on this phone.");
+        }
         File part = new File(to.getPath() + ".part");
         HttpURLConnection connection = open(fresh(base + file));
         try {
             InputStream in = body(connection, file);
             long total = connection.getContentLengthLong();
+            if (total < 0) total = size;
             if (total > MAX_APK) throw new IOException(file + " is far too large.");
             long done = 0;
             try {
@@ -131,6 +133,7 @@ public final class Releases {
                     if (progress != null) progress.update(0, total);
                     while ((n = in.read(buffer)) != -1) {
                         out.write(buffer, 0, n);
+                        digest.update(buffer, 0, n);
                         done += n;
                         if (done > MAX_APK) throw new IOException(file + " is far too large.");
                         if (progress != null) progress.update(done, total);
@@ -142,6 +145,10 @@ public final class Releases {
                 in.close();
             }
             if (total >= 0 && done != total) throw new IOException("The download was cut short.");
+            if (size >= 0 && done != size) throw new IOException("The download isn't the size the release gives.");
+            if (sha256 != null && !sha256.equals(hex(digest.digest()))) {
+                throw new IOException("The download doesn't match the release.");
+            }
             if (to.exists() && !to.delete()) throw new IOException("Can't replace the old download.");
             if (!part.renameTo(to)) throw new IOException("Can't save the download.");
         } catch (IOException e) {
@@ -150,6 +157,12 @@ public final class Releases {
         } finally {
             connection.disconnect();
         }
+    }
+
+    private static String hex(byte[] bytes) {
+        StringBuilder out = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) out.append(String.format("%02x", b & 0xFF));
+        return out.toString();
     }
 
     private HttpURLConnection open(String url) throws IOException {

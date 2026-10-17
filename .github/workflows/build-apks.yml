@@ -20,7 +20,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The whole history: manifest.json carries each app's newest commits.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -54,32 +57,17 @@ jobs:
 
       # Each APK is named for its app's directory (the launcher keeps its old
       # AppDrawer.apk), which is also its name in the release. Then what the
-      # Updater app reads: each APK's version and
-      # package, from the built APKs themselves, so they can't drift from the
-      # build files.
-      - name: Collect APKs, versions and packages
+      # Updater reads, manifest.json, from the built APKs themselves so it
+      # can't drift from the build files (see .github/manifest.py).
+      - name: Collect APKs and write the manifest
         run: |
           mkdir apks
           for apk in */android/app/build/outputs/apk/release/app-release.apk */app/build/outputs/apk/release/app-release.apk; do
             [ -f "$apk" ] && cp "$apk" "apks/${apk%%/*}.apk"
           done
           cp launcher/AppDrawer.apk apks/
-          aapt2="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS/aapt2"
-          : > apks/versions.txt
-          : > apks/packages.txt
-          for apk in apks/*.apk; do
-            app=$(basename "$apk" .apk)
-            badging=$("$aapt2" dump badging "$apk" | head -n 1)
-            version=$(printf '%s\n' "$badging" | sed -n "s/.* versionName='\([^']*\)'.*/\1/p")
-            package=$(printf '%s\n' "$badging" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
-            if [ -z "$version" ] || [ -z "$package" ]; then
-              echo "No version or package in $apk: $badging" >&2
-              exit 1
-            fi
-            echo "$app = $version" >> apks/versions.txt
-            echo "$app = $package" >> apks/packages.txt
-          done
-          cat apks/versions.txt apks/packages.txt
+          python3 .github/manifest.py apks "$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS/aapt2"
+          cat apks/manifest.json
 
       - uses: actions/upload-artifact@v4
         with:
@@ -98,12 +86,12 @@ jobs:
           cat > notes.md <<'EOF'
           Built automatically from master. Download the APK for the app you want and install it with `adb install <file>.apk`, or let the Updater app on the phone do it.
 
-          `versions.txt` lists each app's latest version and `packages.txt` its package name; the Updater reads both.
+          `manifest.json` describes every app (version, package, size, SHA-256 and its newest commits); the Updater reads it. `versions.txt` and `packages.txt` are only for Updaters older than 1.3.0.
           EOF
           gh release view latest >/dev/null 2>&1 || \
             gh release create latest --title "Sonim apps (latest)" --notes-file notes.md
           gh release edit latest --notes-file notes.md
-          gh release upload latest apks/*.apk apks/versions.txt apks/packages.txt --clobber
+          gh release upload latest apks/*.apk apks/manifest.json apks/versions.txt apks/packages.txt --clobber
           # Drop assets no build produces any more, such as the old
           # *-debug.apk files.
           gh release view latest --json assets -q '.assets[].name' | while read -r name; do

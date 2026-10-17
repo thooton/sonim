@@ -14,9 +14,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.TimeZone;
 
 /**
@@ -50,25 +48,48 @@ public final class SelfTest {
         check.same("huge parts", 1, Version.compare("1.99999999999999999999", "1.9"));
     }
 
-    private static void catalog(Check check) {
-        Map<String, String> versions = Catalog.parse(
-            "delta = 1.1.0\n# a comment\n\nlist=1.0.0\r\nbad name = 1\n../x = 2\nempty =\nnoequals\nAppDrawer = 1.0\n");
-        check.same("kept", 3, versions.size());
-        check.same("spaces trimmed", "1.1.0", versions.get("delta"));
-        check.same("no spaces", "1.0.0", versions.get("list"));
-        check.same("CRLF", "1.0.0", versions.get("list"));
-        check.ok("unsafe name dropped", !versions.containsKey("../x"));
-        check.ok("empty value dropped", !versions.containsKey("empty"));
+    /** A manifest as .github/manifest.py writes one, with things to skip. */
+    private static final String MANIFEST = "{\"schema\": 1, \"built\": \"2026-10-17T10:00:00Z\", \"apps\": {"
+        + "\"list\": {\"version\": \"1.0.1\", \"versionCode\": 3, \"package\": \"com.list.xp3\", \"label\": \"List\","
+        + " \"apk\": \"list.apk\", \"size\": SIZE, \"sha256\": \"SHA\", \"notes\": ["
+        + "{\"commit\": \"a\", \"time\": \"2026-10-14T10:00:00+00:00\", \"text\": \"Older.\"},"
+        + "{\"commit\": \"b\", \"time\": \"2026-10-16T10:00:00+00:00\", \"text\": \"Drop the bar.\", \"version\": \"1.0.1\"},"
+        + "{\"commit\": \"c\", \"text\": \"  \"}]},"
+        + "\"new\": {\"version\": \"2.0.0\", \"package\": \"com.new.xp3\", \"sha256\": \"not hex\"},"
+        + "\"AppDrawer\": {\"version\": \"1.0\", \"package\": \"not a package\"},"
+        + "\"../x\": {\"version\": \"1.0\", \"package\": \"com.x.xp3\"},"
+        + "\"nover\": {\"package\": \"com.nover.xp3\"}"
+        + "}}";
 
-        Map<String, String> packages = Catalog.parse(
-            "list = com.list.xp3\ndelta = com.delta.xp3\nAppDrawer = not a package\n");
-        List<Catalog.Entry> entries = Catalog.join(versions, packages);
-        check.same("only apps in both, with a valid package", 2, entries.size());
-        check.same("sorted", "delta", entries.get(0).name);
-        check.same("version", "1.1.0", entries.get(0).version);
-        check.same("package", "com.list.xp3", entries.get(1).packageName);
-        check.same("apk", "list.apk", entries.get(1).apk());
-        check.same("null text", 0, Catalog.parse(null).size());
+    private static String manifest(long size, String sha) {
+        return MANIFEST.replace("SIZE", String.valueOf(size)).replace("SHA", sha);
+    }
+
+    private static void catalog(Check check) {
+        String sha = "AB" + new String(new char[62]).replace('\0', '0');
+        List<Catalog.Entry> entries = Catalog.parse(manifest(1234, sha));
+        check.same("only valid apps", 2, entries.size());
+        Catalog.Entry list = entries.get(0);
+        check.same("sorted", "list", list.name);
+        check.same("version", "1.0.1", list.version);
+        check.same("package", "com.list.xp3", list.packageName);
+        check.same("label", "List", list.label);
+        check.same("size", Long.valueOf(1234), Long.valueOf(list.size));
+        check.same("sha256 lowercased", "ab" + sha.substring(2), list.sha256);
+        check.same("apk", "list.apk", list.apk());
+        check.same("blank notes dropped", 2, list.notes.size());
+        check.same("newest first", "Drop the bar.", list.notes.get(0).text);
+        check.same("note version", "1.0.1", list.notes.get(0).version);
+        check.same("note time", Long.valueOf(java.time.Instant.parse("2026-10-14T10:00:00Z").toEpochMilli()),
+            Long.valueOf(list.notes.get(1).time));
+        check.same("no version", null, list.notes.get(1).version);
+        Catalog.Entry fresh = entries.get(1);
+        check.same("label from name", "New", fresh.label);
+        check.same("size unknown", Long.valueOf(-1), Long.valueOf(fresh.size));
+        check.same("bad sha256 dropped", null, fresh.sha256);
+        check.same("no notes", 0, fresh.notes.size());
+        check.fails("other schema", "schema", () -> Catalog.parse("{\"schema\": 2, \"apps\": {}}"));
+        check.fails("not JSON", "", () -> Catalog.parse("list = 1.0.0"));
     }
 
     private static void status(Check check) {
@@ -79,33 +100,7 @@ public final class SelfTest {
         check.same("no versionName", Status.UPDATE, Status.of(true, null, "1.0.0"));
     }
 
-    private static final String COMMITS = "["
-        + "{\"commit\":{\"message\":\"Mail: drop the bar\\n\\nLonger body.\",\"committer\":{\"date\":\"2026-10-16T10:00:00Z\"}}},"
-        + "{\"commit\":{\"message\":\"Merge branch 'x'\",\"committer\":{\"date\":\"2026-10-15T10:00:00Z\"}}},"
-        + "{\"commit\":{\"message\":\"List, Canvas: remove the chat!\",\"committer\":{\"date\":\"2026-10-14T10:00:00Z\"}}},"
-        + "{\"commit\":{\"message\":\"Delta 1.1.0: accounts\",\"committer\":{\"date\":\"2026-10-13T10:00:00Z\"}}},"
-        + "{\"commit\":{\"message\":\"Strip text from every app\",\"committer\":{\"date\":\"2026-10-12T10:00:00Z\"}}},"
-        + "{\"commit\":{\"message\":\"Mail: older\",\"committer\":{\"date\":\"2026-10-11T10:00:00Z\"}}}"
-        + "]";
-
     private static void notes(Check check) {
-        check.same("one", Arrays.asList("Mail"), Notes.names("Mail: x"));
-        check.same("several", Arrays.asList("List", "Canvas", "Books"), Notes.names("List, Canvas and Books: x"));
-        check.same("version dropped", Arrays.asList("Delta"), Notes.names("Delta 1.0.4: upload files"));
-        check.same("no colon", 0, Notes.names("Strip text from every app").size());
-        check.same("capital and stop", "Remove the chat.", Notes.text("List: remove the chat"));
-        check.same("own stop kept", "Done!", Notes.text("List: done!"));
-        check.same("nothing after", null, Notes.text("List:"));
-
-        Map<String, List<Notes.Note>> notes = Notes.parse(COMMITS, Arrays.asList("mail", "list", "canvas", "delta", "books"));
-        check.same("mail's two", 2, notes.get("mail").size());
-        check.same("subject only", "Drop the bar.", notes.get("mail").get(0).text);
-        check.same("newest first", "Older.", notes.get("mail").get(1).text);
-        check.same("shared commit", "Remove the chat!", notes.get("canvas").get(0).text);
-        check.same("list too", 1, notes.get("list").size());
-        check.same("delta", "Accounts.", notes.get("delta").get(0).text);
-        check.ok("unnamed apps get nothing", !notes.containsKey("books"));
-
         TimeZone utc = TimeZone.getTimeZone("UTC");
         long now = java.time.Instant.parse("2026-10-17T15:00:00Z").toEpochMilli();
         check.same("today", "Today", Notes.when(now - 3600000L, now, utc));
@@ -116,18 +111,19 @@ public final class SelfTest {
     private static void releases(Check check) throws Exception {
         final byte[] apk = new byte[300 * 1024];
         for (int i = 0; i < apk.length; i++) apk[i] = (byte) i;
+        StringBuilder hex = new StringBuilder();
+        for (byte b : java.security.MessageDigest.getInstance("SHA-256").digest(apk)) {
+            hex.append(String.format("%02x", b & 0xFF));
+        }
+        final String manifest = manifest(apk.length, hex.toString());
         final List<String> asked = java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             String path = exchange.getRequestURI().getPath();
-            if (path.equals("/latest/versions.txt")) {
+            if (path.equals("/latest/manifest.json")) {
                 asked.add(exchange.getRequestURI().getRawQuery() + " "
                     + exchange.getRequestHeaders().getFirst("Connection"));
-                send(exchange, 200, "list = 1.0.1\nnew = 2.0.0\n".getBytes("UTF-8"));
-            } else if (path.equals("/latest/packages.txt")) {
-                send(exchange, 200, "list = com.list.xp3\nnew = com.new.xp3\n".getBytes("UTF-8"));
-            } else if (path.equals("/commits")) {
-                send(exchange, 200, COMMITS.getBytes("UTF-8"));
+                send(exchange, 200, manifest.getBytes("UTF-8"));
             } else if (path.equals("/latest/list.apk")) {
                 // As GitHub does: the file itself is somewhere else.
                 exchange.getResponseHeaders().set("Location", "/files/list.apk");
@@ -141,8 +137,8 @@ public final class SelfTest {
         server.start();
         File dir = Files.createTempDirectory("updater-test").toFile();
         try {
-            String root = "http://127.0.0.1:" + server.getAddress().getPort();
-            final Releases releases = new Releases(root + "/latest", root + "/commits");
+            final Releases releases = new Releases(
+                "http://127.0.0.1:" + server.getAddress().getPort() + "/latest");
             List<Catalog.Entry> entries = releases.catalog();
             check.same("catalog size", 2, entries.size());
             check.same("catalog version", "1.0.1", entries.get(0).version);
@@ -153,12 +149,11 @@ public final class SelfTest {
             check.ok("never pooled", asked.get(0).endsWith(" close") && asked.get(1).endsWith(" close"));
             check.ok("a new URL each check", asked.get(0).startsWith("t=")
                 && !asked.get(0).equals(asked.get(1)));
-            check.same("notes fetched", "Drop the bar.",
-                releases.notes(Arrays.asList("mail")).get("mail").get(0).text);
+            check.same("notes came with it", "Drop the bar.", entries.get(0).notes.get(0).text);
 
             final File to = new File(dir, "list.apk");
             final long[] last = {-1, -1};
-            releases.download("list.apk", to, (done, total) -> {
+            releases.download(entries.get(0), to, (done, total) -> {
                 last[0] = done;
                 last[1] = total;
             });
@@ -167,8 +162,17 @@ public final class SelfTest {
             check.same("progress knew the total", Long.valueOf(apk.length), Long.valueOf(last[1]));
             check.ok("no part file left", !new File(dir, "list.apk.part").exists());
 
+            check.fails("wrong SHA-256", "doesn't match", () -> {
+                releases.download("list.apk", apk.length, hex.toString().replace('0', '1').replace('a', '0'),
+                    new File(to.getParentFile(), "bad.apk"), null);
+            });
+            check.ok("mismatch leaves nothing", !new File(dir, "bad.apk").exists()
+                && !new File(dir, "bad.apk.part").exists());
+            check.fails("wrong size", "size", () -> {
+                releases.download("list.apk", apk.length + 1, null, new File(to.getParentFile(), "bad.apk"), null);
+            });
             check.fails("missing file", "has no gone.apk", () -> {
-                releases.download("gone.apk", new File(to.getParentFile(), "gone.apk"), null);
+                releases.download("gone.apk", -1, null, new File(to.getParentFile(), "gone.apk"), null);
             });
             check.ok("failed download leaves nothing", !new File(dir, "gone.apk").exists()
                 && !new File(dir, "gone.apk.part").exists());

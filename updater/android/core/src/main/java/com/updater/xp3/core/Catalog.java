@@ -1,18 +1,27 @@
 package com.updater.xp3.core;
 
+import com.xp3.common.Json;
+
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
- * What the latest release offers, from the two files CI publishes with it.
+ * What the latest release offers, from the `manifest.json` CI publishes with
+ * it (see .github/manifest.py):
  *
- * `versions.txt` has a line `<app> = <versionName>` per APK, and
- * `packages.txt` a line `<app> = <package name>`; `<app>` is the APK's name
- * in the release without `.apk` (see .github/workflows/build-apks.yml). An
- * app is only offered when both files name it.
+ * <pre>
+ * {"schema": 1, "apps": {"list": {
+ *     "version": "1.1.0", "versionCode": 4, "package": "com.list.xp3",
+ *     "label": "List", "apk": "list.apk", "size": 51234, "sha256": "…",
+ *     "notes": [{"time": "2026-10-17T09:49:29+00:00", "text": "…", "version": "1.1.0"}]}}}
+ * </pre>
+ *
+ * An app is only offered when its name could be a release file name and it
+ * has a version and a valid package; anything else about it that is missing
+ * or malformed is left out rather than refused.
  */
 public final class Catalog {
 
@@ -23,11 +32,24 @@ public final class Catalog {
         /** The release's versionName. */
         public final String version;
         public final String packageName;
+        /** The APK's own label, for an app not on the phone; never null. */
+        public final String label;
+        /** The APK's size in bytes, or -1 when the manifest doesn't say. */
+        public final long size;
+        /** The APK's SHA-256 in lowercase hex, or null when the manifest doesn't say. */
+        public final String sha256;
+        /** What's new in it, newest first. */
+        public final List<Notes.Note> notes;
 
-        public Entry(String name, String version, String packageName) {
+        public Entry(String name, String version, String packageName, String label,
+                     long size, String sha256, List<Notes.Note> notes) {
             this.name = name;
             this.version = version;
             this.packageName = packageName;
+            this.label = label;
+            this.size = size;
+            this.sha256 = sha256;
+            this.notes = notes;
         }
 
         public String apk() {
@@ -37,37 +59,50 @@ public final class Catalog {
 
     private Catalog() {}
 
-    /**
-     * The `name = value` lines of one file, in order. Blank lines and lines
-     * starting with `#` are skipped, and so is any line whose name couldn't be
-     * a release file name or whose value is empty.
-     */
-    public static Map<String, String> parse(String text) {
-        Map<String, String> out = new LinkedHashMap<>();
-        if (text == null) return out;
-        for (String raw : text.split("\r?\n")) {
-            String line = raw.trim();
-            if (line.isEmpty() || line.startsWith("#")) continue;
-            int eq = line.indexOf('=');
-            if (eq < 0) continue;
-            String name = line.substring(0, eq).trim();
-            String value = line.substring(eq + 1).trim();
-            if (!validName(name) || value.isEmpty()) continue;
-            out.put(name, value);
+    /** The apps in a manifest, sorted by name. */
+    public static List<Entry> parse(String json) {
+        Map<String, Object> manifest = Json.object(Json.parse(json));
+        Double schema = Json.number(manifest, "schema");
+        if (schema == null || schema.intValue() != 1) {
+            throw new IllegalArgumentException("Unknown manifest schema");
         }
-        return out;
-    }
-
-    /** The apps both files name, sorted by name. */
-    public static List<Entry> join(Map<String, String> versions, Map<String, String> packages) {
         List<Entry> out = new ArrayList<>();
-        for (Map.Entry<String, String> version : versions.entrySet()) {
-            String packageName = packages.get(version.getKey());
+        for (Map.Entry<String, Object> app : Json.child(manifest, "apps").entrySet()) {
+            if (!validName(app.getKey()) || !(app.getValue() instanceof Map)) continue;
+            Map<String, Object> fields = Json.object(app.getValue());
+            String version = Json.text(fields, "version");
+            String packageName = Json.text(fields, "package");
+            if (version == null || version.trim().isEmpty()) continue;
             if (packageName == null || !validPackage(packageName)) continue;
-            out.add(new Entry(version.getKey(), version.getValue(), packageName));
+            String label = Json.text(fields, "label");
+            if (label == null || label.trim().isEmpty()) label = title(app.getKey());
+            Double size = Json.number(fields, "size");
+            String sha256 = Json.text(fields, "sha256");
+            if (sha256 != null && !sha256.matches("[0-9a-fA-F]{64}")) sha256 = null;
+            out.add(new Entry(app.getKey(), version.trim(), packageName, label.trim(),
+                size != null ? size.longValue() : -1,
+                sha256 != null ? sha256.toLowerCase(Locale.ROOT) : null,
+                notes(Json.children(fields, "notes"))));
         }
         Collections.sort(out, (a, b) -> a.name.compareToIgnoreCase(b.name));
         return out;
+    }
+
+    private static List<Notes.Note> notes(List<Object> items) {
+        List<Notes.Note> out = new ArrayList<>();
+        for (Object item : items) {
+            if (!(item instanceof Map)) continue;
+            Map<String, Object> note = Json.object(item);
+            String text = Json.text(note, "text");
+            if (text == null || text.trim().isEmpty()) continue;
+            out.add(new Notes.Note(Json.instant(note, "time"), text.trim(), Json.text(note, "version")));
+        }
+        Collections.sort(out, (a, b) -> Long.compare(b.time, a.time));
+        return out;
+    }
+
+    private static String title(String name) {
+        return Character.toUpperCase(name.charAt(0)) + name.substring(1);
     }
 
     /**

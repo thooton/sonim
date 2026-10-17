@@ -82,10 +82,17 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
 
 `.github/workflows/build-apks.yml` builds every app on each push to master
 and publishes them to the rolling `latest` release as `<app>.apk` (named for
-the app's directory), together with `versions.txt` (`<app> = <versionName>`)
-and `packages.txt` (`<app> = <package name>`), both read from the built APKs.
-The Updater reads those two files. A new Gradle app is built and published as
-soon as it exists; nothing needs adding to the workflow.
+the app's directory), together with `manifest.json`, written by
+`.github/manifest.py`: for each app its versionName, versionCode, package
+and label (read from the built APK), the APK's size and SHA-256, and its ten
+newest commits (`git log` on the app's directory, the "App 1.2.3:" lead cut
+from each subject and its version kept beside it). The Updater reads only
+that. `versions.txt` and `packages.txt` are still published from the same
+data, solely so phones on an Updater older than 1.3.0 can update to one
+that reads the manifest. A new Gradle app is built and published as soon as
+it exists; nothing needs adding to the workflow (an app whose sources aren't
+in a directory of its release name goes in `DIRS` in the script, as the
+launcher's `AppDrawer` does).
 
 ## Shared rules
 
