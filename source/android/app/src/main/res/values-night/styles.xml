@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorPrimary">@color/accent</item>
+        <item name="android:colorPrimaryDark">@color/page</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:colorControlHighlight">@color/highlight</item>
+        <item name="android:navigationBarColor">@color/page</item>
+        <item name="android:statusBarColor">@color/page</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/page</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:alertDialogTheme">@style/SourceDialog</item>
+        <item name="android:popupMenuStyle">@style/FamilyPopupMenu</item>
+        <item name="android:contextPopupMenuStyle">@style/FamilyPopupMenu</item>
+    </style>
+
+    <!-- FamilyDialog's look on the dark platform theme, so its fields and
+         hints are drawn for a dark window. -->
+    <style name="SourceDialog" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:colorControlHighlight">@color/highlight</item>
+        <item name="android:windowBackground">@drawable/family_dialog</item>
+        <item name="android:colorBackground">@color/container</item>
+        <item name="android:buttonBarButtonStyle">@style/FamilyDialogButton</item>
+        <item name="android:textColorPrimary">@color/text</item>
+    </style>
+
+    <style name="Sheet" parent="android:style/Theme.Material.Dialog.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.55</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:colorControlHighlight">@color/highlight</item>
+    </style>
+</resources>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The soft-key bar, always at the foot: what Menu (the left soft key) does,
+     what OK does in the centre pill, and what Back (the right soft key)
+     does. The labels change with the screen and its state. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/softkeys_height"
+    android:background="@color/container"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingLeft="8dp"
+    android:paddingRight="8dp">
+
+    <TextView
+        android:id="@+id/key_left"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="start"
+        android:includeFontPadding="false"
+        android:singleLine="true"
+        android:textColor="@color/text"
+        android:textSize="@dimen/text_label" />
+
+    <TextView
+        android:id="@+id/key_centre"
+        android:layout_width="wrap_content"
+        android:layout_height="20dp"
+        android:background="@drawable/softkey_pill"
+        android:drawablePadding="4dp"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxWidth="120dp"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:textColor="@color/on_accent"
+        android:textSize="@dimen/text_label"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/key_right"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="end"
+        android:includeFontPadding="false"
+        android:singleLine="true"
+        android:textColor="@color/text"
+        android:textSize="@dimen/text_label" />
+</LinearLayout>

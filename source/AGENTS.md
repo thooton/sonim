@@ -34,14 +34,28 @@ client changes, change `Books` here and keep its test in step.
 
 - `android/core`: `net/` — over the shared `Http`, `Json` and `Login` (the
   command center address and token, validated as Delta's `Config` does;
-  `../common/core`): `Music` (the music routes, and the results' wording), `Books` (the book source client and file
-  names), `Tar` (a minimal reader), `Names` (makes job paths safe under the
-  Music folder). Tests in `src/test` run via `:core:selfTest`.
-- `android/app`: `MainActivity` (the one screen: modes, keys, music and book
-  results, menu, login dialog), `Download` (the single running music search
-  or download, book search or book download, kept outside the activity under a partial wake
-  lock; music goes straight into shared `Music/` through `.part` files,
-  books into shared `Books/`, and both are handed to the media scanner).
+  `../common/core`): `Music` (the music routes, and the results' wording),
+  `Books` (the book source client, file names, and a result's other
+  formats), `Tar` (a minimal reader), `Names` (makes job paths safe under the
+  Music folder). `data/`: `History` (what was saved, newest first, as JSON),
+  `Recents` (the last few searches), `Monogram` (a drawn cover's initials and
+  tone). Tests in `src/test` run via `:core:selfTest`.
+- `android/app`: `Tonal` (the base of every screen: the look, the dark
+  theme, the soft-key bar, the login, watching `Download`), `MainActivity`
+  (the list screen: tabs, search, home, log, results, empty states, keys,
+  Options), `DetailActivity` (one result or download), `DownloadsActivity`
+  (storage, then active, failed and saved downloads), `Download` (one search
+  or download at a time, kept outside the activities under a partial wake
+  lock: downloads queue, each with its own state and log, and a search waits
+  for the running download rather than run beside it, since two runs would
+  log the command center's Soulseek account in twice; music goes straight
+  into shared `Music/` through `.part` files, books into shared `Books/`, both
+  handed to the media scanner, and saved ones kept in `History`), and the
+  drawn pieces: `ResultRow`, `Cover`, `StateButton`, `Wavy`, `StorageCard`,
+  `Sheet` (the options sheet), `Files` (play, read, storage).
+
+The look is Tonal (`../DESIGN.md`, "Source: Tonal"). Every music result
+shows the folders it sits in, as the sharer named them; keep it that way.
 
 ## Credentials
 

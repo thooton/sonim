@@ -1,5 +1,8 @@
 package com.source.xp3;
 
+import com.source.xp3.data.History;
+import com.source.xp3.data.Monogram;
+import com.source.xp3.data.Recents;
 import com.source.xp3.net.Books;
 import com.xp3.common.Login;
 import com.source.xp3.net.Music;
@@ -43,6 +46,55 @@ public final class SelfTest {
             check.same("trailing dots", "[Vol, a.mp3]", Names.parts("Vol.../a.mp3").toString());
             check.same("numbered", "Song (2).mp3", Names.numbered("Song.mp3", 2));
             check.same("numbered folder", "Album (3)", Names.numbered("Album", 3));
+        });
+        check.run("history", () -> {
+            History history = new History();
+            history.add(new History.Entry("slsk://a", Music.SONG, "Song", "m / Music", java.util.Arrays.asList("/sd/Music/a.mp3"), 7, 1000));
+            history.add(new History.Entry("book:1/x", "book", "Book", "Author", java.util.Arrays.asList("/sd/Books/b.epub"), 9, 3000000000000L));
+            history.add(new History.Entry("slsk://a", Music.SONG, "Song again", "m / Music", java.util.Arrays.asList("/sd/Music/a (2).mp3"), 7, 5000));
+            check.same("newest first, once each", "Song again", history.entries().get(0).title);
+            check.same("count", 2, history.entries().size());
+            History back = History.parse(history.toJson());
+            History.Entry book = back.find("book:1/x");
+            check.ok("found", book != null);
+            check.same("big times survive", 3000000000000L, book.time);
+            check.same("files", "[/sd/Books/b.epub]", book.files.toString());
+            check.same("bytes", 9L, book.bytes);
+            check.ok("missing", back.find("nope") == null);
+            check.same("junk is empty", 0, History.parse("{junk").entries().size());
+            for (int i = 0; i < History.LIMIT + 5; i++) {
+                history.add(new History.Entry("k" + i, Music.SONG, "", "", new ArrayList<String>(), 0, i));
+            }
+            check.same("limited", History.LIMIT, history.entries().size());
+            history.remove("k" + (History.LIMIT + 4));
+            check.same("removed", "k" + (History.LIMIT + 3), history.entries().get(0).key);
+        });
+        check.run("recents", () -> {
+            Recents recents = new Recents();
+            recents.add(Music.SONG, " Artist - Song ");
+            recents.add("book", "Dune");
+            recents.add(Music.SONG, "artist - song");
+            recents.add(Music.ALBUM, "   ");
+            check.same("newest first, once each", "artist - song", recents.searches().get(0).query);
+            check.same("count", 2, recents.searches().size());
+            for (int i = 0; i < 9; i++) recents.add(Music.ALBUM, "Album " + i);
+            check.same("limited", Recents.LIMIT, recents.searches().size());
+            Recents back = Recents.parse(recents.toJson());
+            check.same("round trip", "Album 8", back.searches().get(0).query);
+            check.same("mode kept", Music.ALBUM, back.searches().get(0).mode);
+            check.same("junk is empty", 0, Recents.parse("nope").searches().size());
+        });
+        check.run("monogram", () -> {
+            check.same("two words", "SO", Monogram.initials("Slow Orbit"));
+            check.same("track number passed over", "TC", Monogram.initials("01 - the cure"));
+            check.same("one word", "U", Monogram.initials("Untitled"));
+            check.same("digits alone", "12", Monogram.initials("1999 - 2001"));
+            check.same("nothing", "", Monogram.initials(" - "));
+            check.same("accents kept", "ÉP", Monogram.initials("élan (pt. 2)"));
+            int tone = Monogram.tone("Slow Orbit", 6);
+            check.ok("tone in range", tone >= 0 && tone < 6);
+            check.same("tone steady", tone, Monogram.tone("Slow Orbit", 6));
+            check.ok("negative hashes in range", Monogram.tone("polygenelubricants", 6) >= 0);
         });
         check.run("tar", () -> {
             String longName = "Some Artist - A Very Long Album Title That Goes On And On (Deluxe Edition)/"
@@ -127,11 +179,20 @@ public final class SelfTest {
                 check.same("song meta", "MP3 · 320 kbps · 4:12 · 8.1 MB", song.meta());
                 check.same("song source", "bob · 1.3 MB/s", song.source());
                 check.same("song where", "@@m\\Music", song.where());
+                check.same("song name", "Artist - Song", song.name());
+                check.same("song folders", "@@m / Music", song.folders());
+                check.same("song formats", "MP3", song.formats());
+                check.same("song specs", "320 kbps · 4:12 · 8.1 MB", song.specs());
+                check.same("song bytes", 8500000L, song.bytes());
                 Music.Hit album = found.hits.get(1);
                 check.ok("album", album.album() && !song.album());
                 check.same("album title", "Artist / Album (2001)", album.title());
                 check.same("album meta", "2 files · FLAC · 16/44.1 kHz · 1:02:05 · 47.7 MB", album.meta());
                 check.same("album source", "carol · 0.0 MB/s · queued", album.source());
+                check.same("album name", "Album (2001)", album.name());
+                check.same("album folders", "m / Artist", album.folders());
+                check.same("album specs", "2 files · 16/44.1 kHz · 1:02:05 · 47.7 MB", album.specs());
+                check.same("track title", "01", album.tracks.get(0).title());
                 Music.Found none = music.search(Music.ALBUM, "Nothing", (text, error) -> {});
                 check.ok("nothing found", none.hits.isEmpty() && none.error.startsWith("Nothing on Soulseek"));
 
@@ -187,6 +248,13 @@ public final class SelfTest {
                 boolean session = cookie.contains("remix_userid=42") && cookie.contains("remix_userkey=key");
                 if (path.equals("/eapi/book/search")) {
                     if (!session) return TestServer.Reply.json("{\"success\":0,\"error\":\"Please login\"}");
+                    if (request.body.contains("message=formats")) {
+                        return TestServer.Reply.json("{\"success\":1,\"books\":["
+                            + "{\"id\":1,\"hash\":\"a\",\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"extension\":\"epub\"},"
+                            + "{\"id\":2,\"hash\":\"b\",\"title\":\"Dune Messiah\",\"author\":\"Frank Herbert\",\"extension\":\"epub\"},"
+                            + "{\"id\":3,\"hash\":\"c\",\"title\":\" dune\",\"author\":\"Frank Herbert \",\"extension\":\"pdf\"}],"
+                            + "\"pagination\":{\"total_pages\":1}}");
+                    }
                     return TestServer.Reply.json("{\"success\":1,\"books\":[{\"id\":7,\"hash\":\"ab\",\"title\":\"The Hobbit: Or There and Back Again\","
                         + "\"author\":\"J.R.R. Tolkien\",\"year\":\"1937\",\"language\":\"english\",\"extension\":\"EPUB\",\"filesize\":\"2048\"}],"
                         + "\"pagination\":{\"total_pages\":3}}");
@@ -228,6 +296,12 @@ public final class SelfTest {
                 TestServer.Request search = null;
                 for (TestServer.Request r : server.seen) if (r.path.equals("/eapi/book/search")) search = r;
                 check.same("search form", "message=hobbit&limit=20&page=1&extensions%5B%5D=EPUB", search.body);
+
+                Books.Page dunes = books.search("formats", 1, null);
+                List<Books.Book> dune = Books.formats(dunes, dunes.books.get(0));
+                check.same("same work, other formats", 2, dune.size());
+                check.same("its other format", "pdf", dune.get(1).extension);
+                check.same("a work alone", 1, Books.formats(dunes, dunes.books.get(1)).size());
 
                 Books.Progress quiet = (done, total) -> {};
                 Books.Saved saved = books.download(hobbit, folder, quiet);

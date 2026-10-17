@@ -1,27 +1,78 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- A deep violet in the family's four tones (DESIGN.md): the band near
-         black, the accent for focus and for what is happening now, a pale
-         wash behind the picked result and the field at rest, and greys
-         tinted to match. The status bar is the band's own colour. -->
-    <color name="primary">#291741</color>
-    <color name="primary_dark">#291741</color>
+    <!-- Tonal (DESIGN.md, "Source: Tonal"): Material 3's colour roles from
+         the seed #6750A4, light here and dark in values-night. The family's
+         names (primary, row, focus_fill...) are kept for what the shared
+         drawables and dialogs draw with, pointed at the matching role. -->
+
+    <!-- surface, and the containers on it, lowest to highest. -->
+    <color name="page">#FEF7FF</color>
+    <color name="container">#F3EDF7</color>
+    <color name="container_high">#ECE6F0</color>
+    <color name="container_highest">#E6E0E9</color>
+    <!-- onSurface, onSurfaceVariant, outline and outlineVariant. -->
+    <color name="text">#1D1B20</color>
+    <color name="text_muted">#49454F</color>
+    <color name="outline">#79747E</color>
+    <color name="outline_variant">#CAC4D0</color>
+    <color name="input_hint">#79747E</color>
+
+    <!-- primary and primaryContainer: the one key action, progress and focus
+         rings; the focused row, the picked tab and tonal buttons. -->
+    <color name="accent">#6750A4</color>
+    <color name="on_accent">#FFFFFF</color>
+    <color name="accent_container">#EADDFF</color>
+    <color name="on_accent_container">#21005D</color>
+    <!-- What is left of a progress bar or ring. -->
+    <color name="track">#E0D7EC</color>
+
+    <!-- tertiaryContainer, for format tags. -->
+    <color name="tag">#FFD8E4</color>
+    <color name="on_tag">#31111D</color>
+
+    <!-- tertiary: the Books share of the storage bar. -->
+    <color name="tertiary">#7D5260</color>
+
+    <!-- Saved, and failed. -->
+    <color name="success">#2E7D4F</color>
+    <color name="success_container">#C4EED0</color>
+    <color name="on_success_container">#0F5223</color>
+    <color name="error">#B3261E</color>
+    <color name="error_container">#F9DEDC</color>
+    <color name="on_error_container">#410E0B</color>
+
+
+    <!-- Drawn covers: a container tone and the ink of its initials. -->
+    <color name="cover_1">#EADDFF</color>
+    <color name="cover_1_ink">#21005D</color>
+    <color name="cover_2">#FFD8E4</color>
+    <color name="cover_2_ink">#31111D</color>
+    <color name="cover_3">#C4EED0</color>
+    <color name="cover_3_ink">#0F5223</color>
+    <color name="cover_4">#D6E3FF</color>
+    <color name="cover_4_ink">#001B3E</color>
+    <color name="cover_5">#FFDDB3</color>
+    <color name="cover_5_ink">#2A1800</color>
+    <color name="cover_6">#BCEBF0</color>
+    <color name="cover_6_ink">#002022</color>
+    <!-- The record behind an album's cover. -->
+    <color name="cover_back">#D5CFDB</color>
+
+    <!-- The family's names. -->
+    <color name="primary">#FEF7FF</color>
+    <color name="primary_dark">#FEF7FF</color>
     <color name="on_primary">#FFFFFF</color>
-    <color name="on_primary_dim">#BBA9D3</color>
-
-    <color name="page">#FFFFFF</color>
-    <color name="row">#FFFFFF</color>
-    <color name="divider">#E7E2EF</color>
-    <color name="field_fill">#F3F0F7</color>
-
-    <color name="focus_fill">#F2EDFA</color>
-    <color name="focus_rule">#6334A3</color>
-    <color name="press_fill">#E2D7F2</color>
+    <color name="on_primary_dim">#49454F</color>
+    <color name="row">#FEF7FF</color>
+    <color name="section_fill">#F3EDF7</color>
+    <color name="grouped_page">#F3EDF7</color>
+    <color name="divider">#E6E0E9</color>
+    <color name="field_fill">#ECE6F0</color>
+    <color name="code_fill">#ECE6F0</color>
+    <color name="focus_fill">#EADDFF</color>
+    <color name="focus_rule">#6750A4</color>
+    <color name="press_fill">#EADDFF</color>
     <!-- The platform's highlight (a stock menu's item under the d-pad, a
          press): the accent, faint enough that what it covers stays legible. -->
-    <color name="highlight">#246334A3</color>
-
-    <color name="text">#1B1B1D</color>
-    <color name="text_muted">#66616F</color>
-    <color name="input_hint">#8A8590</color>
+    <color name="highlight">#246750A4</color>
 </resources>

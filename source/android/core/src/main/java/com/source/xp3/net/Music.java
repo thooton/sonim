@@ -79,6 +79,13 @@ public final class Music {
             int dot = name().lastIndexOf('.');
             return dot < 0 ? "" : name().substring(dot + 1).toUpperCase(Locale.US);
         }
+
+        /** The file's name without its extension, which its format tag shows. */
+        public String title() {
+            String name = name();
+            int dot = name.lastIndexOf('.');
+            return dot > 0 ? name.substring(0, dot) : name;
+        }
     }
 
     /** A search result: one file for a song, one shared folder for an album. */
@@ -119,8 +126,54 @@ public final class Music {
             return parts.length > 1 ? parts[parts.length - 2] + " / " + last : last;
         }
 
+        /** A song's file name without its extension, or an album's own folder. */
+        public String name() {
+            if (album()) {
+                String[] parts = folder.split("\\\\");
+                return parts[parts.length - 1];
+            }
+            return tracks.isEmpty() ? "" : tracks.get(0).title();
+        }
+
+        /**
+         * The folders it sits in, as the sharer named them, joined with " / ":
+         * a song's whole folder, an album's folders above its own. Shown with
+         * every result, since the folders often say more than the file does.
+         */
+        public String folders() {
+            String path = album() ? folder : where();
+            if (album()) {
+                int slash = path.lastIndexOf('\\');
+                path = slash < 0 ? "" : path.substring(0, slash);
+            }
+            return path.replace("\\", " / ");
+        }
+
+        /** "MP3", "FLAC/MP3": every format in it, as its format tag. */
+        public String formats() {
+            Set<String> formats = new LinkedHashSet<String>();
+            for (Track t : tracks) if (t.format().length() > 0) formats.add(t.format());
+            return join(formats, "/");
+        }
+
+        /** Every byte of it. */
+        public long bytes() {
+            long bytes = 0;
+            for (Track t : tracks) bytes += t.size;
+            return bytes;
+        }
+
+        /** As meta(), without the formats, which a tag beside it shows. */
+        public String specs() {
+            return describe(false);
+        }
+
         /** "MP3 · 320 kbps · 4:12 · 8.1 MB"; an album leads with its file count. Unknowns are left out. */
         public String meta() {
+            return describe(true);
+        }
+
+        private String describe(boolean withFormats) {
             Set<String> formats = new LinkedHashSet<String>();
             int low = Integer.MAX_VALUE;
             int high = 0;
@@ -141,7 +194,7 @@ public final class Music {
             }
             List<String> parts = new ArrayList<String>();
             if (album()) parts.add(tracks.size() + (tracks.size() == 1 ? " file" : " files"));
-            if (!formats.isEmpty()) parts.add(join(formats, "/"));
+            if (withFormats && !formats.isEmpty()) parts.add(join(formats, "/"));
             if (high > 0) parts.add((low == high ? "" : low + "-") + high + " kbps");
             if (depth > 0 && rate > 0) parts.add(depth + "/" + trim(rate / 1000.0) + " kHz");
             if (seconds > 0) parts.add(clock(seconds));
@@ -397,7 +450,7 @@ public final class Music {
     }
 
     /** 4:05, or 1:02:05 past an hour. */
-    static String clock(long seconds) {
+    public static String clock(long seconds) {
         if (seconds >= 3600) {
             return String.format(Locale.US, "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60);
         }
