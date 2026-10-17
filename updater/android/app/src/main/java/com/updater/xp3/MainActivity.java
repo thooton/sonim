@@ -107,6 +107,12 @@ public final class MainActivity extends BaseActivity {
     private TextView messageDetail;
     /** The highlighted app, by its release name, kept across redraws. */
     private String selectedName;
+    /**
+     * Set when a check has just answered: the next redraw goes back to the
+     * top row, where Available leads with whatever it found, rather than
+     * staying down in Installed with the new updates out of sight.
+     */
+    private boolean toTop;
 
     /** The release's apps; null until the first check succeeds. */
     private List<Catalog.Entry> catalog;
@@ -198,6 +204,7 @@ public final class MainActivity extends BaseActivity {
                     checking = false;
                     checkError = null;
                     catalog = found;
+                    toTop = true;
                     render();
                 });
                 // What's new is a nicety: without it the rows show versions.
@@ -298,12 +305,14 @@ public final class MainActivity extends BaseActivity {
         boolean focus = listView == null || listView.hasFocus() || getCurrentFocus() == null
             || (hadBar && updates == 0);
         if (listView == null) buildList();
+        boolean top = toTop;
+        toTop = false;
         int at = 0;
-        for (int i = 0; i < rows.size(); i++) {
+        for (int i = 0; !top && i < rows.size(); i++) {
             if (rows.get(i).entry.name.equals(selectedName)) at = i;
         }
         selectedName = rows.get(at).entry.name;
-        boolean moved = adapter.getSelectedPosition() != at;
+        boolean moved = top || adapter.getSelectedPosition() != at;
         adapter.replace(rows);
         if (moved) {
             adapter.setSelectedPosition(at);
