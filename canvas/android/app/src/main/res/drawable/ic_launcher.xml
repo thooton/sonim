@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A painter's canvas on an easel with a tick painted on it, in the app's
-     maroon: the app is named for the Canvas it reads, and the tick, like a
-     teacher's check, keeps the homework meaning the old checklist icon
-     carried. Shapes are few and thick because the launcher draws this at 48px
-     on the XP3's mdpi screen. -->
+<!-- A homework sheet, ticked, on the app's wine accent, in the rounded square
+     the other apps' icons share. Shapes are few and thick because the
+     launcher draws this at 48px on the XP3's mdpi screen: an earlier easel
+     with thin legs turned to mush at that size. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#7B1E2E" android:pathData="M4,4h40v40h-40z" />
-    <path android:strokeColor="#C8A165" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M24,7L13.5,42M24,7L34.5,42" />
-    <path android:strokeColor="#A87B45" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M24,33L24,42" />
-    <path android:fillColor="#FAF6EC" android:pathData="M10,11h28v19h-28z" />
-    <path android:fillColor="#E2D8C3" android:pathData="M10,28.5h28v1.5h-28z" />
-    <path android:fillColor="#C8A165" android:pathData="M8,30h32v3h-32z" />
-    <path android:strokeColor="#7B1E2E" android:strokeWidth="3.5" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M17,20.5L22,25.5L31,15.5" />
+    <path android:fillColor="#8E1F48" android:pathData="M10,4h28a6,6 0,0 1,6 6v28a6,6 0,0 1,-6 6h-28a6,6 0,0 1,-6 -6v-28a6,6 0,0 1,6 -6z" />
+    <!-- The sheet, its top right corner folded over. -->
+    <path android:fillColor="#FFFFFF" android:pathData="M14,8h15l7,7v23a2,2 0,0 1,-2 2h-20a2,2 0,0 1,-2 -2v-28a2,2 0,0 1,2 -2z" />
+    <path android:fillColor="#E3BFCE" android:pathData="M29,8v5a2,2 0,0 0,2 2h5z" />
+    <!-- Two lines of writing, then the tick. -->
+    <path android:fillColor="#D8CCD1" android:pathData="M17,14h9v2.5h-9zM17,19.5h14v2.5h-14z" />
+    <path android:strokeColor="#8E1F48" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M17.5,29.5l4.5,4.5l9,-9" />
 </vector>
