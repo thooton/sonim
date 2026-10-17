@@ -56,6 +56,28 @@ public final class Message {
         return "";
     }
 
+    /**
+     * Whether it carries a file, as far as its MIME tree says: a named part,
+     * or a multipart/mixed body, which is what a message with attachments is
+     * sent as. A list's metadata has only the top of the tree, so there it
+     * is the second.
+     */
+    public boolean hasFiles() {
+        return hasFiles(payload);
+    }
+
+    private static boolean hasFiles(Map<String, Object> part) {
+        if (part == null) return false;
+        String type = Json.text(part, "mimeType");
+        if (type != null && type.equalsIgnoreCase("multipart/mixed")) return true;
+        String name = Json.text(part, "filename");
+        if (name != null && name.length() > 0) return true;
+        for (Object child : Json.children(part, "parts")) {
+            if (child instanceof Map && hasFiles(Json.object(child))) return true;
+        }
+        return false;
+    }
+
     public String subject() {
         return Mime.words(header("Subject")).replaceAll("\\s+", " ").trim();
     }

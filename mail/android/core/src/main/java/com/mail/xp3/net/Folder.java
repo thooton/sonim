@@ -47,6 +47,24 @@ public final class Folder {
             && (label == null ? other.label == null : label.equals(other.label));
     }
 
+    /**
+     * The label whose count the folder pane shows beside this folder, as
+     * Gmail does: the inbox's, spam's and each label's unread, and how many
+     * drafts there are. Null for the rest.
+     */
+    public String countedLabel() {
+        if (kind.equals("inbox")) return "INBOX";
+        if (kind.equals("drafts")) return "DRAFT";
+        if (kind.equals("spam")) return "SPAM";
+        if (kind.equals("label")) return label;
+        return null;
+    }
+
+    /** Drafts are counted whole; everything else by what is unread. */
+    public boolean countsAll() {
+        return kind.equals("drafts");
+    }
+
     /** Spam and Trash are left out of every list but their own. */
     public boolean includesSpamAndTrash() {
         return this == SPAM || this == TRASH;

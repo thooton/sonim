@@ -6,20 +6,22 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.text.InputType;
-import android.text.Layout;
 import android.text.SpannableStringBuilder;
-import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.Spanned;
+import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
-import android.text.style.LeadingMarginSpan;
-import android.text.style.RelativeSizeSpan;
 import android.text.style.TypefaceSpan;
+import android.text.style.UnderlineSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -28,8 +30,10 @@ import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import com.mail.xp3.net.Address;
@@ -54,7 +58,6 @@ import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -65,15 +68,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**
- * One screen, three ways: a folder's conversations, one conversation, or a
- * message being written.
+ * Thunderbird for Android, as a flip phone drives it: one screen showing a
+ * folder's conversations, one conversation, or a message being written, with
+ * the folder pane sliding over it from the left.
  *
- * The list: Up and Down pick (Down past the last loads more), OK opens, Left
- * and Right step through Gmail's own folders, Menu has everything else.
- * A conversation: Up and Down scroll, Left and Right jump between its
- * messages, OK or Menu for reply, forward, archive and the rest, Back to the
- * list. Writing: the fields as usual, OK starts a new line in the message,
- * Menu sends, Back offers to save a draft.
+ * The list: Up and Down pick (Down past the last loads more), OK or Right
+ * opens, Left opens the folder pane. A conversation: Up and Down scroll, Left
+ * and Right go to the conversation before or after it, OK is the menu, Back
+ * returns to the list. Writing: the fields as usual, OK starts a new line in
+ * the message, Menu sends, Back offers to save a draft. The keypad's digits,
+ * * and # are shortcuts, shown beside each item in the menu (1 reply, 4
+ * archive, 9 delete and so on).
  */
 public final class MainActivity extends BaseActivity {
 
@@ -86,28 +91,51 @@ public final class MainActivity extends BaseActivity {
     private static final int MAX_SHOWN = 20000;
     /** The list is fetched again on coming back to the app after this long. */
     private static final long STALE_MS = 120000;
+    /** The folder pane's counts are fetched again when it opens after this long. */
+    private static final long COUNTS_MS = 60000;
+    /** The menu's key for opening the folder pane: Left, not a keypad key. */
+    private static final char LEFT = '◀';
 
     /** Work for the background thread: returns what to do with its result on the main thread. */
     private interface Work {
         Runnable call() throws Exception;
     }
 
+    private ImageView barIcon;
     private TextView titleView;
+    private TextView subtitleView;
     private TextView countView;
+    private TextView positionView;
+    private ImageView barAction;
+    private ProgressBar progress;
     private TextView statusView;
     private ListView listView;
+    private View emptyView;
+    private ImageView emptyIcon;
+    private TextView emptyText;
     private ScrollView reader;
-    private TextView readerText;
+    private LinearLayout readerBody;
     private View compose;
+    private View fromRow;
+    private TextView fromView;
     private View ccRow;
     private EditText toField;
     private EditText ccField;
     private EditText subjectField;
+    private TextView filesView;
     private EditText bodyField;
+    private View scrim;
+    private View drawer;
+    private ListView foldersView;
+    private TextView accountName;
+    private TextView accountEmail;
     private final ConversationAdapter adapter = new ConversationAdapter();
+    private final FolderAdapter folderAdapter = new FolderAdapter();
     private final ExecutorService worker = Ui.worker("mail");
     /** Archive, delete and the rest go one at a time, in order, beside whatever is loading. */
     private final ExecutorService changes = Ui.worker("mail-changes");
+    /** The folder pane's counts, fetched beside the rest. */
+    private final ExecutorService counter = Ui.worker("mail-counts");
 
     private Login login = Login.blank();
     private Gmail gmail;
@@ -123,14 +151,24 @@ public final class MainActivity extends BaseActivity {
     private final List<Conversation> items = new ArrayList<Conversation>();
     private String next;
     private int picked;
-    private int unread = -1;
+    /** Whether this folder has been listed since it was opened, so an empty list means an empty folder. */
+    private boolean listed;
     private long loadedAt;
 
-    // The conversation open, whole, and where each message starts in its text.
+    // The folder pane: what it lists, which one the d-pad is on, and Gmail's counts by label id.
+    private boolean drawerOpen;
+    private final List<Entry> entries = new ArrayList<Entry>();
+    private int drawerPick;
+    private final Map<String, Integer> counts = new HashMap<String, Integer>();
+    private long countsAt;
+    private boolean counting;
+
+    // The conversation open, whole, and the view of each of its messages.
     private Conversation reading;
     private final Map<String, Conversation> whole = new HashMap<String, Conversation>();
-    private final List<Integer> starts = new ArrayList<Integer>();
+    private final List<View> messageViews = new ArrayList<View>();
     private boolean showQuoted;
+    private boolean expandAll;
 
     // The message being written, as it began (to tell whether anything was typed), and where it was begun.
     private Outgoing writing;
@@ -140,26 +178,51 @@ public final class MainActivity extends BaseActivity {
 
     private Attachment pendingSave;
     private Future<?> job;
+    private String doing = "";
     private int generation;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
+        barIcon = (ImageView) findViewById(R.id.bar_icon);
         titleView = (TextView) findViewById(R.id.title);
+        subtitleView = (TextView) findViewById(R.id.subtitle);
         countView = (TextView) findViewById(R.id.count);
+        positionView = (TextView) findViewById(R.id.position);
+        barAction = (ImageView) findViewById(R.id.bar_action);
+        progress = (ProgressBar) findViewById(R.id.progress);
         statusView = (TextView) findViewById(R.id.status);
         listView = (ListView) findViewById(R.id.list);
+        emptyView = findViewById(R.id.empty);
+        emptyIcon = (ImageView) findViewById(R.id.empty_icon);
+        emptyText = (TextView) findViewById(R.id.empty_text);
         reader = (ScrollView) findViewById(R.id.reader);
-        readerText = (TextView) findViewById(R.id.reader_text);
+        readerBody = (LinearLayout) findViewById(R.id.reader_body);
         compose = findViewById(R.id.compose);
+        fromRow = findViewById(R.id.from_row);
+        fromView = (TextView) findViewById(R.id.from);
         ccRow = findViewById(R.id.cc_row);
         toField = (EditText) findViewById(R.id.to);
         ccField = (EditText) findViewById(R.id.cc);
         subjectField = (EditText) findViewById(R.id.subject);
+        filesView = (TextView) findViewById(R.id.files);
         bodyField = (EditText) findViewById(R.id.body);
+        scrim = findViewById(R.id.scrim);
+        drawer = findViewById(R.id.drawer);
+        foldersView = (ListView) findViewById(R.id.folders);
+        accountName = (TextView) findViewById(R.id.account_name);
+        accountEmail = (TextView) findViewById(R.id.account_email);
+
         listView.setAdapter(adapter);
         Family.list(listView);
+        // Thunderbird's rows are ruled the whole width, white and grey alike.
+        listView.setDivider(new ColorDrawable(color(R.color.divider)));
+        listView.setDividerHeight(1);
+        foldersView.setAdapter(folderAdapter);
+        filesView.setCompoundDrawablesRelative(small(R.drawable.ic_attachment), null, null, null);
+        Pills.attach(toField, color(R.color.pill_wash), color(R.color.focus_rule), color(R.color.draft), dp(4));
+        Pills.attach(ccField, color(R.color.pill_wash), color(R.color.focus_rule), color(R.color.draft), dp(4));
 
         SharedPreferences prefs = prefs();
         login = loadLogin(prefs);
@@ -172,8 +235,7 @@ public final class MainActivity extends BaseActivity {
         } else {
             refresh();
         }
-        if (!login.ready()) say("No command center: Menu → Command center.");
-        else if (kept == null) load();
+        if (login.ready() && kept == null) load();
     }
 
     @Override
@@ -195,6 +257,7 @@ public final class MainActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         worker.shutdownNow();
+        counter.shutdownNow();
         changes.shutdown();
         if (gmail != null) gmail.close();
         super.onDestroy();
@@ -233,11 +296,15 @@ public final class MainActivity extends BaseActivity {
 
     // ---- Background work ----
 
-    /** Runs `work` off the main thread, in place of anything already running. */
+    /**
+     * Runs `work` off the main thread, in place of anything already running.
+     * Meanwhile a bar runs along the foot of the app bar and `doing` stands
+     * under the title, as Thunderbird's status line does.
+     */
     private void start(String doing, final Work work) {
         stop();
         final int mine = ++generation;
-        say(doing);
+        this.doing = doing;
         job = worker.submit(() -> {
             Runnable done;
             try {
@@ -253,8 +320,10 @@ public final class MainActivity extends BaseActivity {
                 if (mine != generation) return;
                 job = null;
                 then.run();
+                refresh();
             });
         });
+        refresh();
     }
 
     private static String message(Exception e) {
@@ -271,6 +340,7 @@ public final class MainActivity extends BaseActivity {
         job.cancel(true);
         job = null;
         generation++;
+        bar();
     }
 
     // ---- The list ----
@@ -298,12 +368,13 @@ public final class MainActivity extends BaseActivity {
                 items.clear();
                 items.addAll(page.conversations);
                 next = page.next;
-                unread = count;
+                if (count >= 0) counts.put("INBOX", count);
                 picked = Math.max(0, Math.min(picked, items.size() - 1));
+                listed = true;
                 loadedAt = System.currentTimeMillis();
                 learn(page.conversations);
-                say(items.isEmpty() ? "Nothing in " + from.name + "." : "");
-                refresh();
+                say("");
+                if (System.currentTimeMillis() - countsAt > COUNTS_MS) loadCounts();
             };
         });
     }
@@ -323,7 +394,6 @@ public final class MainActivity extends BaseActivity {
                 if (wasLast && picked + 1 < items.size()) picked++;
                 learn(page.conversations);
                 say("");
-                refresh();
             };
         });
     }
@@ -334,18 +404,11 @@ public final class MainActivity extends BaseActivity {
         items.clear();
         next = null;
         picked = 0;
-        unread = -1;
+        listed = false;
         screen = LIST;
+        say("");
         refresh();
         load();
-    }
-
-    /** Left and Right on the list: the folder before or after this one among Gmail's own. */
-    private void stepFolder(int by) {
-        int at = -1;
-        for (int i = 0; i < Folder.SYSTEM.size(); i++) if (Folder.SYSTEM.get(i).is(folder)) at = i;
-        int count = Folder.SYSTEM.size();
-        setFolder(Folder.SYSTEM.get(at < 0 ? 0 : (at + by + count) % count));
     }
 
     private void movePick(int by) {
@@ -371,30 +434,229 @@ public final class MainActivity extends BaseActivity {
         return items.isEmpty() ? null : items.get(Math.min(picked, items.size() - 1));
     }
 
+    // ---- The folder pane ----
+
+    /** A line of the folder pane: a folder, a heading, or something to do. */
+    private static final class Entry {
+        final Folder folder;
+        final int icon;
+        final String name;
+        final Runnable action;
+
+        Entry(Folder folder, int icon, String name, Runnable action) {
+            this.folder = folder;
+            this.icon = icon;
+            this.name = name;
+            this.action = action;
+        }
+
+        boolean heading() {
+            return folder == null && action == null;
+        }
+    }
+
+    /** Thunderbird's icon for each kind of folder. */
+    private static int icon(Folder folder) {
+        switch (folder.kind) {
+            case "inbox": return R.drawable.ic_inbox;
+            case "starred": return R.drawable.ic_star;
+            case "sent": return R.drawable.ic_send;
+            case "drafts": return R.drawable.ic_draft;
+            case "all": return R.drawable.ic_archive;
+            case "spam": return R.drawable.ic_report;
+            case "trash": return R.drawable.ic_delete;
+            case "search": return R.drawable.ic_search;
+            default: return R.drawable.ic_folder;
+        }
+    }
+
+    /** Gmail's folders, a search if one is open, the labels, then the command center. */
+    private void buildEntries() {
+        entries.clear();
+        for (Folder each : Folder.SYSTEM) entries.add(new Entry(each, icon(each), each.name, null));
+        if (folder.kind.equals("search")) entries.add(new Entry(folder, icon(folder), folder.name, null));
+        if (!labels.isEmpty()) {
+            entries.add(new Entry(null, 0, getString(R.string.labels), null));
+            for (Folder label : labels) entries.add(new Entry(label, icon(label), label.name, null));
+        }
+        entries.add(new Entry(null, 0, "Account", null));
+        entries.add(new Entry(null, R.drawable.ic_settings, "Command center", this::askLogin));
+    }
+
+    private void openDrawer() {
+        if (drawerOpen) return;
+        buildEntries();
+        drawerPick = 0;
+        for (int i = 0; i < entries.size(); i++) if (entries.get(i).folder != null && entries.get(i).folder.is(folder)) drawerPick = i;
+        drawerOpen = true;
+        String name = me == null ? "" : me.addresses.get(0).name;
+        String email = me == null ? (login.ready() ? "Gmail" : "Not set up") : me.email;
+        accountName.setText(name.length() > 0 ? name : "Gmail");
+        accountEmail.setText(email);
+        scrim.setVisibility(View.VISIBLE);
+        drawer.setVisibility(View.VISIBLE);
+        drawer.setTranslationX(-dp(40));
+        drawer.setAlpha(0.6f);
+        drawer.animate().translationX(0).alpha(1).setDuration(140).start();
+        folderAdapter.notifyDataSetChanged();
+        foldersView.setSelection(Math.max(0, drawerPick - 3));
+        if (System.currentTimeMillis() - countsAt > COUNTS_MS) loadCounts();
+    }
+
+    private void closeDrawer() {
+        if (!drawerOpen) return;
+        drawerOpen = false;
+        drawer.animate().cancel();
+        scrim.setVisibility(View.GONE);
+        drawer.setVisibility(View.GONE);
+    }
+
+    private void moveDrawer(int by) {
+        int to = drawerPick;
+        do {
+            to += by;
+        } while (to >= 0 && to < entries.size() && entries.get(to).heading());
+        if (to < 0 || to >= entries.size()) return;
+        drawerPick = to;
+        folderAdapter.notifyDataSetChanged();
+        foldersView.smoothScrollToPosition(to);
+    }
+
+    private void chooseEntry() {
+        if (drawerPick < 0 || drawerPick >= entries.size()) return;
+        Entry entry = entries.get(drawerPick);
+        closeDrawer();
+        if (entry.action != null) entry.action.run();
+        else if (entry.folder != null && !entry.folder.is(folder)) setFolder(entry.folder);
+    }
+
+    /** The counts beside each folder, as Gmail shows them; a failure leaves the old ones. */
+    private void loadCounts() {
+        if (!login.ready() || counting) return;
+        counting = true;
+        final Gmail client = gmail();
+        final List<Folder> all = new ArrayList<Folder>(Folder.SYSTEM);
+        all.addAll(labels);
+        counter.submit(() -> {
+            Map<String, Integer> found = null;
+            try {
+                found = client.counts(all);
+            } catch (InterruptedException e) {
+                return;
+            } catch (Exception e) {
+                // The counts are a nicety; the list says when Gmail fails.
+            }
+            final Map<String, Integer> got = found;
+            runOnUiThread(() -> {
+                counting = false;
+                if (got == null || client != gmail) return;
+                counts.clear();
+                counts.putAll(got);
+                countsAt = System.currentTimeMillis();
+                folderAdapter.notifyDataSetChanged();
+                bar();
+            });
+        });
+    }
+
+    private int count(Folder of) {
+        String label = of.countedLabel();
+        Integer count = label == null ? null : counts.get(label);
+        return count == null ? 0 : count;
+    }
+
     // ---- Showing ----
 
     /** Puts the screen in step with the state. */
     private void refresh() {
-        listView.setVisibility(screen == LIST ? View.VISIBLE : View.GONE);
+        boolean list = screen == LIST;
+        listView.setVisibility(list && !items.isEmpty() ? View.VISIBLE : View.GONE);
+        emptyView.setVisibility(list && items.isEmpty() ? View.VISIBLE : View.GONE);
         reader.setVisibility(screen == READ ? View.VISIBLE : View.GONE);
         compose.setVisibility(screen == WRITE ? View.VISIBLE : View.GONE);
-        if (screen == WRITE) {
-            String kind = writing.kind;
-            titleView.setText(kind.equals(Outgoing.REPLY) ? "Reply" : kind.equals(Outgoing.FORWARD) ? "Forward"
-                : kind.equals(Outgoing.DRAFT) ? "Draft" : "New message");
-            countView.setText("");
+        bar();
+        if (!list) return;
+        if (items.isEmpty()) {
+            empty();
             return;
         }
-        titleView.setText(folder.name + (unread > 0 ? " (" + unread + ")" : ""));
-        countView.setText(items.isEmpty() ? "" : (picked + 1) + "/" + items.size() + (next != null ? "+" : ""));
         adapter.notifyDataSetChanged();
-        if (screen == LIST && !items.isEmpty()) listView.post(() -> listView.smoothScrollToPosition(picked));
+        listView.post(() -> listView.smoothScrollToPosition(picked));
     }
 
-    /** The line under the bar; it takes no room while there is nothing to say. */
+    /**
+     * The app bar: what Left or Back does (the folder pane, back, or close),
+     * the folder or what is being written, the account (or what is under
+     * way) under it, and on the right the folder's unread count or which
+     * conversation of the list is open.
+     */
+    private void bar() {
+        progress.setVisibility(busy() ? View.VISIBLE : View.INVISIBLE);
+        String account = me != null ? me.email : login.ready() ? "Gmail" : "Not set up";
+        String under = busy() ? doing : account;
+        countView.setVisibility(View.GONE);
+        positionView.setVisibility(View.GONE);
+        barAction.setVisibility(View.GONE);
+        if (screen == WRITE) {
+            String kind = writing == null ? Outgoing.NEW : writing.kind;
+            barIcon.setImageResource(R.drawable.ic_close);
+            titleView.setText(kind.equals(Outgoing.REPLY) ? "Reply" : kind.equals(Outgoing.FORWARD) ? "Forward"
+                : kind.equals(Outgoing.DRAFT) ? "Draft" : "New message");
+            under = busy() ? doing : "Menu to send";
+            barAction.setImageResource(R.drawable.ic_send);
+            barAction.setImageTintList(ColorStateList.valueOf(color(R.color.focus_rule)));
+            barAction.setVisibility(View.VISIBLE);
+        } else if (screen == READ) {
+            barIcon.setImageResource(R.drawable.ic_arrow_back);
+            titleView.setText(folder.name);
+            int at = reading == null ? -1 : indexOf(reading.id);
+            if (at >= 0) {
+                positionView.setText((at + 1) + " of " + items.size() + (next != null ? "+" : ""));
+                positionView.setVisibility(View.VISIBLE);
+            }
+        } else {
+            barIcon.setImageResource(R.drawable.ic_menu);
+            titleView.setText(folder.name);
+            int unread = folder.countsAll() ? 0 : count(folder);
+            if (unread > 0) {
+                countView.setText(unread > 999 ? "999+" : String.valueOf(unread));
+                countView.setVisibility(View.VISIBLE);
+            }
+        }
+        subtitleView.setText(under);
+        subtitleView.setVisibility(under.length() == 0 ? View.GONE : View.VISIBLE);
+    }
+
+    /** What an empty list says: that it is loading, that it failed, or that the folder is empty, and what to press. */
+    private void empty() {
+        emptyIcon.setImageResource(icon(folder));
+        String title;
+        String hint;
+        if (!login.ready()) {
+            title = "Mail isn't set up";
+            hint = "Menu, then Command center";
+        } else if (busy()) {
+            title = doing;
+            hint = null;
+        } else if (!listed) {
+            title = folder.name + " didn't load";
+            hint = "Press # to try again";
+        } else {
+            title = "Nothing in " + folder.name;
+            hint = "0 to write, Left for folders";
+        }
+        emptyText.setText(Family.emptyText(this, title, hint));
+    }
+
+    /** The note under the bar; it takes no room while there is nothing to say. */
     private void say(String text) {
         statusView.setText(text);
         statusView.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
+    }
+
+    private int indexOf(String id) {
+        for (int i = 0; i < items.size(); i++) if (items.get(i).id.equals(id)) return i;
+        return -1;
     }
 
     // ---- Reading ----
@@ -411,6 +673,7 @@ public final class MainActivity extends BaseActivity {
         stop();
         screen = READ;
         showQuoted = false;
+        expandAll = false;
         final String id = listed.id;
         reading = whole.get(id);
         render(reading != null ? reading : listed, reading == null);
@@ -420,14 +683,16 @@ public final class MainActivity extends BaseActivity {
             markRead(reading);
             return;
         }
+        reading = listed;
         final Gmail client = gmail();
-        start("Loading…", () -> {
+        start("Opening…", () -> {
             final Conversation full = client.conversation(id);
             return () -> {
                 whole.put(id, full);
+                if (screen != READ || reading == null || !reading.id.equals(id)) return;
                 reading = full;
                 say("");
-                if (screen == READ) render(full, false);
+                render(full, false);
                 markRead(full);
             };
         });
@@ -446,74 +711,208 @@ public final class MainActivity extends BaseActivity {
         refresh();
     }
 
+    /** Left and Right in a conversation: the one before or after it in the list, as Thunderbird's swipe. */
+    private void stepConversation(int by) {
+        int at = reading == null ? -1 : indexOf(reading.id);
+        if (at < 0) return;
+        int to = at + by;
+        if (to < 0) {
+            toast("This is the first in " + folder.name);
+            return;
+        }
+        if (to >= items.size()) {
+            toast(next != null ? "Back to the list for more" : "This is the last in " + folder.name);
+            return;
+        }
+        picked = to;
+        show(items.get(to));
+    }
+
     /**
-     * The subject, then each message: who from, when and to whom, its text
-     * (a reply's quote of the one before it hidden), and its files. A
-     * conversation known only from the list shows its messages' headers
+     * The subject and its tags, then each message under a header of its
+     * own, as Thunderbird's conversation view: read messages before the last
+     * are folded to their header and first words, unless all are opened. A
+     * conversation known only from the list shows every message folded
      * while the rest loads.
      */
     private void render(Conversation conversation, boolean partial) {
-        SpannableStringBuilder out = new SpannableStringBuilder();
-        starts.clear();
-        span(out, conversation.subject(), new TypefaceSpan("sans-serif-medium"), new RelativeSizeSpan(1.2f));
-        int first = -1;
+        readerBody.removeAllViews();
+        messageViews.clear();
+        readerBody.addView(subjectView(conversation));
         List<Message> messages = conversation.messages;
+        int first = -1;
         for (int i = 0; i < messages.size(); i++) {
             Message message = messages.get(i);
             if (first < 0 && message.unread()) first = i;
-            out.append("\n\n");
-            starts.add(out.length());
-            Avatar avatar = new Avatar(message.sender(), dp(26), dp(8), color(R.color.focus_fill), color(R.color.focus_rule));
-            int name = out.length();
-            span(out, message.sender(), new TypefaceSpan("sans-serif-medium"));
-            if (message.draft()) span(out, "  Draft", new ForegroundColorSpan(color(R.color.draft)));
-            out.append('\n');
-            out.setSpan(avatar, name, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            int date = out.length();
-            span(out, longDate(message.time()) + recipients(message), new ForegroundColorSpan(color(R.color.text_muted)),
-                new RelativeSizeSpan(0.88f));
-            out.append('\n');
-            out.setSpan(new LeadingMarginSpan.Standard(avatar.margin()), date, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            out.append('\n');
-            if (partial) {
-                span(out, message.snippet(), new ForegroundColorSpan(color(R.color.text_muted)));
-                continue;
-            }
-            Message.Content content = message.content();
-            String body = content.body();
-            boolean hidden = false;
-            if (i > 0 && !showQuoted) {
-                String cut = Mime.unquoted(body);
-                if (cut != null) {
-                    body = cut;
-                    hidden = true;
-                }
-            }
-            if (body.length() > MAX_SHOWN) body = body.substring(0, MAX_SHOWN) + "…";
-            if (body.trim().length() == 0) span(out, "(no text)", new ForegroundColorSpan(color(R.color.text_muted)));
-            else out.append(body);
-            if (hidden) {
-                out.append('\n');
-                span(out, "[quoted text hidden]", new ForegroundColorSpan(color(R.color.text_muted)));
-            }
-            for (Attachment attachment : content.attachments) {
-                out.append('\n');
-                span(out, "📎 " + attachment.label(), new ForegroundColorSpan(color(R.color.text_muted)));
-            }
+            boolean folded = partial
+                || !expandAll && i < messages.size() - 1 && !message.unread() && !message.draft();
+            View view = messageView(message, i, folded, partial);
+            readerBody.addView(view);
+            messageViews.add(view);
         }
-        readerText.setText(out);
         // The first unread message, or the last, as Gmail opens a conversation.
         final int at = first >= 0 ? first : messages.size() - 1;
-        if (at <= 0) reader.scrollTo(0, 0);
-        else readerText.post(() -> scrollToMessage(at));
+        reader.scrollTo(0, 0);
+        if (at > 0) scrollOnceLaidOut(at);
     }
 
-    /** " · to Jane, Bob +2". */
+    /** Scrolls to a message as soon as the views just added have been measured. */
+    private void scrollOnceLaidOut(final int index) {
+        readerBody.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View view, int left, int top, int right, int bottom,
+                                       int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                view.removeOnLayoutChangeListener(this);
+                view.post(() -> scrollToMessage(index));
+            }
+        });
+    }
+
+    /** The subject, large, and under it a star and the user's labels as Thunderbird's tag pills. */
+    private View subjectView(Conversation conversation) {
+        SpannableStringBuilder out = new SpannableStringBuilder();
+        span(out, conversation.subject(), new TypefaceSpan("sans-serif-medium"), new AbsoluteSizeSpan(16, true),
+            new ForegroundColorSpan(color(R.color.text)));
+        List<String> tags = new ArrayList<String>();
+        List<String> on = conversation.labels();
+        for (Folder label : labels) if (on.contains(label.label)) tags.add(label.name);
+        boolean starred = conversation.starred();
+        if (starred || !tags.isEmpty()) out.append('\n');
+        if (starred) span(out, "★ Starred", new Pills.Pill("★ Starred", color(R.color.row_read), color(R.color.star), color(R.color.star), dp(5)));
+        for (String tag : tags) {
+            if (out.charAt(out.length() - 1) != '\n') out.append(' ');
+            span(out, tag, new Pills.Pill(tag, color(R.color.pill_wash), color(R.color.pill), 0, dp(5)));
+        }
+        TextView view = new TextView(this);
+        view.setText(out);
+        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        view.setLineSpacing(dp(6), 1f);
+        view.setTextColor(color(R.color.text));
+        int pad = getResources().getDimensionPixelSize(R.dimen.pad_h);
+        view.setPadding(pad, dp(10), pad, dp(10));
+        return view;
+    }
+
+    /** One message: its header, then (unless folded) its text, a note where a quote was cut, and its files. */
+    private View messageView(Message message, int index, boolean folded, boolean partial) {
+        View view = getLayoutInflater().inflate(R.layout.reader_message, readerBody, false);
+        String sender = message.sender();
+        ((TextView) view.findViewById(R.id.avatar)).setText(Avatar.letter(sender));
+        SpannableStringBuilder name = new SpannableStringBuilder(sender.length() == 0 ? "(nobody)" : sender);
+        if (message.draft()) span(name, "  Draft", new ForegroundColorSpan(color(R.color.draft)));
+        ((TextView) view.findViewById(R.id.name)).setText(name);
+        ((TextView) view.findViewById(R.id.date)).setText(shortDate(message.time()));
+        TextView detail = (TextView) view.findViewById(R.id.detail);
+        String line = folded ? message.snippet() : join(recipients(message), timeUnlessToday(message.time()));
+        detail.setText(line);
+        detail.setVisibility(line.length() == 0 ? View.GONE : View.VISIBLE);
+
+        TextView body = (TextView) view.findViewById(R.id.body);
+        TextView quoted = (TextView) view.findViewById(R.id.quoted);
+        LinearLayout files = (LinearLayout) view.findViewById(R.id.files);
+        if (folded) {
+            body.setVisibility(View.GONE);
+            quoted.setVisibility(View.GONE);
+            files.setVisibility(View.GONE);
+            if (partial) view.findViewById(R.id.head).setPadding(dp(10), dp(9), dp(10), dp(9));
+            return view;
+        }
+        Message.Content content = message.content();
+        String text = content.body();
+        boolean hidden = false;
+        if (index > 0 && !showQuoted) {
+            String cut = Mime.unquoted(text);
+            if (cut != null) {
+                text = cut;
+                hidden = true;
+            }
+        }
+        if (text.length() > MAX_SHOWN) text = text.substring(0, MAX_SHOWN) + "…";
+        if (text.trim().length() == 0) {
+            SpannableStringBuilder none = new SpannableStringBuilder();
+            span(none, "(no text)", new ForegroundColorSpan(color(R.color.text_muted)));
+            body.setText(none);
+        } else {
+            body.setText(linked(text.trim()));
+        }
+        quoted.setText("Quoted text hidden");
+        quoted.setVisibility(hidden ? View.VISIBLE : View.GONE);
+
+        List<Attachment> attachments = content.attachments;
+        if (attachments.isEmpty()) {
+            files.setVisibility(View.GONE);
+            return view;
+        }
+        long size = 0;
+        for (Attachment attachment : attachments) size += attachment.size;
+        TextView header = fileLine(R.drawable.ic_attachment,
+            files(attachments.size()) + ", " + Mime.size(size), R.color.text_read, true);
+        header.setPadding(0, 0, 0, dp(5));
+        files.addView(header);
+        for (Attachment attachment : attachments) {
+            SpannableStringBuilder label = new SpannableStringBuilder();
+            span(label, attachment.name, new TypefaceSpan("sans-serif-medium"), new ForegroundColorSpan(color(R.color.text)));
+            label.append('\n');
+            span(label, Mime.size(attachment.size) + "  ·  " + attachment.type,
+                new ForegroundColorSpan(color(R.color.text_muted)), new AbsoluteSizeSpan(11, true));
+            TextView card = fileLine(R.drawable.ic_description, "", R.color.text, false);
+            card.setText(label);
+            card.setSingleLine(false);
+            card.setMaxLines(2);
+            card.setBackgroundResource(R.drawable.file_card);
+            card.setPadding(dp(8), dp(6), dp(8), dp(6));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+            params.topMargin = dp(4);
+            files.addView(card, params);
+        }
+        return view;
+    }
+
+    private TextView fileLine(int icon, String text, int textColor, boolean medium) {
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextColor(color(textColor));
+        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        view.setIncludeFontPadding(false);
+        view.setSingleLine(true);
+        view.setEllipsize(TextUtils.TruncateAt.END);
+        view.setGravity(Gravity.CENTER_VERTICAL);
+        if (medium) view.setTypeface(Family.MEDIUM);
+        view.setCompoundDrawablesRelative(small(icon), null, null, null);
+        view.setCompoundDrawablePadding(dp(6));
+        return view;
+    }
+
+    /** An icon at the size of a line of small text. */
+    private Drawable small(int icon) {
+        Drawable drawable = getDrawable(icon).mutate();
+        drawable.setBounds(0, 0, dp(16), dp(16));
+        return drawable;
+    }
+
+    /** A message's text with its web addresses in Thunderbird's link blue; * opens them. */
+    private CharSequence linked(String text) {
+        SpannableStringBuilder out = new SpannableStringBuilder(text);
+        int from = 0;
+        for (String[] link : Mime.links(text)) {
+            int at = text.indexOf(link[0], from);
+            if (at < 0) at = text.indexOf(link[0]);
+            if (at < 0) continue;
+            int end = at + link[0].length();
+            out.setSpan(new ForegroundColorSpan(color(R.color.focus_rule)), at, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            out.setSpan(new UnderlineSpan(), at, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            from = end;
+        }
+        return out;
+    }
+
+    /** "to me, Jane, Bob +2". */
     private String recipients(Message message) {
         List<Address> to = new ArrayList<Address>(message.to());
         to.addAll(message.cc());
         if (to.isEmpty()) return "";
-        StringBuilder out = new StringBuilder(" · to ");
+        StringBuilder out = new StringBuilder("to ");
         int shown = Math.min(2, to.size());
         for (int i = 0; i < shown; i++) {
             if (i > 0) out.append(", ");
@@ -524,49 +923,42 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void scrollToMessage(int index) {
-        Layout layout = readerText.getLayout();
-        if (layout == null || index < 0 || index >= starts.size()) return;
-        reader.scrollTo(0, layout.getLineTop(layout.getLineForOffset(starts.get(index))) + readerText.getPaddingTop());
+        if (index < 0 || index >= messageViews.size()) return;
+        reader.scrollTo(0, messageViews.get(index).getTop());
     }
 
-    /** The message at the top of the screen. */
+    /**
+     * The message being read: the one at the top of the screen, or, once the
+     * conversation is scrolled to its end, the last one in sight.
+     */
     private int messageInView() {
-        Layout layout = readerText.getLayout();
-        if (layout == null) return Math.max(0, starts.size() - 1);
-        int y = reader.getScrollY() + dp(8);
-        int found = 0;
-        for (int i = 0; i < starts.size(); i++) {
-            if (layout.getLineTop(layout.getLineForOffset(starts.get(i))) <= y) found = i;
-        }
-        return found;
-    }
-
-    /** Left and Right in a conversation: the message before or after the one in view. */
-    private void stepMessage(int by) {
-        if (starts.isEmpty()) return;
-        int to = messageInView() + by;
-        if (by < 0) {
-            // Back to the top of the one in view first, if it is scrolled into.
-            Layout layout = readerText.getLayout();
-            int here = messageInView();
-            if (layout != null && reader.getScrollY() > layout.getLineTop(layout.getLineForOffset(starts.get(here))) + dp(8)) {
-                to = here;
+        if (messageViews.isEmpty()) return 0;
+        int top = reader.getScrollY();
+        if (!reader.canScrollVertically(1)) {
+            int bottom = top + reader.getHeight();
+            for (int i = messageViews.size() - 1; i >= 0; i--) {
+                if (messageViews.get(i).getTop() + dp(24) < bottom) return i;
             }
         }
-        if (to < 0) {
-            reader.smoothScrollTo(0, 0);
-            return;
-        }
-        if (to >= starts.size()) return;
-        scrollToMessage(to);
+        int found = 0;
+        for (int i = 0; i < messageViews.size(); i++) if (messageViews.get(i).getTop() <= top + dp(8)) found = i;
+        return found;
     }
 
     /** Whom a reply answers: the message in view, or the latest when that is a draft. */
     private Message replyTarget() {
-        if (reading == null) return null;
+        if (reading == null || reading.messages.isEmpty()) return null;
         int at = Math.min(messageInView(), reading.messages.size() - 1);
         Message message = reading.messages.get(at);
         return message.draft() ? reading.latest() : message;
+    }
+
+    /** Draws it again as it is now, keeping the message in view at the top. */
+    private void rerender() {
+        if (reading == null) return;
+        final int at = messageInView();
+        render(reading, !whole.containsKey(reading.id));
+        scrollOnceLaidOut(at);
     }
 
     private static void span(SpannableStringBuilder out, String text, Object... spans) {
@@ -585,12 +977,18 @@ public final class MainActivity extends BaseActivity {
         return new SimpleDateFormat(pattern, Locale.US).format(new Date(time));
     }
 
-    /** For a message: "Tue, Oct 13, 3:04 PM", with the year when it isn't this one. */
-    private static String longDate(long time) {
+    /** For an open message, whose date beside the name says only the day: "3:04 PM", or "" today, when it already did. */
+    private static String timeUnlessToday(long time) {
+        Calendar now = Calendar.getInstance();
         Calendar then = Calendar.getInstance();
         then.setTimeInMillis(time);
-        boolean thisYear = then.get(Calendar.YEAR) == Calendar.getInstance().get(Calendar.YEAR);
-        return new SimpleDateFormat(thisYear ? "EEE, MMM d, h:mm a" : "EEE, MMM d, yyyy, h:mm a", Locale.US).format(new Date(time));
+        boolean today = now.get(Calendar.YEAR) == then.get(Calendar.YEAR)
+            && now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR);
+        return today ? "" : new SimpleDateFormat("h:mm a", Locale.US).format(new Date(time));
+    }
+
+    private static String join(String first, String second) {
+        return first.length() == 0 ? second : second.length() == 0 ? first : first + "  ·  " + second;
     }
 
     // ---- Changing conversations ----
@@ -614,15 +1012,19 @@ public final class MainActivity extends BaseActivity {
     private void change(Conversation conversation, final Change change, boolean quiet) {
         final String id = conversation.id;
         boolean wasUnread = conversation.unread();
+        boolean wasStarred = conversation.starred();
         for (Conversation copy : copies(id)) change.apply(copy);
-        if (folder == Folder.INBOX && unread >= 0 && conversation.has("INBOX")) {
-            if (change == Change.READ && wasUnread) unread = Math.max(0, unread - 1);
-            if (change == Change.UNREAD && !wasUnread) unread++;
+        Integer inbox = counts.get("INBOX");
+        if (inbox != null && conversation.has("INBOX")) {
+            if (change == Change.READ && wasUnread) counts.put("INBOX", Math.max(0, inbox - 1));
+            if (change == Change.UNREAD && !wasUnread) counts.put("INBOX", inbox + 1);
         }
+        countsAt = 0;
         boolean gone = !folder.holds(conversation);
         if (gone) removeFromList(id);
         if (!quiet) toast(change.done);
         if (screen == READ && (gone || change == Change.UNREAD)) closeReader();
+        else if (screen == READ && conversation.starred() != wasStarred) rerender();
         else refresh();
         final Gmail client = gmail();
         changes.submit(() -> {
@@ -674,9 +1076,12 @@ public final class MainActivity extends BaseActivity {
                 if (add.isEmpty() && remove.isEmpty()) return;
                 final String id = conversation.id;
                 for (Conversation copy : copies(id)) copy.relabel(add, remove);
+                countsAt = 0;
                 if (!folder.holds(conversation)) {
                     removeFromList(id);
                     if (screen == READ) closeReader();
+                } else if (screen == READ) {
+                    rerender();
                 }
                 refresh();
                 toast("Labels changed");
@@ -698,21 +1103,50 @@ public final class MainActivity extends BaseActivity {
 
     private void write(Outgoing out, int from, String status) {
         stop();
+        closeDrawer();
         writing = out;
         writingStart = Outgoing.parse(out.toJson());
         writeFrom = from;
         screen = WRITE;
         sending = false;
-        toField.setText(out.to);
-        ccField.setText(out.cc);
+        toField.setText(pilled(out.to));
+        ccField.setText(pilled(out.cc));
         subjectField.setText(out.subject);
         bodyField.setText(out.text);
         ccRow.setVisibility(out.cc.length() > 0 ? View.VISIBLE : View.GONE);
+        showFrom();
+        if (out.attachments.isEmpty()) {
+            filesView.setVisibility(View.GONE);
+        } else {
+            long size = 0;
+            for (Attachment attachment : out.attachments) size += attachment.size;
+            filesView.setText(files(out.attachments.size()) + ", " + Mime.size(size));
+            filesView.setVisibility(View.VISIBLE);
+        }
         EditText focus = out.to.length() == 0 ? toField : out.subject.length() == 0 ? subjectField : bodyField;
         focus.requestFocus();
         focus.setSelection(focus == bodyField && !out.kind.equals(Outgoing.DRAFT) ? 0 : focus.length());
         refresh();
         say(status);
+    }
+
+    /** Whom it is sent as, as Thunderbird's From line: the name, then the address in grey. */
+    private void showFrom() {
+        List<Address> chosen = Address.parse(writing.from);
+        Address from = chosen.isEmpty() || me != null && !me.is(chosen.get(0).email) ? null : chosen.get(0);
+        if (from == null && me != null) from = me.addresses.get(0);
+        if (from == null) {
+            fromRow.setVisibility(View.GONE);
+            return;
+        }
+        SpannableStringBuilder line = new SpannableStringBuilder();
+        if (from.name.length() > 0) {
+            span(line, from.name, new ForegroundColorSpan(color(R.color.text)));
+            line.append("  ");
+        }
+        span(line, from.email, new ForegroundColorSpan(color(R.color.text_muted)));
+        fromView.setText(line);
+        fromRow.setVisibility(View.VISIBLE);
     }
 
     private void compose(String to) {
@@ -728,8 +1162,7 @@ public final class MainActivity extends BaseActivity {
     private void forward() {
         Message target = replyTarget();
         if (target == null || me == null) return;
-        Outgoing out = Outgoing.forward(target, me, TimeZone.getDefault());
-        write(out, READ, out.attachments.isEmpty() ? "" : "With " + files(out.attachments.size()) + ".");
+        write(Outgoing.forward(target, me, TimeZone.getDefault()), READ, "");
     }
 
     private static String files(int count) {
@@ -751,16 +1184,26 @@ public final class MainActivity extends BaseActivity {
             if (draftId == null) throw new IOException("That draft was sent or deleted.");
             return () -> {
                 whole.put(id, loaded);
-                Outgoing out = Outgoing.draft(draft, draftId);
-                write(out, from, out.attachments.isEmpty() ? "" : "With " + files(out.attachments.size()) + ".");
+                write(Outgoing.draft(draft, draftId), from, "");
             };
         });
     }
 
+    /** Addresses as a field shows them: each finished with a comma, so each is drawn as a pill. */
+    private static String pilled(String addresses) {
+        String trimmed = addresses.trim();
+        return trimmed.length() == 0 || trimmed.endsWith(",") ? trimmed : trimmed + ", ";
+    }
+
+    /** A field's addresses as kept: without the comma after the last. */
+    private static String unpilled(EditText field) {
+        return field.getText().toString().trim().replaceAll("[\\s,]+$", "");
+    }
+
     /** The fields into the message being written. */
     private void collect() {
-        writing.to = toField.getText().toString().trim();
-        writing.cc = ccField.getText().toString().trim();
+        writing.to = unpilled(toField);
+        writing.cc = unpilled(ccField);
         writing.subject = subjectField.getText().toString();
         writing.text = bodyField.getText().toString();
     }
@@ -858,19 +1301,17 @@ public final class MainActivity extends BaseActivity {
             finishWriting(false);
             return;
         }
-        new AlertDialog.Builder(this)
-            .setItems(new String[] {"Save draft", "Discard", "Keep writing"}, (dialog, which) -> {
-                if (which == 0) saveDraft();
-                else if (which == 1) discard();
-            })
-            .show();
+        new Sheet()
+            .add(R.drawable.ic_save, "Save draft", this::saveDraft)
+            .add(R.drawable.ic_delete, "Discard", this::discard)
+            .add(R.drawable.ic_edit, "Keep writing", () -> {})
+            .show(this);
     }
 
     /** Back to where writing began; what it changed (a reply, a draft) is fetched again. */
     private void finishWriting(boolean changedMail) {
         prefs().edit().remove("compose").apply();
         String thread = writing.threadId;
-        writing = null;
         View focus = getCurrentFocus();
         if (focus != null) {
             ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(focus.getWindowToken(), 0);
@@ -878,6 +1319,7 @@ public final class MainActivity extends BaseActivity {
         }
         if (changedMail && thread.length() > 0) whole.remove(thread);
         if (writeFrom == READ && reading != null) {
+            writing = null;
             if (changedMail) {
                 // Open it again, whole, with the reply in it.
                 whole.remove(reading.id);
@@ -890,6 +1332,7 @@ public final class MainActivity extends BaseActivity {
             return;
         }
         screen = LIST;
+        writing = null;
         say("");
         refresh();
         if (changedMail || items.isEmpty()) load();
@@ -930,7 +1373,14 @@ public final class MainActivity extends BaseActivity {
         if (reading == null) return;
         final List<Attachment> all = new ArrayList<Attachment>();
         for (Message message : reading.messages) all.addAll(message.content().attachments);
-        if (all.isEmpty()) return;
+        if (all.isEmpty()) {
+            toast("No attachments here.");
+            return;
+        }
+        if (all.size() == 1) {
+            saveAttachment(all.get(0));
+            return;
+        }
         List<String> shown = new ArrayList<String>();
         for (Attachment attachment : all) shown.add(attachment.label());
         listDialog("Save to Download", shown, which -> saveAttachment(all.get(which)), null);
@@ -1018,12 +1468,51 @@ public final class MainActivity extends BaseActivity {
         boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
         boolean first = down && event.getRepeatCount() == 0;
         if (key == KeyEvent.KEYCODE_MENU) {
-            if (!down) menu();
+            if (!down) {
+                closeDrawer();
+                actions().show(this);
+            }
             return true;
         }
+        if (drawerOpen) return drawerKey(key, down, first);
         if (screen == WRITE) return writeKey(event, key, down, first);
+        char shortcut = shortcut(key);
+        if (shortcut != 0) {
+            if (first) actions().press(shortcut);
+            return true;
+        }
         if (screen == READ) return readKey(event, key, down, first);
         return listKey(event, key, down, first);
+    }
+
+    /** The keypad key as the menu shows it, or 0. */
+    private static char shortcut(int key) {
+        if (key >= KeyEvent.KEYCODE_0 && key <= KeyEvent.KEYCODE_9) return (char) ('0' + key - KeyEvent.KEYCODE_0);
+        if (key >= KeyEvent.KEYCODE_NUMPAD_0 && key <= KeyEvent.KEYCODE_NUMPAD_9) return (char) ('0' + key - KeyEvent.KEYCODE_NUMPAD_0);
+        if (key == KeyEvent.KEYCODE_STAR || key == KeyEvent.KEYCODE_NUMPAD_MULTIPLY) return '*';
+        if (key == KeyEvent.KEYCODE_POUND) return '#';
+        return 0;
+    }
+
+    private boolean drawerKey(int key, boolean down, boolean first) {
+        if (Ui.isOk(key) || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            if (first) chooseEntry();
+            return true;
+        }
+        switch (key) {
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                if (down) moveDrawer(key == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1);
+                return true;
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                if (first) closeDrawer();
+                return true;
+            case KeyEvent.KEYCODE_BACK:
+                if (!down) closeDrawer();
+                return true;
+            default:
+                return true;
+        }
     }
 
     private boolean listKey(KeyEvent event, int key, boolean down, boolean first) {
@@ -1037,14 +1526,16 @@ public final class MainActivity extends BaseActivity {
                 if (down) movePick(key == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1);
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
+                if (first) openDrawer();
+                return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (first) stepFolder(key == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1);
+                if (first) open();
                 return true;
             case KeyEvent.KEYCODE_BACK:
                 if (busy()) {
                     if (!down) {
                         stop();
-                        say("Stopped.");
+                        refresh();
                     }
                     return true;
                 }
@@ -1060,7 +1551,7 @@ public final class MainActivity extends BaseActivity {
 
     private boolean readKey(KeyEvent event, int key, boolean down, boolean first) {
         if (Ui.isOk(key)) {
-            if (first) menu();
+            if (first) actions().show(this);
             return true;
         }
         switch (key) {
@@ -1070,7 +1561,7 @@ public final class MainActivity extends BaseActivity {
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (first) stepMessage(key == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1);
+                if (first) stepConversation(key == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1);
                 return true;
             case KeyEvent.KEYCODE_BACK:
                 if (!down) closeReader();
@@ -1110,94 +1601,120 @@ public final class MainActivity extends BaseActivity {
 
     // ---- Menus ----
 
-    private void menu() {
-        final List<String> names = new ArrayList<String>();
-        final List<Runnable> actions = new ArrayList<Runnable>();
+    /**
+     * What can be done here, in the menu's order, each with its keypad
+     * shortcut: the digits as Thunderbird's single-key shortcuts are grouped
+     * (1 to 3 answer, 4 to 9 file away), 0 writes, * and # the rest.
+     */
+    private Sheet actions() {
+        Sheet sheet = new Sheet();
         if (screen == WRITE) {
-            if (sending) return;
-            add(names, actions, "Send", this::send);
-            add(names, actions, "Add recipient…", this::addRecipient);
+            if (sending) return sheet;
+            sheet.add(R.drawable.ic_send, "Send", this::send);
+            sheet.add(R.drawable.ic_person_add, "Add recipient…", this::addRecipient);
             if (ccRow.getVisibility() != View.VISIBLE) {
-                add(names, actions, "Add Cc", () -> {
+                sheet.add(R.drawable.ic_add, "Add Cc", () -> {
                     ccRow.setVisibility(View.VISIBLE);
                     ccField.requestFocus();
                 });
             }
-            add(names, actions, "Save draft", this::saveDraft);
-            add(names, actions, "Discard", () -> {
+            sheet.add(R.drawable.ic_save, "Save draft", this::saveDraft);
+            sheet.add(R.drawable.ic_delete, "Discard", () -> {
                 collect();
                 discard();
             });
-        } else if (screen == READ) {
+            return sheet;
+        }
+        if (busy()) {
+            sheet.add(R.drawable.ic_close, "Stop", () -> {
+                stop();
+                refresh();
+            });
+        }
+        if (screen == READ) {
             final Conversation conversation = reading != null ? reading : current();
-            if (busy()) {
-                add(names, actions, "Stop", () -> {
-                    stop();
-                    say("");
-                });
-            }
-            if (reading != null && me != null) {
-                add(names, actions, "Reply", () -> reply(false));
+            boolean loaded = reading != null && whole.containsKey(reading.id);
+            if (loaded && me != null) {
+                sheet.add(R.drawable.ic_reply, "Reply", '1', () -> reply(false));
                 Message target = replyTarget();
                 if (target != null && target.to().size() + target.cc().size() > 1) {
-                    add(names, actions, "Reply all", () -> reply(true));
+                    sheet.add(R.drawable.ic_reply_all, "Reply all", '2', () -> reply(true));
                 }
-                add(names, actions, "Forward", this::forward);
-                if (reading.draft() != null) add(names, actions, "Edit draft", () -> editDraft(reading));
+                sheet.add(R.drawable.ic_forward, "Forward", '3', this::forward);
+                if (reading.draft() != null) sheet.add(R.drawable.ic_edit, "Edit draft", () -> editDraft(reading));
             }
-            if (conversation != null) conversationItems(names, actions, conversation);
-            if (reading != null) {
+            if (conversation != null) conversationActions(sheet, conversation);
+            if (loaded) {
                 boolean files = false;
                 for (Message message : reading.messages) files |= !message.content().attachments.isEmpty();
-                if (files) add(names, actions, "Save attachment…", this::chooseAttachment);
-                add(names, actions, "Open link…", this::chooseLink);
-                add(names, actions, showQuoted ? "Hide quoted text" : "Show quoted text", () -> {
+                if (files) sheet.add(R.drawable.ic_download, "Save attachment…", '#', this::chooseAttachment);
+                sheet.add(R.drawable.ic_link, "Open link…", '*', this::chooseLink);
+                if (reading.messages.size() > 1) {
+                    sheet.add(expandAll ? R.drawable.ic_expand_less : R.drawable.ic_expand_more,
+                        expandAll ? "Fold read messages" : "Expand all messages", () -> {
+                            expandAll = !expandAll;
+                            rerender();
+                        });
+                }
+                sheet.add(R.drawable.ic_description, showQuoted ? "Hide quoted text" : "Show quoted text", () -> {
                     showQuoted = !showQuoted;
-                    int at = messageInView();
-                    render(reading, false);
-                    readerText.post(() -> scrollToMessage(at));
+                    rerender();
                 });
             }
-            add(names, actions, "Back to " + folder.name, this::closeReader);
-        } else {
-            if (busy()) {
-                add(names, actions, "Stop", () -> {
-                    stop();
-                    say("Stopped.");
-                });
-            }
-            add(names, actions, "Write", () -> compose(""));
-            Conversation conversation = current();
-            if (conversation != null) conversationItems(names, actions, conversation);
-            add(names, actions, "Search…", this::askSearch);
-            add(names, actions, "Folders…", this::chooseFolder);
-            add(names, actions, "Refresh", this::load);
-            if (next != null) add(names, actions, "More", this::more);
-            add(names, actions, "Command center…", this::askLogin);
+            sheet.add(R.drawable.ic_edit, "Write", '0', () -> compose(""));
+            sheet.add(R.drawable.ic_arrow_back, "Back to " + folder.name, this::closeReader);
+            return sheet;
         }
-        new AlertDialog.Builder(this)
-            .setItems(names.toArray(new String[0]), (dialog, which) -> actions.get(which).run())
-            .show();
+        sheet.add(R.drawable.ic_edit, "Write", '0', () -> compose(""));
+        Conversation conversation = current();
+        if (conversation != null) conversationActions(sheet, conversation);
+        sheet.add(R.drawable.ic_search, "Search…", '*', this::askSearch);
+        sheet.add(R.drawable.ic_menu, "Folders", LEFT, this::openDrawer);
+        sheet.add(R.drawable.ic_refresh, "Refresh", '#', this::load);
+        if (next != null) sheet.add(R.drawable.ic_expand_more, "Load more", this::more);
+        sheet.add(R.drawable.ic_settings, "Command center…", this::askLogin);
+        return sheet;
     }
 
-    private void conversationItems(List<String> names, List<Runnable> actions, final Conversation conversation) {
+    /** Archive, delete and the rest that make sense for it, then its labels. */
+    private void conversationActions(Sheet sheet, final Conversation conversation) {
         for (final Change change : Change.offered(conversation)) {
-            add(names, actions, change.label, () -> change(conversation, change, false));
+            sheet.add(icon(change), change.label, key(change), () -> change(conversation, change, false));
         }
-        if (!labels.isEmpty()) add(names, actions, "Labels…", () -> chooseLabels(conversation));
+        if (!labels.isEmpty()) sheet.add(R.drawable.ic_folder, "Labels…", '8', () -> chooseLabels(conversation));
     }
 
-    private static void add(List<String> names, List<Runnable> actions, String name, Runnable action) {
-        names.add(name);
-        actions.add(action);
+    private static int icon(Change change) {
+        switch (change) {
+            case ARCHIVE: return R.drawable.ic_archive;
+            case TRASH: return R.drawable.ic_delete;
+            case READ: return R.drawable.ic_mark_email_read;
+            case UNREAD: return R.drawable.ic_mark_email_unread;
+            case STAR: return R.drawable.ic_star;
+            case UNSTAR: return R.drawable.ic_star_filled;
+            case SPAM: return R.drawable.ic_report;
+            default: return R.drawable.ic_inbox;
+        }
     }
 
-    private void chooseFolder() {
-        final List<Folder> all = new ArrayList<Folder>(Folder.SYSTEM);
-        all.addAll(labels);
-        List<String> names = new ArrayList<String>();
-        for (Folder each : all) names.add(each.name);
-        listDialog("Folders", names, which -> setFolder(all.get(which)), null);
+    /** 4 files it away (or back), 5 stars, 6 marks, 7 is spam, 9 deletes (or restores). */
+    private static char key(Change change) {
+        switch (change) {
+            case ARCHIVE:
+            case INBOX:
+                return '4';
+            case STAR:
+            case UNSTAR:
+                return '5';
+            case READ:
+            case UNREAD:
+                return '6';
+            case SPAM:
+            case NOT_SPAM:
+                return '7';
+            default:
+                return '9';
+        }
     }
 
     private void askSearch() {
@@ -1255,6 +1772,8 @@ public final class MainActivity extends BaseActivity {
                     me = null;
                     labelsLoaded = false;
                     whole.clear();
+                    counts.clear();
+                    countsAt = 0;
                     prefs().edit().putString("login", next.toJson()).apply();
                     say("Saved: " + next.host());
                     if (screen == LIST) load();
@@ -1266,7 +1785,13 @@ public final class MainActivity extends BaseActivity {
             .show();
     }
 
-    /** A conversation: who, and when; the subject; the start of the latest message. Unread ones in bold. */
+    // ---- Adapters ----
+
+    /**
+     * A conversation, as Thunderbird's message item: unread ones white, with
+     * the dot, Medium type and a blue time; read ones on grey in a softer
+     * ink. A star, a paperclip and the message count show when they apply.
+     */
     private final class ConversationAdapter extends BaseAdapter {
 
         @Override
@@ -1286,67 +1811,133 @@ public final class MainActivity extends BaseActivity {
 
         @Override
         public View getView(int position, View convert, ViewGroup parent) {
-            LinearLayout row = (LinearLayout) convert;
-            if (row == null) {
-                int padH = getResources().getDimensionPixelSize(R.dimen.pad_h);
-                int padV = dp(7);
-                row = vertical();
-                row.setBackgroundResource(com.xp3.common.ui.R.drawable.family_pick);
-                row.setPadding(padH, padV, padH, padV);
-                LinearLayout top = new LinearLayout(MainActivity.this);
-                top.setOrientation(LinearLayout.HORIZONTAL);
-                top.setGravity(Gravity.CENTER_VERTICAL);
-                TextView who = line(R.dimen.text_name, R.color.text);
-                top.addView(who, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-                TextView when = line(R.dimen.text_meta, R.color.text_muted);
-                when.setPadding(dp(6), 0, 0, 0);
-                when.setCompoundDrawablePadding(dp(4));
-                top.addView(when);
-                row.addView(top);
-                TextView subject = line(R.dimen.text_subject, R.color.text);
-                subject.setPadding(0, dp(3), 0, 0);
-                row.addView(subject);
-                TextView snippet = line(R.dimen.text_meta, R.color.text_muted);
-                snippet.setPadding(0, dp(2), 0, 0);
-                row.addView(snippet);
-            }
+            View row = convert != null ? convert : getLayoutInflater().inflate(R.layout.row_conversation, parent, false);
             Conversation conversation = items.get(position);
             boolean unread = conversation.unread();
-            LinearLayout top = (LinearLayout) row.getChildAt(0);
-            TextView who = (TextView) top.getChildAt(0);
-            String people = conversation.people(me, folder == Folder.SENT);
-            who.setText(people.length() == 0 ? "(nobody)" : people);
-            who.setTypeface(unread ? Family.MEDIUM : Typeface.DEFAULT);
-            who.setTextColor(color(conversation.onlyDrafts() ? R.color.draft : R.color.text));
-            // What is new carries the accent: a dot, and the time beside it.
-            TextView when = (TextView) top.getChildAt(1);
+            boolean sent = folder == Folder.SENT;
+            int ink = color(unread ? R.color.text : R.color.text_read);
+            Typeface face = unread ? Family.MEDIUM : Typeface.DEFAULT;
+            row.setBackgroundResource(unread ? R.drawable.row_unread : R.drawable.row_read);
+            row.setActivated(position == picked);
+            row.findViewById(R.id.dot).setVisibility(unread ? View.VISIBLE : View.INVISIBLE);
+
+            String names = conversation.names(me, sent);
+            ((TextView) row.findViewById(R.id.avatar)).setText(Avatar.letter(person(conversation, names, sent)));
+
+            TextView who = (TextView) row.findViewById(R.id.who);
+            who.setText(names.length() == 0 ? "(nobody)" : names);
+            who.setTypeface(face);
+            who.setTextColor(conversation.onlyDrafts() ? color(R.color.draft) : ink);
+
+            row.findViewById(R.id.star).setVisibility(conversation.starred() ? View.VISIBLE : View.GONE);
+            TextView when = (TextView) row.findViewById(R.id.when);
             when.setText(shortDate(conversation.time()));
             when.setTextColor(color(unread ? R.color.focus_rule : R.color.text_muted));
-            when.setTypeface(unread ? Family.MEDIUM : Typeface.DEFAULT);
-            when.setCompoundDrawablesRelativeWithIntrinsicBounds(unread ? getDrawable(R.drawable.unread_dot) : null, null, null, null);
+            when.setTypeface(face);
 
-            TextView subject = (TextView) row.getChildAt(1);
-            SpannableStringBuilder line = new SpannableStringBuilder();
-            if (conversation.starred()) span(line, "★ ", new ForegroundColorSpan(color(R.color.star)));
-            line.append(conversation.subject());
-            subject.setText(line);
-            subject.setTypeface(unread ? Family.MEDIUM : Typeface.DEFAULT);
+            TextView subject = (TextView) row.findViewById(R.id.subject);
+            subject.setText(conversation.subject());
+            subject.setTypeface(face);
+            subject.setTextColor(ink);
+            row.findViewById(R.id.clip).setVisibility(conversation.hasFiles() ? View.VISIBLE : View.GONE);
+            TextView thread = (TextView) row.findViewById(R.id.thread);
+            int count = conversation.messages.size();
+            thread.setVisibility(count > 1 ? View.VISIBLE : View.GONE);
+            thread.setText(count > 99 ? "99+" : String.valueOf(count));
+            int badge = color(unread ? R.color.focus_rule : R.color.text_muted);
+            thread.setTextColor(badge);
+            thread.setBackgroundTintList(ColorStateList.valueOf(badge));
 
-            TextView snippet = (TextView) row.getChildAt(2);
+            TextView snippet = (TextView) row.findViewById(R.id.snippet);
             snippet.setText(conversation.snippet());
+            snippet.setTextColor(color(R.color.text_muted));
             snippet.setVisibility(conversation.snippet().length() == 0 ? View.GONE : View.VISIBLE);
-            row.setActivated(position == picked);
             return row;
         }
+    }
 
-        private TextView line(int size, int textColor) {
-            TextView view = new TextView(MainActivity.this);
-            view.setTextColor(color(textColor));
-            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(size));
-            view.setSingleLine(true);
-            view.setEllipsize(TextUtils.TruncateAt.END);
-            view.setIncludeFontPadding(false);
-            return view;
+    /**
+     * Whom a conversation's monogram stands for: in Sent whom it went to,
+     * else the latest sender who isn't the user, so a thread the user
+     * answered last still shows who it is with.
+     */
+    private String person(Conversation conversation, String names, boolean sent) {
+        if (sent && names.startsWith("To: ")) return names.substring(4);
+        for (int i = conversation.messages.size() - 1; i >= 0; i--) {
+            Message message = conversation.messages.get(i);
+            if (message.draft()) continue;
+            List<Address> from = message.from();
+            if (me == null || from.isEmpty() || !me.is(from.get(0).email)) return message.sender();
+        }
+        Message latest = conversation.latest();
+        return latest == null ? names : latest.sender();
+    }
+
+    /**
+     * The folder pane's lines: a folder (icon, name, count) on a pill that
+     * fills under the d-pad and is washed for the folder open now, or a
+     * heading.
+     */
+    private final class FolderAdapter extends BaseAdapter {
+
+        @Override
+        public int getCount() {
+            return entries.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return entries.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public int getViewTypeCount() {
+            return 2;
+        }
+
+        @Override
+        public int getItemViewType(int position) {
+            return entries.get(position).heading() ? 1 : 0;
+        }
+
+        @Override
+        public boolean isEnabled(int position) {
+            return !entries.get(position).heading();
+        }
+
+        @Override
+        public View getView(int position, View convert, ViewGroup parent) {
+            Entry entry = entries.get(position);
+            if (entry.heading()) {
+                View row = convert != null ? convert : getLayoutInflater().inflate(R.layout.row_section, parent, false);
+                ((TextView) row.findViewById(R.id.name)).setText(entry.name);
+                return row;
+            }
+            View row = convert != null ? convert : getLayoutInflater().inflate(R.layout.row_folder, parent, false);
+            boolean picked = position == drawerPick;
+            boolean open = entry.folder != null && entry.folder.is(folder);
+            row.setActivated(picked);
+            row.setSelected(open);
+            int ink = picked ? color(R.color.on_primary) : open ? color(R.color.focus_rule) : color(R.color.text);
+            ImageView icon = (ImageView) row.findViewById(R.id.icon);
+            icon.setImageResource(entry.icon);
+            icon.setImageTintList(ColorStateList.valueOf(picked || open ? ink : color(R.color.icon)));
+            TextView name = (TextView) row.findViewById(R.id.name);
+            name.setText(entry.name);
+            name.setTextColor(ink);
+            name.setTypeface(picked || open ? Family.MEDIUM : Typeface.DEFAULT);
+            TextView count = (TextView) row.findViewById(R.id.count);
+            int n = entry.folder == null ? 0 : count(entry.folder);
+            count.setText(n > 999 ? "999+" : String.valueOf(n));
+            count.setVisibility(n > 0 ? View.VISIBLE : View.GONE);
+            count.setTextColor(picked ? color(R.color.on_primary)
+                : entry.folder != null && entry.folder.countsAll() ? color(R.color.text_muted) : color(R.color.focus_rule));
+            return row;
         }
     }
 }

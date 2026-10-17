@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Beside the time of a conversation with something unread. -->
+<!-- Beside the monogram of a conversation with something unread:
+     Thunderbird's new-message badge. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
     <solid android:color="@color/focus_rule" />
-    <size android:width="6dp" android:height="6dp" />
+    <size android:width="8dp" android:height="8dp" />
 </shape>

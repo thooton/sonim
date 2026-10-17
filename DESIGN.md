@@ -68,12 +68,35 @@ would otherwise lay that wash over the whole page.
 | --- | --- | --- | --- | --- |
 | Canvas | `#45142A` | `#D3AEBE` | `#8E1F48` | `#F9EEF3` |
 | List | `#23201C` | `#C7B9A6` | `#A85C00` | `#FBF2E5` |
-| Mail | `#4D1711` | `#DBB3AC` | `#A12C1D` | `#FCEFEC` |
+| Mail | `#004F9B` | `#A9C7FF` | `#004F9B` | `#E4EDF8` |
 | Places | `#0F3624` | `#A3C6B2` | `#1D6A45` | `#EAF5EF` |
 | Serve | `#0D3236` | `#9CC3C6` | `#11707A` | `#E7F4F5` |
 | Source | `#291741` | `#BBA9D3` | `#6334A3` | `#F2EDFA` |
 | Updater | `#1B2633` | `#A8B6C6` | `#2B5E92` | `#EAF1F8` |
 
-Each pair was checked for contrast: the dim header text is at least 7:1 on
-its header, the accent at least 4.5:1 on its wash, and muted text at least
-4.8:1 on white.
+Mail's row is Thunderbird's: see below. Each pair was checked for contrast:
+the dim header text is at least 7:1 on its header, the accent at least 4.5:1
+on its wash, and muted text at least 4.8:1 on white.
+
+## Mail: Thunderbird on a flip phone
+
+Mail takes its look from Thunderbird for Android rather than from Charge
+and Books, because that is the mail client people know. It keeps the rules
+above (one accent, Medium for emphasis, the focus card, `Family.empty`), and
+departs from them where Thunderbird does:
+
+- **Light chrome.** The app bar and status bar are Thunderbird's warm
+  surface grey (`bar`, `#F1EDEC`) with dark text and status icons, not a dark
+  band. The folder pane slides over the screen from the left on Left, on
+  Thunderbird's `#FCF8F8`, with the account's blue bar at its head.
+- **Thunderbird's palette.** The accent is Thunderbird's primary blue
+  `#004F9B`; the folder under the d-pad is a filled pill in its secondary
+  container `#2E61A0`, the open folder a pale wash of it. Read conversations
+  sit on `#F6F3F2` in a softer ink (`#45474A`), unread ones on white with a
+  blue dot, Medium type and a blue time, as Thunderbird's message items do.
+- **Its icons.** The Material Symbols icons are copied from
+  thunderbird-android (Apache License 2.0), noted in each file. People are
+  monograms: an initial in a circle of the accent at 15% with a 1dp ring.
+- **Keys shown in menus.** The digits, * and # are shortcuts on the list and
+  in a conversation, and each menu item shows its key on a keycap, as
+  Thunderbird's menus show their shortcuts.

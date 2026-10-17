@@ -85,12 +85,17 @@ public final class Conversation {
      * how many messages when there are several. In Sent it is who it went to.
      */
     public String people(Me me, boolean sent) {
-        if (sent) {
-            Message latest = null;
-            for (Message message : messages) if (message.has("SENT")) latest = message;
-            List<Address> to = latest == null ? new ArrayList<Address>() : latest.to();
-            if (!to.isEmpty()) return "To: " + (to.size() == 1 ? to.get(0).display() : briefs(to, me));
-        }
+        String to = sent ? sentTo(me) : null;
+        if (to != null) return to;
+        String names = names(me, false);
+        int count = messages.size();
+        return count > 1 ? names + " (" + count + ")" : names;
+    }
+
+    /** As {@link #people}, without the count, for a list that shows it apart. */
+    public String names(Me me, boolean sent) {
+        String to = sent ? sentTo(me) : null;
+        if (to != null) return to;
         List<Address> senders = new ArrayList<Address>();
         boolean drafts = false;
         for (Message message : messages) {
@@ -105,8 +110,22 @@ public final class Conversation {
             : senders.size() == 1 ? (me != null && me.is(senders.get(0).email) ? "me" : senders.get(0).display())
             : briefs(senders, me);
         if (drafts) names = names.length() == 0 ? "Draft" : names + ", Draft";
-        int count = messages.size();
-        return count > 1 ? names + " (" + count + ")" : names;
+        return names;
+    }
+
+    /** Whether any message seems to carry a file (see {@link Message#hasFiles}). */
+    public boolean hasFiles() {
+        for (Message message : messages) if (message.hasFiles()) return true;
+        return false;
+    }
+
+    /** "To: Jane", whom the latest sent message went to, or null when there is none. */
+    private String sentTo(Me me) {
+        Message latest = null;
+        for (Message message : messages) if (message.has("SENT")) latest = message;
+        List<Address> to = latest == null ? new ArrayList<Address>() : latest.to();
+        if (to.isEmpty()) return null;
+        return "To: " + (to.size() == 1 ? to.get(0).display() : briefs(to, me));
     }
 
     private static String briefs(List<Address> addresses, Me me) {
