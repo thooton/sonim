@@ -1,6 +1,6 @@
 # The family look
 
-How the light, list-and-form apps (Canvas, List, Mail, Places, Serve, Source)
+How the light, list-and-form apps (Canvas, List, Mail, Serve, Source)
 are drawn, so they read as siblings of Charge and Books rather than
 as stock Android with a coloured bar. The pieces live in `common/ui`
 (`Family`, `res/drawable/family_*`, `res/values/family*.xml`); this is why
@@ -78,7 +78,6 @@ would otherwise lay that wash over the whole page.
 | Canvas | `#45142A` | `#D3AEBE` | `#8E1F48` | `#F9EEF3` |
 | List | `#23201C` | `#C7B9A6` | `#A85C00` | `#FBF2E5` |
 | Mail | `#004F9B` | `#A9C7FF` | `#004F9B` | `#E4EDF8` |
-| Places | `#0F3624` | `#A3C6B2` | `#1D6A45` | `#EAF5EF` |
 | Serve | `#0D3236` | `#9CC3C6` | `#11707A` | `#E7F4F5` |
 | Source | `#291741` | `#BBA9D3` | `#6334A3` | `#F2EDFA` |
 
@@ -109,42 +108,41 @@ departs from them where Thunderbird does:
   in a conversation, and each menu item shows its key on a keycap, as
   Thunderbird's menus show their shortcuts.
 
-## Places: as Google Maps shows it
+## Places: Google Maps, dark, for a d-pad
 
-Places takes its layout from Google Maps, since that is how people expect a
-place to read, while keeping the family's colours and Medium for emphasis.
+Places is not one of the light family. It takes Google Maps' dark theme,
+since Maps is the app people know for finding a place, and lays it out for
+a 240x320 screen and a d-pad rather than a finger. Its colours were sampled
+from Maps screenshots (`res/values/colors.xml`):
 
-The results are Maps' list, without its photos and chips (they would cost
-a request each and leave room for one result on this screen):
+- **The sheet.** `#131314` everywhere, status and navigation bars included;
+  hairlines `#3E3E40`; the clear button and recent searches' clocks on
+  `#303030`.
+- **Google Sans.** Google Sans Flex, regular and medium (OFL), bundled as
+  fonts: names 14.5sp in the list and 18sp atop a place, facts 12 to
+  12.5sp, the text `#E3E3E3`, what follows it `#ABABAD`.
+- **Maps' teal.** Icons, links, the cursor and the loading bar are the
+  bright teal `#7DD3E3`/`#5CB8C9`. Filter chips are 8dp-rounded and
+  outlined, and filled `#00363F` with `#A6EEFB` text and a tick when on.
+- **Maps' signals.** "Closed" `#F2B8B5`, "Open" `#81C995`, stars `#FFC42A`,
+  the wheelchair `#A8C7FA`.
+- **Focus, which Maps doesn't have.** The row under the d-pad sits on a
+  teal-tinted `#1C2B2E`; the chip under it takes a pale teal ring.
 
-- **A row in four lines.** The name, 13.5sp Medium; the rating in the text
-  colour, one gold star and the count, then price range, a wheelchair in
-  the accent and the kind of place, muted; the full address, muted (Maps
-  leaves it out, but on a list of branches it is what tells them apart);
-  then "Open" in green or "Closed" in red, Medium, when that changes, and
-  how far. A line with nothing on it takes no room.
-- **Bands, not hairlines.** Results are parted by 6dp of `grouped_page`, as
-  Maps parts its results, and the picked one is the family's focus card.
+What changes from Maps, for the keys and the screen:
 
-A place's own screen (`PlacePage`) takes its layout from Maps' place sheet:
-
-- **A head on white over the grouped page.** The name at 17sp Medium; the
-  rating with five gold stars filled to it (a drawable, so 4.5 shows half a
-  star) and the count; kind, price range and distance in muted text, with a
-  wheelchair in the accent when the entrance takes one; "Open" in green or
-  "Closed" in red, Medium, then when that changes.
-- **Chips for what Menu can do.** Call (filled in the accent, as Maps fills
-  Directions) and Website (the wash), under the head.
-- **Icons, not labels.** The first card is address, phone and website, a
-  muted Material icon leading each row and hairlines inset to the text. The
-  phone and website are in the accent, the website shown as its host.
-- **Headed sections.** Hours (two columns, today in Medium, other hours
-  under a caption), About, Amenities (ticked chips for what it has, crossed
-  and muted for what it hasn't; payment, parking and access as icon rows of
-  chips; fuel prices) and Reviews (the rating at 30sp Light beside its
-  stars, Google's summary marked with the accent's sparkle, then each review
-  with its writer's initial in a circle). Headings are 14sp Medium on the
-  page, in line with the text on the cards.
+- **A compact list.** A result is three lines, as Maps words them: the
+  name; "4.8 ★ (112) · $10-20 · ♿ · Cafe"; "Closed · Opens 7:00 AM · 3.5
+  mi". No photos and no chips, so three or four fit the screen and Up and
+  Down move one place at a time. The picked row doesn't grow.
+- **One page for a place, no tabs.** Up and Down scroll it: the rating,
+  kind and status; one photo; address, hours, website and phone, each
+  after a teal icon; then Reviews and About under headings. The name stays
+  at the top, large, and shrinks to one Medium line, with a hairline under
+  it, as the page scrolls under it.
+- **OK lists what can be done, no button bar.** On a place, OK opens a
+  list of choices, each after a teal icon: Call, Copy address, Copy website
+  URL. Menu's choices take icons too.
 
 ## Updater: as the App Store shows it
 

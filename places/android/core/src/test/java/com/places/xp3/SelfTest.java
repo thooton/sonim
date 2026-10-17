@@ -124,11 +124,15 @@ public final class SelfTest {
         check.run("client", () -> {
             final AtomicInteger keys = new AtomicInteger();
             final String[] key = {"key-1"};
+            final String[] server0 = {""};
             TestServer server = new TestServer(request -> {
                 if (request.path.equals("/cc/maps-key")) {
                     if (!request.header("Authorization").equals("Bearer tok")) return TestServer.Reply.of(401, "text/plain", "no");
                     keys.incrementAndGet();
                     return TestServer.Reply.json("{\"key\":\"" + key[0] + "\"}");
+                }
+                if (request.path.equals("/v1/img/one.jpg")) {
+                    return TestServer.Reply.of(request.header("X-Goog-Api-Key") == null || request.header("X-Goog-Api-Key").isEmpty() ? 200 : 400, "image/jpeg", "JPEG");
                 }
                 if (!request.header("X-Goog-Api-Key").equals("key-2")) {
                     return TestServer.Reply.of(400, "application/json",
@@ -146,13 +150,18 @@ public final class SelfTest {
                     return TestServer.Reply.json("{\"places\":[{\"id\":\"ChIJone\",\"displayName\":{\"text\":\"One\"}},"
                         + "{\"id\":\"ChIJtwo\",\"displayName\":{\"text\":\"Two\"}}],\"nextPageToken\":\"page2\"}");
                 }
+                if (request.path.startsWith("/v1/places/ChIJone/photos/p1/media?")) {
+                    return TestServer.Reply.json("{\"name\":\"places/ChIJone/photos/p1\",\"photoUri\":\"" + server0[0] + "/v1/img/one.jpg\"}");
+                }
                 if (request.path.equals("/v1/places/ChIJone") && request.method.equals("GET")) {
-                    return TestServer.Reply.json("{\"id\":\"ChIJone\",\"displayName\":{\"text\":\"One\"},\"websiteUri\":\"https://one.example\"}");
+                    return TestServer.Reply.json("{\"id\":\"ChIJone\",\"displayName\":{\"text\":\"One\"},\"websiteUri\":\"https://one.example\","
+                        + "\"photos\":[{\"name\":\"places/ChIJone/photos/p1\"},{\"widthPx\":10}]}");
                 }
                 return TestServer.Reply.of(404, "application/json", "{}");
             });
             try {
                 String base = server.uri("").toString();
+                server0[0] = base;
                 Places places = new Places(base + "/cc", "tok", base + "/v1");
                 check.fails("a refused key says why", "API key not valid", () -> places.locate("Tempe"));
                 key[0] = "key-2";
@@ -190,6 +199,20 @@ public final class SelfTest {
                 check.ok("details ask for features", last(server).header("X-Goog-FieldMask").contains("servesCoffee"));
                 check.same("key fetched once", 2, keys.get());
                 check.fails("an id is checked", () -> places.details("../maps-key"));
+                check.same("photos named", java.util.Arrays.asList("places/ChIJone/photos/p1"), one.photos());
+                check.same("photo fetched without the key", "JPEG", new String(places.photo("places/ChIJone/photos/p1", 160), "UTF-8"));
+                check.ok("photo scaled by Google", last(server).path.endsWith("/img/one.jpg"));
+                check.fails("a photo name is checked", () -> places.photo("../maps-key", 160));
+                places.details("ChIJone");
+                check.ok("details ask for photos", last(server).header("X-Goog-FieldMask").contains(",photos"));
+                places.search("coffee", tempe, null, true, 4.5);
+                check.ok("search asks for photos and the phone", last(server).header("X-Goog-FieldMask").contains("places.photos")
+                    && last(server).header("X-Goog-FieldMask").contains("places.nationalPhoneNumber"));
+                Map<String, Object> filtered = Json.object(Json.parse(last(server).body));
+                check.ok("open now sent", Json.flag(filtered, "openNow"));
+                check.close("rating floor sent", 4.5, Json.number(filtered, "minRating"), 1e-9);
+                places.search("coffee", tempe, null);
+                check.ok("no filters, none sent", !Json.object(Json.parse(last(server).body)).containsKey("openNow"));
 
                 Places stranger = new Places(base + "/cc", "wrong", base + "/v1");
                 check.fails("a bad token says so", "login", () -> stranger.search("coffee", null, null));

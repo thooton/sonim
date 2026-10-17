@@ -1,52 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:fontFamily">sans-serif</item>
-        <item name="android:colorPrimary">@color/primary</item>
-        <item name="android:colorPrimaryDark">@color/primary_dark</item>
-        <item name="android:colorAccent">@color/focus_rule</item>
+    <!-- Dark, in Google Sans, as Google Maps is: the status and navigation
+         bars are the sheet's own colour. -->
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">@font/google_sans</item>
+        <item name="android:colorPrimary">@color/page</item>
+        <item name="android:colorPrimaryDark">@color/page</item>
+        <item name="android:colorAccent">@color/accent</item>
         <item name="android:colorControlHighlight">@color/highlight</item>
-        <item name="android:navigationBarColor">@color/primary_dark</item>
-        <item name="android:statusBarColor">@color/primary_dark</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorBackground">@color/page</item>
+        <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:textColorSecondary">@color/text_muted</item>
+        <item name="android:navigationBarColor">@color/page</item>
+        <item name="android:statusBarColor">@color/page</item>
         <item name="android:windowBackground">@color/page</item>
         <item name="android:windowNoTitle">true</item>
-        <item name="android:alertDialogTheme">@style/FamilyDialog</item>
-        <item name="android:popupMenuStyle">@style/FamilyPopupMenu</item>
-        <item name="android:contextPopupMenuStyle">@style/FamilyPopupMenu</item>
+        <item name="android:alertDialogTheme">@style/MapsDialog</item>
     </style>
 
-    <!-- A soft field with its label inside: the row holds the fill and
-         lights up (white, accent outline) while its EditText has the keys. -->
-    <style name="LabelledField">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">30dp</item>
-        <item name="android:addStatesFromChildren">true</item>
-        <item name="android:background">@drawable/family_field</item>
-        <item name="android:gravity">center_vertical</item>
-        <item name="android:orientation">horizontal</item>
-        <item name="android:paddingLeft">6dp</item>
-        <item name="android:paddingRight">6dp</item>
+    <!-- Menus and the login: Maps' raised dark surface, its teal buttons. -->
+    <style name="MapsDialog" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">@font/google_sans</item>
+        <item name="android:colorBackground">#2A2A2C</item>
+        <item name="android:colorAccent">@color/link</item>
+        <item name="android:colorControlHighlight">@color/highlight</item>
+        <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:textColorSecondary">@color/text_muted</item>
+        <item name="android:textColorAlertDialogListItem">@color/text</item>
+        <item name="android:windowBackground">@drawable/dialog</item>
     </style>
 
-    <style name="FieldLabel">
-        <item name="android:layout_width">@dimen/label_width</item>
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:includeFontPadding">false</item>
-        <item name="android:textColor">@color/text_muted</item>
-        <item name="android:textSize">@dimen/text_label</item>
-    </style>
-
-    <style name="FieldText">
+    <style name="HeaderField">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">match_parent</item>
         <item name="android:layout_weight">1</item>
         <item name="android:background">@null</item>
+        <item name="android:fontFamily">@font/google_sans</item>
         <item name="android:gravity">center_vertical</item>
         <item name="android:maxLines">1</item>
         <item name="android:padding">0dp</item>
         <item name="android:textColor">@color/text</item>
-        <item name="android:textColorHint">@color/input_hint</item>
-        <item name="android:textSize">@dimen/text_input</item>
+        <item name="android:textColorHint">@color/text_hint</item>
+        <item name="android:textCursorDrawable">@drawable/cursor</item>
+        <item name="android:textSize">@dimen/text_query</item>
     </style>
 </resources>

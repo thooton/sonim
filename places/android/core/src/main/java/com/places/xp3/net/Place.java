@@ -402,6 +402,17 @@ public final class Place {
         return out;
     }
 
+    /** The names of its photos (up to ten, as Google picked them), for {@link Places#photo}. */
+    public List<String> photos() {
+        List<String> out = new ArrayList<String>();
+        for (Object item : Json.children(raw, "photos")) {
+            if (!(item instanceof Map)) continue;
+            String name = Json.text(Json.object(item), "name");
+            if (name != null && name.length() > 0) out.add(name);
+        }
+        return out;
+    }
+
     /** Up to five reviews, as Google picked them. */
     public List<Review> reviews() {
         List<Review> out = new ArrayList<Review>();

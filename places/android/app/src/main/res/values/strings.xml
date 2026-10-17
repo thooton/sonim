@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Places</string>
-    <string name="label_near">Near</string>
-    <string name="label_find">Find</string>
+    <string name="hint_query">Search here</string>
+    <string name="hint_near">Search near</string>
 </resources>
