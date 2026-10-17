@@ -40,13 +40,17 @@ Times are shown in the place's own offset (`utcOffsetMinutes`).
 
 - `android/core`: `net/` over the shared `Http`, `Json` and `Login`
   (`../common/core`): `Places` (the key and the three requests), `Place`
-  (Google's object, read lazily, and written out as a results line, an
-  open/closed status and the sections of the details screen), `Anchor`
-  (where to search near, distances). Tests in `src/test` run via
+  (Google's object, read lazily: a results line, an open/closed status,
+  the CLI's sections of a place as text, and the same facts in pieces for
+  the details screen: hours, about, amenities as yes/no options, reviews),
+  `Anchor` (where to search near, distances). Tests in `src/test` run via
   `:core:selfTest`, against a loopback server standing in for both the
   command center and Google.
 - `android/app`: `MainActivity` (the one screen: the two fields, the
-  results, a place's details, the keys, the menu, the login dialog).
+  results, a place's details, the keys, the menu, the login dialog) and
+  `PlacePage` (a place's details, laid out as Google Maps lays out a place;
+  see `../DESIGN.md`), with `Stars` (a rating's stars, partly filled) and
+  `Flow` (chips that wrap).
 
 ## Credentials
 

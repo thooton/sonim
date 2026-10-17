@@ -105,6 +105,26 @@ public final class SelfTest {
             check.same("review", "★★★★★ · Sam · a week ago\nGreat.", text(sections, "Review"));
             check.same("no website, no section", null, text(sections, "Website"));
             check.same("no hours", "No opening hours listed.", text(place("{}").details(NOON, null), "Hours"));
+
+            // The pieces the details screen draws from, apart.
+            check.same("open, apart", "Open|Closes 9:00 PM", String.join("|", p.statusParts(NOON)));
+            check.same("closed, apart", "Closed|Opens tomorrow 7:00 AM", String.join("|",
+                place("{\"utcOffsetMinutes\":-420,\"currentOpeningHours\":{\"openNow\":false,\"nextOpenTime\":\"2026-10-17T14:00:00Z\"}}").statusParts(NOON)));
+            check.same("unknown, apart", "Hours unknown|", String.join("|", place("{}").statusParts(NOON)));
+            check.same("today, there", "Fri", p.today(NOON));
+            check.same("short price", "$10\u201320", p.priceShort());
+            check.same("short price, level only", "$$", place("{\"priceLevel\":\"PRICE_LEVEL_MODERATE\"}").priceShort());
+            check.same("local time, elsewhere", "Fri Oct 16, 12:00 PM", p.localTime(NOON, -240));
+            check.same("local time, same offset", "", p.localTime(NOON, -420));
+            check.ok("wheelchair entrance", p.wheelchairEntrance());
+            check.same("features", "[takeout]|[delivery]", p.features().yes + "|" + p.features().no);
+            check.same("payment", "[credit cards, NFC]|[cash only]", p.payment().yes + "|" + p.payment().no);
+            check.ok("no parking", p.parking().isEmpty());
+            check.same("fuel", "regular unleaded $3.46", p.fuel().get(0)[0] + " " + p.fuel().get(0)[1]);
+            Place.Review review = p.reviews().get(0);
+            check.same("review", "5.0 Sam, a week ago: Great.",
+                String.format(java.util.Locale.US, "%.1f %s, %s: %s", review.rating, review.author, review.ago, review.text));
+            check.same("hours sections", 2, p.hours().size());
         });
         check.run("client", () -> {
             final AtomicInteger keys = new AtomicInteger();

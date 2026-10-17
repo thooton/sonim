@@ -33,6 +33,31 @@ public final class Place {
         }
     }
 
+    /** One review: its stars (0 when it gave none), who wrote it, when, and what it says. */
+    public static final class Review {
+        public final double rating;
+        public final String author;
+        public final String ago;
+        public final String text;
+
+        Review(double rating, String author, String ago, String text) {
+            this.rating = rating;
+            this.author = author;
+            this.ago = ago;
+            this.text = text;
+        }
+    }
+
+    /** A set of yes/no answers, as labels: what the place has, and what it says it hasn't. */
+    public static final class Options {
+        public final List<String> yes = new ArrayList<String>();
+        public final List<String> no = new ArrayList<String>();
+
+        public boolean isEmpty() {
+            return yes.isEmpty() && no.isEmpty();
+        }
+    }
+
     /** The yes/no fields and their labels, in the order they are shown. */
     static final String[][] FEATURES = {
         {"dineIn", "dine-in"}, {"takeout", "takeout"}, {"delivery", "delivery"},
@@ -120,17 +145,17 @@ public final class Place {
         return join(parts, " · ");
     }
 
-    double rating() {
+    public double rating() {
         Double rating = Json.number(raw, "rating");
         return rating == null ? 0 : rating;
     }
 
-    int ratingCount() {
+    public int ratingCount() {
         Double count = Json.number(raw, "userRatingCount");
         return count == null ? 0 : count.intValue();
     }
 
-    String priceLevel() {
+    public String priceLevel() {
         String level = orEmpty(Json.text(raw, "priceLevel"));
         if (level.equals("PRICE_LEVEL_FREE")) return "free";
         if (level.equals("PRICE_LEVEL_INEXPENSIVE")) return "$";
@@ -143,16 +168,25 @@ public final class Place {
     /** "$$ ($10-20 per person)", or as much of it as Google knows. */
     String price() {
         String level = priceLevel();
+        String range = range("-");
+        if (range.length() == 0) return level;
+        return (level + " (" + range + " per person)").trim();
+    }
+
+    /** "$10–20" a person, as Google Maps writes it under the name; the level ("$$") when Google gives no range. */
+    public String priceShort() {
+        String range = range("\u2013");
+        return range.length() > 0 ? range : priceLevel();
+    }
+
+    /** "$10" and "20" joined by `dash`, "$10+" when open-ended, "" when Google gives no range. */
+    private String range(String dash) {
         Map<String, Object> range = Json.child(raw, "priceRange");
-        if (!(range.get("startPrice") instanceof Map)) return level;
+        if (!(range.get("startPrice") instanceof Map)) return "";
         String text = money(Json.child(range, "startPrice"));
-        if (range.get("endPrice") instanceof Map) {
-            String end = money(Json.child(range, "endPrice"));
-            text += "-" + (end.startsWith("$") ? end.substring(1) : end);
-        } else {
-            text += "+";
-        }
-        return (level + " (" + text + " per person)").trim();
+        if (!(range.get("endPrice") instanceof Map)) return text + "+";
+        String end = money(Json.child(range, "endPrice"));
+        return text + dash + (end.startsWith("$") ? end.substring(1) : end);
     }
 
     /** Open or closed now and until when, in the place's own time: "Open until 9:00 PM". */
@@ -169,6 +203,48 @@ public final class Place {
         OffsetDateTime next = time(hours, isOpen ? "nextCloseTime" : "nextOpenTime", here.getOffset());
         if (isOpen) return next == null ? "Open now" : "Open until " + when(next, here);
         return next == null ? "Closed now" : "Closed until " + when(next, here);
+    }
+
+    /**
+     * The same, as Google Maps splits it: the open-or-closed word, coloured
+     * on the details screen, and what changes next. {"Open", "Closes 9:00
+     * PM"}, {"Closed", "Opens tomorrow 7:00 AM"}, {"Permanently closed", ""}.
+     */
+    public String[] statusParts(long now) {
+        String business = orEmpty(Json.text(raw, "businessStatus"));
+        if (business.equals("CLOSED_PERMANENTLY")) return new String[] {"Permanently closed", ""};
+        if (business.equals("CLOSED_TEMPORARILY")) return new String[] {"Temporarily closed", ""};
+        Map<String, Object> hours = Json.child(raw, "currentOpeningHours");
+        Object open = hours.get("openNow");
+        if (!(open instanceof Boolean)) return new String[] {"Hours unknown", ""};
+        OffsetDateTime here = here(now);
+        boolean isOpen = (Boolean) open;
+        OffsetDateTime next = time(hours, isOpen ? "nextCloseTime" : "nextOpenTime", here.getOffset());
+        String then = next == null ? "" : (isOpen ? "Closes " : "Opens ") + when(next, here);
+        return new String[] {isOpen ? "Open" : "Closed", then};
+    }
+
+    /** "Fri": today, where the place is. */
+    public String today(long now) {
+        return DAYS[here(now).getDayOfWeek().getValue() - 1].substring(0, 3);
+    }
+
+    /** The time where the place is, "Fri Oct 16, 12:00 PM"; "" when unknown or the same as the phone's offset. */
+    public String localTime(long now, int phoneOffsetMinutes) {
+        ZoneOffset zone = zone();
+        if (zone == null || zone.getTotalSeconds() == phoneOffsetMinutes * 60) return "";
+        return DATE.format(Instant.ofEpochMilli(now).atOffset(zone));
+    }
+
+    /** Now, in the place's offset (UTC when Google doesn't give one). */
+    private OffsetDateTime here(long now) {
+        ZoneOffset zone = zone();
+        return Instant.ofEpochMilli(now).atOffset(zone == null ? ZoneOffset.UTC : zone);
+    }
+
+    /** Whether Google says the entrance takes a wheelchair. */
+    public boolean wheelchairEntrance() {
+        return Boolean.TRUE.equals(Json.child(raw, "accessibilityOptions").get("wheelchairAccessibleEntrance"));
     }
 
     /** Whether the place is open right now: null when Google doesn't say. */
@@ -234,6 +310,41 @@ public final class Place {
             add(out, "Local time there", DATE.format(Instant.ofEpochMilli(now).atOffset(zone)));
         }
 
+        out.addAll(hours());
+        add(out, "About", editorial());
+        add(out, "Overview (written by Google's AI)", overview());
+        add(out, "What reviewers say (written by Google's AI)", reviewSummary());
+
+        Options features = features();
+        add(out, "Has", join(features.yes, ", "));
+        add(out, "Doesn't have", join(features.no, ", "));
+        add(out, "Payment", options(payment()));
+        add(out, "Parking", options(parking()));
+        add(out, "Wheelchair access", options(accessibility()));
+
+        List<String> fuel = new ArrayList<String>();
+        for (String[] kind : fuel()) fuel.add(kind[0] + ": " + kind[1]);
+        add(out, "Fuel", join(fuel, "\n"));
+
+        List<String> reviews = new ArrayList<String>();
+        for (Review review : reviews()) {
+            List<String> head = new ArrayList<String>();
+            if (review.rating > 0) head.add(stars(review.rating));
+            head.add(review.author);
+            head.add(review.ago);
+            reviews.add(join(head, " · ") + "\n" + (review.text.length() == 0 ? "(no text)" : review.text));
+        }
+        add(out, reviews.size() == 1 ? "Review" : "Reviews", join(reviews, "\n\n"));
+        return out;
+    }
+
+    /**
+     * The opening hours, one block a section, one day a line: this week's
+     * (and the usual ones when they differ), or the usual ones alone, or "No
+     * opening hours listed."; then secondary hours, such as "Happy hour".
+     */
+    public List<Section> hours() {
+        List<Section> out = new ArrayList<Section>();
         List<String> current = hours(Json.child(raw, "currentOpeningHours"));
         List<String> usual = hours(Json.child(raw, "regularOpeningHours"));
         if (!current.isEmpty()) {
@@ -254,51 +365,71 @@ public final class Place {
             if (!kind.endsWith("hour")) kind += " hours";
             add(out, Character.toUpperCase(kind.charAt(0)) + kind.substring(1), join(lines, "\n"));
         }
+        return out;
+    }
 
-        add(out, "About", Json.text(Json.child(raw, "editorialSummary"), "text"));
-        add(out, "Overview (written by Google's AI)",
-            Json.text(Json.child(Json.child(raw, "generativeSummary"), "overview"), "text"));
-        add(out, "What reviewers say (written by Google's AI)",
-            Json.text(Json.child(Json.child(raw, "reviewSummary"), "text"), "text"));
+    /** Google's own line about the place, or "". */
+    public String editorial() {
+        return trimmed(Json.text(Json.child(raw, "editorialSummary"), "text"));
+    }
 
-        List<String> yes = new ArrayList<String>();
-        List<String> no = new ArrayList<String>();
+    /** Google's AI overview of the place, or "". */
+    public String overview() {
+        return trimmed(Json.text(Json.child(Json.child(raw, "generativeSummary"), "overview"), "text"));
+    }
+
+    /** Google's AI summary of the reviews, or "". */
+    public String reviewSummary() {
+        return trimmed(Json.text(Json.child(Json.child(raw, "reviewSummary"), "text"), "text"));
+    }
+
+    /** Dine-in, takeout, outdoor seating and the rest, in {@link #FEATURES} order. */
+    public Options features() {
+        Options out = new Options();
         for (String[] feature : FEATURES) {
             Object value = raw.get(feature[0]);
-            if (Boolean.TRUE.equals(value)) yes.add(feature[1]);
-            else if (Boolean.FALSE.equals(value)) no.add(feature[1]);
+            if (Boolean.TRUE.equals(value)) out.yes.add(feature[1]);
+            else if (Boolean.FALSE.equals(value)) out.no.add(feature[1]);
         }
-        add(out, "Has", join(yes, ", "));
-        add(out, "Doesn't have", join(no, ", "));
-        add(out, "Payment", options(Json.child(raw, "paymentOptions"), "accepts"));
-        add(out, "Parking", options(Json.child(raw, "parkingOptions"), ""));
-        add(out, "Wheelchair access", options(Json.child(raw, "accessibilityOptions"), "wheelchairAccessible"));
+        return out;
+    }
 
-        List<String> fuel = new ArrayList<String>();
+    public Options payment() {
+        return options(Json.child(raw, "paymentOptions"), "accepts");
+    }
+
+    public Options parking() {
+        return options(Json.child(raw, "parkingOptions"), "");
+    }
+
+    public Options accessibility() {
+        return options(Json.child(raw, "accessibilityOptions"), "wheelchairAccessible");
+    }
+
+    /** Fuel and its price, {"regular unleaded", "$3.46"}, as Google lists them. */
+    public List<String[]> fuel() {
+        List<String[]> out = new ArrayList<String[]>();
         for (Object item : Json.children(Json.child(raw, "fuelOptions"), "fuelPrices")) {
             if (!(item instanceof Map)) continue;
             Map<String, Object> entry = Json.object(item);
             String kind = orEmpty(Json.text(entry, "type")).toLowerCase(Locale.US).replace('_', ' ');
-            fuel.add(kind + ": " + money(Json.child(entry, "price")));
+            out.add(new String[] {kind, money(Json.child(entry, "price"))});
         }
-        add(out, "Fuel", join(fuel, "\n"));
+        return out;
+    }
 
-        List<String> reviews = new ArrayList<String>();
+    /** Up to five reviews, as Google picked them. */
+    public List<Review> reviews() {
+        List<Review> out = new ArrayList<Review>();
         for (Object item : Json.children(raw, "reviews")) {
             if (!(item instanceof Map)) continue;
             Map<String, Object> review = Json.object(item);
             Double rating = Json.number(review, "rating");
-            List<String> head = new ArrayList<String>();
-            if (rating != null) head.add(stars(rating));
-            String who = Json.text(Json.child(review, "authorAttribution"), "displayName");
-            if (who != null && who.trim().length() > 0) head.add(who.trim());
-            String ago = Json.text(review, "relativePublishTimeDescription");
-            if (ago != null && ago.trim().length() > 0) head.add(ago.trim());
-            String text = Json.text(Json.child(review, "text"), "text");
-            text = text == null || text.trim().length() == 0 ? "(no text)" : text.trim();
-            reviews.add(join(head, " · ") + "\n" + text);
+            out.add(new Review(rating == null ? 0 : rating,
+                trimmed(Json.text(Json.child(review, "authorAttribution"), "displayName")),
+                trimmed(Json.text(review, "relativePublishTimeDescription")),
+                trimmed(Json.text(Json.child(review, "text"), "text"))));
         }
-        add(out, reviews.size() == 1 ? "Review" : "Reviews", join(reviews, "\n\n"));
         return out;
     }
 
@@ -319,25 +450,26 @@ public final class Place {
         return lines;
     }
 
-    /**
-     * A set of yes/no options, the yes ones first: "credit cards, NFC (not:
-     * cash only)". `prefix` comes off each name: "acceptsCreditCards".
-     */
-    static String options(Map<String, Object> set, String prefix) {
+    /** A set of yes/no options, sorted by name. `prefix` comes off each name: "acceptsCreditCards". */
+    static Options options(Map<String, Object> set, String prefix) {
         List<String> keys = new ArrayList<String>(set.keySet());
         Collections.sort(keys);
-        List<String> yes = new ArrayList<String>();
-        List<String> no = new ArrayList<String>();
+        Options out = new Options();
         for (String key : keys) {
             String label = words(key.startsWith(prefix) ? key.substring(prefix.length()) : key);
             if (label.length() == 0) label = "yes";
-            if (Boolean.TRUE.equals(set.get(key))) yes.add(label);
-            else if (Boolean.FALSE.equals(set.get(key))) no.add(label);
+            if (Boolean.TRUE.equals(set.get(key))) out.yes.add(label);
+            else if (Boolean.FALSE.equals(set.get(key))) out.no.add(label);
         }
-        String text = join(yes, ", ");
-        if (!no.isEmpty()) {
+        return out;
+    }
+
+    /** Options written out, the yes ones first: "credit cards, NFC (not: cash only)". */
+    static String options(Options options) {
+        String text = join(options.yes, ", ");
+        if (!options.no.isEmpty()) {
             if (text.length() == 0) text = "none";
-            text += " (not: " + join(no, ", ") + ")";
+            text += " (not: " + join(options.no, ", ") + ")";
         }
         return text;
     }
@@ -400,6 +532,10 @@ public final class Place {
             out.append(part);
         }
         return out.toString();
+    }
+
+    private static String trimmed(String text) {
+        return text == null ? "" : text.trim();
     }
 
     private static String orEmpty(String text) {

@@ -100,3 +100,27 @@ departs from them where Thunderbird does:
 - **Keys shown in menus.** The digits, * and # are shortcuts on the list and
   in a conversation, and each menu item shows its key on a keycap, as
   Thunderbird's menus show their shortcuts.
+
+## Places: a place as Google Maps shows one
+
+The results list is the family's. A place's own screen (`PlacePage`) takes
+its layout from Google Maps' place sheet, since that is how people expect a
+place to read, while keeping the family's colours and Medium for emphasis:
+
+- **A head on white over the grouped page.** The name at 17sp Medium; the
+  rating with five gold stars filled to it (a drawable, so 4.5 shows half a
+  star) and the count; kind, price range and distance in muted text, with a
+  wheelchair in the accent when the entrance takes one; "Open" in green or
+  "Closed" in red, Medium, then when that changes.
+- **Chips for what Menu can do.** Call (filled in the accent, as Maps fills
+  Directions) and Website (the wash), under the head.
+- **Icons, not labels.** The first card is address, phone and website, a
+  muted Material icon leading each row and hairlines inset to the text. The
+  phone and website are in the accent, the website shown as its host.
+- **Headed sections.** Hours (two columns, today in Medium, other hours
+  under a caption), About, Amenities (ticked chips for what it has, crossed
+  and muted for what it hasn't; payment, parking and access as icon rows of
+  chips; fuel prices) and Reviews (the rating at 30sp Light beside its
+  stars, Google's summary marked with the accent's sparkle, then each review
+  with its writer's initial in a circle). Headings are 14sp Medium on the
+  page, in line with the text on the cards.
