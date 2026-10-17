@@ -94,17 +94,6 @@
                 android:layout_marginTop="10dp"
                 android:focusable="false" />
 
-            <TextView
-                android:id="@+id/hint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center_horizontal"
-                android:includeFontPadding="false"
-                android:text="@string/hint_menu"
-                android:textColor="@color/text_muted"
-                android:textSize="@dimen/text_status" />
-
             <!-- Why serving stopped or never started: storage access was
                  refused, the folder has gone. -->
             <TextView

@@ -62,14 +62,9 @@ public final class SelfTest {
                 + "\"rating\":4.62,\"userRatingCount\":1820,\"priceLevel\":\"PRICE_LEVEL_MODERATE\","
                 + "\"location\":{\"latitude\":33.4255,\"longitude\":-111.94}}");
             check.same("name", "Cartel Coffee", p.name());
-            check.same("line", "4.6★ (1,820) · $$ · Coffee shop", p.summary());
             check.same("here", "164 ft", p.distanceFrom(new Anchor("x", "x", 33.4255 + 50 / 111195.0, -111.94)));
             check.same("no anchor", "", p.distanceFrom(null));
-            check.same("short address", "433 S Farmer Ave, Tempe",
-                place("{\"formattedAddress\":\"433 S Farmer Ave, Tempe, AZ 85281, USA\",\"shortFormattedAddress\":\"433 S Farmer Ave, Tempe\"}").shortAddress());
-            check.same("no short address", "Tempe, AZ, USA", place("{\"formattedAddress\":\"Tempe, AZ, USA\"}").shortAddress());
             check.same("unnamed", "Unnamed place", place("{}").name());
-            check.same("nothing known", "", place("{}").summary());
         });
         check.run("details", () -> {
             Place p = place("{\"id\":\"ChIJabc\",\"displayName\":{\"text\":\"Joe's\"},\"primaryTypeDisplayName\":{\"text\":\"Diner\"},"
@@ -93,9 +88,9 @@ public final class SelfTest {
             check.same("address", "1 Mill Ave, Tempe, AZ", text(sections, "Address"));
             check.same("phone", "(480) 555-0100", p.phone());
             check.same("local time", "Fri Oct 16, 12:00 PM", text(sections, "Local time there"));
-            check.same("hours, days shortened and spaces made plain", "Mon 7:00 AM – 9:00 PM\nTue Closed", text(sections, "Hours this week"));
+            check.same("hours, days shortened, spaces made plain and dashes hyphens", "Mon 7:00 AM - 9:00 PM\nTue Closed", text(sections, "Hours this week"));
             check.same("usual hours left out when the same", null, text(sections, "Usual hours"));
-            check.same("happy hour", "Fri 3:00 PM – 6:00 PM", text(sections, "Happy hour"));
+            check.same("happy hour", "Fri 3:00 PM - 6:00 PM", text(sections, "Happy hour"));
             check.same("about", "Pancakes since 1950.", text(sections, "About"));
             check.same("has", "takeout", text(sections, "Has"));
             check.same("hasn't", "delivery", text(sections, "Doesn't have"));
@@ -112,7 +107,7 @@ public final class SelfTest {
                 place("{\"utcOffsetMinutes\":-420,\"currentOpeningHours\":{\"openNow\":false,\"nextOpenTime\":\"2026-10-17T14:00:00Z\"}}").statusParts(NOON)));
             check.same("unknown, apart", "Hours unknown|", String.join("|", place("{}").statusParts(NOON)));
             check.same("today, there", "Fri", p.today(NOON));
-            check.same("short price", "$10\u201320", p.priceShort());
+            check.same("short price", "$10-20", p.priceShort());
             check.same("short price, level only", "$$", place("{\"priceLevel\":\"PRICE_LEVEL_MODERATE\"}").priceShort());
             check.same("local time, elsewhere", "Fri Oct 16, 12:00 PM", p.localTime(NOON, -240));
             check.same("local time, same offset", "", p.localTime(NOON, -420));
@@ -177,7 +172,8 @@ public final class SelfTest {
                 Map<String, Object> circle = Json.child(Json.child(sent, "locationBias"), "circle");
                 check.close("biased toward the anchor", 33.4, Json.number(Json.child(circle, "center"), "latitude"), 1e-9);
                 check.ok("search asks for hours", last(server).header("X-Goog-FieldMask").contains("currentOpeningHours.openNow"));
-                check.ok("search asks for the short address", last(server).header("X-Goog-FieldMask").contains("places.shortFormattedAddress"));
+                check.ok("search asks for the price range", last(server).header("X-Goog-FieldMask").contains("places.priceRange"));
+                check.ok("search asks for the entrance", last(server).header("X-Goog-FieldMask").contains("places.accessibilityOptions.wheelchairAccessibleEntrance"));
                 check.ok("search leaves reviews out", !last(server).header("X-Goog-FieldMask").contains("reviews"));
                 Places.Page second = places.search("coffee", tempe, page.next);
                 check.same("next page", "Third", second.places.get(0).name());

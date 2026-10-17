@@ -53,10 +53,9 @@ import java.util.Set;
  */
 final class Backend {
 
-    static final String NO_LOGIN = "No command center set. Add one from the Files tab's menu.";
     static final String NO_CENTER = "No command center set.";
     static final String NO_ACCOUNTS =
-        "No cloud accounts on the command center yet. Add one with delta accounts login on a computer.";
+        "No cloud accounts on the command center.";
 
     /** Transcripts kept on the phone besides the open one. */
     private static final int KEEP_SESSIONS = 20;

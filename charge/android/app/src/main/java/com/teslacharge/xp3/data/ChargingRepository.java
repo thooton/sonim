@@ -198,7 +198,7 @@ public final class ChargingRepository {
     public JSONObject stop(String id) throws ApiException {
         try {
             JSONObject result = api.stopSession(id);
-            if (!result.optBoolean("isRequestDelivered")) throw new ApiException("The stop request was not accepted. Try again.", 502);
+            if (!result.optBoolean("isRequestDelivered")) throw new ApiException("The stop request was not accepted.", 502);
             JSONObject info;
             try { info = api.sessionInfo(id); } catch (ApiException ignored) { info = new JSONObject().put("authorizationSessionId", id); }
             return Normalizer.session(info, context(id, null));

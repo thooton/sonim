@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.app.admin.DevicePolicyManager;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -37,6 +38,7 @@ public final class MainActivity extends Activity {
         body = new TextView(this);
         body.setTextSize(14);
         body.setTextColor(Color.DKGRAY);
+        body.setTypeface(Typeface.MONOSPACE);
 
         release = new Button(this);
         release.setText("Stop being device owner");
@@ -64,14 +66,9 @@ public final class MainActivity extends Activity {
         boolean owner = owner();
         heading.setText(owner ? "Ready" : "Not set up");
         heading.setTextColor(owner ? 0xFF1F4037 : 0xFFB00020);
-        body.setText(owner
-            ? "This app is the device owner, so Delta and the Updater can install "
-                + "apps without the “App not installed” screen.\n"
-            : "Installs from Delta and the Updater will still be blocked until this app is the "
-                + "device owner. With the phone connected to a computer and no "
-                + "accounts on the phone, run:\n\n"
-                + "adb shell dpm set-device-owner com.installer.xp3/.Admin\n\n"
-                + "Then reopen this screen to check.");
+        // Not set up: the one command that sets it up, and nothing else.
+        body.setText("adb shell dpm set-device-owner com.installer.xp3/.Admin");
+        body.setVisibility(owner ? View.GONE : View.VISIBLE);
         release.setVisibility(owner ? View.VISIBLE : View.GONE);
         if (owner) release.requestFocus();
     }
@@ -79,7 +76,6 @@ public final class MainActivity extends Activity {
     private void confirmRelease() {
         new AlertDialog.Builder(this)
             .setTitle("Stop being device owner?")
-            .setMessage("Installs from Delta and the Updater will be blocked again until this is set up anew over adb.")
             .setPositiveButton("Stop", (dialog, which) -> {
                 dpm.clearDeviceOwnerApp(getPackageName());
                 show();

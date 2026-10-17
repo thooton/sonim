@@ -473,7 +473,7 @@ public final class Books {
         if (parsed instanceof Map) return Json.object(parsed);
         int s = reply.status;
         if (body.toLowerCase(Locale.US).contains("diamwall") || s == 307 || s == 403 || s == 513 || s == 517) {
-            throw new Unreachable("The book source is blocking requests right now; try again later.");
+            throw new Unreachable("The book source is blocking requests right now.");
         }
         if (s >= 400) throw new IOException("The book source returned HTTP " + s + ".");
         throw new IOException("The book source returned something unexpected (HTTP " + s + ").");
@@ -569,10 +569,10 @@ public final class Books {
             } catch (IOException e) {
                 c.disconnect();
                 if (cancelled) throw new InterruptedException();
-                if (e instanceof java.net.SocketTimeoutException) throw new Unreachable("The book source timed out; try again.");
+                if (e instanceof java.net.SocketTimeoutException) throw new Unreachable("The book source timed out.");
                 if (e instanceof java.net.UnknownHostException || e instanceof java.net.ConnectException
                     || e instanceof javax.net.ssl.SSLException || e instanceof java.net.NoRouteToHostException) {
-                    throw new Unreachable("Couldn't reach the book source; try again later.");
+                    throw new Unreachable("Couldn't reach the book source.");
                 }
                 throw e;
             }

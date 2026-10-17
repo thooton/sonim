@@ -7,7 +7,6 @@
     <dimen name="text_input">13.5sp</dimen>
     <dimen name="text_status">11.5sp</dimen>
     <dimen name="text_name">13.5sp</dimen>
-    <dimen name="text_address">12sp</dimen>
     <dimen name="text_meta">11.5sp</dimen>
     <dimen name="text_detail">13sp</dimen>
     <dimen name="text_detail_title">16sp</dimen>

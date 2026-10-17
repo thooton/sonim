@@ -31,16 +31,19 @@ again on the next request, in case it was replaced.
 
 Field masks decide what Google bills, so keep them the CLI's: search asks
 for nothing past the Enterprise tier, only a place's details ask for
-reviews and the other Atmosphere fields. The one addition is
-`shortFormattedAddress` in the search mask, for the results list: a Pro
-field, so the search still bills as Enterprise. If the CLI's masks or wording
+reviews and the other Atmosphere fields. The additions are `priceRange` and
+`accessibilityOptions.wheelchairAccessibleEntrance` in the search mask, for
+the results list: an Enterprise and a Pro field, so the search still bills
+as Enterprise. If the CLI's masks or wording
 change, change `Places` and `Place` here and keep the test in step.
 
-Times are shown in the place's own offset (`utcOffsetMinutes`).
+Times are shown in the place's own offset (`utcOffsetMinutes`). The dash
+Google writes between opening and closing times becomes a hyphen, and price
+ranges use one too: the app writes no en or em dashes of its own.
 
 - `android/core`: `net/` over the shared `Http`, `Json` and `Login`
   (`../common/core`): `Places` (the key and the three requests), `Place`
-  (Google's object, read lazily: a results line, an open/closed status,
+  (Google's object, read lazily: an open/closed status,
   the CLI's sections of a place as text, and the same facts in pieces for
   the details screen: hours, about, amenities as yes/no options, reviews),
   `Anchor` (where to search near, distances). Tests in `src/test` run via

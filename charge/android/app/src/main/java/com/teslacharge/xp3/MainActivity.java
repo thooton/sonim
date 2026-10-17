@@ -241,9 +241,7 @@ public final class MainActivity extends BaseActivity {
         // spend 34 of 284 usable pixels saying nothing new.
         LinearLayout root = vertical();
         if (favoriteSites.isEmpty()) {
-            TextView empty = emptyMessage(
-                "No favorites yet.\n\nFind a charger in Discover, open it, then choose Add favorite."
-            );
+            TextView empty = emptyMessage("No favorites yet");
             root.addView(empty, Ui.weighted());
             Button discover = action("Go to Discover");
             discover.setOnClickListener(v -> showTab(DISCOVER, true));
@@ -256,9 +254,8 @@ public final class MainActivity extends BaseActivity {
                 root.addView(
                     warning(
                         favoritesRefreshFailures == 1
-                            ? "1 favorite could not be refreshed. Its live status is unavailable."
-                            : favoritesRefreshFailures +
-                              " favorites could not be refreshed. Their live status is unavailable."
+                            ? "1 favorite could not be refreshed"
+                            : favoritesRefreshFailures + " favorites could not be refreshed"
                     )
                 );
             }
@@ -397,7 +394,7 @@ public final class MainActivity extends BaseActivity {
         root.addView(find);
         final TextView status = small(
             searchResults.isEmpty()
-                ? "Search within " + displayRadius()
+                ? "Within " + displayRadius()
                 : resultSummary()
         );
         status.setMaxLines(1);
@@ -438,7 +435,7 @@ public final class MainActivity extends BaseActivity {
         final ListView list
     ) {
         final AlertDialog.Builder builder = new AlertDialog.Builder(this).setTitle("Find Chargers")
-            .setMessage("Enter a ZIP code or address.").setPositiveButton("Find", null)
+            .setPositiveButton("Find", null)
             .setNegativeButton("Cancel", null);
         final Context themed = builder.getContext();
 
@@ -533,7 +530,7 @@ public final class MainActivity extends BaseActivity {
                 adapter.replace(searchResults);
                 status.setText(
                     searchResults.isEmpty()
-                        ? "No chargers found. Try a wider radius."
+                        ? "No chargers found"
                         : resultSummary()
                 );
                 if (!searchResults.isEmpty()) {
@@ -947,9 +944,7 @@ public final class MainActivity extends BaseActivity {
             // that a scrolling parent's unbounded height would collapse.
             LinearLayout empty = vertical();
             empty.addView(
-                emptyMessage(
-                    "No active charging session.\n\nStart one from a charger in Favorites or Discover."
-                ),
+                emptyMessage("No active charging session"),
                 Ui.weighted()
             );
             Button refresh = action("Check again");
@@ -1019,7 +1014,7 @@ public final class MainActivity extends BaseActivity {
         // not arrive leaves the last one on screen, and power and cost that have
         // quietly stopped advancing look exactly like a charge that has stalled.
         if (sessionError != null) {
-            root.addView(warning("Lost contact with Tesla. Figures below are the last received."));
+            root.addView(warning("Lost contact with Tesla"));
         }
         if (
             "charging".equals(phase) ||
@@ -1085,7 +1080,7 @@ public final class MainActivity extends BaseActivity {
             loadCongestionFees(congestionFees);
         }
         if (currentSession.optBoolean("awaitingUnplug")) root.addView(
-            warning("Charging has stopped. Unplug the connector to close the session.")
+            warning("Charging has stopped")
         );
         // Same rule as the banner: a session that has already moved past the
         // stop offers nothing to press, so it keeps no button. Waiting for an
@@ -1115,9 +1110,7 @@ public final class MainActivity extends BaseActivity {
         LinearLayout root = vertical();
         if (historySessions.isEmpty()) {
             root.addView(
-                emptyMessage(
-                    "No charging sessions yet.\n\nCompleted charging sessions appear here."
-                ),
+                emptyMessage("No charging sessions yet"),
                 Ui.weighted()
             );
             Ui.fill(content, root);
@@ -1207,7 +1200,7 @@ public final class MainActivity extends BaseActivity {
         if (historyAdapter == null) return;
         if (historyLoadingMore) historyAdapter.setFooter("Loading more…", true);
         else if (historyMoreError != null) historyAdapter.setFooter(
-            historyMoreError + "\nPress OK to try again.",
+            historyMoreError,
             false
         );
         else if (historyHasMore) historyAdapter.setFooter("Load older sessions", false);
@@ -1531,11 +1524,7 @@ public final class MainActivity extends BaseActivity {
         }
         final boolean charging = currentSession.optBoolean("charging");
         new AlertDialog.Builder(this).setTitle(charging ? "Stop charging?" : "Cancel session?")
-            .setMessage(
-                charging
-                    ? "This ends the current charge. Starting again requires a new session."
-                    : "This releases the reserved stall."
-            ).setPositiveButton(
+            .setPositiveButton(
                 charging ? "Stop" : "Cancel session",
                 (dialog, which) -> stopSession()
             ).setNegativeButton("Keep session", null).show();
@@ -1770,7 +1759,7 @@ public final class MainActivity extends BaseActivity {
         if (payment == null) {
             text.append(
                 account.isNull("paymentError")
-                    ? "No card on file. Add one in the Tesla app."
+                    ? "No card on file"
                     : account.optString("paymentError")
             );
         } else {
@@ -1847,8 +1836,8 @@ public final class MainActivity extends BaseActivity {
             // loud rather than left inside the filter that reads it.
             text.append(
                 vehicle.optBoolean("hasNacsAdapter")
-                    ? "Adapter registered (searches include NACS-only stalls)"
-                    : "No adapter registered (searches skip NACS-only stalls)"
+                    ? "NACS adapter registered"
+                    : "No NACS adapter registered"
             );
         } else text.append(
             account.isNull("vehicleError")
@@ -1873,12 +1862,12 @@ public final class MainActivity extends BaseActivity {
      */
     private static String signInExpiry(long expiresAt) {
         long remaining = expiresAt - System.currentTimeMillis();
-        if (remaining <= 0) return "Expired. Rebuild and reinstall the app.";
+        if (remaining <= 0) return "Expired";
         long days = remaining / 86_400_000L;
-        if (days == 0) return "Expires today. Rebuild and reinstall the app.";
-        if (days == 1) return "Expires tomorrow. Rebuild the app soon.";
-        if (days <= 14) return "Expires in " + days + " days. Rebuild the app soon.";
-        return "Valid for " + days + " more days.";
+        if (days == 0) return "Expires today";
+        if (days == 1) return "Expires tomorrow";
+        if (days <= 14) return "Expires in " + days + " days";
+        return "Valid for " + days + " more days";
     }
 
     private void chooseRadius() {

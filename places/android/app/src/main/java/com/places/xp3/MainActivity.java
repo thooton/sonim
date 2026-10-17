@@ -4,6 +4,8 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
@@ -11,6 +13,8 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.ImageSpan;
+import android.text.style.TypefaceSpan;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
@@ -32,6 +36,7 @@ import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -101,6 +106,9 @@ public final class MainActivity extends BaseActivity {
         detailBody = (LinearLayout) findViewById(R.id.detail_body);
         resultList.setAdapter(adapter);
         Family.list(resultList);
+        // Results parted by a band of the page behind a place, as Google Maps parts them.
+        resultList.setDivider(new ColorDrawable(color(R.color.grouped_page)));
+        resultList.setDividerHeight(dp(6));
 
         SharedPreferences prefs = prefs();
         login = loadLogin(prefs);
@@ -124,7 +132,7 @@ public final class MainActivity extends BaseActivity {
         });
         if (near.length() == 0) near.requestFocus();
         else query.requestFocus();
-        say(login.ready() ? "" : "No command center: Menu → Command center.");
+        say(login.ready() ? "" : "No command center");
         refresh();
     }
 
@@ -574,7 +582,7 @@ public final class MainActivity extends BaseActivity {
         server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         server.setText(login.server() == null ? "" : login.server());
         final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "Token (blank keeps it)" : "Delta token");
+        token.setHint(login.ready() ? "••••••••" : "Token");
         token.setSingleLine(true);
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);
@@ -601,12 +609,19 @@ public final class MainActivity extends BaseActivity {
     }
 
     /**
-     * A result: its name, then where it is (street and town, in full-strength
-     * text, since that is what tells one branch from another), then rating,
-     * price and kind, then how far and whether it is open now. Name and
-     * address wrap to a second line rather than lose their ends.
+     * A result, laid out as Google Maps lays out one in its list: the name;
+     * the rating with a gold star and the count, the price range, a
+     * wheelchair in the accent when the entrance takes one, and the kind of
+     * place; the full address, since that is what tells one branch from
+     * another; then "Open" in green or "Closed" in red, when that changes,
+     * and how far. A line with nothing to say takes no room, and results are
+     * parted by a band of the grouped page, as Maps parts them.
      */
     private final class ResultAdapter extends BaseAdapter {
+
+        /** Shared by every row: the star after a rating, and the wheelchair. */
+        private Drawable star;
+        private Drawable wheelchair;
 
         @Override
         public int getCount() {
@@ -628,29 +643,65 @@ public final class MainActivity extends BaseActivity {
             LinearLayout row = (LinearLayout) convert;
             if (row == null) {
                 int padH = getResources().getDimensionPixelSize(R.dimen.pad_h);
-                int padV = dp(7);
                 row = vertical();
                 row.setBackgroundResource(com.xp3.common.ui.R.drawable.family_pick);
-                row.setPadding(padH, padV, padH, padV);
+                row.setPadding(padH, dp(8), padH, dp(9));
                 row.addView(line(R.dimen.text_name, R.color.text, true, 2));
-                row.addView(line(R.dimen.text_address, R.color.text, false, 2));
                 row.addView(line(R.dimen.text_meta, R.color.text_muted, false, 1));
-                row.addView(line(R.dimen.text_meta, R.color.text_muted, false, 1));
+                row.addView(line(R.dimen.text_meta, R.color.text_muted, false, 3));
+                row.addView(line(R.dimen.text_meta, R.color.text_muted, false, 2));
             }
             Place place = results.get(position);
             ((TextView) row.getChildAt(0)).setText(place.name());
-            show((TextView) row.getChildAt(1), place.shortAddress());
-            show((TextView) row.getChildAt(2), place.summary());
-            // Only the open-or-closed part takes a colour; the distance before it stays muted.
-            String status = place.status(System.currentTimeMillis());
-            String distance = place.distanceFrom(searchedNear);
-            SpannableStringBuilder last = new SpannableStringBuilder(distance.length() == 0 ? "" : distance + " · ");
-            Boolean open = place.openNow();
-            if (open == null) last.append(status);
-            else span(last, status, new ForegroundColorSpan(color(open ? R.color.open : R.color.closed)));
-            ((TextView) row.getChildAt(3)).setText(last);
+            show((TextView) row.getChildAt(1), facts(place));
+            show((TextView) row.getChildAt(2), place.address());
+            show((TextView) row.getChildAt(3), status(place, System.currentTimeMillis()));
             row.setActivated(picking && position == picked);
             return row;
+        }
+
+        /** "4.8 ★ (112) · $10-20 · ♿ · Cafe": the rating in the text colour, the rest muted. */
+        private CharSequence facts(Place place) {
+            SpannableStringBuilder out = new SpannableStringBuilder();
+            if (place.ratingCount() > 0) {
+                if (star == null) star = new Stars(1, 1, dp(10), 0, color(R.color.star), color(R.color.star_empty));
+                span(out, String.format(Locale.US, "%.1f", place.rating()), new ForegroundColorSpan(color(R.color.text)));
+                out.append(' ');
+                span(out, " ", new ImageSpan(star, ImageSpan.ALIGN_BASELINE));
+                out.append(String.format(Locale.US, " (%,d)", place.ratingCount()));
+            }
+            String price = place.priceShort();
+            if (price.length() > 0) dot(out).append(price);
+            if (place.wheelchairEntrance()) {
+                if (wheelchair == null) {
+                    wheelchair = getDrawable(R.drawable.ic_accessible).mutate();
+                    wheelchair.setTint(color(R.color.focus_rule));
+                    wheelchair.setBounds(0, 0, dp(12), dp(12));
+                }
+                span(dot(out), " ", new ImageSpan(wheelchair, ImageSpan.ALIGN_BASELINE));
+            }
+            if (place.type().length() > 0) dot(out).append(place.type());
+            return out;
+        }
+
+        /** "Closed · Opens 7:00 AM · 3.4 mi": only the open-or-closed word in colour, and Medium. */
+        private CharSequence status(Place place, long now) {
+            SpannableStringBuilder out = new SpannableStringBuilder();
+            String[] parts = place.statusParts(now);
+            if (!parts[0].equals("Hours unknown")) {
+                Boolean open = place.openNow();
+                int tone = open == null ? R.color.text_muted : open ? R.color.open : R.color.closed;
+                span(out, parts[0], new ForegroundColorSpan(color(tone)), new TypefaceSpan("sans-serif-medium"));
+                if (parts[1].length() > 0) dot(out).append(parts[1]);
+            }
+            String distance = place.distanceFrom(searchedNear);
+            if (distance.length() > 0) dot(out).append(distance);
+            return out;
+        }
+
+        /** " · " between the parts of a line, none before the first. */
+        private SpannableStringBuilder dot(SpannableStringBuilder out) {
+            return out.length() == 0 ? out : out.append(" \u00b7 ");
         }
 
         private TextView line(int size, int textColor, boolean bold, int lines) {
@@ -660,13 +711,14 @@ public final class MainActivity extends BaseActivity {
             if (bold) view.setTypeface(Family.MEDIUM);
             view.setMaxLines(lines);
             view.setIncludeFontPadding(false);
-            view.setPadding(0, bold ? 0 : dp(2), 0, 0);
+            view.setLineSpacing(dp(1), 1f);
+            view.setPadding(0, bold ? 0 : dp(4), 0, 0);
             view.setEllipsize(TextUtils.TruncateAt.END);
             return view;
         }
 
         /** A line that takes no room when there is nothing to put on it. */
-        private void show(TextView view, String text) {
+        private void show(TextView view, CharSequence text) {
             view.setText(text);
             view.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
         }

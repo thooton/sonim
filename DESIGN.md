@@ -18,7 +18,8 @@ they look the way they do. Charge and Books keep their own looks.
   follows.
 - One left edge. Every line of text starts 10dp in; hairlines are inset to it.
 - Focus you can see at arm's length: a whole row lifted into a rounded card.
-- Every screen says what to do next, including empty ones.
+- Nothing on screen explains itself. What to do next is shown (a button,
+  the focus, an icon), never spelled out.
 
 ## The rules
 
@@ -42,9 +43,14 @@ they look the way they do. Charge and Books keep their own looks.
    its label inside, turning white with the accent outline while it takes
    the keys. A form that is a list of lines (Mail's composer) uses
    `family_line_field` rows instead.
-7. **Say what to do.** Empty screens use `Family.empty`: a short title and,
-   under it, the key to press. A status screen shows its main action as a
-   `FamilyButton`, not only in the Menu.
+7. **Show, don't tell.** No text tells the user how to use the app: no
+   "Press Menu to…", no keys to press, no example input in a field ("Coffee,
+   pharmacy…"), no "blank keeps it", no sentence explaining what a screen is
+   for. Empty screens use `Family.empty` with a short title saying what is
+   (or isn't) there, and a detail line only for a fact such as why a fetch
+   failed. A status screen shows its main action as a `FamilyButton`, not
+   only in the Menu; a saved secret shows as dots in its empty field; a
+   button that can't act yet is greyed out rather than explained.
 8. **No header names the app.** You just opened it. A header says where
    you are or how things stand (a folder, "Up to date"), and a screen with
    nothing like that to say has no header at all. Nor does a screen carry
@@ -101,11 +107,24 @@ departs from them where Thunderbird does:
   in a conversation, and each menu item shows its key on a keycap, as
   Thunderbird's menus show their shortcuts.
 
-## Places: a place as Google Maps shows one
+## Places: as Google Maps shows it
 
-The results list is the family's. A place's own screen (`PlacePage`) takes
-its layout from Google Maps' place sheet, since that is how people expect a
-place to read, while keeping the family's colours and Medium for emphasis:
+Places takes its layout from Google Maps, since that is how people expect a
+place to read, while keeping the family's colours and Medium for emphasis.
+
+The results are Maps' list, without its photos and chips (they would cost
+a request each and leave room for one result on this screen):
+
+- **A row in four lines.** The name, 13.5sp Medium; the rating in the text
+  colour, one gold star and the count, then price range, a wheelchair in
+  the accent and the kind of place, muted; the full address, muted (Maps
+  leaves it out, but on a list of branches it is what tells them apart);
+  then "Open" in green or "Closed" in red, Medium, when that changes, and
+  how far. A line with nothing on it takes no room.
+- **Bands, not hairlines.** Results are parted by 6dp of `grouped_page`, as
+  Maps parts its results, and the picked one is the family's focus card.
+
+A place's own screen (`PlacePage`) takes its layout from Maps' place sheet:
 
 - **A head on white over the grouped page.** The name at 17sp Medium; the
   rating with five gold stars filled to it (a drawable, so 4.5 shows half a

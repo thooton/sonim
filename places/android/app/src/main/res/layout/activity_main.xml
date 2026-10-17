@@ -22,7 +22,6 @@
             <EditText
                 android:id="@+id/near"
                 style="@style/FieldText"
-                android:hint="@string/hint_near"
                 android:imeOptions="actionNext|flagNoExtractUi"
                 android:inputType="textCapWords|textPostalAddress" />
         </LinearLayout>
@@ -31,7 +30,6 @@
             <EditText
                 android:id="@+id/query"
                 style="@style/FieldText"
-                android:hint="@string/hint_find"
                 android:imeOptions="actionSearch|flagNoExtractUi"
                 android:inputType="textCapSentences" />
         </LinearLayout>

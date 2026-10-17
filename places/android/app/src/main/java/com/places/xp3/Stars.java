@@ -10,20 +10,27 @@ import android.graphics.drawable.Drawable;
 /**
  * Five stars filled to a rating, as Google Maps draws them: 4.5 is four gold
  * stars and half of a fifth, on grey ones. A drawable rather than ★ and ☆,
- * which can only show whole stars.
+ * which can only show whole stars. A row of results has just one, gold,
+ * after the rating, as Maps' list does.
  */
 final class Stars extends Drawable {
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path star = new Path();
     private final double rating;
+    private final int count;
     private final int size;
     private final int gap;
     private final int filled;
     private final int empty;
 
     Stars(double rating, int size, int gap, int filled, int empty) {
+        this(rating, 5, size, gap, filled, empty);
+    }
+
+    Stars(double rating, int count, int size, int gap, int filled, int empty) {
         this.rating = rating;
+        this.count = count;
         this.size = size;
         this.gap = gap;
         this.filled = filled;
@@ -44,7 +51,7 @@ final class Stars extends Drawable {
 
     @Override
     public int getIntrinsicWidth() {
-        return size * 5 + gap * 4;
+        return size * count + gap * (count - 1);
     }
 
     @Override
@@ -56,7 +63,7 @@ final class Stars extends Drawable {
     public void draw(Canvas canvas) {
         canvas.save();
         canvas.translate(getBounds().left, getBounds().top);
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < count; i++) {
             paint.setColor(empty);
             canvas.drawPath(star, paint);
             double part = Math.max(0, Math.min(1, rating - i));
