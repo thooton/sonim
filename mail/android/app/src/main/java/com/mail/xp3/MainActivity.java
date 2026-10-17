@@ -114,6 +114,9 @@ public final class MainActivity extends BaseActivity {
     private TextView emptyText;
     private ScrollView reader;
     private LinearLayout readerBody;
+    private View readerLoading;
+    private ProgressBar readerSpinner;
+    private TextView readerFailed;
     private View compose;
     private View fromRow;
     private TextView fromView;
@@ -197,6 +200,9 @@ public final class MainActivity extends BaseActivity {
         emptyText = (TextView) findViewById(R.id.empty_text);
         reader = (ScrollView) findViewById(R.id.reader);
         readerBody = (LinearLayout) findViewById(R.id.reader_body);
+        readerLoading = findViewById(R.id.reader_loading);
+        readerSpinner = (ProgressBar) findViewById(R.id.reader_spinner);
+        readerFailed = (TextView) findViewById(R.id.reader_failed);
         compose = findViewById(R.id.compose);
         fromRow = findViewById(R.id.from_row);
         fromView = (TextView) findViewById(R.id.from);
@@ -570,7 +576,14 @@ public final class MainActivity extends BaseActivity {
         boolean list = screen == LIST;
         listView.setVisibility(list && !items.isEmpty() ? View.VISIBLE : View.GONE);
         emptyView.setVisibility(list && items.isEmpty() ? View.VISIBLE : View.GONE);
-        reader.setVisibility(screen == READ ? View.VISIBLE : View.GONE);
+        boolean opening = opening();
+        reader.setVisibility(screen == READ && !opening ? View.VISIBLE : View.GONE);
+        readerLoading.setVisibility(opening ? View.VISIBLE : View.GONE);
+        if (opening) {
+            readerSpinner.setVisibility(busy() ? View.VISIBLE : View.GONE);
+            readerFailed.setVisibility(busy() ? View.GONE : View.VISIBLE);
+            if (!busy()) readerFailed.setText(Family.emptyText(this, "This conversation didn't load", null));
+        }
         compose.setVisibility(screen == WRITE ? View.VISIBLE : View.GONE);
         bar();
         if (!list) return;
@@ -579,7 +592,29 @@ public final class MainActivity extends BaseActivity {
             return;
         }
         adapter.notifyDataSetChanged();
-        listView.post(() -> listView.smoothScrollToPosition(picked));
+        keepInView();
+    }
+
+    /**
+     * Scrolls the list just far enough to show the picked row whole, at
+     * once. A smooth scroll started on every press, while the rows were
+     * being bound again, would sometimes run from the top back down to it.
+     */
+    private void keepInView() {
+        listView.post(() -> {
+            if (items.isEmpty()) return;
+            int first = listView.getFirstVisiblePosition();
+            View row = listView.getChildAt(picked - first);
+            int height = listView.getHeight();
+            if (row != null && row.getTop() >= 0 && row.getBottom() <= height) return;
+            if (picked <= first) {
+                listView.setSelectionFromTop(picked, 0);
+            } else {
+                View any = row != null ? row : listView.getChildAt(0);
+                int rowHeight = any == null ? 0 : any.getHeight();
+                listView.setSelectionFromTop(picked, Math.max(0, height - rowHeight));
+            }
+        });
     }
 
     /**
@@ -650,7 +685,10 @@ public final class MainActivity extends BaseActivity {
         else show(listed);
     }
 
-    /** A conversation, whole: at once when it was opened before, else its headers while it loads. */
+    /**
+     * A conversation, whole: at once when it was opened before, else a
+     * spinner until all of it has loaded, never a part of it.
+     */
     private void show(Conversation listed) {
         stop();
         screen = READ;
@@ -658,14 +696,16 @@ public final class MainActivity extends BaseActivity {
         expandAll = false;
         final String id = listed.id;
         reading = whole.get(id);
-        render(reading != null ? reading : listed, reading == null);
-        refresh();
         if (reading != null) {
+            render(reading);
+            refresh();
             say("");
             markRead(reading);
             return;
         }
         reading = listed;
+        readerBody.removeAllViews();
+        messageViews.clear();
         final Gmail client = gmail();
         start("Opening…", () -> {
             final Conversation full = client.conversation(id);
@@ -674,10 +714,15 @@ public final class MainActivity extends BaseActivity {
                 if (screen != READ || reading == null || !reading.id.equals(id)) return;
                 reading = full;
                 say("");
-                render(full, false);
+                render(full);
                 markRead(full);
             };
         });
+    }
+
+    /** Whether the conversation open is still loading (or failed to), so only the spinner shows. */
+    private boolean opening() {
+        return screen == READ && reading != null && !whole.containsKey(reading.id);
     }
 
     /** Opening an unread conversation reads it, as in Gmail. */
@@ -713,11 +758,9 @@ public final class MainActivity extends BaseActivity {
     /**
      * The subject and its tags, then each message under a header of its
      * own, as Thunderbird's conversation view: read messages before the last
-     * are folded to their header and first words, unless all are opened. A
-     * conversation known only from the list shows every message folded
-     * while the rest loads.
+     * are folded to their header and first words, unless all are opened.
      */
-    private void render(Conversation conversation, boolean partial) {
+    private void render(Conversation conversation) {
         readerBody.removeAllViews();
         messageViews.clear();
         readerBody.addView(subjectView(conversation));
@@ -726,9 +769,8 @@ public final class MainActivity extends BaseActivity {
         for (int i = 0; i < messages.size(); i++) {
             Message message = messages.get(i);
             if (first < 0 && message.unread()) first = i;
-            boolean folded = partial
-                || !expandAll && i < messages.size() - 1 && !message.unread() && !message.draft();
-            View view = messageView(message, i, folded, partial);
+            boolean folded = !expandAll && i < messages.size() - 1 && !message.unread() && !message.draft();
+            View view = messageView(message, i, folded);
             readerBody.addView(view);
             messageViews.add(view);
         }
@@ -776,7 +818,7 @@ public final class MainActivity extends BaseActivity {
     }
 
     /** One message: its header, then (unless folded) its text, a note where a quote was cut, and its files. */
-    private View messageView(Message message, int index, boolean folded, boolean partial) {
+    private View messageView(Message message, int index, boolean folded) {
         View view = getLayoutInflater().inflate(R.layout.reader_message, readerBody, false);
         String sender = message.sender();
         ((TextView) view.findViewById(R.id.avatar)).setText(Avatar.letter(sender));
@@ -796,7 +838,6 @@ public final class MainActivity extends BaseActivity {
             body.setVisibility(View.GONE);
             quoted.setVisibility(View.GONE);
             files.setVisibility(View.GONE);
-            if (partial) view.findViewById(R.id.head).setPadding(dp(10), dp(9), dp(10), dp(9));
             return view;
         }
         Message.Content content = message.content();
@@ -937,9 +978,9 @@ public final class MainActivity extends BaseActivity {
 
     /** Draws it again as it is now, keeping the message in view at the top. */
     private void rerender() {
-        if (reading == null) return;
+        if (reading == null || !whole.containsKey(reading.id)) return;
         final int at = messageInView();
-        render(reading, !whole.containsKey(reading.id));
+        render(reading);
         scrollOnceLaidOut(at);
     }
 
