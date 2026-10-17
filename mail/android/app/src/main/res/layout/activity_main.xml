@@ -169,7 +169,6 @@
                     <EditText
                         android:id="@+id/to"
                         style="@style/Field"
-                        android:hint="@string/hint_to"
                         android:imeOptions="actionNext|flagNoExtractUi"
                         android:inputType="textEmailAddress" />
                 </LinearLayout>
@@ -186,7 +185,6 @@
                     <EditText
                         android:id="@+id/subject"
                         style="@style/Field"
-                        android:hint="@string/hint_subject"
                         android:imeOptions="actionNext|flagNoExtractUi"
                         android:inputType="textCapSentences|textAutoCorrect" />
                 </LinearLayout>

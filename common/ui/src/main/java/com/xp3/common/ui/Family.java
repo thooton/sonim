@@ -40,7 +40,9 @@ public final class Family {
 
     /**
      * What an empty screen says: a short title, and under it, smaller and
-     * muted, what to do about it (which key to press). `hint` may be null.
+     * muted, any detail (why a fetch failed). Never instructions: what to do
+     * next is shown, by a button or the focus, not spelled out. `hint` may
+     * be null.
      */
     public static CharSequence emptyText(Context context, String title, String hint) {
         SpannableStringBuilder out = new SpannableStringBuilder(title);

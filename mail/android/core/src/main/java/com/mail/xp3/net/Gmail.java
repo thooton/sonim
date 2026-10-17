@@ -416,7 +416,7 @@ public final class Gmail {
             if (status == 403 && message.toLowerCase(Locale.US).matches(".*(scope|permission).*")) {
                 throw new IOException("The Gmail login lacks a permission. Run `delta gmail login` again and allow everything.");
             }
-            if (status == 429) throw new IOException("Gmail: too many requests. Wait a minute and try again.");
+            if (status == 429) throw new IOException("Gmail: too many requests");
             throw new IOException("Gmail: " + (message.length() > 0 ? message : "HTTP " + status));
         }
     }

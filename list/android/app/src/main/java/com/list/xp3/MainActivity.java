@@ -2,7 +2,9 @@ package com.list.xp3;
 
 import android.app.AlertDialog;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.ContextMenu;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -10,6 +12,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -106,7 +109,7 @@ public final class MainActivity extends BaseActivity {
         if (items.isEmpty()) {
             listAdapter = null;
             listView = null;
-            TextView empty = Family.empty(this, "Nothing on the list", "Press Menu to add an item");
+            TextView empty = Family.empty(this, "Nothing on the list", null);
             // Focusable so the screen still has somewhere for keys to land,
             // and so Menu's popup has something to sit beside.
             empty.setFocusable(true);
@@ -325,10 +328,7 @@ public final class MainActivity extends BaseActivity {
             .create();
         final Runnable commit = () -> {
             String text = field.getText().toString().trim();
-            if (text.length() == 0) {
-                toast("Type something first");
-                return;
-            }
+            if (text.length() == 0) return;
             dialog.dismiss();
             try {
                 result.accept(text);
@@ -350,8 +350,18 @@ public final class MainActivity extends BaseActivity {
             return true;
         });
         dialog.show();
-        // Wired after show() so an empty field keeps the dialog open.
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> commit.run());
+        // Wired after show() so an empty field keeps the dialog open; Save is
+        // greyed out while there is nothing to save.
+        final Button save = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        save.setOnClickListener(view -> commit.run());
+        save.setEnabled(field.getText().toString().trim().length() > 0);
+        field.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence text, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable text) {
+                save.setEnabled(text.toString().trim().length() > 0);
+            }
+        });
         field.requestFocus();
     }
 

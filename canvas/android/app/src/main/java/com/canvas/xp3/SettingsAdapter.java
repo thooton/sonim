@@ -11,7 +11,7 @@ import java.util.List;
 
 import com.xp3.common.ui.SelectableAdapter;
 
-/** The settings list: a label, what it is currently set to, and nothing else. */
+/** The settings list: a label, what it is currently set to, and nothing else; or an action, by name. */
 final class SettingsAdapter extends SelectableAdapter {
 
     static final class Row {
@@ -53,8 +53,12 @@ final class SettingsAdapter extends SelectableAdapter {
         View view = convertView;
         if (view == null) view = inflater.inflate(R.layout.row_setting, parent, false);
         view.setSelected(isSelected(position));
-        ((TextView) view.findViewById(R.id.setting_label)).setText(row.label);
-        ((TextView) view.findViewById(R.id.setting_value)).setText(shown(row));
+        TextView label = (TextView) view.findViewById(R.id.setting_label);
+        TextView value = (TextView) view.findViewById(R.id.setting_value);
+        // An action (signing out) is its own name, with nothing set under it.
+        label.setVisibility(row.field == null ? View.GONE : View.VISIBLE);
+        label.setText(row.label);
+        value.setText(row.field == null ? row.label : shown(row));
         return view;
     }
 
@@ -67,7 +71,6 @@ final class SettingsAdapter extends SelectableAdapter {
      * bottom. Whether it is there is the only question this screen is asked.
      */
     private static String shown(Row row) {
-        if (row.field == null) return row.value;
         if (row.value == null || row.value.length() == 0) return "Not set";
         return row.secret ? "Set" : row.value;
     }

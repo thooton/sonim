@@ -303,11 +303,11 @@ public final class MainActivity extends BaseActivity {
         // With nothing set up, the empty page in the middle of the screen says
         // it at length; a strip above it would say it twice.
         if (!backend.canvasReady()) return null;
-        // So would a strip saying "Updating" over a page saying "Fetching your
-        // work from Canvas". The strip is for a list that has something in it.
+        // So would a strip saying "Updating" over a page saying "Fetching".
+        // The strip is for a list that has something in it.
         if (todos.isEmpty() && (syncing || syncError != null || snapshot == null)) return null;
         if (syncing) return "Updating…";
-        if (syncError != null) return "Could not update. Menu to retry.";
+        if (syncError != null) return "Could not update";
         if (snapshot == null) return null;
         if (!snapshot.complete()) {
             int count = snapshot.unavailable.size();
@@ -341,7 +341,7 @@ public final class MainActivity extends BaseActivity {
     private void refresh(final boolean announce) {
         if (syncing) return;
         if (!backend.canvasReady()) {
-            if (announce) toast("Add your Canvas details in Settings first");
+            if (announce) toast("Not set up");
             return;
         }
         syncing = true;
@@ -591,20 +591,20 @@ public final class MainActivity extends BaseActivity {
      */
     private String emptyText(int state) {
         if (!backend.canvasReady()) {
-            return "Not set up yet.\n\nPress Menu, then Settings, to add your Canvas address and service token.";
+            return "Not set up";
         }
         if (todos.isEmpty()) {
-            if (syncing) return "Fetching your work from Canvas…";
-            if (syncError != null) return syncError + "\n\nPress Menu, then Refresh, to try again.";
-            if (snapshot == null) return "Nothing fetched yet.\n\nPress Menu, then Refresh.";
+            if (syncing) return "Fetching…";
+            if (syncError != null) return syncError;
+            if (snapshot == null) return "Nothing fetched yet";
         }
         if (state == ASSIGNED) {
-            return "Nothing assigned.\n\nWork your teachers post shows up here, soonest first.";
+            return "Nothing assigned";
         }
         if (state == MISSING) {
-            return "Nothing missing.\n\nEverything with a date on it has been turned in.";
+            return "Nothing missing";
         }
-        return "Nothing turned in yet.\n\nWork you hand in on Canvas shows up here.";
+        return "Nothing turned in yet";
     }
 
     // ------------------------------------------------------------------
@@ -892,20 +892,11 @@ public final class MainActivity extends BaseActivity {
 
     private void showAbout() {
         String updated = snapshot == null
-            ? "Nothing has been fetched yet."
-            : "Work list fetched "
-                + Dates.dayAndTime(snapshot.fetchedAt, System.currentTimeMillis()) + ".";
+            ? "Nothing fetched yet"
+            : "Fetched " + Dates.dayAndTime(snapshot.fetchedAt, System.currentTimeMillis());
         new AlertDialog.Builder(this)
             .setTitle("About")
-            .setMessage(
-                "Canvas, for the Sonim XP3.\n\n" +
-                "Your assignments are read from Canvas and kept on this phone " +
-                "so they can be read without a signal. Nothing is ever written " +
-                "back to Canvas: this app cannot turn work in or change a grade.\n\n" +
-                updated + "\n\n" +
-                "Left and right move between tabs. OK opens a section or an " +
-                "assignment. Back leaves a page. Menu has refresh and settings."
-            )
+            .setMessage(updated)
             .setPositiveButton("OK", null)
             .show();
     }
@@ -939,9 +930,9 @@ public final class MainActivity extends BaseActivity {
         rows.add(row(config, Config.COOKIE_TOKEN, "Service token", true));
         rows.add(row(config, Config.TIMEZONE, "Time zone", false));
         if (backend.hasBundledSetup()) {
-            rows.add(new SettingsAdapter.Row(null, RESTORE, "Put this build's own setup back", false));
+            rows.add(new SettingsAdapter.Row(null, RESTORE, null, false));
         }
-        rows.add(new SettingsAdapter.Row(null, SIGN_OUT, "Remove everything saved here", false));
+        rows.add(new SettingsAdapter.Row(null, SIGN_OUT, null, false));
         return rows;
     }
 
@@ -956,7 +947,7 @@ public final class MainActivity extends BaseActivity {
 
         LinearLayout root = vertical();
         root.addView(heading("Settings"));
-        root.addView(subheading(backend.canvasReady() ? "Work is set up" : "Not set up yet"));
+        root.addView(subheading(backend.canvasReady() ? "Set up" : "Not set up"));
         root.addView(divider());
         root.addView(list, Ui.weighted());
         wireSettings(list, adapter);
@@ -1217,9 +1208,8 @@ public final class MainActivity extends BaseActivity {
     }
 
     /**
-     * Centred guidance for a screen that has nothing in it: the first
-     * paragraph is what is (or isn't) here, set as a title, and the rest
-     * says what to do about it.
+     * Centred text for a screen that has nothing in it: the first paragraph
+     * is what is (or isn't) here, set as a title, and any rest is detail.
      */
     private TextView emptyMessage(String message) {
         int cut = message.indexOf("\n\n");

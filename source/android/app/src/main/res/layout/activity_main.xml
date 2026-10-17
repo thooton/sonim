@@ -58,19 +58,6 @@
         android:layout_weight="1"
         android:layout_marginTop="2dp">
 
-        <!-- Nothing yet: what this tab finds and how. -->
-        <TextView
-            android:id="@+id/empty"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:lineSpacingExtra="5dp"
-            android:paddingBottom="24dp"
-            android:paddingLeft="20dp"
-            android:paddingRight="20dp"
-            android:visibility="gone" />
-
         <!-- The command center's log, as it streams: set small in a
              monospace face, so it reads as a record rather than as the
              screen's content. -->

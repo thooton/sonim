@@ -177,7 +177,7 @@ final class PlacePage {
         card(body).addView(column);
     }
 
-    /** "Mon 7:00 AM – 9:00 PM" as two columns, each range of a split day on its own line. */
+    /** "Mon 7:00 AM - 9:00 PM" as two columns, each range of a split day on its own line. */
     private View day(String text, String today) {
         String day = text.length() > 4 && DAYS.contains(text.substring(0, 3)) && text.charAt(3) == ' ' ? text.substring(0, 3) : "";
         String times = (day.length() > 0 ? text.substring(4) : text).replace(", ", "\n");

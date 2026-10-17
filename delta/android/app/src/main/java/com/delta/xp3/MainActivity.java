@@ -476,7 +476,7 @@ public final class MainActivity extends BaseActivity {
 
     private void renderChats(boolean focusContent) {
         if (!anySessions()) {
-            Ui.fill(content, emptyMessage(Backend.NO_LOGIN));
+            Ui.fill(content, emptyMessage(Backend.NO_CENTER));
             return;
         }
         LinearLayout root = vertical();
@@ -648,7 +648,7 @@ public final class MainActivity extends BaseActivity {
 
     private void renderAccounts(boolean focusContent) {
         if (!backend.ready()) {
-            Ui.fill(content, emptyMessage(Backend.NO_LOGIN));
+            Ui.fill(content, emptyMessage(Backend.NO_CENTER));
             return;
         }
         LinearLayout root = vertical();
@@ -815,7 +815,7 @@ public final class MainActivity extends BaseActivity {
         }
         final boolean backup = backupNow();
         if (backup ? !backend.centerReady() : !backend.ready()) {
-            transcript.note(backup ? Backend.NO_CENTER : Backend.NO_LOGIN);
+            transcript.note(Backend.NO_CENTER);
             render(FOCUS_INPUT);
             return;
         }
@@ -1039,14 +1039,9 @@ public final class MainActivity extends BaseActivity {
         long until = backend.limitedUntil(sessionId);
         if (until <= 0) return null;
         String when = Backend.when(until).replaceFirst("^at ", "until ").replaceFirst("^on ", "until ");
-        String said = "This account is out of usage " + when + ".";
+        String said = "Out of usage " + when + ".";
         int waiting = backend.queuedFor(sessionId);
-        if (waiting > 0) {
-            said += waiting == 1 ? " Your message will be sent then." : " Your messages will be sent then.";
-        } else {
-            said += " A message sent now waits until then.";
-        }
-        if (backend.canMove(sessionId)) said += " Or move the conversation to another account:";
+        if (waiting > 0) said += waiting == 1 ? " 1 message waiting." : " " + waiting + " messages waiting.";
         return said;
     }
 
@@ -1361,7 +1356,7 @@ public final class MainActivity extends BaseActivity {
             }
             attachedFiles.add(name);
         }
-        toast(name + " goes with your next message");
+        toast("Attached " + name);
     }
 
     private void removeFiles() {
@@ -2317,7 +2312,7 @@ public final class MainActivity extends BaseActivity {
         // Visible, not hidden: it is typed on a keypad and has to be checked
         // by eye, and T9 must not try to correct it into words.
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-        token.setHint(backend.centerReady() ? "Token (blank keeps it)" : "Token");
+        token.setHint(backend.centerReady() ? "••••••••" : "Token");
         form.addView(token);
         new AlertDialog.Builder(this)
             .setTitle("Command center")

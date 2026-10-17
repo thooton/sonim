@@ -41,7 +41,6 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     private TextView othersView;
     private TextView statusView;
     private TextView actionView;
-    private View hintView;
     private File folder;
     private Runnable whenAllowed;
 
@@ -59,7 +58,6 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
         othersView = (TextView) findViewById(R.id.others);
         statusView = (TextView) findViewById(R.id.status);
         actionView = (TextView) findViewById(R.id.action);
-        hintView = findViewById(R.id.hint);
         // Drawn as focused: it is what OK does, whatever has the focus.
         actionView.setSelected(true);
         String saved = prefs().getString("folder", "");
@@ -92,20 +90,18 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
         stateView.getCompoundDrawablesRelative()[0].setLevel(running ? 1 : 0);
         folderView.setText(folder == null ? "None chosen" : shown(folder));
         actionView.setText(running ? "Stop serving" : folder == null ? "Choose a folder" : "Start serving");
-        hintView.setVisibility(folder == null || running ? View.GONE : View.VISIBLE);
 
         // The address changes with the network, so it is read afresh each time.
         List<String> addresses = Addresses.local();
         if (addresses.isEmpty()) {
             addressView.setText("No network");
-            othersView.setText("Join Wi-Fi or turn on the hotspot.");
+            othersView.setText("");
         } else {
             addressView.setText(address(addresses.get(0)));
             StringBuilder others = new StringBuilder();
-            if (running) others.append("Open it in a browser on the same Wi-Fi");
             for (int i = 1; i < addresses.size(); i++) {
                 if (others.length() > 0) others.append('\n');
-                others.append(i == 1 ? "or " : "").append(url(addresses.get(i)));
+                others.append(url(addresses.get(i)));
             }
             othersView.setText(others);
         }
@@ -172,7 +168,7 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     private void begin() {
         if (!allowed(() -> begin())) return;
         if (!folder.isDirectory()) {
-            problem("That folder is gone. Choose another.");
+            problem("That folder is gone");
             return;
         }
         ServeService.start(this, folder);
@@ -202,7 +198,7 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
         if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
             if (then != null) then.run();
         } else {
-            problem("Serve needs storage access to read the folder.");
+            problem("No storage access");
         }
     }
 

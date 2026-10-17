@@ -53,7 +53,6 @@ public final class MainActivity extends BaseActivity implements Download.Listene
     private EditText query;
     private TextView[] tabs;
     private TextView statusView;
-    private TextView emptyView;
     private TextView logView;
     private ScrollView scroll;
     private ListView resultList;
@@ -78,7 +77,6 @@ public final class MainActivity extends BaseActivity implements Download.Listene
             (TextView) findViewById(R.id.tab_book),
         };
         statusView = (TextView) findViewById(R.id.status);
-        emptyView = (TextView) findViewById(R.id.empty);
         logView = (TextView) findViewById(R.id.log);
         scroll = (ScrollView) findViewById(R.id.scroll);
         resultList = (ListView) findViewById(R.id.results);
@@ -187,15 +185,13 @@ public final class MainActivity extends BaseActivity implements Download.Listene
         if (rows() == 0) picking = false;
 
         String status = Download.status();
-        if (status.length() == 0 && !login.ready()) status = "No command center: Menu → Command center.";
+        if (status.length() == 0 && !login.ready()) status = "No command center";
         say(status);
 
         boolean list = shown != null;
         boolean blank = !list && Download.log().isEmpty();
         resultList.setVisibility(list ? View.VISIBLE : View.GONE);
         scroll.setVisibility(list || blank ? View.GONE : View.VISIBLE);
-        emptyView.setVisibility(blank ? View.VISIBLE : View.GONE);
-        if (blank) showEmpty();
         adapter.notifyDataSetChanged();
         if (list) {
             resultList.post(() -> {
@@ -232,19 +228,6 @@ public final class MainActivity extends BaseActivity implements Download.Listene
 
     private void showMode() {
         for (int i = 0; i < MODES.length; i++) tabs[i].setSelected(MODES[i].equals(mode));
-        if (Music.ALBUM.equals(mode)) query.setHint(R.string.hint_album);
-        else if (books()) query.setHint(R.string.hint_book);
-        else query.setHint(R.string.hint_song);
-        if (emptyView.getVisibility() == View.VISIBLE) showEmpty();
-    }
-
-    /** Before anything has been searched for: what this tab finds, and how. */
-    private void showEmpty() {
-        String title = books() ? "Find a book" : Music.ALBUM.equals(mode) ? "Find an album" : "Find a song";
-        String how = books() ? "Type a title, author or ISBN,\nthen press OK."
-            : Music.ALBUM.equals(mode) ? "Type an artist and album,\nthen press OK."
-            : "Type an artist and title,\nthen press OK.";
-        emptyView.setText(Family.emptyText(this, title, how + "\n\nLeft and Right switch between\nsongs, albums and books."));
     }
 
     /** Song, Album, Book and round again; `step` is 1 or -1. */
@@ -332,7 +315,7 @@ public final class MainActivity extends BaseActivity implements Download.Listene
         if (granted && then != null) {
             then.run();
         } else if (!granted) {
-            say("Source needs storage access to save into the Music and Books folders.");
+            say("No storage access");
         }
     }
 
@@ -464,7 +447,7 @@ public final class MainActivity extends BaseActivity implements Download.Listene
                 labels.add(any ? "Search EPUBs only" : "Search every format");
                 actions.add(() -> {
                     prefs().edit().putBoolean("any_format", !any).apply();
-                    say(any ? "Searches look for EPUBs first." : "Searches show every format.");
+                    say(any ? "EPUBs first" : "Every format");
                 });
                 if (page != null) {
                     labels.add("Clear results");
@@ -502,7 +485,7 @@ public final class MainActivity extends BaseActivity implements Download.Listene
             return;
         }
         new AlertDialog.Builder(this)
-            .setMessage("Only if downloads keep saying they couldn't connect: too many new logins get the command center throttled. Reconnect?")
+            .setTitle("Reconnect music account?")
             .setPositiveButton("Reconnect", (dialog, which) -> relogin())
             .setNegativeButton("Cancel", null)
             .show();
@@ -515,7 +498,7 @@ public final class MainActivity extends BaseActivity implements Download.Listene
             String result;
             try {
                 new Music(using).relogin();
-                result = "Reconnected. Try the download again.";
+                result = "Reconnected";
             } catch (Exception e) {
                 result = "Couldn't reconnect: " + e.getMessage();
             }
@@ -536,7 +519,7 @@ public final class MainActivity extends BaseActivity implements Download.Listene
         server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         server.setText(login.server() == null ? "" : login.server());
         final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "Token (blank keeps it)" : "Delta token");
+        token.setHint(login.ready() ? "••••••••" : "Token");
         token.setSingleLine(true);
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);

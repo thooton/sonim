@@ -65,7 +65,7 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         root.addView(menu, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, Gravity.BOTTOM));
         setContentView(root);
         if (!allowed()) {
-            view.setMessage("Find your books", "Books needs to read the phone\u2019s storage to find them.\nPress OK to allow.");
+            view.setMessage("No storage access", null);
             requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, ASK_STORAGE);
         }
     }
@@ -97,10 +97,9 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
             view.setMessage("Looking for books\u2026", null);
             scan();
         } else if (!shouldShowRequestPermissionRationale(Manifest.permission.READ_EXTERNAL_STORAGE)) {
-            view.setMessage("Storage is turned off",
-                "Allow Storage for Books in Settings \u203A Apps \u203A Books \u203A Permissions.");
+            view.setMessage("Storage is turned off", null);
         } else {
-            view.setMessage("Find your books", "Books needs to read the phone\u2019s storage to find them.\nPress OK to allow.");
+            view.setMessage("No storage access", null);
         }
     }
 
@@ -125,8 +124,7 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
     private void show(List<Shelf.Entry> books) {
         if (books.isEmpty()) {
             view.setBooks(books);
-            view.setMessage("No books yet",
-                "Copy .epub or .txt files into the Books folder on the phone or its SD card, and they will show up here.");
+            view.setMessage("No books yet", null);
             return;
         }
         view.setBooks(books);

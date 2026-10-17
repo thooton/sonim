@@ -191,15 +191,15 @@ final class Download {
         log.clear();
         logShown = true;
         line("» Search for " + (Music.ALBUM.equals(mode) ? "album: " : "song: ") + query);
-        setStatus("Searching… (Back cancels)");
+        setStatus("Searching…");
         start(context, "music-search", new Work() {
             @Override
             public void run() throws IOException, InterruptedException {
                 final Music.Found result = music.search(mode, query, (text, error) -> Download.line(text));
                 final int count = result.hits.size();
                 final String said = count == 0
-                    ? "Nothing found; see the log"
-                    : count + (count == 1 ? " result" : " results") + ", best first";
+                    ? "Nothing found"
+                    : count + (count == 1 ? " result" : " results");
                 if (result.error != null) line("✗ " + result.error);
                 else line("✓ " + said);
                 MAIN.post(() -> {
@@ -225,7 +225,7 @@ final class Download {
         logShown = true;
         line("");
         line("» Download " + hit.link);
-        setStatus("Downloading… (Back cancels)");
+        setStatus("Downloading…");
         start(context, "music-download", new Work() {
             @Override
             public void run() throws IOException, InterruptedException {
@@ -260,10 +260,10 @@ final class Download {
                 String where = saved.folder == null ? "Music" : "Music/" + saved.folder;
                 String done = "Saved " + saved.count + " file(s) to " + where;
                 if (saved.kept > 0) done += ", " + saved.kept + " already there";
-                post("✓ " + done, result.error == null ? done : "Saved some files; see the log");
+                post("✓ " + done, result.error == null ? done : "Saved some files");
             }
             if (result.error != null) {
-                post("✗ " + result.error, result.job == null ? "Nothing downloaded; see the log" : status);
+                post("✗ " + result.error, result.job == null ? "Nothing downloaded" : status);
             }
             return result.job != null;
         } finally {
@@ -368,7 +368,7 @@ final class Download {
     static void search(Context context, Login login, final String query, final int page, final String format) {
         if (running()) return;
         final Books books = books(context, login);
-        setStatus(page > 1 ? "Loading page " + page + "… (Back cancels)" : "Searching… (Back cancels)");
+        setStatus(page > 1 ? "Loading page " + page + "…" : "Searching…");
         start(context, "book-search", new Work() {
             @Override
             public void run() throws IOException, InterruptedException {
@@ -402,7 +402,7 @@ final class Download {
         final Books books = books(context, login);
         final Context app = context.getApplicationContext();
         line("» Book: " + book.title);
-        setStatus("Downloading… (Back cancels)");
+        setStatus("Downloading…");
         start(context, "book-download", new Work() {
             @Override
             public void run() throws IOException, InterruptedException {

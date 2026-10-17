@@ -100,12 +100,6 @@ public final class Place {
         return orEmpty(Json.text(raw, "formattedAddress"));
     }
 
-    /** "433 S Farmer Ave, Tempe": street and town, for a row of results; the full address when Google gives no short one. */
-    public String shortAddress() {
-        String street = Json.text(raw, "shortFormattedAddress");
-        return street != null && street.trim().length() > 0 ? street.trim() : address();
-    }
-
     /** The national number, which is what the phone dials; the international one when there is no other. */
     public String phone() {
         String phone = Json.text(raw, "nationalPhoneNumber");
@@ -135,16 +129,6 @@ public final class Place {
         return Anchor.distance(near.metersTo(lat(), lng()));
     }
 
-    /** "4.6★ (820) · $$ · Coffee shop", for a row of results. */
-    public String summary() {
-        List<String> parts = new ArrayList<String>();
-        if (ratingCount() > 0) parts.add(String.format(Locale.US, "%.1f★ (%s)", rating(), commas(ratingCount())));
-        String level = priceLevel();
-        if (level.length() > 0) parts.add(level);
-        if (type().length() > 0) parts.add(type());
-        return join(parts, " · ");
-    }
-
     public double rating() {
         Double rating = Json.number(raw, "rating");
         return rating == null ? 0 : rating;
@@ -168,25 +152,25 @@ public final class Place {
     /** "$$ ($10-20 per person)", or as much of it as Google knows. */
     String price() {
         String level = priceLevel();
-        String range = range("-");
+        String range = range();
         if (range.length() == 0) return level;
         return (level + " (" + range + " per person)").trim();
     }
 
-    /** "$10–20" a person, as Google Maps writes it under the name; the level ("$$") when Google gives no range. */
+    /** "$10-20" a person, as Google Maps writes it under the name; the level ("$$") when Google gives no range. */
     public String priceShort() {
-        String range = range("\u2013");
+        String range = range();
         return range.length() > 0 ? range : priceLevel();
     }
 
-    /** "$10" and "20" joined by `dash`, "$10+" when open-ended, "" when Google gives no range. */
-    private String range(String dash) {
+    /** "$10-20", "$10+" when open-ended, "" when Google gives no range. */
+    private String range() {
         Map<String, Object> range = Json.child(raw, "priceRange");
         if (!(range.get("startPrice") instanceof Map)) return "";
         String text = money(Json.child(range, "startPrice"));
         if (!(range.get("endPrice") instanceof Map)) return text + "+";
         String end = money(Json.child(range, "endPrice"));
-        return text + dash + (end.startsWith("$") ? end.substring(1) : end);
+        return text + "-" + (end.startsWith("$") ? end.substring(1) : end);
     }
 
     /** Open or closed now and until when, in the place's own time: "Open until 9:00 PM". */
@@ -433,12 +417,15 @@ public final class Place {
         return out;
     }
 
-    /** A block of opening hours, one day a line: "Mon 7:00 AM – 9:00 PM". */
+    /**
+     * A block of opening hours, one day a line: "Mon 7:00 AM - 9:00 PM",
+     * with a hyphen for the dash Google puts between the times.
+     */
     private static List<String> hours(Map<String, Object> block) {
         List<String> lines = new ArrayList<String>();
         for (Object item : Json.children(block, "weekdayDescriptions")) {
             if (!(item instanceof String)) continue;
-            String line = plainSpaces((String) item);
+            String line = plainSpaces((String) item).replace('\u2013', '-').replace('\u2014', '-');
             for (String day : DAYS) {
                 if (line.startsWith(day + ": ")) {
                     line = day.substring(0, 3) + " " + line.substring(day.length() + 2);

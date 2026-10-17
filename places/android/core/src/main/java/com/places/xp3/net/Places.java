@@ -23,8 +23,8 @@ import java.util.Map;
  * for nothing past the Enterprise tier (ratings and opening hours need it), a
  * place's details add reviews and the other Atmosphere fields, and looking up
  * where to search near asks only for Pro fields. A search also asks for the
- * short address, for the results list; it is a Pro field, so the search still
- * bills as Enterprise.
+ * price range and the wheelchair entrance, for the results list; they are
+ * Enterprise and Pro fields, so the search still bills as Enterprise.
  */
 public final class Places {
 
@@ -37,7 +37,8 @@ public final class Places {
     static final String LOCATE_FIELDS = "places.id,places.displayName,places.formattedAddress,places.location";
 
     static final String SEARCH_FIELDS = "places.id,places.displayName,places.primaryTypeDisplayName,"
-        + "places.formattedAddress,places.shortFormattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,"
+        + "places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.priceRange,"
+        + "places.accessibilityOptions.wheelchairAccessibleEntrance,"
         + "places.businessStatus,places.utcOffsetMinutes,places.currentOpeningHours.openNow,"
         + "places.currentOpeningHours.nextOpenTime,places.currentOpeningHours.nextCloseTime,nextPageToken";
 
@@ -94,7 +95,7 @@ public final class Places {
         Map<String, Object> body = Json.map("textQuery", typed.trim(), "pageSize", Integer.valueOf(1));
         List<Object> found = Json.children(google("/places:searchText", LOCATE_FIELDS, Json.write(body)), "places");
         if (found.isEmpty() || !(found.get(0) instanceof Map)) {
-            throw new IOException("Couldn't find \"" + typed.trim() + "\". Try adding a city or zip code.");
+            throw new IOException("Couldn't find \"" + typed.trim() + "\"");
         }
         Place place = new Place(Json.object(found.get(0)));
         if (!place.located()) throw new IOException("\"" + typed.trim() + "\" has no location.");

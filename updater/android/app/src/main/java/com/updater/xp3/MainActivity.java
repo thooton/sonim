@@ -299,8 +299,8 @@ public final class MainActivity extends BaseActivity {
     private void showMessage() {
         CharSequence text;
         if (checking) text = Family.emptyText(this, "Checking for updates…", null);
-        else if (checkError != null) text = Family.emptyText(this, "Couldn't check for updates", checkError + "\n\nPress Menu to check again");
-        else text = Family.emptyText(this, "The release lists no apps", "Press Menu to check again");
+        else if (checkError != null) text = Family.emptyText(this, "Couldn't check for updates", checkError);
+        else text = Family.emptyText(this, "The release lists no apps", null);
         if (messageView == null) {
             TextView view = Family.empty(this, "", null);
             // Focusable so keys land somewhere and the menu has an anchor.
@@ -561,7 +561,7 @@ public final class MainActivity extends BaseActivity {
             .putExtra(HELPER_PACKAGE, done.entry.packageName);
         if (hasHelper()) intent.setComponent(HELPER);
         if (done.entry.packageName.equals(getPackageName())) {
-            toast("The Updater closes to update itself. Open it again after.");
+            toast("The Updater closes to update itself");
         }
         try {
             startActivityForResult(intent, INSTALL);
@@ -572,8 +572,7 @@ public final class MainActivity extends BaseActivity {
             // Signature permissions are granted when an app is installed, so
             // an Updater installed before Installer doesn't have it.
             done(done);
-            alert(failure(done), "Installer wouldn't take it. Reinstall the Updater "
-                + "(with adb) now that Installer is on the phone.");
+            alert(failure(done), "Installer wouldn't take it. Reinstall the Updater with adb.");
         }
     }
 
@@ -592,12 +591,10 @@ public final class MainActivity extends BaseActivity {
         PackageInfo here = installed(info.packageName, PackageManager.GET_SIGNATURES);
         if (here == null) return null;
         if (!Arrays.equals(here.signatures, info.signatures)) {
-            return "The phone's copy is signed with a different key, so Android won't "
-                + "replace it. Uninstall it first, then install it from here.";
+            return "The phone's copy is signed with a different key.";
         }
         if (versionCode(info) < versionCode(here)) {
-            return "The release's " + version(info) + " is older than the phone's "
-                + version(here) + ", and Android won't go back a version.";
+            return "The release's " + version(info) + " is older than the phone's " + version(here) + ".";
         }
         return null;
     }

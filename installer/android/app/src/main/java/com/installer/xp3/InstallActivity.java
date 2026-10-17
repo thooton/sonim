@@ -64,7 +64,7 @@ public final class InstallActivity extends Activity {
         DevicePolicyManager dpm =
             (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
         if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) {
-            fail("Installer isn't the device owner yet. Open Installer for how to set it up.");
+            fail("Installer isn't the device owner.");
             return;
         }
 

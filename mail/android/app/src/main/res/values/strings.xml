@@ -5,8 +5,6 @@
     <string name="label_to">To</string>
     <string name="label_cc">Cc</string>
     <string name="label_subject">Subject</string>
-    <string name="hint_to">Address, or Menu → Add recipient</string>
-    <string name="hint_subject">Subject</string>
     <string name="hint_body">Message</string>
     <string name="labels">Labels</string>
 </resources>

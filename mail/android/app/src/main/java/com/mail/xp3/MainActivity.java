@@ -602,7 +602,7 @@ public final class MainActivity extends BaseActivity {
             barIcon.setImageResource(R.drawable.ic_close);
             titleView.setText(kind.equals(Outgoing.REPLY) ? "Reply" : kind.equals(Outgoing.FORWARD) ? "Forward"
                 : kind.equals(Outgoing.DRAFT) ? "Draft" : "New message");
-            under = busy() ? doing : "Menu to send";
+            under = busy() ? doing : "";
             barAction.setImageResource(R.drawable.ic_send);
             barAction.setImageTintList(ColorStateList.valueOf(color(R.color.focus_rule)));
             barAction.setVisibility(View.VISIBLE);
@@ -627,25 +627,15 @@ public final class MainActivity extends BaseActivity {
         subtitleView.setVisibility(under.length() == 0 ? View.GONE : View.VISIBLE);
     }
 
-    /** What an empty list says: that it is loading, that it failed, or that the folder is empty, and what to press. */
+    /** What an empty list says: that it is loading, that it failed, or that the folder is empty. */
     private void empty() {
         emptyIcon.setImageResource(icon(folder));
         String title;
-        String hint;
-        if (!login.ready()) {
-            title = "Mail isn't set up";
-            hint = "Menu, then Command center";
-        } else if (busy()) {
-            title = doing;
-            hint = null;
-        } else if (!listed) {
-            title = folder.name + " didn't load";
-            hint = "Press # to try again";
-        } else {
-            title = "Nothing in " + folder.name;
-            hint = "0 to write, Left for folders";
-        }
-        emptyText.setText(Family.emptyText(this, title, hint));
+        if (!login.ready()) title = "Mail isn't set up";
+        else if (busy()) title = doing;
+        else if (!listed) title = folder.name + " didn't load";
+        else title = "Nothing in " + folder.name;
+        emptyText.setText(Family.emptyText(this, title, null));
     }
 
     /** The note under the bar; it takes no room while there is nothing to say. */
@@ -721,7 +711,7 @@ public final class MainActivity extends BaseActivity {
             return;
         }
         if (to >= items.size()) {
-            toast(next != null ? "Back to the list for more" : "This is the last in " + folder.name);
+            toast(next != null ? "Last one loaded" : "This is the last in " + folder.name);
             return;
         }
         picked = to;
@@ -1348,11 +1338,11 @@ public final class MainActivity extends BaseActivity {
         if (typed.contains("@") && typed.trim().matches("\\S+@\\S+\\.\\S+")) typed = "";
         List<Address> found = people.matching(typed);
         if (found.isEmpty() && typed.trim().length() > 0) {
-            toast("Nobody matches \"" + typed.trim() + "\"; showing everyone.");
+            toast("Nobody matches \"" + typed.trim() + "\"");
             found = people.matching("");
         }
         if (found.isEmpty()) {
-            toast("No addresses yet: they are learned from your mail.");
+            toast("No addresses yet");
             return;
         }
         final List<Address> choices = found.size() > 100 ? found.subList(0, 100) : found;
@@ -1723,7 +1713,6 @@ public final class MainActivity extends BaseActivity {
         box.setPadding(pad, pad / 2, pad, 0);
         final EditText field = new EditText(this);
         field.setSingleLine(true);
-        field.setHint("Words, from:jane, has:attachment…");
         field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT);
         if (folder.kind.equals("search")) {
             field.setText(folder.query);
@@ -1752,7 +1741,7 @@ public final class MainActivity extends BaseActivity {
         server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         server.setText(login.server() == null ? "" : login.server());
         final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "Token (blank keeps it)" : "Delta token");
+        token.setHint(login.ready() ? "••••••••" : "Token");
         token.setSingleLine(true);
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);
