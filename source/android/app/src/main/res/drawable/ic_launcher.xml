@@ -3,7 +3,7 @@
      both songs and books come from. Shapes are few and thick because the
      launcher draws this at 48px on the XP3's mdpi screen. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#4A2C5E" android:pathData="M4,4h40v40h-40z" />
+    <path android:fillColor="#4A2C5E" android:pathData="M10,4h28a6,6 0,0 1,6 6v28a6,6 0,0 1,-6 6h-28a6,6 0,0 1,-6 -6v-28a6,6 0,0 1,6 -6z" />
     <!-- The book's edge, showing behind the pages. -->
     <path android:fillColor="#B9A3CB" android:pathData="M8,24.5v14c5.5,-1.6 11.5,-1.1 16,1.5c4.5,-2.6 10.5,-3.1 16,-1.5v-14z" />
     <path android:fillColor="#FFFFFF" android:pathData="M23.2,24.6c-4,-2.6 -9.3,-3 -13.7,-1.6v14c4.4,-1.3 9.7,-0.9 13.7,1.6z" />
