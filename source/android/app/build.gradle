@@ -17,8 +17,8 @@ android {
 
     defaultConfig {
         applicationId "com.source.xp3"
-        versionCode 7
-        versionName "1.2.2"
+        versionCode 8
+        versionName "1.2.3"
     }
 }
 

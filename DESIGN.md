@@ -50,7 +50,10 @@ they look the way they do. Charge and Books keep their own looks.
    (or isn't) there, and a detail line only for a fact such as why a fetch
    failed. A status screen shows its main action as a `FamilyButton`, not
    only in the Menu; a saved secret shows as dots in its empty field; a
-   button that can't act yet is greyed out rather than explained.
+   button that can't act yet is greyed out rather than explained. What a
+   field expects is fine as its hint, when the label alone doesn't say it
+   ("Artist - Title", "Title, author or ISBN"): that is the field's format,
+   not a lesson in using the app.
 8. **No header names the app.** You just opened it. A header says where
    you are or how things stand (a folder, "Up to date"), and a screen with
    nothing like that to say has no header at all. Nor does a screen carry

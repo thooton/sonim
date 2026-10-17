@@ -4,4 +4,7 @@
     <string name="tab_song">Song</string>
     <string name="tab_album">Album</string>
     <string name="tab_book">Book</string>
+    <string name="hint_song">Artist - Title</string>
+    <string name="hint_album">Artist - Album</string>
+    <string name="hint_book">Title, author or ISBN</string>
 </resources>
