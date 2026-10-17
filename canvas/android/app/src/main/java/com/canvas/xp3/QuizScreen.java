@@ -140,8 +140,8 @@ final class QuizScreen extends Screen {
         root.addView(parts.nav(title, questions == null ? null : (index + 1) + " of " + questions.size()),
             Views.wide());
         if (questions == null) {
-            root.addView(parts.empty(0, problem != null ? "Couldn't open the quiz" : "Opening the quiz",
-                problem), Views.tall());
+            if (problem == null) return parts.spinner();
+            root.addView(parts.empty(0, "Couldn't open the quiz", problem), Views.tall());
             return root;
         }
         if (questions.isEmpty()) {
@@ -188,7 +188,7 @@ final class QuizScreen extends Screen {
             v.pad(note, 12, 8, 12, 0);
             page.addView(note, Views.wide());
         }
-        TextView saved = v.text(saving ? "Saving…" : "Your answers save as you go.", 9, look.regular, look.muted);
+        TextView saved = v.text("Your answers save as you go.", 9, look.regular, look.muted);
         v.pad(saved, 12, 8, 12, 0);
         page.addView(saved, Views.wide());
         return root;

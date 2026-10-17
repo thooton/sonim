@@ -211,8 +211,30 @@ public final class Dates {
         return format(shortened ? "EEE" : "EEEE", when);
     }
 
+    /*
+     * One formatter per pattern and thread. A screen of work formats a few
+     * dozen dates, and building a SimpleDateFormat each time is the slowest
+     * thing in drawing a list on this phone. They are per thread because a
+     * SimpleDateFormat is not safe to share.
+     */
+    private static final ThreadLocal<java.util.Map<String, SimpleDateFormat>> FORMATS =
+        new ThreadLocal<java.util.Map<String, SimpleDateFormat>>() {
+            @Override
+            protected java.util.Map<String, SimpleDateFormat> initialValue() {
+                return new java.util.HashMap<String, SimpleDateFormat>();
+            }
+        };
+
     private static String format(String pattern, long when) {
-        return new SimpleDateFormat(pattern, Locale.US).format(new Date(when));
+        java.util.Map<String, SimpleDateFormat> formats = FORMATS.get();
+        SimpleDateFormat format = formats.get(pattern);
+        if (format == null) {
+            format = new SimpleDateFormat(pattern, Locale.US);
+            formats.put(pattern, format);
+        }
+        // The zone is read every time: the phone's can change while the app runs.
+        format.setTimeZone(java.util.TimeZone.getDefault());
+        return format.format(new Date(when));
     }
 
     private static long startOfDay(long when) {

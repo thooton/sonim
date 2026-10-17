@@ -2,7 +2,7 @@
 
 Week Strip: a calm, planner-style Canvas app for the XP3's 240x320 screen, d-pad and keypad.
 
-The home screen is the week: Assigned work on a timeline under a strip of days, with Missing and Done beside it. Classes have Stream, Classwork, People and Grades. An assignment page shows the due date, instructions and the teacher's files. You can add typed answers, photos of paper work (saved as one PDF), audio, files and links, then turn them in. Grades, private comments, class comments, classic quizzes, notifications and opt-in reminders are all here. Everything is kept for offline use. A turn-in made with no signal waits on the phone and finishes when the phone reconnects.
+The home screen is the week: Assigned work on a timeline under a strip of days, with Missing and Done beside it. This semester's classes (worked out from Canvas's term names) have Stream, Classwork, People and Grades. An assignment page shows the due date, instructions and the teacher's files. You can add typed answers, photos of paper work (saved as one PDF), audio, files and links, then turn them in. Grades, private comments, class comments, classic quizzes, notifications and opt-in reminders are all here. Everything is kept for offline use. A turn-in made with no signal waits on the phone and finishes when the phone reconnects.
 
 ## Build and test
 

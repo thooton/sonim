@@ -51,9 +51,10 @@ final class NoticesScreen extends Screen {
         android.widget.TextView heading = v.screenTitle("Notifications");
         v.pad(heading, 12, 4, 12, 6);
         root.addView(heading, Views.wide());
+        if (notices.isEmpty() && loading) return parts.spinner();
         LinearLayout list = parts.page(this, root);
         if (notices.isEmpty()) {
-            list.addView(parts.empty(0, loading ? "Checking for news" : "Nothing new", null),
+            list.addView(parts.empty(0, "Nothing new", null),
                 v.margins(Views.wide(), 0, 60, 0, 0));
             return root;
         }

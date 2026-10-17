@@ -23,15 +23,25 @@ public final class Todos {
      */
     private final java.util.Set<String> checked = new java.util.HashSet<>();
 
+    /**
+     * Each list's work, worked out once per minute rather than on every call:
+     * drawing the week asks for Assigned work once per day of it, and the
+     * answer only changes when the list or the minute does.
+     */
+    private final java.util.Map<Integer, List<Assignment>> memo = new java.util.HashMap<>();
+    private long memoMinute = Long.MIN_VALUE;
+
     /** Swaps in what a sync, or the cache read at startup, just produced. */
     public void replace(List<Assignment> next) {
         work.clear();
         if (next != null) work.addAll(next);
+        memo.clear();
     }
 
     public void check(java.util.Collection<String> assignmentIds) {
         checked.clear();
         if (assignmentIds != null) checked.addAll(assignmentIds);
+        memo.clear();
     }
 
     public boolean checked(Assignment item) {
@@ -64,11 +74,20 @@ public final class Todos {
     }
 
     public List<Assignment> inState(int state, long now) {
+        long minute = now / 60000L;
+        if (minute != memoMinute) {
+            memo.clear();
+            memoMinute = minute;
+        }
+        List<Assignment> known = memo.get(Integer.valueOf(state));
+        if (known != null) return known;
         List<Assignment> matching = new ArrayList<>();
         for (int i = 0; i < work.size(); i++) {
             if (state(work.get(i), now) == state) matching.add(work.get(i));
         }
-        return matching;
+        known = Collections.unmodifiableList(matching);
+        memo.put(Integer.valueOf(state), known);
+        return known;
     }
 
     /**

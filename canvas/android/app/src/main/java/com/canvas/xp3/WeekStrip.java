@@ -29,7 +29,6 @@ final class WeekStrip extends View {
     private long weekStart;
     private int selected = -1;
     private boolean focused;
-    private boolean skeleton;
     private final List<List<Integer>> dots = new ArrayList<>();
     private int today = -1;
 
@@ -58,11 +57,6 @@ final class WeekStrip extends View {
 
     void focus(boolean value) {
         focused = value;
-        invalidate();
-    }
-
-    void skeleton(boolean value) {
-        skeleton = value;
         invalidate();
     }
 
@@ -113,18 +107,12 @@ final class WeekStrip extends View {
             float y = dp(3) + sp(8) * 0.8f;
             canvas.drawText(Dates.initial(day), center, y, paint);
             y += dp(1) + sp(12.5f) * 0.95f;
-            if (skeleton) {
-                paint.setColor(look.paper);
-                float half = dp(7);
-                canvas.drawRoundRect(new RectF(center - half, y - sp(10), center + half, y), dp(3), dp(3), paint);
-            } else {
-                paint.setTypeface(look.bold);
-                paint.setTextSize(sp(12.5f));
-                paint.setFontFeatureSettings("tnum");
-                paint.setColor(numberColor);
-                canvas.drawText(Dates.dayOfMonth(day), center, y, paint);
-                paint.setFontFeatureSettings(null);
-            }
+            paint.setTypeface(look.bold);
+            paint.setTextSize(sp(12.5f));
+            paint.setFontFeatureSettings("tnum");
+            paint.setColor(numberColor);
+            canvas.drawText(Dates.dayOfMonth(day), center, y, paint);
+            paint.setFontFeatureSettings(null);
             List<Integer> colors = dots.get(i);
             int count = Math.min(colors.size(), 4);
             float size = dp(4);

@@ -187,23 +187,35 @@ public final class Canvas {
      * out their classwork. Canvas leaves a module's items out of this list
      * when there are too many of them, so those are fetched on their own.
      */
-    public List<Object> modules(String course) throws IOException, InterruptedException {
+    public List<Object> modules(final String course) throws IOException, InterruptedException {
         List<Object> modules = list("courses/" + course + "/modules?include%5B%5D=items&include%5B%5D=content_details",
             MODULE_FIELDS);
+        List<Map<String, Object>> missing = new ArrayList<Map<String, Object>>();
+        List<Parallel.Task<List<Object>>> fetches = new ArrayList<Parallel.Task<List<Object>>>();
         for (Object entry : modules) {
             Map<String, Object> module = Json.object(entry);
             if (module.get("items") instanceof List) {
                 module.put("items", selectAll(Json.array(module.get("items")), ITEM_FIELDS));
                 continue;
             }
-            String id;
+            final String id;
             try {
                 id = id(module, "id");
             } catch (IllegalArgumentException e) {
                 continue;
             }
-            module.put("items", list("courses/" + course + "/modules/" + id
+            missing.add(module);
+            fetches.add(() -> list("courses/" + course + "/modules/" + id
                 + "/items?include%5B%5D=content_details", ITEM_FIELDS));
+        }
+        List<Parallel.Outcome<List<Object>>> fetched = Parallel.all(fetches);
+        for (int i = 0; i < missing.size(); i++) {
+            Parallel.Outcome<List<Object>> result = fetched.get(i);
+            if (!result.ok()) {
+                if (result.error instanceof IOException) throw (IOException) result.error;
+                throw new IOException("Canvas could not be read.");
+            }
+            missing.get(i).put("items", result.value);
         }
         return modules;
     }

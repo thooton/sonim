@@ -115,6 +115,9 @@ final class AssignmentScreen extends Screen {
     @Override
     View build() {
         Parts parts = new Parts(app);
+        // Nothing fetched yet: the page waits whole rather than drawing its
+        // top half and filling in the instructions afterwards.
+        if (detail == null && loading) return parts.spinner();
         Assignment work = current();
         draft = app.backend.draft(work.id);
         Course course = app.course(work.courseId);
@@ -177,8 +180,8 @@ final class AssignmentScreen extends Screen {
             page.addView(body, Views.wide());
         } else if (detail == null) {
             page.addView(parts.section("Instructions", null), Views.wide());
-            TextView wait = v.bodyText(loading ? "Fetching the instructions…"
-                : problem != null ? problem : "Open this again with a signal to read the instructions.");
+            TextView wait = v.bodyText(problem != null ? "The instructions couldn't be loaded. " + problem
+                : "Open this again with a signal to read the instructions.");
             wait.setTextColor(look.muted);
             v.pad(wait, 12, 0, 12, 0);
             page.addView(wait, Views.wide());

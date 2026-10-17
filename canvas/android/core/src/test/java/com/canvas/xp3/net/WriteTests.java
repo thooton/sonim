@@ -30,6 +30,7 @@ public final class WriteTests {
         check.run("canvas upload", () -> upload(check));
         check.run("canvas download", () -> download(check));
         check.run("canvas write guards", () -> guards(check));
+        check.run("parallel sync", () -> parallel(check));
     }
 
     private static Canvas canvas(TestServer server) {
@@ -190,5 +191,36 @@ public final class WriteTests {
         check.same("a number is", "42", Canvas.number("42"));
         check.same("forms are encoded", "a=b+c&d=%26", Canvas.form("a", "b c", "d", "&"));
         check.fails("a link must be a web address", () -> canvas(noToken).submitUrl("1", "2", "javascript:x", null));
+    }
+
+    private static void parallel(Check check) throws Exception {
+        final AtomicInteger inFlight = new AtomicInteger();
+        final AtomicInteger most = new AtomicInteger();
+        TestServer server = new TestServer(request -> {
+            if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE);
+            if (request.path.contains("/assignments")) {
+                int now = inFlight.incrementAndGet();
+                most.accumulateAndGet(now, Math::max);
+                Thread.sleep(400);
+                inFlight.decrementAndGet();
+                if (request.path.contains("/courses/3/")) return TestServer.Reply.of(403, "application/json", "{}");
+                return TestServer.Reply.json("[{\"id\":11,\"name\":\"Lab\"}]");
+            }
+            if (request.path.contains("planner")) return TestServer.Reply.json("[]");
+            return TestServer.Reply.json("[{\"id\":1,\"name\":\"A\"},{\"id\":2,\"name\":\"B\"},"
+                + "{\"id\":3,\"name\":\"C\"},{\"id\":4,\"name\":\"D\"}]");
+        });
+        try {
+            long start = System.currentTimeMillis();
+            com.canvas.xp3.data.Sync.Result result = new com.canvas.xp3.data.Sync(canvas(server)).run();
+            long took = System.currentTimeMillis() - start;
+            check.ok("classes are fetched at the same time", most.get() >= 3);
+            check.ok("so four slow classes take about one's time", took < 1200);
+            check.same("every readable class's work", 3, result.work.size());
+            check.same("in the classes' order", "1", result.work.get(0).courseId);
+            check.same("the unreadable one is named", "C", result.unavailable.get(0));
+        } finally {
+            server.close();
+        }
     }
 }

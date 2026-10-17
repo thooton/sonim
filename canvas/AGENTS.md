@@ -107,6 +107,15 @@ generation/version check).
 - Drafts (`drafts/`) are saved before anything is sent; a turn-in records
   each uploaded file's id so a retry does not resend it, and the draft is
   deleted only once Canvas has the submission.
+- Only this semester's classes exist for the app. Canvas keeps old
+  enrolments active and leaves term dates empty, so `Terms` decides from term
+  names ("2026 Fall C"); a saved cache is filtered the same way on launch.
+- A screen is either loading (a spinner, `Parts.spinner`, filling the screen)
+  or whole. No "Loading…" text, no skeletons, and no page drawn with one part
+  still waiting. Cached content counts as whole and is replaced silently.
+- Requests that do not depend on each other run at once through
+  `net/Parallel` (a sync's classes, a class's three parts, a page's
+  assignment and submission, a class's long modules).
 - Startup shows the last good cache before fetching. One unreadable course is
   a partial sync with an `unavailable` entry, not a reason to discard all other
   courses.

@@ -68,6 +68,7 @@ final class PostScreen extends Screen {
     @Override
     View build() {
         Parts parts = new Parts(app);
+        if (replies == null && problem == null) return parts.spinner();
         LinearLayout root = v.column();
         root.addView(parts.nav("Stream", course), Views.wide());
         LinearLayout page = parts.page(this, root);
@@ -93,7 +94,7 @@ final class PostScreen extends Screen {
         page.addView(parts.section("Class comments", replies == null ? null : Integer.toString(replies.size())),
             Views.wide());
         if (replies == null) {
-            TextView wait = v.text(problem != null ? problem : "Fetching comments…", 10, look.regular, look.muted);
+            TextView wait = v.text("Comments couldn't be loaded. " + problem, 10, look.regular, look.muted);
             v.pad(wait, 12, 0, 12, 0);
             page.addView(wait, Views.wide());
         } else {

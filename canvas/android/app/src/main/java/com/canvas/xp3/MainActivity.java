@@ -74,6 +74,8 @@ public final class MainActivity extends BaseActivity {
     private Views views;
 
     final Todos todos = new Todos();
+    /** Goes up whenever the work list changes, so screens know what they built is stale. */
+    int version;
     Sync.Result snapshot;
     boolean syncing;
     String syncError;
@@ -101,6 +103,7 @@ public final class MainActivity extends BaseActivity {
         prefs = backend.prefs();
         applyWeekStart();
         snapshot = backend.cached();
+        if (snapshot != null) snapshot = com.canvas.xp3.data.Terms.current(snapshot, System.currentTimeMillis());
         if (snapshot != null) {
             todos.replace(snapshot.work);
             todos.check(snapshot.checked);
@@ -232,6 +235,7 @@ public final class MainActivity extends BaseActivity {
 
     /** Drops the work on screen, which belonged to the setup just replaced. */
     void forgetWork() {
+        version++;
         snapshot = null;
         syncError = null;
         todos.replace(new ArrayList<Assignment>());
@@ -591,6 +595,7 @@ public final class MainActivity extends BaseActivity {
         background(() -> backend.refresh(), (result, problem) -> {
             syncing = false;
             if (result != null) {
+                version++;
                 snapshot = result;
                 todos.replace(result.work);
                 todos.check(result.checked);
@@ -627,6 +632,7 @@ public final class MainActivity extends BaseActivity {
         final Sync.Result copy = new Sync.Result(new ArrayList<>(todos.all()), snapshot.courses,
             snapshot.unavailable, snapshot.fetchedAt, snapshot.overrides, todos.checkedIds());
         snapshot = copy;
+        version++;
         work.execute(() -> backend.save(copy));
     }
 

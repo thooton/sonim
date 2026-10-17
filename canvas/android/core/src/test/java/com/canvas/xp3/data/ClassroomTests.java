@@ -24,6 +24,7 @@ public final class ClassroomTests {
         check.run("notices", () -> notices(check));
         check.run("details", () -> details(check));
         check.run("classroom store", () -> store(check));
+        check.run("this semester", () -> semester(check));
     }
 
     private static final long DAY = 24L * 60L * 60L * 1000L;
@@ -248,6 +249,44 @@ public final class ClassroomTests {
         } finally {
             delete(directory);
         }
+    }
+
+    private static java.util.Map<String, Object> course(String json) {
+        return Json.object(Json.parse(json));
+    }
+
+    private static void semester(Check check) {
+        List<java.util.Map<String, Object>> all = new ArrayList<>();
+        all.add(course("{\"id\":1,\"name\":\"THF 101: Acting (2026 Fall C)\",\"term\":{\"name\":\"2026 Fall C\"}}"));
+        all.add(course("{\"id\":2,\"name\":\"UNI 220: Mindset\",\"term\":{\"name\":\"2026 Fall DYN\"}}"));
+        all.add(course("{\"id\":3,\"name\":\"ENG 105 (2026 Spring C)\",\"term\":{\"name\":\"2026 Spring C\"}}"));
+        all.add(course("{\"id\":4,\"name\":\"CSE 205 (2024 Fall C)\",\"term\":{\"name\":\"2024 Fall C\"}}"));
+        all.add(course("{\"id\":5,\"name\":\"Pitchfork Pantry Fall 2026\",\"term\":{\"name\":\"2025 ORG\"}}"));
+        all.add(course("{\"id\":6,\"name\":\"ASU Ready\",\"term\":{\"name\":\"2025 TRN\"}}"));
+        all.add(course("{\"id\":7,\"name\":\"THE 125 (2026 Fall A)\"}"));
+        List<java.util.Map<String, Object>> fall = Terms.current(all, at(Calendar.OCTOBER, 17, 12, 0));
+        check.same("this fall's classes only", 3, fall.size());
+        check.same("in order", 1, ((Number) fall.get(0).get("id")).intValue());
+        check.same("a term in the course's own name counts", 7, ((Number) fall.get(2).get("id")).intValue());
+        List<java.util.Map<String, Object>> spring = Terms.current(all, at(Calendar.FEBRUARY, 3, 12, 0));
+        check.same("in February, spring's", 1, spring.size());
+        List<java.util.Map<String, Object>> other = new ArrayList<>();
+        other.add(course("{\"id\":8,\"name\":\"Biology\",\"end_at\":\"2020-01-01T00:00:00Z\"}"));
+        other.add(course("{\"id\":9,\"name\":\"Chemistry\"}"));
+        List<java.util.Map<String, Object>> kept = Terms.current(other, at(Calendar.OCTOBER, 17, 12, 0));
+        check.same("without season names, ended classes go", 1, kept.size());
+        check.same("and undated ones stay", 9, ((Number) kept.get(0).get("id")).intValue());
+
+        List<Course> saved = new ArrayList<>();
+        saved.add(new Course("1", "Acting", "THF 101", "2026 Fall C", new ArrayList<String>(), 0, null, null));
+        saved.add(new Course("4", "Java", "CSE 205", "2024 Fall C", new ArrayList<String>(), 1, null, null));
+        List<Assignment> work = new ArrayList<>();
+        work.add(new Assignment("1", "10", "Now", "Acting", null, 0, false, false, null, null, false));
+        work.add(new Assignment("4", "11", "Old", "Java", null, 0, false, false, null, null, false));
+        Sync.Result trimmed = Terms.current(new Sync.Result(work, saved, new ArrayList<String>(), 1),
+            at(Calendar.OCTOBER, 17, 12, 0));
+        check.same("a saved sync keeps this semester's classes", 1, trimmed.courses.size());
+        check.same("and only their work", "Now", trimmed.work.get(0).title);
     }
 
     private static void delete(File file) {

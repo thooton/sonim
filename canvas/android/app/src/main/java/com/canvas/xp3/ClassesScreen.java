@@ -42,9 +42,10 @@ final class ClassesScreen extends Screen {
         }
         if (term != null) head.addView(v.text(term, 9, look.semibold, look.muted), v.margins(Views.wrap(), 0, 0, 0, 2));
         root.addView(head, Views.wide());
+        if ((app.snapshot == null || app.snapshot.courses.isEmpty()) && app.syncing) return parts.spinner();
         LinearLayout list = parts.page(this, root);
         if (app.snapshot == null || app.snapshot.courses.isEmpty()) {
-            list.addView(parts.empty(0, app.syncing ? "Fetching your classes" : "No classes yet", null),
+            list.addView(parts.empty(0, "No classes this semester", null),
                 v.margins(Views.wide(), 0, 50, 0, 0));
             return root;
         }
