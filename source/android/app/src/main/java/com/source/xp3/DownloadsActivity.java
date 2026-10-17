@@ -51,7 +51,7 @@ public final class DownloadsActivity extends Tonal {
         list.setDefaultFocusHighlightEnabled(false);
         list.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY);
         parent.addView(list, at, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
-        storage = new StorageCard(this);
+        storage = new StorageCard(this, false);
         list.setAdapter(adapter);
         list.requestFocus();
     }

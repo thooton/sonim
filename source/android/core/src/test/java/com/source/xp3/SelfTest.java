@@ -184,6 +184,7 @@ public final class SelfTest {
                 check.same("song formats", "MP3", song.formats());
                 check.same("song specs", "320 kbps · 4:12 · 8.1 MB", song.specs());
                 check.same("song bytes", 8500000L, song.bytes());
+                check.same("song brief", "320 · 8.1 MB", song.brief());
                 Music.Hit album = found.hits.get(1);
                 check.ok("album", album.album() && !song.album());
                 check.same("album title", "Artist / Album (2001)", album.title());
@@ -192,6 +193,7 @@ public final class SelfTest {
                 check.same("album name", "Album (2001)", album.name());
                 check.same("album folders", "m / Artist", album.folders());
                 check.same("album specs", "2 files · 16/44.1 kHz · 1:02:05 · 47.7 MB", album.specs());
+                check.same("album brief", "2 files · 16/44.1 · 47.7 MB", album.brief());
                 check.same("track title", "01", album.tracks.get(0).title());
                 Music.Found none = music.search(Music.ALBUM, "Nothing", (text, error) -> {});
                 check.ok("nothing found", none.hits.isEmpty() && none.error.startsWith("Nothing on Soulseek"));

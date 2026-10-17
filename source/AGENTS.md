@@ -54,7 +54,9 @@ client changes, change `Books` here and keep its test in step.
   drawn pieces: `ResultRow`, `Cover`, `StateButton`, `Wavy`, `StorageCard`,
   `Sheet` (the options sheet), `Files` (play, read, storage).
 
-The look is Tonal (`../DESIGN.md`, "Source: Tonal"). Every music result
+The look is Tonal (`../DESIGN.md`, "Source: Tonal"), set in DM Sans
+(`res/font`, OFL, `OFL.txt`): static weights cut from Google Fonts'
+variable font, since API 27 has no use for its axes. Every music result
 shows the folders it sits in, as the sharer named them; keep it that way.
 
 ## Credentials

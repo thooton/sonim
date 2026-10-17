@@ -7,11 +7,10 @@
     <dimen name="softkeys_height">26dp</dimen>
     <dimen name="gutter">6dp</dimen>
 
-    <dimen name="text_row">13sp</dimen>
-    <dimen name="text_input">13sp</dimen>
-    <dimen name="text_label">11.5sp</dimen>
-    <dimen name="text_meta">11sp</dimen>
-    <dimen name="text_status">11sp</dimen>
+    <dimen name="text_row">12.5sp</dimen>
+    <dimen name="text_input">12.5sp</dimen>
+    <dimen name="text_meta">10.5sp</dimen>
+    <dimen name="text_status">10.5sp</dimen>
     <dimen name="text_log">10sp</dimen>
-    <dimen name="text_tag">8.5sp</dimen>
+    <dimen name="text_tag">8sp</dimen>
 </resources>

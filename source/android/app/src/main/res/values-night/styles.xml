@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
-        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:fontFamily">@font/dm_sans_family</item>
         <item name="android:colorPrimary">@color/accent</item>
         <item name="android:colorPrimaryDark">@color/page</item>
         <item name="android:colorAccent">@color/accent</item>
@@ -25,6 +25,7 @@
         <item name="android:colorBackground">@color/container</item>
         <item name="android:buttonBarButtonStyle">@style/FamilyDialogButton</item>
         <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:fontFamily">@font/dm_sans_family</item>
     </style>
 
     <style name="Sheet" parent="android:style/Theme.Material.Dialog.NoActionBar">
@@ -34,5 +35,6 @@
         <item name="android:backgroundDimAmount">0.55</item>
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:colorControlHighlight">@color/highlight</item>
+        <item name="android:fontFamily">@font/dm_sans_family</item>
     </style>
 </resources>

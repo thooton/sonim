@@ -10,7 +10,6 @@
     <color name="text_muted">#CAC4D0</color>
     <color name="outline">#938F99</color>
     <color name="outline_variant">#49454F</color>
-    <color name="input_hint">#938F99</color>
 
     <color name="accent">#D0BCFF</color>
     <color name="on_accent">#381E72</color>
@@ -44,7 +43,6 @@
     <color name="cover_5_ink">#FFDDB3</color>
     <color name="cover_6">#1F4D52</color>
     <color name="cover_6_ink">#BCEBF0</color>
-    <color name="cover_back">#4A4458</color>
 
     <color name="primary">#141218</color>
     <color name="primary_dark">#141218</color>

@@ -27,8 +27,8 @@
             android:includeFontPadding="false"
             android:singleLine="true"
             android:textColor="@color/text"
-            android:textSize="13.5sp"
-            android:textStyle="bold" />
+            android:fontFamily="@font/dm_sans_bold"
+            android:textSize="13.5sp" />
     </FrameLayout>
 
     <ScrollView

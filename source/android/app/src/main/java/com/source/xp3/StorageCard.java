@@ -22,7 +22,8 @@ import java.io.File;
 /**
  * How full the phone is, in the style of Files by Google: what is free of
  * how much, a bar split into Music, Books and everything else, and what
- * Music and Books hold. The folders are measured off the main thread, at most
+ * Music and Books hold. On the list screen it is compact, as the proposal's
+ * idle screen has it: a round folder, "Music folder", what is free, the bar. The folders are measured off the main thread, at most
  * once a minute; until then the bar shows only used and free.
  */
 final class StorageCard extends LinearLayout {
@@ -32,27 +33,60 @@ final class StorageCard extends LinearLayout {
     private static long measured;
     private static boolean measuring;
 
+    private final boolean compact;
     private final TextView free;
     private final TextView legend;
     private final Bar bar;
 
-    StorageCard(Context context) {
+    StorageCard(Context context, boolean compact) {
         super(context);
+        this.compact = compact;
         setOrientation(VERTICAL);
         setBackgroundResource(R.drawable.card_pick);
         int pad = Ui.dp(context, 12);
-        setPadding(pad, Ui.dp(context, 8), pad, Ui.dp(context, 9));
+        setPadding(pad, Ui.dp(context, compact ? 9 : 8), pad, Ui.dp(context, 9));
+        LinearLayout column = this;
+        if (compact) {
+            LinearLayout row = new LinearLayout(context);
+            row.setOrientation(HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            android.widget.ImageView lead = new android.widget.ImageView(context);
+            lead.setBackgroundResource(R.drawable.round_accent);
+            android.graphics.drawable.Drawable folder = context.getDrawable(R.drawable.ic_folder).mutate();
+            folder.setTint(context.getColor(R.color.on_accent_container));
+            lead.setImageDrawable(folder);
+            int inset = Ui.dp(context, 8.5f);
+            lead.setPadding(inset, inset, inset, inset);
+            row.addView(lead, new LayoutParams(Ui.dp(context, 32), Ui.dp(context, 32)));
+            column = new LinearLayout(context);
+            column.setOrientation(VERTICAL);
+            LayoutParams columnSize = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1);
+            columnSize.leftMargin = Ui.dp(context, 10);
+            row.addView(column, columnSize);
+            addView(row);
+            TextView title = new TextView(context);
+            title.setText("Music folder");
+            title.setTypeface(Tonal.BOLD);
+            title.setTextSize(12.5f);
+            title.setTextColor(context.getColor(R.color.text));
+            title.setIncludeFontPadding(false);
+            column.addView(title);
+        }
 
         free = new TextView(context);
-        free.setTextColor(context.getColor(R.color.text));
+        free.setTextColor(context.getColor(compact ? R.color.text_muted : R.color.text));
         free.setIncludeFontPadding(false);
         free.setSingleLine(true);
-        addView(free);
+        if (compact) {
+            free.setTextSize(10.5f);
+            free.setPadding(0, Ui.dp(context, 2), 0, 0);
+        }
+        column.addView(free);
 
         bar = new Bar(context);
         LayoutParams barSize = new LayoutParams(LayoutParams.MATCH_PARENT, Ui.dp(context, 6));
-        barSize.topMargin = Ui.dp(context, 7);
-        addView(bar, barSize);
+        barSize.topMargin = Ui.dp(context, compact ? 5 : 7);
+        column.addView(bar, barSize);
 
         legend = new TextView(context);
         legend.setTextColor(context.getColor(R.color.text_muted));
@@ -60,7 +94,7 @@ final class StorageCard extends LinearLayout {
         legend.setIncludeFontPadding(false);
         legend.setPadding(0, Ui.dp(context, 6), 0, 0);
         legend.setGravity(Gravity.START);
-        addView(legend);
+        if (!compact) addView(legend);
         refresh();
     }
 
@@ -68,15 +102,24 @@ final class StorageCard extends LinearLayout {
     void refresh() {
         long[] space = Files.space();
         Context context = getContext();
+        bar.set(space[1], space[1] - space[0], Math.max(0, music), Math.max(0, books));
+        if (compact) {
+            free.setText(Download.human(space[0]) + " free of " + Download.human(space[1]));
+        } else {
+            showFree(context, space);
+        }
+        measure();
+    }
+
+    private void showFree(Context context, long[] space) {
         SpannableStringBuilder line = new SpannableStringBuilder(Download.human(space[0]));
         line.setSpan(new AbsoluteSizeSpan(18, true), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        line.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        line.setSpan(new Tonal.Face(Tonal.BOLD), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         int start = line.length();
         line.append(" free of ").append(Download.human(space[1]));
         line.setSpan(new AbsoluteSizeSpan(11, true), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         line.setSpan(new ForegroundColorSpan(context.getColor(R.color.text_muted)), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         free.setText(line);
-        bar.set(space[1], space[1] - space[0], Math.max(0, music), Math.max(0, books));
 
         SpannableStringBuilder key = new SpannableStringBuilder();
         if (music >= 0) {
@@ -87,7 +130,9 @@ final class StorageCard extends LinearLayout {
         }
         legend.setText(key);
         legend.setVisibility(key.length() == 0 ? GONE : VISIBLE);
+    }
 
+    private void measure() {
         if (measuring || System.currentTimeMillis() - measured < 60000) return;
         measuring = true;
         final Handler main = new Handler(Looper.getMainLooper());

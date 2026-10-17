@@ -5,7 +5,6 @@ import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import com.source.xp3.data.History;
@@ -16,12 +15,13 @@ import java.text.DateFormat;
 import java.util.Date;
 
 /**
- * A row of results or downloads: the drawn cover, the lines that tell one
- * result from another, and the state button. A music result shows its name,
- * the folders it sits in (from the deepest up, which say the most), a format
- * tag with its bitrate, length and size, and who shares it and how fast. A
- * book shows its title, a format tag with its author, then year, language
- * and size. The row under the d-pad is a filled block of primaryContainer.
+ * A row of results or downloads, at the proposal's sizes: the drawn cover,
+ * the lines that tell one result from another, and the state button. A music
+ * result shows its name, the folders it sits in (from the deepest up, which
+ * say the most), then a format tag with its bitrate and size and who shares
+ * it (its length, and how fast it comes, are on its page). A book shows its title, then a format
+ * tag with its author and size. The row under the d-pad is a filled block of
+ * primaryContainer.
  */
 final class ResultRow extends LinearLayout {
 
@@ -38,31 +38,26 @@ final class ResultRow extends LinearLayout {
         setOrientation(HORIZONTAL);
         setGravity(Gravity.CENTER_VERTICAL);
         setBackgroundResource(R.drawable.row_pick);
-        int gutter = Ui.dp(context, 6);
-        setPadding(gutter * 2, Ui.dp(context, 6), gutter * 2, Ui.dp(context, 6));
+        setPadding(Ui.dp(context, 12), Ui.dp(context, 6), Ui.dp(context, 12), Ui.dp(context, 6));
+        setMinimumHeight(Ui.dp(context, 44));
 
         cover = new Cover(context);
-        FrameLayout.LayoutParams coverSize = new FrameLayout.LayoutParams(Ui.dp(context, 32), Ui.dp(context, 34));
-        FrameLayout holder = new FrameLayout(context);
-        holder.addView(cover, coverSize);
-        LayoutParams holderSize = new LayoutParams(Ui.dp(context, 32), LayoutParams.WRAP_CONTENT);
-        holderSize.gravity = Gravity.TOP;
-        holderSize.topMargin = Ui.dp(context, 1);
-        addView(holder, holderSize);
+        addView(cover, new LayoutParams(Ui.dp(context, 32), Ui.dp(context, 34)));
 
         LinearLayout lines = new LinearLayout(context);
         lines.setOrientation(VERTICAL);
         LayoutParams linesSize = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1);
-        linesSize.leftMargin = Ui.dp(context, 8);
-        linesSize.rightMargin = Ui.dp(context, 6);
+        linesSize.leftMargin = Ui.dp(context, 9);
+        linesSize.rightMargin = Ui.dp(context, 9);
         addView(lines, linesSize);
 
         title = line(context, R.dimen.text_row, R.color.text);
         // So a screen that paints the d-pad's row itself can recolour it.
         title.setId(android.R.id.text1);
         title.setTypeface(Tonal.BOLD);
-        title.setMaxLines(2);
+        title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setPadding(0, 0, 0, 0);
         lines.addView(title);
 
         folders = line(context, R.dimen.text_meta, R.color.text_muted);
@@ -82,16 +77,17 @@ final class ResultRow extends LinearLayout {
         tag.setTypeface(Tonal.BOLD);
         tag.setIncludeFontPadding(false);
         tag.setSingleLine(true);
-        tag.setPadding(Ui.dp(context, 3), Ui.dp(context, 1), Ui.dp(context, 3), Ui.dp(context, 1));
+        tag.setLetterSpacing(0.04f);
+        tag.setPadding(Ui.dp(context, 4), Ui.dp(context, 1), Ui.dp(context, 4), Ui.dp(context, 1));
         LayoutParams tagSize = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        tagSize.rightMargin = Ui.dp(context, 4);
+        tagSize.rightMargin = Ui.dp(context, 3);
         tagLine.addView(tag, tagSize);
         meta = line(context, R.dimen.text_meta, R.color.text_muted);
         meta.setSingleLine(true);
         meta.setEllipsize(TextUtils.TruncateAt.END);
         meta.setPadding(0, 0, 0, 0);
         tagLine.addView(meta);
-        tagLine.setPadding(0, Ui.dp(context, 3), 0, 0);
+        tagLine.setPadding(0, Ui.dp(context, 2), 0, 0);
         lines.addView(tagLine);
 
         extra = line(context, R.dimen.text_meta, R.color.text_muted);
@@ -99,8 +95,12 @@ final class ResultRow extends LinearLayout {
         extra.setEllipsize(TextUtils.TruncateAt.END);
         lines.addView(extra);
 
+        // Kept for a download's progress, and gone on a result's row.
+        extra.setVisibility(GONE);
+
         button = new StateButton(context);
         addView(button, new LayoutParams(Ui.dp(context, 26), Ui.dp(context, 26)));
+        lines.setGravity(Gravity.CENTER_VERTICAL);
     }
 
     private TextView line(Context context, int size, int color) {
@@ -108,7 +108,7 @@ final class ResultRow extends LinearLayout {
         view.setTextColor(context.getColor(color));
         view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(size));
         view.setIncludeFontPadding(false);
-        view.setPadding(0, Ui.dp(context, 3), 0, 0);
+        view.setPadding(0, Ui.dp(context, 2), 0, 0);
         return view;
     }
 
@@ -140,9 +140,9 @@ final class ResultRow extends LinearLayout {
         show(folders, hit.folders());
         folderIcon(true);
         show(tag, hit.formats());
-        meta.setText(hit.specs());
+        meta.setText(join(hit.brief(), hit.free ? hit.user : hit.user + " (queued)"));
         ((View) meta.getParent()).setVisibility(VISIBLE);
-        show(extra, hit.source());
+        show(extra, null);
         button.set(state, progress, picked);
         picked(picked);
     }
@@ -153,9 +153,9 @@ final class ResultRow extends LinearLayout {
         title.setText(name);
         show(folders, null);
         show(tag, book.extension.toUpperCase(java.util.Locale.US));
-        meta.setText(book.author);
+        meta.setText(join(book.author, book.size));
         ((View) meta.getParent()).setVisibility(VISIBLE);
-        show(extra, join(book.year, book.language, book.size));
+        show(extra, null);
         button.set(state, progress, picked);
         picked(picked);
     }

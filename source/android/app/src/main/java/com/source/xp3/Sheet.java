@@ -84,7 +84,7 @@ final class Sheet {
         scroll.addView(list);
         // Every row is one line at its least height; at most most of the
         // screen, so the scrim shows what the sheet is over.
-        int most = activity.getResources().getDisplayMetrics().heightPixels * 3 / 4;
+        int most = activity.getResources().getDisplayMetrics().heightPixels * 2 / 3;
         int tall = Math.min(most, rows.size() * Ui.dp(activity, 30) + Ui.dp(activity, 4));
         sheet.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, tall));
 
