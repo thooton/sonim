@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- An envelope on red. Shapes are few and thick because the launcher draws
-     this at 48px on the XP3's mdpi screen. -->
+<!-- An envelope on Thunderbird blue, the app's own accent. Shapes are few
+     and thick because the launcher draws this at 48px on the XP3's mdpi
+     screen. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#9E2A1E" android:pathData="M4,4h40v40h-40z" />
+    <path android:fillColor="#004F9B" android:pathData="M4,4h40v40h-40z" />
     <!-- The envelope's body. -->
     <path android:fillColor="#FFFFFF" android:pathData="M9,14h30v21h-30z" />
     <!-- The flap, folded down to a point in the middle. -->
-    <path android:fillColor="#9E2A1E" android:pathData="M9,14h30l-15,12.5z" />
+    <path android:fillColor="#004F9B" android:pathData="M9,14h30l-15,12.5z" />
     <path android:fillColor="#FFFFFF" android:pathData="M12.5,14h23l-11.5,9.5z" />
 </vector>
