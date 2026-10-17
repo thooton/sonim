@@ -29,10 +29,9 @@ import java.util.concurrent.ExecutorService;
 /**
  * The checklist and the keys that edit it, dressed as Google Tasks.
  *
- * The screen is one layout: the title, the tab strip, the list and the add
- * button. The list is a single ListView whose rows draw Google Tasks' two
- * cards (ItemAdapter); its positions are rows, and each row knows the index
- * of the item it shows.
+ * The screen is the list alone: a single ListView whose rows draw Google
+ * Tasks' two cards, To-do and Completed (ItemAdapter); its positions are
+ * rows, and each row knows the index of the item it shows.
  *
  * Everything with a disk behind it is behind Backend. The list is saved on
  * its own single thread so writes land in the order the edits were made.
@@ -97,8 +96,6 @@ public final class MainActivity extends BaseActivity {
         // parent is registered, not the list, so ListView's own long press
         // never opens one.
         registerForContextMenu((View) listView.getParent());
-
-        findViewById(R.id.fab).setOnClickListener(view -> itemAction(MENU_ADD, -1, -1, null));
 
         showRows(0);
         listView.requestFocus();

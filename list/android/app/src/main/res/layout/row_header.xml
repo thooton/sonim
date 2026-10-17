@@ -1,34 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The top of the list's card: its name, then sort and overflow. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- The top of the to-do card: its name. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="@dimen/card_header_height"
     android:gravity="center_vertical"
-    android:orientation="horizontal"
+    android:includeFontPadding="false"
     android:paddingLeft="12dp"
-    android:paddingRight="6dp"
-    android:paddingTop="2dp">
-
-    <TextView
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:includeFontPadding="false"
-        android:singleLine="true"
-        android:text="@string/list_name"
-        android:textColor="@color/text"
-        android:textSize="15sp" />
-
-    <ImageView
-        android:layout_width="18dp"
-        android:layout_height="18dp"
-        android:layout_marginRight="12dp"
-        android:importantForAccessibility="no"
-        android:src="@drawable/ic_sort" />
-
-    <ImageView
-        android:layout_width="18dp"
-        android:layout_height="18dp"
-        android:importantForAccessibility="no"
-        android:src="@drawable/ic_more" />
-</LinearLayout>
+    android:paddingRight="12dp"
+    android:paddingTop="2dp"
+    android:singleLine="true"
+    android:text="@string/list_name"
+    android:textColor="@color/text"
+    android:textSize="15sp" />

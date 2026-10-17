@@ -30,7 +30,7 @@ import java.util.List;
  *
  * The first is the list itself: its heading, then the open tasks in order
  * (or a word on why there are none). The second, only when something is
- * done, is "Completed (n)", which folds the finished tasks away or shows
+ * done, is "Completed", which folds the finished tasks away or shows
  * them. Both cards are drawn by their rows, each painting its own slice
  * with the card's corners where it starts and ends, so the whole thing is
  * still one ListView that the d-pad walks through.
@@ -179,7 +179,7 @@ final class ItemAdapter extends SelectableAdapter {
             case COMPLETED: {
                 if (view == null) view = inflater.inflate(R.layout.row_completed, parent, false);
                 ((TextView) view.findViewById(R.id.completed_text))
-                    .setText("Completed (" + doneCount + ")");
+                    .setText("Completed");
                 ((ImageView) view.findViewById(R.id.completed_chevron))
                     .setImageResource(expanded ? R.drawable.ic_expand_less : R.drawable.ic_expand_more);
                 view.setContentDescription("Completed, " + doneCount + (expanded ? ", shown" : ", hidden"));
@@ -213,8 +213,6 @@ final class ItemAdapter extends SelectableAdapter {
             ? flags | Paint.STRIKE_THRU_TEXT_FLAG
             : flags & ~Paint.STRIKE_THRU_TEXT_FLAG);
 
-        // A finished task has no star in Google Tasks.
-        view.findViewById(R.id.item_star).setVisibility(item.done ? View.INVISIBLE : View.VISIBLE);
         view.setContentDescription((item.done ? "Done: " : "To do: ") + item.text);
     }
 
