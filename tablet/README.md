@@ -8,15 +8,15 @@ Tablet reaches the tablet through the Delta command center, which the tablet syn
 | --- | --- |
 | Left / Right | Library: the previous or next file |
 | Up / Down | A choice in a menu or sheet; a job in Transforms; pan the page in the preview |
-| OK | Library: the file's menu (Open, Transform, Rename, Move to folder, Details). Transforms: the job's menu. Elsewhere, the highlighted thing |
+| OK | Library: the file's menu (Open, Transform, Rename, Move to folder, Details, Delete). Transforms: the job's menu. Elsewhere, the highlighted thing |
 | Menu (left soft key) | The drawer: Library, Transforms, Settings |
 | Back (right soft key) | Close the drawer or a sheet, leave the preview or Transforms; on the shelf, leave the app |
 | 4 / 6 | Preview: previous, next page |
 | * / # / 0 | Preview: zoom out, zoom in, fit the page |
 
-Transforms is the list of jobs, running ones first. OK on one opens its menu: a running job can be cancelled (the menu opens on "Keep it running", so OK, OK never cancels one), a finished one viewed, downloaded, or tried again, and removed from the list. A running job shows how far along it is as a ring, with the percentage inside.
+Transforms is the list of jobs, running ones first. OK on one opens its menu: a running job can be cancelled (the menu opens on "Keep it running", so OK, OK never cancels one), a finished one viewed, downloaded, or tried again, and removed from the list. A file's menu also has Delete, which moves it to the tablet's trash. A running job shows how far along it is as a ring, with the percentage inside.
 
-**Download Word** and **Download PDF** save a finished job's result into the phone's Download folder, where Canvas's file picker finds it under Downloads. Hand in the Word document; if the result needs more work, write on the PDF on the tablet and transform it again. A job has a Word document when the agent made one.
+**Download Word** and **Download PDF** save a finished job's result into Documents on the SD card (never the phone's own storage), where Canvas's file picker finds it under SD card. Hand in the Word document; if the result needs more work, write on the PDF on the tablet and transform it again. A job has a Word document when the agent made one.
 
 ## Build
 

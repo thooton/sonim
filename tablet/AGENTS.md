@@ -33,17 +33,20 @@ reads and writes its storage, so the app sees what the tablet last synced.
   document id and edit time and draws them with `PdfRenderer`; covers are
   page 1, small. An ePub with nothing written on it has no pages to show
   (the tablet lays it out itself), so its cover is its name on a plain page.
-- `POST /remarkable/{id}` with `{"name"}` or `{"parent"}`: Rename and Move.
+- `POST /remarkable/{id}` with `{"name"}` or `{"parent"}`: Rename, Move,
+  and Delete (`"parent": "trash"`, the tablet's trash, which the user
+  empties on the tablet). Delete asks first, opening on Cancel.
   The route is PATCH, which `HttpURLConnection` can't send; the command
   center takes POST the same.
 - `GET /files/{name}`: a finished job's result from Delta's Files (its
   `files`: the PDF, and the Word document when the agent made one), which a
-  job's menu downloads into the phone's Download folder (`Downloads.free`
-  numbers a name already taken). That is where Canvas's file picker looks
-  (Downloads), so the `.docx` can be handed in straight from there: many of
-  the user's teachers take only Word documents. The PDF is the one on the
-  tablet, for marking up and transforming again. Downloading asks for
-  storage the first time.
+  job's menu downloads into `Documents` on the SD card, never the phone's
+  own storage (`Card.root` in common; no card, no download).
+  `Downloads.free` numbers a name already taken. Canvas's file picker
+  reaches it (SD card, Documents), so the `.docx` can be handed in straight
+  from there: many of the user's teachers take only Word documents. The PDF
+  is the one on the tablet, for marking up and transforming again.
+  Downloading asks for storage the first time.
 - `GET /transforms`, `POST /transforms`, `DELETE /transforms/{id}`: the jobs.
   They are read every 5 seconds while one runs (every minute otherwise),
   and a job that finishes is announced and the Library read again, since
@@ -65,6 +68,17 @@ number of jobs run at once; offline, the Library shows the last listing
 (`library.json`) and the pages already seen. The command center's error
 messages are shown as it words them, with "the reMarkable" made "the
 tablet".
+
+## Wording
+
+The screens state facts and never explain the app. What a sheet knows about
+a file or a job is label and value rows (`Sheet.rows`), not sentences; a
+toast is a few words ("Renamed", "Saved  SD card/Documents/Essay.docx");
+nothing says where to find something or what will happen next. Keep it
+that way.
+
+The Library opens on the newest file, at the far left, every time the app
+comes to the front.
 
 ## Layout
 

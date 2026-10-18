@@ -120,7 +120,7 @@ public final class SelfTest {
 
         Job essay = jobs.find("t1");
         check.same("the agent's title", "MLA paper", essay.heading());
-        check.same("from", "From Essay draft", essay.from());
+        check.same("from", "Essay draft", essay.from());
         check.same("summary", "Transcribing page 9 of 12", essay.summary(NOW, UTC, true));
         Job fresh = jobs.find("t4");
         check.same("before the agent reports, the document", "Lease agreement", fresh.heading());
@@ -128,7 +128,7 @@ public final class SelfTest {
         check.same("starting", "Starting", fresh.summary(NOW, UTC, true));
         Job done = jobs.find("t2");
         check.same("done", Job.DONE, done.status);
-        check.same("done summary", "On your tablet since 10:42", done.summary(NOW, UTC, true));
+        check.same("done summary", "10:42", done.summary(NOW, UTC, true));
         check.same("result on the tablet", "d9", done.tablet);
         check.same("both files", 2, done.files.size());
         check.same("its PDF", "Lease summary.pdf", done.pdf());
@@ -241,14 +241,14 @@ public final class SelfTest {
             tablet.download("Lease summary.docx", word);
             check.same("a result downloaded", "PK the word document", new String(Files.readAllBytes(word.toPath()), "UTF-8"));
             check.ok("no part file left of it", !new File(dir, "Lease summary.docx.part").exists());
-            check.fails("a result no longer in Files", "no longer in Delta's Files",
+            check.fails("a result no longer in Files", "File not found",
                 () -> tablet.download("Gone.pdf", new File(dir, "Gone.pdf")));
             check.ok("nothing saved for that", !new File(dir, "Gone.pdf").exists());
             check.same("a free name", "Essay.docx", Downloads.free(dir, "Essay.docx").getName());
             check.same("a taken name is numbered", "Lease summary (2).docx", Downloads.free(dir, "Lease summary.docx").getName());
             check.same("a name can't leave the folder", "x.pdf", Downloads.free(dir, "../x.pdf").getName());
 
-            check.fails("a wrong token", "refused the token", () -> new Center(base, "bad").library());
+            check.fails("a wrong token", "Token refused", () -> new Center(base, "bad").library());
         } finally {
             server.close();
         }

@@ -85,9 +85,9 @@ public final class Job {
         return title.length() > 0 ? title : name;
     }
 
-    /** The document it came from, under a heading the agent gave: "From Essay draft". */
+    /** The document it came from, when the heading is the agent's title rather than its name; else "". */
     public String from() {
-        return title.length() > 0 ? "From " + name : "";
+        return title.length() > 0 ? name : "";
     }
 
     /** What the agent is doing now, in its words. */
@@ -105,7 +105,7 @@ public final class Job {
 
     /** Why it failed, or that it did. */
     public String failure() {
-        return error.length() > 0 ? error : "It stopped without a result.";
+        return error.length() > 0 ? error : "No result";
     }
 
     /** When it finished: "10:42" today, "yesterday", "Oct 12". */
@@ -134,8 +134,7 @@ public final class Job {
         switch (status) {
             case RUNNING: return step();
             case DONE:
-                String when = finished(now, zone, hours24);
-                return when.length() == 0 ? "On your tablet" : "On your tablet since " + when;
+                return finished(now, zone, hours24);
             default: return failure();
         }
     }

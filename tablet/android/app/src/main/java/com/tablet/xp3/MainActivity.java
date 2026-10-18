@@ -8,7 +8,6 @@ import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.media.MediaScannerConnection;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
@@ -36,6 +35,7 @@ import com.tablet.xp3.data.When;
 import com.tablet.xp3.net.Center;
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
+import com.xp3.common.ui.Card;
 import com.xp3.common.ui.Ui;
 
 import java.io.File;
@@ -71,6 +71,8 @@ public final class MainActivity extends Activity {
     private static final long POLL_IDLE = 60000;
     /** Asking for storage, to download a result. */
     private static final int STORAGE = 1;
+    /** The folder on the SD card that results are downloaded into. */
+    private static final String DOWNLOADS = "Documents";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private ExecutorService worker;
@@ -184,6 +186,10 @@ public final class MainActivity extends Activity {
     protected void onStart() {
         super.onStart();
         started = true;
+        // Every time the app comes up: the newest file, at the far left.
+        file = 0;
+        fileId = "";
+        library.setDocs(lib.docs, file, this::cover);
         refresh();
     }
 
@@ -262,10 +268,10 @@ public final class MainActivity extends Activity {
                     login = next;
                     prefs().edit().putString("login", next.toJson()).apply();
                     signIn();
-                    say("", "Signed in to " + next.host() + ".");
+                    say("", "Signed in to " + next.host());
                     refresh();
                 } catch (IllegalArgumentException e) {
-                    say("", e.getMessage() + ".");
+                    say("", e.getMessage());
                 }
             })
             .setNegativeButton("Cancel", null)
@@ -358,9 +364,9 @@ public final class MainActivity extends Activity {
                     jobs = got;
                     for (Job job : finished) {
                         if (job.status == Job.DONE) {
-                            say("Done:", " " + (job.result.length() > 0 ? job.result : job.heading()) + " is on your tablet.");
+                            say("Done", "  " + (job.result.length() > 0 ? job.result : job.heading()));
                         } else {
-                            say("Failed:", " " + job.heading() + ". " + job.failure());
+                            say("Failed", "  " + job.heading());
                         }
                     }
                     // A finished job put its result on the tablet.
@@ -374,7 +380,7 @@ public final class MainActivity extends Activity {
 
     private static String message(Exception e) {
         String text = e.getMessage();
-        return text == null || text.length() == 0 ? "Something went wrong." : text;
+        return text == null || text.length() == 0 ? "Something went wrong" : text;
     }
 
     /** Page 1 of a file, for its cover. */
@@ -473,8 +479,7 @@ public final class MainActivity extends Activity {
             for (int i = 0; i < list.size(); i++) if (list.get(i).id.equals(jobId)) jobSel = i;
             if (jobSel >= list.size()) jobSel = Math.max(0, list.size() - 1);
             jobId = list.isEmpty() ? "" : list.get(jobSel).id;
-            String empty = tablet == null ? "Not signed in. Sign in from Menu → Settings."
-                : "No transforms yet. In Library, pick a file and choose Transform.";
+            String empty = tablet == null ? "Not signed in" : "No transforms";
             transforms.show(list, jobs.active(), drawerOpen || list.isEmpty() ? -1 : jobSel, empty);
         }
         if (drawerOpen) {
@@ -492,13 +497,13 @@ public final class MainActivity extends Activity {
             fileId = doc.id;
             library.show(file, status, doc.name, doc.meta(System.currentTimeMillis(), TimeZone.getDefault()), true);
         } else if (tablet == null) {
-            library.show(0, status, "Not signed in", "Press Menu, then Settings, to sign in to the command center.", false);
+            library.show(0, status, "Not signed in", "", false);
         } else if (loading || updated == 0 && problem.length() == 0) {
             library.show(0, status, "Reading the tablet…", "", false);
         } else if (problem.length() > 0) {
-            library.show(0, status, "Couldn't read the tablet", problem + " Menu → Settings → Refresh now tries again.", false);
+            library.show(0, status, "Couldn't read the tablet", problem, false);
         } else {
-            library.show(0, status, "Nothing on the tablet yet", "Files appear here once the tablet syncs.", false);
+            library.show(0, status, "No files", "", false);
         }
     }
 
@@ -693,10 +698,11 @@ public final class MainActivity extends Activity {
                             break;
                         case LibraryScreen.RENAME: openSheet(Sheet.rename(this, doc), doc); break;
                         case LibraryScreen.MOVE: openSheet(Sheet.move(this, doc, lib.folders), doc); break;
+                        case LibraryScreen.DELETE: openSheet(Sheet.delete(this, doc), doc); break;
                         default:
                             String edited = doc.modified > 0
                                 ? When.day(doc.modified, System.currentTimeMillis(), TimeZone.getDefault(), DateFormat.is24HourFormat(this))
-                                : "Not known";
+                                : "—";
                             openSheet(Sheet.details(this, doc, edited), doc);
                     }
                     return;
@@ -708,7 +714,7 @@ public final class MainActivity extends Activity {
                     if (picked == 0 && name.length() > 0 && !name.equals(doc.name)) {
                         change(t -> t.rename(doc.id, name), () -> {
                             doc.name = name;
-                            say("", "Renamed. The tablet shows it at its next sync.");
+                            say("", "Renamed");
                         });
                     }
                     break;
@@ -718,9 +724,12 @@ public final class MainActivity extends Activity {
                         change(t -> t.move(doc.id, folder.id), () -> {
                             doc.parent = folder.id;
                             doc.folder = folder.path;
-                            say("", "Moved to " + folder.path + ".");
+                            say("", "Moved to " + folder.path);
                         });
                     }
+                    break;
+                case Sheet.DELETE:
+                    if (picked == 1) change(t -> t.move(doc.id, "trash"), () -> say("", "Deleted " + doc.name));
                     break;
                 case Sheet.JOB:
                     Job job = sheetJob;
@@ -751,11 +760,11 @@ public final class MainActivity extends Activity {
 
     /** Starts a transform job on a document, and says so once the command center has. */
     private void start(String id, String name) {
-        say("", "Starting the transform of " + name + "…");
+        say("", "Starting…");
         final Job[] started = new Job[1];
         change(t -> started[0] = t.start(id), () -> {
             jobs = jobs.with(started[0]);
-            say("Transform started.", " Follow it in Menu → Transforms.");
+            say("", "Transform started");
             render();
         });
     }
@@ -770,7 +779,7 @@ public final class MainActivity extends Activity {
             jobId = list.get(++jobSel).id;
         } else if (k == OK && jobSel < list.size()) {
             Job job = list.get(jobSel);
-            openSheet(Sheet.job(this, job, job.summary(System.currentTimeMillis(), TimeZone.getDefault(),
+            openSheet(Sheet.job(this, job, job.finished(System.currentTimeMillis(), TimeZone.getDefault(),
                 DateFormat.is24HourFormat(this))), null);
             sheetJob = job;
         }
@@ -781,14 +790,14 @@ public final class MainActivity extends Activity {
     private void jobAction(Job job, int what) {
         switch (what) {
             case Sheet.CANCEL_JOB:
-                forget(job, "Job cancelled. Nothing more goes to the tablet.");
+                forget(job, "Cancelled");
                 break;
             case Sheet.REMOVE:
-                forget(job, "Removed from the list. Its result stays on the tablet.");
+                forget(job, "Removed");
                 break;
             case Sheet.RETRY:
                 if (lib.find(job.document) == null && updated > 0) {
-                    say("", "That file isn't on the tablet any more.");
+                    say("", "File no longer on the tablet");
                 } else {
                     start(job.document, job.name);
                 }
@@ -810,9 +819,9 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * Saves a result from Delta's Files into the phone's Download folder,
-     * where Canvas's file picker finds it (Downloads) for handing in. Asks
-     * for storage first, once.
+     * Saves a result from Delta's Files into Documents on the SD card, never
+     * the phone's own storage; Canvas's file picker finds it there (SD card,
+     * Documents) for handing in. Asks for storage first, once.
      */
     private void download(String name) {
         if (name.length() == 0) return;
@@ -823,16 +832,21 @@ public final class MainActivity extends Activity {
         }
         final Center with = tablet;
         if (with == null) {
-            say("", "Not signed in. Sign in from Menu → Settings.");
+            say("", "Not signed in");
             return;
         }
-        final File folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        File card = Card.root(this);
+        if (card == null) {
+            say("", "No SD card");
+            return;
+        }
+        final File folder = new File(card, DOWNLOADS);
         say("", "Downloading " + name + "…");
         worker.execute(() -> {
             String error = null;
             File dest = null;
             try {
-                if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't make the Download folder.");
+                if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't make the " + DOWNLOADS + " folder");
                 dest = Downloads.free(folder, name);
                 with.download(name, dest);
             } catch (IOException e) {
@@ -849,7 +863,7 @@ public final class MainActivity extends Activity {
                 }
                 // So other apps (Canvas's picker, the file manager) see it straight away.
                 MediaScannerConnection.scanFile(this, new String[] {saved.getPath()}, null, null);
-                say("Saved:", " Download/" + saved.getName() + ".");
+                say("Saved", "  SD card/" + DOWNLOADS + "/" + saved.getName());
             });
         });
     }
@@ -861,7 +875,7 @@ public final class MainActivity extends Activity {
         String name = pendingDownload;
         pendingDownload = "";
         if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) download(name);
-        else say("", "Downloading needs storage. Allow it, then try again.");
+        else say("", "Storage permission denied");
     }
 
     /** Takes a job off the list, which for a running one also ends it. */
