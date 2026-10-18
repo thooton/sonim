@@ -93,7 +93,7 @@ final class Views {
         return view;
     }
 
-    /** "TUESDAY 20", "YOUR WORK": small capitals, spaced. */
+    /** "TUESDAY OCT 20", "YOUR WORK": small capitals, spaced. */
     TextView label(String value) {
         // Upper-cased here rather than with setAllCaps, which setSingleLine's
         // own transformation would silently replace.

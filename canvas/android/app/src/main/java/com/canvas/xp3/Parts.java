@@ -83,7 +83,7 @@ final class Parts {
         return row;
     }
 
-    /** The day header on the timeline: "TUESDAY 20 ··· 2 DUE". */
+    /** The day header on the timeline: "TUESDAY OCT 20 ··· 2 DUE". */
     View dayHeader(String label, String note) {
         LinearLayout row = v.row();
         v.pad(row, 12, 7, 12, 3);

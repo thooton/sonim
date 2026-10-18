@@ -83,9 +83,13 @@ public final class Dates {
         return twentyFourHour ? null : format("a", when);
     }
 
-    /** "TUESDAY 20", a day's heading on the timeline. */
+    /**
+     * "TUESDAY OCT 20", a day's heading on the timeline. The month is here
+     * because nothing else on the home screen names it: the strip shows
+     * only the days' numbers.
+     */
     public static String dayHeading(long when) {
-        return format("EEEE d", when).toUpperCase(Locale.US);
+        return format("EEEE MMM d", when).toUpperCase(Locale.US);
     }
 
     /** "M", "T": a column's letter on the week strip. */
@@ -106,29 +110,6 @@ public final class Dates {
     /** "20". */
     public static String dayOfMonth(long when) {
         return format("d", when);
-    }
-
-    /** "Oct 19 – 25", or "Oct 26 – Nov 1" across a month's end. */
-    public static String weekRange(long weekStart) {
-        long last = addDays(weekStart, 6);
-        String from = format("MMM d", weekStart);
-        boolean sameMonth = format("MMM", weekStart).equals(format("MMM", last));
-        return from + " – " + (sameMonth ? format("d", last) : format("MMM d", last));
-    }
-
-    /**
-     * The week's range from longest to shortest: "Oct 19 – 25", "Oct 19–25",
-     * then the month alone ("Oct", or "Oct–Nov"). The tab row shows the
-     * longest that fits beside the tabs, which at the larger text sizes is
-     * sometimes only the month.
-     */
-    public static String[] weekRanges(long weekStart) {
-        long last = addDays(weekStart, 6);
-        String month = format("MMM", weekStart);
-        String lastMonth = format("MMM", last);
-        boolean sameMonth = month.equals(lastMonth);
-        String tight = format("MMM d", weekStart) + "–" + (sameMonth ? format("d", last) : format("MMM d", last));
-        return new String[] { weekRange(weekStart), tight, sameMonth ? month : month + "–" + lastMonth };
     }
 
     /** "Due Tue, Oct 20 at 10:30", the line under a title with room for one. */
