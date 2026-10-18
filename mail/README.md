@@ -65,7 +65,8 @@ Folders are Gmail's own (Inbox, Starred, Sent, Drafts, All mail, Spam,
 Trash) and your labels. Search takes Gmail's search syntax
 (`from:jane has:attachment`). Delete moves to the trash, which Restore
 undoes; nothing is deleted for good. Attachments are saved to the Download
-folder on the SD card, never to the phone; links in a message open in the browser, and an email
+folder on the SD card, never to the phone (the first save asks Android to
+let Mail write there; say Allow); links in a message open in the browser, and an email
 address starts a message to it.
 
 ## Build
