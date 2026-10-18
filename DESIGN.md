@@ -225,14 +225,17 @@ its own:
   (and the only tab for a word only it has): each outline at 18sp SemiBold,
   its strokes under it in grey, parted by middle dots.
 - **Menu holds the actions.** Menu opens a stock popup menu over the page
-  (Word of the Day and Search at home, Pronounce and Search on a word). OK
+  (Word of the Day, Search and Shorthand at home, Pronounce, Search and
+  Shorthand on a word; while searching, the other search). OK
   opens the Word of the Day at home and nothing on a word. Up from the top of a page moves into the search
   box, as it would on any screen with a search bar above it.
 - **The search.** Recent Searches, with Clear in dark red, each row a faint
   clock, the word, and a faint arrow over an inset hairline; while typing,
   the same rows with a magnifier and the rest of each suggestion in
-  SemiBold, then under a Shorthand heading the outlines it reads as, each
-  after a faint pen, the outline in SemiBold and its English in grey. The row under the d-pad is washed in a pale blue (`#EBF2FF`).
+  SemiBold. The shorthand search is the same page with a pen in the search
+  button and "Grascii outline" as the hint; its rows are the outlines the
+  query reads as, each after a faint pen, the outline in SemiBold and its
+  English in grey. The row under the d-pad is washed in a pale blue (`#EBF2FF`).
 - **Its icon.** An open book with a gold ribbon on blue.
 
 ## Source: Tonal

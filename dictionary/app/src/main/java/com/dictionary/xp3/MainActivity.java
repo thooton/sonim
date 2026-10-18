@@ -9,6 +9,7 @@ import android.text.Editable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.InputType;
 import android.text.TextWatcher;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
@@ -44,9 +45,12 @@ import java.util.TimeZone;
  * Down scroll a page, and Up from its top moves into the search box. Menu
  * opens a menu over the page: the Word of the Day or Search at home,
  * Pronounce or Search on a word. OK opens nothing on a word. The search
- * lists recent searches and, as a query is typed, the words it could mean
- * and the shorthand outlines it could be read as; OK opens the one picked,
- * or the best match. Back goes back a page, and leaves from home.
+ * lists recent searches and, as a query is typed, the words it could mean;
+ * the shorthand search (Shorthand in the menu, or Up from a Shorthand tab)
+ * reads it instead as a Grascii outline and lists the words it could be.
+ * Menu while searching switches between the two. OK opens the row picked,
+ * or the best match. Back closes the search, goes back a page, and leaves
+ * from home.
  */
 public class MainActivity extends Activity {
 
@@ -76,6 +80,8 @@ public class MainActivity extends Activity {
     private final List<Integer> back = new ArrayList<>();
     private int tab = DEFINITIONS;
     private boolean searching;
+    /** Whether the search reads the query as a shorthand outline rather than a word. */
+    private boolean outlineSearch;
     private int wordOfTheDay;
 
     // The search's rows: pages, or CLEAR, and the tab each opens on; and
@@ -97,6 +103,7 @@ public class MainActivity extends Activity {
 
     private ImageView nav;
     private EditText search;
+    private ImageView searchIcon;
     private ScrollView home;
     private ScrollView entry;
     private TextView headword;
@@ -120,6 +127,7 @@ public class MainActivity extends Activity {
 
         nav = findViewById(R.id.nav);
         search = findViewById(R.id.search);
+        searchIcon = findViewById(R.id.search_icon);
         home = findViewById(R.id.home);
         entry = findViewById(R.id.entry);
         headword = findViewById(R.id.headword);
@@ -199,7 +207,11 @@ public class MainActivity extends Activity {
                 if (first) choose();
                 return true;
             }
-            if (key == KeyEvent.KEYCODE_MENU || key == KeyEvent.KEYCODE_BACK) {
+            if (key == KeyEvent.KEYCODE_MENU) {
+                if (released) showSearchActions();
+                return true;
+            }
+            if (key == KeyEvent.KEYCODE_BACK) {
                 if (released) closeSearch();
                 return true;
             }
@@ -258,7 +270,8 @@ public class MainActivity extends Activity {
     private void move(int direction, boolean first) {
         ScrollView scroll = page == HOME ? home : entry;
         if (direction < 0 && scroll.getScrollY() == 0) {
-            if (first) openSearch();
+            // From a word's Shorthand tab, into the shorthand search.
+            if (first) openSearch(page != HOME && tab == SHORTHAND);
             return;
         }
         int line = body.getLineHeight();
@@ -366,8 +379,9 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Menu on a page: a menu over it. At home, the Word of the Day or Search;
-     * on a word, Pronounce (greyed when the phone cannot speak) or Search.
+     * Menu on a page: a menu over it. At home, the Word of the Day, Search or
+     * Shorthand; on a word, Pronounce (greyed when the phone cannot speak),
+     * Search or Shorthand.
      */
     private void showActions() {
         boolean atHome = page == HOME;
@@ -375,14 +389,43 @@ public class MainActivity extends Activity {
         if (atHome) menu.getMenu().add(0, R.string.word_of_the_day_item, 0, R.string.word_of_the_day_item);
         else menu.getMenu().add(0, R.string.pronounce, 0, R.string.pronounce).setEnabled(speaks);
         menu.getMenu().add(0, R.string.search, 1, R.string.search);
+        menu.getMenu().add(0, R.string.shorthand, 2, R.string.shorthand);
         menu.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
             if (id == R.string.pronounce) tts.speak(headword.getText(), TextToSpeech.QUEUE_FLUSH, null, "word");
             else if (id == R.string.word_of_the_day_item) open(wordOfTheDay, DEFINITIONS);
-            else openSearch();
+            else openSearch(id == R.string.shorthand);
             return true;
         });
         menu.show();
+    }
+
+    /** Menu while searching: switch to the other search, keeping what was typed. */
+    private void showSearchActions() {
+        PopupMenu menu = new PopupMenu(this, findViewById(R.id.pill));
+        int other = outlineSearch ? R.string.search_words : R.string.shorthand;
+        menu.getMenu().add(0, other, 0, other);
+        menu.setOnMenuItemClickListener(item -> {
+            setOutlineSearch(!outlineSearch);
+            showRows();
+            return true;
+        });
+        menu.show();
+    }
+
+    /**
+     * The shorthand search looks its part: a pen in the search button, the
+     * outline's format as the hint, and capitals as Grascii is written.
+     */
+    private void setOutlineSearch(boolean outlines) {
+        outlineSearch = outlines;
+        searchIcon.setImageResource(outlines ? R.drawable.ic_shorthand_button : R.drawable.ic_search);
+        search.setHint(outlines ? R.string.outline_hint : R.string.search_hint);
+        int selection = search.getSelectionEnd();
+        search.setInputType(outlines
+            ? InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            : InputType.TYPE_CLASS_TEXT);
+        if (selection >= 0) search.setSelection(Math.min(selection, search.length()));
     }
 
     private void showWordOfTheDay() {
@@ -401,8 +444,9 @@ public class MainActivity extends Activity {
 
     // Search
 
-    private void openSearch() {
+    private void openSearch(boolean outlines) {
         searching = true;
+        setOutlineSearch(outlines);
         show();
         search.setFocusable(true);
         search.setFocusableInTouchMode(true);
@@ -419,6 +463,7 @@ public class MainActivity extends Activity {
 
     private void endSearch() {
         searching = false;
+        setOutlineSearch(false);
         search.setText("");
         search.setFocusable(false);
         search.setFocusableInTouchMode(false);
@@ -428,7 +473,7 @@ public class MainActivity extends Activity {
 
     /**
      * OK while searching: the row picked, or else the best match for the
-     * query: the word, or what it reads as when it is written as shorthand.
+     * query: the word, or in the shorthand search the first word it reads as.
      */
     private void choose() {
         if (picked >= 0) {
@@ -443,9 +488,9 @@ public class MainActivity extends Activity {
         }
         String query = search.getText().toString();
         if (Dictionary.normalize(query).isEmpty()) return;
-        List<Shorthand.Match> read = shorthand.read(query, 1);
-        if (looksLikeShorthand(query) && !read.isEmpty()) {
-            found(pageFor(shorthand.group(read.get(0).entry)), SHORTHAND);
+        if (outlineSearch) {
+            List<Shorthand.Match> read = shorthand.read(query, 1);
+            if (!read.isEmpty()) found(pageFor(shorthand.group(read.get(0).entry)), SHORTHAND);
             return;
         }
         int found = dictionary.find(query);
@@ -455,7 +500,6 @@ public class MainActivity extends Activity {
         }
         List<Integer> suggestions = suggest(query);
         if (!suggestions.isEmpty()) found(suggestions.get(0), DEFINITIONS);
-        else if (!read.isEmpty()) found(pageFor(shorthand.group(read.get(0).entry)), SHORTHAND);
     }
 
     private void found(int index, int onTab) {
@@ -482,22 +526,6 @@ public class MainActivity extends Activity {
         }
         while (out.size() > SUGGESTIONS) out.remove(out.size() - 1);
         return out;
-    }
-
-    /**
-     * Whether a query is more likely an outline than a word: typed in
-     * capitals, as Grascii is written, or with its marks in it.
-     */
-    private static boolean looksLikeShorthand(String query) {
-        String q = query.trim();
-        boolean letters = false;
-        for (int i = 0; i < q.length(); i++) {
-            char c = q.charAt(i);
-            if (",.|~_()^&'".indexOf(c) >= 0) return true;
-            if (Character.isLowerCase(c)) return false;
-            letters |= Character.isUpperCase(c);
-        }
-        return letters && q.length() > 1;
     }
 
     private List<String> recent() {
@@ -531,48 +559,38 @@ public class MainActivity extends Activity {
             }
             if (recent.isEmpty()) return;
             rows.addView(recentHeader());
-            for (int index : recent) addRow(index, R.drawable.ic_history, null);
+            for (int index : recent) {
+                if (outlineSearch) addRow(index, SHORTHAND, R.drawable.ic_history, name(index));
+                else addRow(index, R.drawable.ic_history, null);
+            }
+        } else if (outlineSearch) {
+            List<Shorthand.Match> outlines = shorthand.read(query, OUTLINES);
+            showNone(outlines.isEmpty());
+            for (Shorthand.Match match : outlines) addOutline(match.entry);
         } else {
             List<Integer> suggestions = suggest(query);
-            List<Shorthand.Match> outlines = shorthand.read(query, OUTLINES);
-            boolean none = suggestions.isEmpty() && outlines.isEmpty();
-            search.setTextColor(getColor(none ? R.color.not_found : R.color.ink));
-            if (none) {
-                TextView empty = text(getString(R.string.no_results), 12.5f, R.color.text_muted, sans);
-                empty.setPadding(dp(12), dp(10), dp(12), dp(10));
-                rows.addView(empty);
-            }
-            // What was typed as Grascii reads it first as shorthand, and the
-            // words then sit under a heading of their own.
-            boolean outlinesFirst = looksLikeShorthand(query);
-            if (outlinesFirst) addOutlines(outlines);
-            if (outlinesFirst && !suggestions.isEmpty() && !outlines.isEmpty()) {
-                rows.addView(sectionHeader(getString(R.string.words)));
-            }
+            showNone(suggestions.isEmpty());
             for (int index : suggestions) addRow(index, R.drawable.ic_search_thin, q);
-            if (!outlinesFirst) addOutlines(outlines);
         }
         results.scrollTo(0, 0);
     }
 
-    /** The outlines a query reads as, under a Shorthand heading: each outline and its English. */
-    private void addOutlines(List<Shorthand.Match> outlines) {
-        if (outlines.isEmpty()) return;
-        rows.addView(sectionHeader(getString(R.string.shorthand)));
-        for (Shorthand.Match match : outlines) {
-            String outline = shorthand.outline(match.entry);
-            SpannableStringBuilder s = new SpannableStringBuilder();
-            append(s, outline, new Spans.Font(semibold));
-            s.append("  ");
-            append(s, shorthand.translation(match.entry), new ForegroundColorSpan(getColor(R.color.text_muted)));
-            addRow(pageFor(shorthand.group(match.entry)), SHORTHAND, R.drawable.ic_shorthand, s);
-        }
+    /** Red text, and "No results", when nothing matches. */
+    private void showNone(boolean none) {
+        search.setTextColor(getColor(none ? R.color.not_found : R.color.ink));
+        if (!none) return;
+        TextView empty = text(getString(R.string.no_results), 12.5f, R.color.text_muted, sans);
+        empty.setPadding(dp(12), dp(10), dp(12), dp(10));
+        rows.addView(empty);
     }
 
-    private View sectionHeader(String title) {
-        TextView header = text(title, 12f, R.color.ink, semibold);
-        header.setPadding(dp(12), dp(8), dp(8), dp(4));
-        return header;
+    /** A row of the shorthand search: the outline in semibold, then its English in grey. */
+    private void addOutline(int entry) {
+        SpannableStringBuilder s = new SpannableStringBuilder();
+        append(s, shorthand.outline(entry), new Spans.Font(semibold));
+        s.append("  ");
+        append(s, shorthand.translation(entry), new ForegroundColorSpan(getColor(R.color.text_muted)));
+        addRow(pageFor(shorthand.group(entry)), SHORTHAND, R.drawable.ic_shorthand, s);
     }
 
     private View recentHeader() {
