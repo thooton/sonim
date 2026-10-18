@@ -54,8 +54,9 @@ The scope is `gmail.modify`: nothing can be deleted for good, only trashed
 - **People** (`mail`: `people`) are the addresses seen in listed mail and
   those written to (first), for Menu → Add recipient.
 - **Attachments** are fetched whole (the shared `Http` caps a response at
-  8 MB, so about 6 MB of file) and written to the shared Download folder,
-  asking for storage access on first use.
+  8 MB, so about 6 MB of file) and written to the Download folder on the
+  SD card (`Card`), asking for storage access on first use. Never to the
+  phone's own storage: with no card in, nothing is saved.
 
 If the CLI's addressing, quoting or forwarding changes, change `Outgoing`
 here and keep the test in step.
