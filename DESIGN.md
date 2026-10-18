@@ -282,3 +282,34 @@ departs from it where the proposal does:
 - **Never a dead end.** An empty or failed search shows what is so and a
   next step that takes the d-pad (search albums instead, search again), with
   the engine's last log lines below it.
+
+## Tablet: e-ink paper and one highlighter
+
+Tablet follows its own design proposal (where it was called Margin) rather
+than the family look: the e-ink tablet itself, on a 240x320 screen.
+
+- **Paper, graphite and one yellow.** Paper `#E3E4DF` for the page, sheet
+  `#F7F7F3` for what rises over it (sheets, cards, the drawer), ink
+  `#222428`, graphite `#62666D` for what follows, rules `#C5C7C1`. The
+  highlighter `#F2D343` means "this is selected" and nothing else: a marker
+  stroke with slanted ends (`Mark`) behind the selected file's or job's
+  title and the selected choice, the zoom level, the part of the page the
+  minimap shows. Never a filled box around
+  a row.
+- **Two faces.** Literata (semibold) for titles, Atkinson Hyperlegible for
+  everything else. Spaced-capital labels
+  at 8.5px bold over sections and sheets.
+- **Larger than the mockup.** Every size is the proposal's pixels times
+  1.25 (`Look.SCALE`); at its own size the 9px text could not be read on
+  the phone.
+- **The shelf has the Library.** Covers slide between slots, the middle one
+  outlined in ink, the rest greyed and fading toward the edges, with dots
+  for where you are (a count instead, past twelve files). A file's actions
+  are a menu OK opens, Open first.
+- **Transforms is a list.** One line per job, the same height selected or
+  not, the selected title under the highlighter; OK opens the job's menu.
+- **No soft-key bar.** The keys' jobs never change, so the full height goes
+  to content: the header's menu glyph is the only hint, for the drawer.
+- **The preview is the page.** A translucent top bar with the file, page
+  and the 4 and 6 keys; round arrows where there is more to pan to; a zoom
+  pill with its * # 0 keys; a minimap.

@@ -1,0 +1,29 @@
+plugins {
+    id "com.android.application"
+}
+
+apply from: rootProject.file("gradle/app.gradle")
+
+apply from: rootProject.file("gradle/bundled.gradle")
+
+// The same command center as Delta, with the same token: it reads and
+// writes the reMarkable and runs the transform jobs.
+bundled("com.tablet.xp3") {
+    def center = deltaCenter(true)
+    [SERVER: center.server, TOKEN: center.token, REVISION: center.revision]
+}
+
+android {
+    namespace "com.tablet.xp3"
+
+    defaultConfig {
+        applicationId "com.tablet.xp3"
+        versionCode 3
+        versionName "0.3.0"
+    }
+}
+
+dependencies {
+    implementation project(":tablet:core")
+    implementation project(":common:ui")
+}

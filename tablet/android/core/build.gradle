@@ -1,0 +1,6 @@
+// The library, the transform jobs and the preview's geometry.
+apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    api project(":common:core")
+}
