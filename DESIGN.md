@@ -105,7 +105,8 @@ a calm, planner-style school app built around the week.
   the screen's shortcut, but no bar labels them; the rows get the space.
 - **Light and dark.** In the dark theme ink and paper swap and the
   highlighter stroke drops to about 42%.
-- **Its icon** stays the ticked homework sheet.
+- **Its icon** is the week strip in miniature: on ink, a yellow day with a
+  tick, dim days beside it, and three course-coloured dots under it.
 
 ## Mail: Thunderbird on a flip phone
 
