@@ -1,10 +1,14 @@
 package com.tablet.xp3;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Typeface;
+import android.media.MediaScannerConnection;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
@@ -24,6 +28,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.tablet.xp3.data.Doc;
+import com.tablet.xp3.data.Downloads;
 import com.tablet.xp3.data.Job;
 import com.tablet.xp3.data.Jobs;
 import com.tablet.xp3.data.Library;
@@ -64,6 +69,8 @@ public final class MainActivity extends Activity {
     /** How often the jobs are read while one is running, and while none is. */
     private static final long POLL_RUNNING = 5000;
     private static final long POLL_IDLE = 60000;
+    /** Asking for storage, to download a result. */
+    private static final int STORAGE = 1;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private ExecutorService worker;
@@ -108,6 +115,9 @@ public final class MainActivity extends Activity {
     private FrameLayout drawerLayer;
     private Drawer drawer;
     private TextView toast;
+
+    /** The result waiting on the storage permission, or "". */
+    private String pendingDownload = "";
 
     private final Runnable hideToast = () -> toast.setVisibility(View.GONE);
     private final Runnable poll = this::pollJobs;
@@ -783,6 +793,12 @@ public final class MainActivity extends Activity {
                     start(job.document, job.name);
                 }
                 break;
+            case Sheet.DOWNLOAD_DOCX:
+                download(job.docx());
+                break;
+            case Sheet.DOWNLOAD_PDF:
+                download(job.pdf());
+                break;
             case Sheet.VIEW:
                 Doc result = lib.find(job.tablet);
                 openPreview(job.tablet, result != null ? result.modified : job.updated,
@@ -791,6 +807,61 @@ public final class MainActivity extends Activity {
             default:
                 break;
         }
+    }
+
+    /**
+     * Saves a result from Delta's Files into the phone's Download folder,
+     * where Canvas's file picker finds it (Downloads) for handing in. Asks
+     * for storage first, once.
+     */
+    private void download(String name) {
+        if (name.length() == 0) return;
+        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            pendingDownload = name;
+            requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE);
+            return;
+        }
+        final Center with = tablet;
+        if (with == null) {
+            say("", "Not signed in. Sign in from Menu → Settings.");
+            return;
+        }
+        final File folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        say("", "Downloading " + name + "…");
+        worker.execute(() -> {
+            String error = null;
+            File dest = null;
+            try {
+                if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't make the Download folder.");
+                dest = Downloads.free(folder, name);
+                with.download(name, dest);
+            } catch (IOException e) {
+                error = message(e);
+            } catch (InterruptedException e) {
+                return;
+            }
+            final String why = error;
+            final File saved = dest;
+            handler.post(() -> {
+                if (why != null) {
+                    say("", why);
+                    return;
+                }
+                // So other apps (Canvas's picker, the file manager) see it straight away.
+                MediaScannerConnection.scanFile(this, new String[] {saved.getPath()}, null, null);
+                say("Saved:", " Download/" + saved.getName() + ".");
+            });
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        if (request != STORAGE) return;
+        String name = pendingDownload;
+        pendingDownload = "";
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) download(name);
+        else say("", "Downloading needs storage. Allow it, then try again.");
     }
 
     /** Takes a job off the list, which for a running one also ends it. */

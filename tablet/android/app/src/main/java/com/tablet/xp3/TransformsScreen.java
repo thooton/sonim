@@ -77,25 +77,31 @@ final class TransformsScreen extends FrameLayout {
         });
     }
 
-    /** A job: a round glyph for its state, its title (under the highlighter when selected) and one line. */
+    /** A job: its progress ring while it runs, else a round glyph for how it ended; its title (under the highlighter when selected) and one line. */
     private static View row(Context c, Job job, boolean on, String summary, boolean divider) {
         LinearLayout outer = Parts.column(c);
         LinearLayout row = Parts.row(c);
         row.setPadding(Look.dp(c, 2), Look.dp(c, 6), Look.dp(c, 4), Look.dp(c, 6));
 
         boolean done = job.status == Job.DONE;
-        int icon = job.status == Job.RUNNING ? R.drawable.ic_sync : done ? R.drawable.ic_check : R.drawable.ic_x;
-        ImageView glyph = new ImageView(c);
-        glyph.setImageDrawable(Look.icon(c, icon, done ? Look.SHEET : Look.INK, 10));
-        // Fitted inside the ring: CENTER would draw it at its own 24dp.
-        glyph.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        glyph.setPadding(Look.dp(c, 6), Look.dp(c, 6), Look.dp(c, 6), Look.dp(c, 6));
-        GradientDrawable ring = new GradientDrawable();
-        ring.setShape(GradientDrawable.OVAL);
-        ring.setColor(done ? Look.INK : 0);
-        ring.setStroke(Math.max(1, Look.dp(c, 1.3f)), Look.INK);
-        glyph.setBackground(ring);
-        row.addView(glyph, Parts.line(Look.dp(c, 22), Look.dp(c, 22)));
+        if (job.status == Job.RUNNING) {
+            // How far along it is, as a ring, rather than in words.
+            Ring ring = new Ring(c);
+            ring.set(job.percent);
+            row.addView(ring, Parts.line(Look.dp(c, 24), Look.dp(c, 24)));
+        } else {
+            ImageView glyph = new ImageView(c);
+            glyph.setImageDrawable(Look.icon(c, done ? R.drawable.ic_check : R.drawable.ic_x, done ? Look.SHEET : Look.INK, 10));
+            // Fitted inside the ring: CENTER would draw it at its own 24dp.
+            glyph.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            glyph.setPadding(Look.dp(c, 7), Look.dp(c, 7), Look.dp(c, 7), Look.dp(c, 7));
+            GradientDrawable ring = new GradientDrawable();
+            ring.setShape(GradientDrawable.OVAL);
+            ring.setColor(done ? Look.INK : 0);
+            ring.setStroke(Math.max(1, Look.dp(c, 1.3f)), Look.INK);
+            glyph.setBackground(ring);
+            row.addView(glyph, Parts.line(Look.dp(c, 24), Look.dp(c, 24)));
+        }
 
         LinearLayout text = Parts.column(c);
         Mark title = new Mark(c);

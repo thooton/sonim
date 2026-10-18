@@ -36,6 +36,14 @@ reads and writes its storage, so the app sees what the tablet last synced.
 - `POST /remarkable/{id}` with `{"name"}` or `{"parent"}`: Rename and Move.
   The route is PATCH, which `HttpURLConnection` can't send; the command
   center takes POST the same.
+- `GET /files/{name}`: a finished job's result from Delta's Files (its
+  `files`: the PDF, and the Word document when the agent made one), which a
+  job's menu downloads into the phone's Download folder (`Downloads.free`
+  numbers a name already taken). That is where Canvas's file picker looks
+  (Downloads), so the `.docx` can be handed in straight from there: many of
+  the user's teachers take only Word documents. The PDF is the one on the
+  tablet, for marking up and transforming again. Downloading asks for
+  storage the first time.
 - `GET /transforms`, `POST /transforms`, `DELETE /transforms/{id}`: the jobs.
   They are read every 5 seconds while one runs (every minute otherwise),
   and a job that finishes is announced and the Library read again, since
@@ -45,7 +53,9 @@ A job is running, done or failed: there is no pausing and no queue (the
 proposal had both; they were dropped). Cancel forgets a running job, after
 which its agent can't submit anything. The agent's own words are what the
 job's row shows: its title for the job (until then the document's
-name), its status line and its percentage. The command center can't read
+name) and its status line. Its percentage is never words: a running job's
+glyph is a ring (`Ring`) that fills clockwise from the top, with the number
+in the middle. The command center can't read
 the instruction before a job starts, so the Transform sheet shows the top
 of page 1 itself, where the instruction is written.
 
@@ -59,7 +69,8 @@ tablet".
 ## Layout
 
 - `android/core`: `data/` - `Doc` (a file), `Library` (the listing and
-  its folders), `Job` and `Jobs` (the transform jobs and their wording),
+  its folders), `Job` and `Jobs` (the transform jobs and their wording), `Downloads`
+  (where a result is saved),
   `When` (times in words), `Viewport` (the preview's zoom levels, panning
   and clamping, for a page of any height); `net/Center` (the command
   center). Tests in `src/test` run via `:core:selfTest`, the client against
@@ -67,7 +78,7 @@ tablet".
 - `android/app`: one activity, `MainActivity`, owning the state, the
   network calls and the key routing (left soft key is `KEYCODE_MENU`, right
   is `KEYCODE_BACK`), over `LibraryScreen` (with `Shelf`, the sliding
-  covers), `TransformsScreen`, `PageView` (the preview, its chrome drawn over
+  covers), `TransformsScreen` (with `Ring`), `PageView` (the preview, its chrome drawn over
   the page), `Drawer` and `Sheet` (the file menu, Transform, Details,
   Rename, Move, Settings, a job's menu). `Pages` fetches and draws pages; `Look` is the
   palette, fonts and scale; `Mark` the highlighter stroke; `Parts` shared
