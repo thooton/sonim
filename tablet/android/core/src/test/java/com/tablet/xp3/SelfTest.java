@@ -1,6 +1,7 @@
 package com.tablet.xp3;
 
 import com.tablet.xp3.data.Doc;
+import com.tablet.xp3.data.Browse;
 import com.tablet.xp3.data.Downloads;
 import com.tablet.xp3.data.Job;
 import com.tablet.xp3.data.Jobs;
@@ -190,6 +191,10 @@ public final class SelfTest {
             if (path.equals("/remarkable/d3/pages/1")) {
                 return TestServer.Reply.of(404, "application/json", "{\"error\":\"nothing is written on it\"}").header("X-Pages: 0");
             }
+            if (request.method.equals("POST") && path.startsWith("/remarkable/documents?")) {
+                lastBody[0] = path + " " + request.body;
+                return TestServer.Reply.of(201, "application/json", "{\"id\":\"d7\"}");
+            }
             if (request.method.equals("GET") && path.equals("/files/Lease%20summary%2Edocx")) {
                 return TestServer.Reply.of(200, "application/octet-stream", "PK the word document");
             }
@@ -244,6 +249,27 @@ public final class SelfTest {
             check.fails("a result no longer in Files", "File not found",
                 () -> tablet.download("Gone.pdf", new File(dir, "Gone.pdf")));
             check.ok("nothing saved for that", !new File(dir, "Gone.pdf").exists());
+            File pdf = new File(dir, "Reading 4 & notes.pdf");
+            Files.write(pdf.toPath(), "%PDF-1.4 from the phone".getBytes("UTF-8"));
+            final long[] sent = {0};
+            check.same("uploaded", "d7", tablet.upload(pdf, Browse.title(pdf), "f1", (done, total) -> sent[0] = done));
+            check.same("upload sends the name and folder, and the file",
+                "/remarkable/documents?name=Reading+4+%26+notes&parent=f1 %PDF-1.4 from the phone", lastBody[0]);
+            check.same("upload says how much went", 23L, sent[0]);
+
+            File phone = new File(dir, "phone");
+            new File(phone, "School").mkdirs();
+            new File(phone, ".hidden").mkdir();
+            for (String name : new String[] {"b.epub", "A.pdf", "notes.txt", ".secret.pdf"}) {
+                Files.write(new File(phone, name).toPath(), new byte[0]);
+            }
+            StringBuilder names = new StringBuilder();
+            for (File f : Browse.list(phone)) names.append(f.getName()).append('|');
+            check.same("folders first, then what the tablet takes, by name", "School|A.pdf|b.epub|", names.toString());
+            check.ok("a PDF is taken", Browse.takes("x.PDF"));
+            check.ok("a Word document isn't", !Browse.takes("x.docx"));
+            check.same("the name on the tablet", "Reading 4 & notes", Browse.title(pdf));
+
             check.same("a free name", "Essay.docx", Downloads.free(dir, "Essay.docx").getName());
             check.same("a taken name is numbered", "Lease summary (2).docx", Downloads.free(dir, "Lease summary.docx").getName());
             check.same("a name can't leave the folder", "x.pdf", Downloads.free(dir, "../x.pdf").getName());

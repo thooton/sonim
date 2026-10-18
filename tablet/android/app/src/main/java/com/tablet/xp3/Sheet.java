@@ -25,7 +25,8 @@ import java.util.List;
 /**
  * A sheet risen over the screen: for one file, its menu (what OK on a
  * cover opens), then starting a transform, its details, renaming, moving
- * or deleting it; a job's menu; or the settings. The page behind is
+ * or deleting it; a job's menu; the folder an upload goes into; or the
+ * settings. The page behind is
  * dimmed; Up and Down pick a choice, OK takes it, Back closes the sheet.
  */
 final class Sheet extends FrameLayout {
@@ -38,6 +39,7 @@ final class Sheet extends FrameLayout {
     static final int SETTINGS = 5;
     static final int JOB = 6;
     static final int DELETE = 7;
+    static final int UPLOAD = 8;
 
     /** What the choices on a job's sheet do. */
     static final int KEEP = 0;
@@ -303,6 +305,18 @@ final class Sheet extends FrameLayout {
     /** What the picked choice on a job's sheet does. */
     int doing() {
         return does.get(picked);
+    }
+
+    /** Which of the tablet's folders a file from the phone goes into; the top first. */
+    static Sheet uploadTo(Context c, String name, List<Library.Folder> folders) {
+        Sheet s = new Sheet(c, UPLOAD);
+        s.head("Upload to", name);
+        for (Library.Folder folder : folders) {
+            Parts.Action a = s.choice(R.drawable.ic_folder, folder.path);
+            a.label.setEllipsize(TextUtils.TruncateAt.START);
+        }
+        s.pick(0);
+        return s;
     }
 
     /** Before a file goes to the tablet's trash. Opens on Cancel. */
