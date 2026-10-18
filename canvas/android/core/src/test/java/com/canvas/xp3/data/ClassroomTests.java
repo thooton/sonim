@@ -96,6 +96,10 @@ public final class ClassroomTests {
         check.same("Tuesday is the second column", 1, Dates.column(tuesday));
         check.same("a week's range", "Oct 19 – 25", Dates.weekRange(Dates.weekOf(tuesday)));
         check.same("across a month", "Oct 26 – Nov 1", Dates.weekRange(Dates.weekOf(at(Calendar.OCTOBER, 28, 9, 0))));
+        String[] ranges = Dates.weekRanges(Dates.weekOf(tuesday));
+        check.same("the ranges, longest first", "Oct 19 – 25|Oct 19–25|Oct", String.join("|", ranges));
+        ranges = Dates.weekRanges(Dates.weekOf(at(Calendar.OCTOBER, 28, 9, 0)));
+        check.same("the ranges across a month", "Oct 26 – Nov 1|Oct 26–Nov 1|Oct–Nov", String.join("|", ranges));
         check.same("the calendar page", "TUE", Dates.weekdayTab(tuesday));
         check.same("the day heading", "TUESDAY 20", Dates.dayHeading(tuesday));
         Dates.setWeekStart(Calendar.SUNDAY);

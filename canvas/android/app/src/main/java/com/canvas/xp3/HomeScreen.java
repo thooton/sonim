@@ -44,6 +44,8 @@ final class HomeScreen extends Screen {
     private final List<Long> headerDays = new ArrayList<>();
     private boolean scrollToDay = true;
     private final Runnable prebuilder = this::prebuild;
+    private Look timeWidthLook;
+    private int timeWidth;
 
     HomeScreen(MainActivity app) {
         super(app);
@@ -245,12 +247,14 @@ final class HomeScreen extends Screen {
             marks[i] = name;
             line.addView(name, v.margins(Views.wrap(), 0, 0, 8, on ? 0 : 2));
         }
-        View gap = new View(app);
-        line.addView(gap, new LinearLayout.LayoutParams(0, 1, 1));
         if (tab == Assignment.ASSIGNED) {
-            TextView range = v.text(Dates.weekRange(weekStart), 8.5f, look.semibold, look.muted);
-            range.setSingleLine(true);
-            line.addView(range, v.margins(Views.wrap(), 0, 0, 0, 2));
+            // The range takes whatever the tabs leave, in the longest wording that fits.
+            FitText range = new FitText(app, Dates.weekRanges(weekStart));
+            range.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 8.5f * look.scale);
+            range.setTypeface(look.semibold);
+            range.setTextColor(look.muted);
+            range.setGravity(Gravity.END);
+            line.addView(range, v.margins(new LinearLayout.LayoutParams(0, -2, 1), 0, 0, 0, 2));
         }
         row.addView(line, Views.wide());
         final int current = tab;
@@ -323,11 +327,12 @@ final class HomeScreen extends Screen {
         if (item.due != null) {
             TextView clock = v.text(Dates.clock(item.due.longValue()), 10.5f, look.bold, look.ink);
             Views.tabular(clock);
+            clock.setSingleLine(true);
             time.addView(clock, v.margins(Views.wrap(), 0, 1, 0, 0));
             String half = Dates.meridiem(item.due.longValue());
             if (half != null) time.addView(v.text(half, 8, look.semibold, look.muted));
         }
-        line.addView(time, new LinearLayout.LayoutParams(v.dp(30), -2));
+        line.addView(time, new LinearLayout.LayoutParams(timeWidth(), -2));
 
         FrameLayout rail = new FrameLayout(app);
         View dot = v.dot(look.course(color(item)), 8);
@@ -360,6 +365,32 @@ final class HomeScreen extends Screen {
             }
         });
         return row;
+    }
+
+    /**
+     * The due time column's width: room for the widest time ("00:00", every
+     * figure being one width) at the current text size, so "10:30" never
+     * breaks onto two lines, and the same for every row so the dots and
+     * titles line up.
+     */
+    private int timeWidth() {
+        if (timeWidthLook == look) return timeWidth;
+        android.graphics.Paint paint = new android.graphics.Paint();
+        paint.setTypeface(look.bold);
+        paint.setFontFeatureSettings("tnum");
+        paint.setTextSize(android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,
+            10.5f * look.scale, app.getResources().getDisplayMetrics()));
+        float widest = paint.measureText("00:00");
+        paint.setTypeface(look.semibold);
+        paint.setFontFeatureSettings(null);
+        paint.setTextSize(android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,
+            8 * look.scale, app.getResources().getDisplayMetrics()));
+        for (String half : new java.text.DateFormatSymbols().getAmPmStrings()) {
+            widest = Math.max(widest, paint.measureText(half));
+        }
+        timeWidthLook = look;
+        timeWidth = Math.max(v.dp(30), (int) Math.ceil(widest) + v.dp(1));
+        return timeWidth;
     }
 
     private void open(Assignment item) {

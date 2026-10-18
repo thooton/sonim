@@ -57,7 +57,10 @@ final class Look {
 
     private Look(Context context, boolean dark, boolean large) {
         this.dark = dark;
-        this.scale = large ? 1.15f : 1f;
+        // The design's sizes are drawn for a sharper screen than the XP3's;
+        // at 1:1 they read too small on the phone, so Default is 15% up and
+        // Large a step past that.
+        this.scale = large ? 1.3f : 1.15f;
         ink = dark ? 0xFFF2F4F7 : 0xFF101828;
         muted = dark ? 0xFF98A2B3 : 0xFF667085;
         faint = dark ? 0xFF5D6676 : 0xFF98A2B3;

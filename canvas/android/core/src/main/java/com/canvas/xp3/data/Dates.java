@@ -116,6 +116,21 @@ public final class Dates {
         return from + " – " + (sameMonth ? format("d", last) : format("MMM d", last));
     }
 
+    /**
+     * The week's range from longest to shortest: "Oct 19 – 25", "Oct 19–25",
+     * then the month alone ("Oct", or "Oct–Nov"). The tab row shows the
+     * longest that fits beside the tabs, which at the larger text sizes is
+     * sometimes only the month.
+     */
+    public static String[] weekRanges(long weekStart) {
+        long last = addDays(weekStart, 6);
+        String month = format("MMM", weekStart);
+        String lastMonth = format("MMM", last);
+        boolean sameMonth = month.equals(lastMonth);
+        String tight = format("MMM d", weekStart) + "–" + (sameMonth ? format("d", last) : format("MMM d", last));
+        return new String[] { weekRange(weekStart), tight, sameMonth ? month : month + "–" + lastMonth };
+    }
+
     /** "Due Tue, Oct 20 at 10:30", the line under a title with room for one. */
     public static String dueLine(long when) {
         return "Due " + shortDay(when) + " at " + time(when);
