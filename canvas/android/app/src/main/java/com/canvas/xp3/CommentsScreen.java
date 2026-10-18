@@ -83,8 +83,7 @@ final class CommentsScreen extends Screen {
         v.pad(thread, 10, 6, 10, 6);
         long now = System.currentTimeMillis();
         if (detail == null || detail.comments.isEmpty()) {
-            TextView none = v.text("No comments yet. Ask a question about this assignment and only your teacher "
-                + "will see it.", 10, look.regular, look.muted);
+            TextView none = v.text("No comments yet.", 10, look.regular, look.muted);
             none.setLineSpacing(0, 1.3f);
             thread.addView(none, Views.wide());
         } else {

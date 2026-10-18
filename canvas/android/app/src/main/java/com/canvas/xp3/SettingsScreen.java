@@ -132,7 +132,7 @@ final class SettingsScreen extends Screen {
     private void downloads() {
         choose("Download teacher files", new String[] { Prefs.ALWAYS, Prefs.WIFI, Prefs.NEVER },
             new String[] { "Always", "On Wi-Fi only", "Never" }, app.prefs.downloads,
-            "Files are kept on the phone so they open with no signal. A file you open is always downloaded.",
+            null,
             value -> app.savePrefs(app.prefs.withDownloads(value)));
     }
 

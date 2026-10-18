@@ -102,7 +102,7 @@ final class RecorderScreen extends Screen {
         middle.addView(time, v.margins(Views.wrap(), 0, 7, 0, 7));
         wave = new Wave(app, look);
         middle.addView(wave, new LinearLayout.LayoutParams(-1, v.dp(40)));
-        TextView hint = v.text("Press OK to stop. The recording saves on this phone before it uploads.", 9.5f,
+        TextView hint = v.text("Press OK to stop.", 9.5f,
             look.regular, look.muted);
         hint.setGravity(Gravity.CENTER);
         hint.setLineSpacing(0, 1.3f);
@@ -267,7 +267,7 @@ final class RecorderScreen extends Screen {
             player.prepare();
             player.start();
             playing = player;
-            app.say("Playing. Press OK again to stop.");
+            app.say("Playing.");
         } catch (Exception e) {
             app.say("This recording couldn't be played.");
         }

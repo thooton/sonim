@@ -113,7 +113,7 @@ final class ReviewScreen extends Screen {
         add.setBackground(v.dashed(0, 3, look.line));
         thumbs.addView(add, v.margins(new LinearLayout.LayoutParams(v.dp(22), v.dp(28)), 2, 0, 2, 0));
         area.addView(thumbs, v.margins(Views.wrap(), 0, 6, 0, 0));
-        TextView note = v.text("Page " + (index + 1) + " of " + camera.pages.size() + " · cropped to the corners",
+        TextView note = v.text("Page " + (index + 1) + " of " + camera.pages.size(),
             9, look.regular, look.muted);
         area.addView(note, v.margins(Views.wrap(), 0, 6, 0, 0));
         root.addView(area, Views.tall());

@@ -62,14 +62,14 @@ final class QuizScreen extends Screen {
         if (count != null) said.append(Assignment.number(count.doubleValue())).append(" questions. ");
         Double limit = Json.number(info, "time_limit");
         if (limit != null && limit.doubleValue() > 0) {
-            said.append("Time limit: ").append(Assignment.number(limit.doubleValue())).append(" minutes, from when you start. ");
+            said.append("Time limit: ").append(Assignment.number(limit.doubleValue())).append(" minutes. ");
         }
         Double allowed = Json.number(info, "allowed_attempts");
         if (allowed != null && allowed.doubleValue() > 0) {
-            said.append("This uses one of your ").append(Assignment.number(allowed.doubleValue())).append(" tries.");
+            said.append(Assignment.number(allowed.doubleValue())).append(" tries allowed.");
         }
         if (Json.flag(info, "has_access_code")) {
-            Sheet.ask(app, "This quiz has an access code", "Ask your teacher, then take it on a computer.", "OK",
+            Sheet.ask(app, "This quiz has an access code", "Take it on a computer.", "OK",
                 "Close", app::pop);
             return;
         }
@@ -145,7 +145,7 @@ final class QuizScreen extends Screen {
             return root;
         }
         if (questions.isEmpty()) {
-            root.addView(parts.empty(0, "No questions to answer here", "Turn it in with the right softkey."),
+            root.addView(parts.empty(0, "No questions to answer here", null),
                 Views.tall());
             return root;
         }
@@ -182,15 +182,11 @@ final class QuizScreen extends Screen {
             typed.setMinLines(Quiz.NUMBER.equals(question.kind) ? 1 : 3);
             page.addView(typed, v.margins(Views.wide(), 12, 0, 12, 0));
         } else {
-            TextView note = v.bodyText("This kind of question can't be answered on the phone. Answer it on a "
-                + "computer, or move on with Next.");
+            TextView note = v.bodyText("This kind of question can't be answered on the phone.");
             note.setTextColor(look.muted);
             v.pad(note, 12, 8, 12, 0);
             page.addView(note, Views.wide());
         }
-        TextView saved = v.text("Your answers save as you go.", 9, look.regular, look.muted);
-        v.pad(saved, 12, 8, 12, 0);
-        page.addView(saved, Views.wide());
         return root;
     }
 

@@ -200,9 +200,9 @@ final class HomeScreen extends Screen {
 
         if (!app.backend.canvasReady()) {
             root.addView(parts.empty(0, "Canvas isn't set up",
-                "Open Options, then Settings, then Account, to sign in."), Views.tall());
+                "Sign in under Settings, then Account."), Views.tall());
         } else if (app.snapshot == null && app.syncError != null) {
-            root.addView(parts.empty(0, "Couldn't reach Canvas", app.syncError + " Press Options, then Refresh."),
+            root.addView(parts.empty(0, "Couldn't reach Canvas", app.syncError),
                 Views.tall());
         } else {
             LinearLayout list = parts.page(this, root);
@@ -295,14 +295,12 @@ final class HomeScreen extends Screen {
             for (Assignment item : undated) list.addView(timeline(item, 0), Views.wide());
         }
         if (!any) {
-            // The empty week (A6): a drawing and the next step, in place of the list.
+            // The empty week (A6): a drawing in place of the list.
             root.removeView((View) list.getParent());
             scroll = null;
             boolean thisWeek = Dates.weekOf(now) == weekStart;
-            root.addView(parts.empty(R.drawable.art_plane,
-                thisWeek ? "Nothing due this week" : "Nothing due this week",
-                thisWeek ? "Press Right to look at the week after."
-                    : "Press Right to look at the week after, or 0 to go back to today."), Views.tall());
+            root.addView(parts.empty(R.drawable.art_plane, "Nothing due this week",
+                thisWeek ? null : "Press 0 for today."), Views.tall());
         }
     }
 
@@ -448,11 +446,6 @@ final class HomeScreen extends Screen {
     // ------------------------------------------------------------------
 
     private void missing(Parts parts, LinearLayout list, long now) {
-        TextView calm = v.text("Work that is past its due date but still open. "
-            + "You can turn it in whenever you're ready.", 10, look.regular, look.muted);
-        calm.setLineSpacing(0, 1.3f);
-        v.pad(calm, 12, 2, 12, 0);
-        list.addView(calm, Views.wide());
         List<Section> sections = app.todos.sections(Assignment.MISSING, now);
         if (sections.isEmpty()) {
             list.addView(parts.empty(0, "Nothing missing", null), v.margins(Views.wide(), 0, 40, 0, 0));

@@ -354,9 +354,6 @@ final class ClassScreen extends Screen {
             Views.tabular(score);
             overall.addView(score);
             page.addView(overall, Views.wide());
-            TextView note = v.text("Shown because your teacher shares it.", 9, look.regular, look.muted);
-            v.pad(note, 12, 4, 12, 0);
-            page.addView(note, Views.wide());
         }
         page.addView(parts.section("Graded work", null), Views.wide());
         List<Assignment> returned = new ArrayList<>();

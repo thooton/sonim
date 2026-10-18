@@ -129,7 +129,7 @@ final class AssignmentScreen extends Screen {
         boolean waiting = draft.queued && !app.onlineNow();
         if (draft.queued) {
             root.addView(parts.offline(app.onlineNow() ? "Turning in." : "You're offline.",
-                "Your work is saved on this phone and will turn in when you reconnect."), Views.wide());
+                "It will turn in when you reconnect."), Views.wide());
         }
         LinearLayout page = parts.page(this, root);
 
@@ -181,7 +181,7 @@ final class AssignmentScreen extends Screen {
         } else if (detail == null) {
             page.addView(parts.section("Instructions", null), Views.wide());
             TextView wait = v.bodyText(problem != null ? "The instructions couldn't be loaded. " + problem
-                : "Open this again with a signal to read the instructions.");
+                : "The instructions haven't downloaded yet.");
             wait.setTextColor(look.muted);
             v.pad(wait, 12, 0, 12, 0);
             page.addView(wait, Views.wide());
@@ -213,7 +213,7 @@ final class AssignmentScreen extends Screen {
         LinearLayout stack = stack();
         Item comment = parts.box("comments", "Comment", v.tile(R.drawable.ic_lock, look.paper, look.ink, 24, 13, 6),
             detail != null && !detail.comments.isEmpty() ? "Private comments" : "Add a private comment",
-            "Only your teacher sees it", this::comments);
+            null, this::comments);
         stack.addView(comment, boxGap());
         page.addView(stack, Views.wide());
         return root;
@@ -451,7 +451,7 @@ final class AssignmentScreen extends Screen {
             } else {
                 Item more = parts.tiled("add", "Add", R.drawable.ic_add, look.paper, look.ink,
                     submitted && draft.isEmpty() ? "Turn in again" : "Add more work",
-                    submitted && draft.isEmpty() ? "Add your work again. Your teacher sees the newest." : null, null,
+                    null, null,
                     this::addWork);
                 stack.addView(more, Views.wide());
             }
@@ -716,7 +716,7 @@ final class AssignmentScreen extends Screen {
 
     private void discussion(LinearLayout page, final Assignment work) {
         if (work.done) {
-            TextView done = v.bodyText("You've posted your answer. Your classmates can see it in the discussion.");
+            TextView done = v.bodyText("You've posted your answer.");
             v.pad(done, 12, 0, 12, 4);
             page.addView(done, Views.wide());
         }
@@ -746,9 +746,6 @@ final class AssignmentScreen extends Screen {
             }
         });
         page.addView(answer, v.margins(Views.wide(), 12, 0, 12, 0));
-        TextView help = v.text("Your classmates see your answer once you post it.", 9, look.regular, look.muted);
-        v.pad(help, 12, 5, 12, 0);
-        page.addView(help, Views.wide());
         Item post = Sheet.button(app, v, "post", "Post", true, () -> postAnswer(work));
         page.addView(post, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 10, 8, 10, 0));
     }
