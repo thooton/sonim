@@ -247,15 +247,6 @@ final class HomeScreen extends Screen {
             marks[i] = name;
             line.addView(name, v.margins(Views.wrap(), 0, 0, 8, on ? 0 : 2));
         }
-        if (tab == Assignment.ASSIGNED) {
-            // The range takes whatever the tabs leave, in the longest wording that fits.
-            FitText range = new FitText(app, Dates.weekRanges(weekStart));
-            range.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 8.5f * look.scale);
-            range.setTypeface(look.semibold);
-            range.setTextColor(look.muted);
-            range.setGravity(Gravity.END);
-            line.addView(range, v.margins(new LinearLayout.LayoutParams(0, -2, 1), 0, 0, 0, 2));
-        }
         row.addView(line, Views.wide());
         final int current = tab;
         row.painter = has -> marks[current].mark(has, look.markStroke);

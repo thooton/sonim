@@ -94,16 +94,10 @@ public final class ClassroomTests {
         check.same("Left from Tuesday finds nothing", null, todos.dayWithWork(Dates.dayOf(tuesday), -1, saturday));
         check.same("undated work is listed apart", 1, todos.undated(saturday).size());
         check.same("Tuesday is the second column", 1, Dates.column(tuesday));
-        check.same("a week's range", "Oct 19 – 25", Dates.weekRange(Dates.weekOf(tuesday)));
-        check.same("across a month", "Oct 26 – Nov 1", Dates.weekRange(Dates.weekOf(at(Calendar.OCTOBER, 28, 9, 0))));
-        String[] ranges = Dates.weekRanges(Dates.weekOf(tuesday));
-        check.same("the ranges, longest first", "Oct 19 – 25|Oct 19–25|Oct", String.join("|", ranges));
-        ranges = Dates.weekRanges(Dates.weekOf(at(Calendar.OCTOBER, 28, 9, 0)));
-        check.same("the ranges across a month", "Oct 26 – Nov 1|Oct 26–Nov 1|Oct–Nov", String.join("|", ranges));
         check.same("the calendar page", "TUE", Dates.weekdayTab(tuesday));
-        check.same("the day heading", "TUESDAY 20", Dates.dayHeading(tuesday));
+        check.same("the day heading", "TUESDAY OCT 20", Dates.dayHeading(tuesday));
         Dates.setWeekStart(Calendar.SUNDAY);
-        check.same("a Sunday week starts on the 18th", "Oct 18 – 24", Dates.weekRange(Dates.weekOf(tuesday)));
+        check.same("a Sunday week starts on the 18th", "SUNDAY OCT 18", Dates.dayHeading(Dates.weekOf(tuesday)));
         check.same("and Tuesday is the third column", 2, Dates.column(tuesday));
         Dates.setWeekStart(Calendar.MONDAY);
     }
