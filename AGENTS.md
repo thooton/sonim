@@ -65,7 +65,8 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
   harness) and `TestServer` (a loopback HTTP server).
 - `common/ui` (Android, `com.xp3.common.ui`): `BaseActivity` (`dp`, `color`,
   `toast`, `alert`, `vertical`, `text`, `listDialog`), `Ui` (workers, `fill`,
-  `weighted`, `isOk`, `onSelect`), `Tabs` (tab bar with d-pad cycling),
+  `weighted`, `isOk`, `onSelect`), `Card` (the SD card, where downloads
+  go), `Tabs` (tab bar with d-pad cycling),
   `SelectableAdapter` (rows that paint their own highlight), `Markdown`, and
   the shared tab, focus and Markdown drawables. An app's own colors and
   dimens override the defaults in its `res/values`. `Family` and the

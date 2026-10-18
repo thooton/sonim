@@ -24,9 +24,9 @@ import java.util.List;
 
 /**
  * A sheet risen over the screen: for one file, its menu (what OK on a
- * cover opens), then starting a transform, its details, renaming it or
- * moving it; or the settings. The page behind is dimmed; Up and Down pick a choice, OK takes
- * it, Back closes the sheet.
+ * cover opens), then starting a transform, its details, renaming, moving
+ * or deleting it; a job's menu; or the settings. The page behind is
+ * dimmed; Up and Down pick a choice, OK takes it, Back closes the sheet.
  */
 final class Sheet extends FrameLayout {
 
@@ -37,6 +37,7 @@ final class Sheet extends FrameLayout {
     static final int MOVE = 4;
     static final int SETTINGS = 5;
     static final int JOB = 6;
+    static final int DELETE = 7;
 
     /** What the choices on a job's sheet do. */
     static final int KEEP = 0;
@@ -94,6 +95,32 @@ final class Sheet extends FrameLayout {
         body.addView(name);
     }
 
+    /** Facts as label and value, one to a line, ruled. A null value leaves its line out. */
+    private void rows(String[][] rows) {
+        Context c = getContext();
+        LinearLayout table = Parts.column(c);
+        for (String[] row : rows) {
+            if (row[1] == null || row[1].length() == 0) continue;
+            LinearLayout line = Parts.row(c);
+            line.setPadding(Look.dp(c, 9), Look.dp(c, 4), Look.dp(c, 9), Look.dp(c, 4));
+            TextView key = Look.text(c, row[0], Look.ui, 10.5f, Look.GRAPHITE);
+            line.addView(key, Parts.line(Parts.WRAP, Parts.WRAP));
+            TextView value = Look.text(c, row[1], Look.ui, 10.5f, Look.INK);
+            value.setSingleLine();
+            value.setEllipsize(TextUtils.TruncateAt.END);
+            value.setGravity(Gravity.END);
+            LinearLayout.LayoutParams grow = Parts.line(0, Parts.WRAP);
+            grow.weight = 1;
+            grow.leftMargin = Look.dp(c, 12);
+            line.addView(value, grow);
+            table.addView(line);
+            table.addView(Parts.rule(c), Parts.line(Parts.FILL, 1));
+        }
+        LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Parts.WRAP);
+        lp.topMargin = Look.dp(c, 6);
+        body.addView(table, lp);
+    }
+
     private void note(String text, float top) {
         Context c = getContext();
         TextView p = Look.text(c, text, Look.ui, 9.5f, Look.GRAPHITE);
@@ -132,15 +159,14 @@ final class Sheet extends FrameLayout {
         Sheet s = new Sheet(c, TRANSFORM);
         s.head("Transform", doc.name);
         if (running != null) {
-            s.note("Already being transformed: " + running.step() + ", " + running.percent + "%. Follow it in Menu → Transforms.", 8);
+            s.rows(new String[][] {{"Status", running.step()}, {"Progress", running.percent + "%"}});
             s.choice(R.drawable.ic_check, "OK");
         } else {
             s.top = new TopOfPage(c, first);
             LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Look.dp(c, 54));
             lp.setMargins(Look.dp(c, 9), Look.dp(c, 8), Look.dp(c, 9), Look.dp(c, 4));
             s.body.addView(s.top, lp);
-            s.note("An agent reads what you wrote at the top of page 1 and makes what it asks for. The result goes on your tablet beside the original.", 3);
-            s.choice(R.drawable.ic_play, "Start transform");
+            s.choice(R.drawable.ic_play, "Start");
             s.choice(R.drawable.ic_x, "Cancel");
         }
         s.pick(0);
@@ -187,26 +213,8 @@ final class Sheet extends FrameLayout {
     static Sheet details(Context c, Doc doc, String edited) {
         Sheet s = new Sheet(c, DETAILS);
         s.head("Details", doc.name);
-        String[][] rows = {{"Type", doc.kind()}, {"Pages", doc.pages > 0 ? String.valueOf(doc.pages) : "Not known"},
-            {"Folder", doc.folder}, {"Size", doc.sizeText()}, {"Edited", edited}};
-        LinearLayout table = Parts.column(c);
-        for (String[] row : rows) {
-            LinearLayout line = Parts.row(c);
-            line.setPadding(Look.dp(c, 9), Look.dp(c, 4), Look.dp(c, 9), Look.dp(c, 4));
-            TextView key = Look.text(c, row[0], Look.ui, 10.5f, Look.GRAPHITE);
-            LinearLayout.LayoutParams grow = Parts.line(0, Parts.WRAP);
-            grow.weight = 1;
-            line.addView(key, grow);
-            TextView value = Look.text(c, row[1], Look.ui, 10.5f, Look.INK);
-            value.setSingleLine();
-            value.setEllipsize(TextUtils.TruncateAt.START);
-            line.addView(value, Parts.line(Parts.WRAP, Parts.WRAP));
-            table.addView(line);
-            table.addView(Parts.rule(c), Parts.line(Parts.FILL, 1));
-        }
-        LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Parts.WRAP);
-        lp.topMargin = Look.dp(c, 6);
-        s.body.addView(table, lp);
+        s.rows(new String[][] {{"Type", doc.kind()}, {"Pages", doc.pages > 0 ? String.valueOf(doc.pages) : "—"},
+            {"Folder", doc.folder}, {"Size", doc.sizeText()}, {"Edited", edited}});
         s.choice(R.drawable.ic_check, "Done");
         s.pick(0);
         return s;
@@ -259,28 +267,28 @@ final class Sheet extends FrameLayout {
      * What can be done with a job, under how it stands. A running job's
      * sheet opens on keeping it, so a second OK never cancels it by accident.
      */
-    static Sheet job(Context c, Job job, String summary) {
+    static Sheet job(Context c, Job job, String finished) {
         Sheet s = new Sheet(c, JOB);
         s.head(job.stateLabel(), job.heading());
-        String from = job.from();
-        String detail = job.status == Job.DONE && job.result.length() > 0 ? "Saved as " + job.result + ". " + summary + "."
-            : job.status == Job.RUNNING ? job.step() + "." : summary;
-        s.note(from.length() > 0 ? from + ". " + detail : detail, 4);
         switch (job.status) {
             case Job.RUNNING:
-                s.jobChoice(R.drawable.ic_check, "Keep it running", KEEP);
+                s.rows(new String[][] {{"From", job.from()}, {"Status", job.step()}, {"Progress", job.percent + "%"}});
+                s.jobChoice(R.drawable.ic_check, "Keep running", KEEP);
                 s.jobChoice(R.drawable.ic_x, "Cancel job", CANCEL_JOB);
                 break;
             case Job.DONE:
-                if (job.tablet.length() > 0) s.jobChoice(R.drawable.ic_eye, "View result", VIEW);
+                s.rows(new String[][] {{"From", job.from()}, {"Saved as", job.result}, {"Finished", finished}});
+                if (job.tablet.length() > 0) s.jobChoice(R.drawable.ic_eye, "View", VIEW);
                 // The Word document is what gets handed in; the PDF is what the tablet has.
                 if (job.docx().length() > 0) s.jobChoice(R.drawable.ic_download, "Download Word", DOWNLOAD_DOCX).note.setText(".docx");
                 if (job.pdf().length() > 0) s.jobChoice(R.drawable.ic_download, "Download PDF", DOWNLOAD_PDF).note.setText(".pdf");
-                s.jobChoice(R.drawable.ic_x, "Remove from list", REMOVE);
+                s.jobChoice(R.drawable.ic_x, "Remove", REMOVE);
                 break;
             default:
+                s.rows(new String[][] {{"From", job.from()}, {"Failed", finished}});
+                s.note(job.failure(), 6);
                 s.jobChoice(R.drawable.ic_play, "Try again", RETRY);
-                s.jobChoice(R.drawable.ic_x, "Remove from list", REMOVE);
+                s.jobChoice(R.drawable.ic_x, "Remove", REMOVE);
         }
         s.pick(0);
         return s;
@@ -297,6 +305,16 @@ final class Sheet extends FrameLayout {
         return does.get(picked);
     }
 
+    /** Before a file goes to the tablet's trash. Opens on Cancel. */
+    static Sheet delete(Context c, Doc doc) {
+        Sheet s = new Sheet(c, DELETE);
+        s.head("Delete", doc.name);
+        s.choice(R.drawable.ic_x, "Cancel");
+        s.choice(R.drawable.ic_trash, "Delete");
+        s.pick(0);
+        return s;
+    }
+
     /** The settings: where the tablet is reached, and reading it again. */
     static final int REFRESH = 0;
     static final int SIGN_IN = 1;
@@ -304,11 +322,9 @@ final class Sheet extends FrameLayout {
     static Sheet settings(Context c, String host) {
         Sheet s = new Sheet(c, SETTINGS);
         s.head("Settings", "Command center");
-        s.note(host.length() > 0
-            ? "The tablet is read through " + host + ", which it syncs with."
-            : "Not signed in. Sign in with the command center's address and the delta token.", 4);
-        s.choice(R.drawable.ic_sync, "Refresh now");
-        s.choice(R.drawable.ic_tablet, host.length() > 0 ? "Sign in again…" : "Sign in…");
+        s.rows(new String[][] {{"Server", host.length() > 0 ? host : "Not signed in"}});
+        s.choice(R.drawable.ic_sync, "Refresh");
+        s.choice(R.drawable.ic_tablet, host.length() > 0 ? "Change server…" : "Sign in…");
         s.choice(R.drawable.ic_check, "Done");
         s.pick(host.length() > 0 ? REFRESH : SIGN_IN);
         return s;

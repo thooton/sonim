@@ -112,11 +112,11 @@ public final class Center {
             int status = stream.status();
             int pages = number(stream.header("X-Pages"));
             if (status == 404 && stream.header("X-Pages").length() > 0) {
-                throw new NoPage(pages, pages == 0 ? "Nothing to show: the tablet lays out an ePub's pages itself."
-                    : "It has " + pages + (pages == 1 ? " page." : " pages."));
+                throw new NoPage(pages, pages == 0 ? "No pages to show"
+                    : pages + (pages == 1 ? " page" : " pages"));
             }
             if (status < 200 || status >= 300) fail(status, small(stream.stream()), "show the page");
-            save(stream.stream(), dest, MAX_PAGE, "That page is too big to show.");
+            save(stream.stream(), dest, MAX_PAGE, "Page too big to show");
             return Math.max(pages, n);
         } finally {
             stream.close();
@@ -131,9 +131,9 @@ public final class Center {
         Http.Stream stream = http.stream(request("/files/" + segment(name), SLOW));
         try {
             int status = stream.status();
-            if (status == 404) throw new IOException("That file is no longer in Delta's Files.");
+            if (status == 404) throw new IOException("File not found");
             if (status < 200 || status >= 300) fail(status, small(stream.stream()), "download it");
-            save(stream.stream(), dest, MAX_FILE, "That file is too big to download here.");
+            save(stream.stream(), dest, MAX_FILE, "File too big");
         } finally {
             stream.close();
         }
@@ -155,7 +155,7 @@ public final class Center {
             }
             out.close();
             saved = part.renameTo(dest);
-            if (!saved) throw new IOException("Couldn't save it.");
+            if (!saved) throw new IOException("Couldn't save the file");
         } finally {
             out.close();
             if (!saved) part.delete();
@@ -180,7 +180,7 @@ public final class Center {
      * this deployment's, and never carry a credential.
      */
     static void fail(int status, String body, String what) throws IOException {
-        if (status == 401) throw new IOException("The command center refused the token.");
+        if (status == 401) throw new IOException("Token refused");
         String said = null;
         try {
             said = Json.text(Json.object(Json.parse(body)), "error");
