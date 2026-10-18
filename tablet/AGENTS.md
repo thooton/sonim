@@ -47,6 +47,13 @@ reads and writes its storage, so the app sees what the tablet last synced.
   from there: many of the user's teachers take only Word documents. The PDF
   is the one on the tablet, for marking up and transforming again.
   Downloading asks for storage the first time.
+- `POST /remarkable/documents?name=&parent=`: Upload, a PDF or ePub from
+  the phone, streamed (`Http.upload`), named as the file is without its
+  extension, into the folder picked on the Upload to sheet. Upload is a
+  screen of its own (`UploadScreen`, from the drawer): the phone's storage
+  and the SD card, then their folders and the files the tablet takes
+  (`Browse`), folders first. Back goes up a folder. Once it is up, the
+  Library opens on it. Reading storage asks for it the first time.
 - `GET /transforms`, `POST /transforms`, `DELETE /transforms/{id}`: the jobs.
   They are read every 5 seconds while one runs (every minute otherwise),
   and a job that finishes is announced and the Library read again, since
@@ -84,7 +91,7 @@ comes to the front.
 
 - `android/core`: `data/` - `Doc` (a file), `Library` (the listing and
   its folders), `Job` and `Jobs` (the transform jobs and their wording), `Downloads`
-  (where a result is saved),
+  (where a result is saved), `Browse` (the phone's folders, for Upload),
   `When` (times in words), `Viewport` (the preview's zoom levels, panning
   and clamping, for a page of any height); `net/Center` (the command
   center). Tests in `src/test` run via `:core:selfTest`, the client against
@@ -92,7 +99,7 @@ comes to the front.
 - `android/app`: one activity, `MainActivity`, owning the state, the
   network calls and the key routing (left soft key is `KEYCODE_MENU`, right
   is `KEYCODE_BACK`), over `LibraryScreen` (with `Shelf`, the sliding
-  covers), `TransformsScreen` (with `Ring`), `PageView` (the preview, its chrome drawn over
+  covers), `TransformsScreen` (with `Ring`), `UploadScreen`, `PageView` (the preview, its chrome drawn over
   the page), `Drawer` and `Sheet` (the file menu, Transform, Details,
   Rename, Move, Settings, a job's menu). `Pages` fetches and draws pages; `Look` is the
   palette, fonts and scale; `Mark` the highlighter stroke; `Parts` shared

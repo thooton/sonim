@@ -60,6 +60,11 @@ public final class Doc {
 
     /** "1.9 MB", "640 KB". */
     public String sizeText() {
+        return size(size);
+    }
+
+    /** A size in bytes, as sizeText says it. */
+    public static String size(long size) {
         if (size >= 1000000) return String.format(Locale.US, "%.1f MB", size / 1e6);
         if (size >= 1000) return Math.round(size / 1e3) + " KB";
         return size + " bytes";

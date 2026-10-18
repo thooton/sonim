@@ -19,9 +19,10 @@ final class Drawer extends LinearLayout {
 
     static final int LIBRARY = 0;
     static final int TRANSFORMS = 1;
-    static final int SETTINGS = 2;
+    static final int UPLOAD = 2;
+    static final int SETTINGS = 3;
 
-    private final Parts.Action[] items = new Parts.Action[3];
+    private final Parts.Action[] items = new Parts.Action[4];
     private final TextView files;
     private final TextView progress;
     private final TextView count;
@@ -58,6 +59,7 @@ final class Drawer extends LinearLayout {
 
         items[LIBRARY] = item(c, R.drawable.ic_book, "Library", files, null);
         items[TRANSFORMS] = item(c, R.drawable.ic_sparkle, "Transforms", progress, count);
+        items[UPLOAD] = item(c, R.drawable.ic_upload, "Upload", null, null);
         items[SETTINGS] = item(c, R.drawable.ic_gear, "Settings", null, null);
 
         View spring = new View(c);

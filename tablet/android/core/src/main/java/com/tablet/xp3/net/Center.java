@@ -8,11 +8,13 @@ import com.xp3.common.Login;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.util.Locale;
 import java.util.Map;
 
@@ -35,6 +37,8 @@ public final class Center {
     private static final int QUICK = 30000;
     /** A page of a long PDF takes the command center a moment to draw. */
     private static final int SLOW = 120000;
+    /** Time for the command center to file a large PDF once it has it all. */
+    private static final int UPLOAD = 300000;
 
     /** There is no page n; `pages` is how many there are (0: nothing to show). */
     public static final class NoPage extends IOException {
@@ -120,6 +124,26 @@ public final class Center {
             return Math.max(pages, n);
         } finally {
             stream.close();
+        }
+    }
+
+    /**
+     * Puts a PDF or ePub from the phone on the tablet, as `name`, in folder
+     * `parent` ("" for the top), streamed rather than read into memory, and
+     * returns its id. `sending` hears how much has gone.
+     */
+    public String upload(File file, String name, String parent, Http.Sending sending) throws IOException, InterruptedException {
+        String query = "?name=" + URLEncoder.encode(name, "UTF-8") + "&parent=" + URLEncoder.encode(parent, "UTF-8");
+        InputStream in = new FileInputStream(file);
+        try {
+            Http.Response sent = check(http.upload(request("/remarkable/documents" + query, UPLOAD).method("POST")
+                .header("Content-Type", "application/octet-stream"), in, file.length(), sending), "upload it");
+            String id = Json.text(Json.object(Json.parse(sent.body())), "id");
+            return id == null ? "" : id;
+        } catch (IllegalArgumentException e) {
+            return "";
+        } finally {
+            in.close();
         }
     }
 

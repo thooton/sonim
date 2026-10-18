@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.media.MediaScannerConnection;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
@@ -26,6 +27,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.tablet.xp3.data.Browse;
 import com.tablet.xp3.data.Doc;
 import com.tablet.xp3.data.Downloads;
 import com.tablet.xp3.data.Job;
@@ -40,6 +42,7 @@ import com.xp3.common.ui.Ui;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
@@ -65,12 +68,15 @@ public final class MainActivity extends Activity {
     private static final int LIBRARY = 0;
     private static final int TRANSFORMS = 1;
     private static final int PREVIEW = 2;
+    private static final int UPLOAD = 3;
     private static final String PREFS = "tablet";
     /** How often the jobs are read while one is running, and while none is. */
     private static final long POLL_RUNNING = 5000;
     private static final long POLL_IDLE = 60000;
     /** Asking for storage, to download a result. */
     private static final int STORAGE = 1;
+    /** Asking for storage, to read it for Upload. */
+    private static final int STORAGE_UPLOAD = 2;
     /** The folder on the SD card that results are downloaded into. */
     private static final String DOWNLOADS = "Documents";
 
@@ -109,6 +115,13 @@ public final class MainActivity extends Activity {
     private FrameLayout root;
     private LibraryScreen library;
     private TransformsScreen transforms;
+    private UploadScreen upload;
+    /** Upload: the folder being looked in (null: the phone and the SD card), what is in it, and the line picked. */
+    private File browsing;
+    private List<File> inside = new ArrayList<>();
+    private int uploadSel;
+    /** The file waiting on the Upload to sheet. */
+    private File uploading;
     private PageView preview;
     private Sheet sheet;
     /** The file or job a sheet is about, so a listing arriving under it changes nothing. */
@@ -150,9 +163,11 @@ public final class MainActivity extends Activity {
         library = new LibraryScreen(this);
         library.setDocs(lib.docs, file, this::cover);
         transforms = new TransformsScreen(this);
+        upload = new UploadScreen(this);
         preview = new PageView(this);
         root.addView(library, full());
         root.addView(transforms, full());
+        root.addView(upload, full());
         root.addView(preview, full());
 
         drawerLayer = new FrameLayout(this);
@@ -470,6 +485,7 @@ public final class MainActivity extends Activity {
     private void render() {
         library.setVisibility(screen == LIBRARY ? View.VISIBLE : View.GONE);
         transforms.setVisibility(screen == TRANSFORMS ? View.VISIBLE : View.GONE);
+        upload.setVisibility(screen == UPLOAD ? View.VISIBLE : View.GONE);
         preview.setVisibility(screen == PREVIEW ? View.VISIBLE : View.GONE);
         drawerLayer.setVisibility(drawerOpen ? View.VISIBLE : View.GONE);
 
@@ -481,6 +497,8 @@ public final class MainActivity extends Activity {
             jobId = list.isEmpty() ? "" : list.get(jobSel).id;
             String empty = tablet == null ? "Not signed in" : "No transforms";
             transforms.show(list, jobs.active(), drawerOpen || list.isEmpty() ? -1 : jobSel, empty);
+        } else if (screen == UPLOAD) {
+            renderUpload();
         }
         if (drawerOpen) {
             Job running = jobs.running();
@@ -637,11 +655,12 @@ public final class MainActivity extends Activity {
         if (k == MENU && screen != PREVIEW) {
             closeSheet();
             drawerOpen = true;
-            drawerPick = screen == LIBRARY ? Drawer.LIBRARY : Drawer.TRANSFORMS;
+            drawerPick = screen == LIBRARY ? Drawer.LIBRARY : screen == UPLOAD ? Drawer.UPLOAD : Drawer.TRANSFORMS;
             return true;
         }
         if (screen == LIBRARY) return libraryKey(k);
         if (screen == TRANSFORMS) return transformsKey(k);
+        if (screen == UPLOAD) return uploadKey(k);
         previewKey(k);
         return true;
     }
@@ -654,6 +673,10 @@ public final class MainActivity extends Activity {
             drawerOpen = false;
             if (drawerPick == Drawer.SETTINGS) {
                 openSheet(Sheet.settings(this, tablet == null ? "" : login.host()), null);
+                return;
+            }
+            if (drawerPick == Drawer.UPLOAD) {
+                openUpload();
                 return;
             }
             screen = drawerPick == Drawer.LIBRARY ? LIBRARY : TRANSFORMS;
@@ -727,6 +750,9 @@ public final class MainActivity extends Activity {
                             say("", "Moved to " + folder.path);
                         });
                     }
+                    break;
+                case Sheet.UPLOAD:
+                    send(uploading, lib.folders.get(picked));
                     break;
                 case Sheet.DELETE:
                     if (picked == 1) change(t -> t.move(doc.id, "trash"), () -> say("", "Deleted " + doc.name));
@@ -868,9 +894,122 @@ public final class MainActivity extends Activity {
         });
     }
 
+    // ---- Upload.
+
+    /** Opens Upload on the phone and the SD card, asking for storage first, once. */
+    private void openUpload() {
+        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {
+                Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE_UPLOAD);
+            return;
+        }
+        screen = UPLOAD;
+        browse(null, null);
+    }
+
+    /** The phone's storage, then the SD card when one is in. */
+    private List<File> places() {
+        List<File> out = new ArrayList<>();
+        out.add(Environment.getExternalStorageDirectory());
+        File card = Card.root(this);
+        if (card != null) out.add(card);
+        return out;
+    }
+
+    private String placeName(File place) {
+        return place.equals(Environment.getExternalStorageDirectory()) ? "Phone" : "SD card";
+    }
+
+    /** Looks in `folder` (null: the places), on the line for `from` if it is there. */
+    private void browse(File folder, File from) {
+        browsing = folder;
+        inside = folder == null ? places() : Browse.list(folder);
+        int at = from == null ? -1 : inside.indexOf(from);
+        uploadSel = Math.max(0, at);
+    }
+
+    private void renderUpload() {
+        List<UploadScreen.Line> lines = new ArrayList<>();
+        long now = System.currentTimeMillis();
+        TimeZone zone = TimeZone.getDefault();
+        for (File f : inside) {
+            if (browsing == null) lines.add(new UploadScreen.Line(placeName(f), "", true));
+            else if (f.isDirectory()) lines.add(new UploadScreen.Line(f.getName(), "", true));
+            else lines.add(new UploadScreen.Line(f.getName(), Doc.size(f.length()) + " · " + When.ago(f.lastModified(), now, zone), false));
+        }
+        upload.show(where(browsing), lines, drawerOpen || sheet != null ? -1 : uploadSel, "No PDFs or ePubs");
+    }
+
+    /** "SD card/Documents/School", for Upload's header. */
+    private String where(File folder) {
+        if (folder == null) return "";
+        for (File place : places()) {
+            String root = place.getAbsolutePath();
+            String path = folder.getAbsolutePath();
+            if (path.equals(root)) return placeName(place);
+            if (path.startsWith(root + "/")) return placeName(place) + path.substring(root.length());
+        }
+        return folder.getAbsolutePath();
+    }
+
+    private boolean uploadKey(int k) {
+        if (k == UP && uploadSel > 0) {
+            uploadSel--;
+        } else if (k == DOWN && uploadSel < inside.size() - 1) {
+            uploadSel++;
+        } else if (k == OK && uploadSel < inside.size()) {
+            File picked = inside.get(uploadSel);
+            if (browsing == null || picked.isDirectory()) {
+                browse(picked, null);
+            } else if (tablet == null) {
+                say("", "Not signed in");
+            } else {
+                uploading = picked;
+                openSheet(Sheet.uploadTo(this, Browse.title(picked), lib.folders), null);
+            }
+        } else if (k == BACK) {
+            if (browsing == null) {
+                screen = LIBRARY;
+            } else {
+                File up = places().contains(browsing) ? null : browsing.getParentFile();
+                browse(up, browsing);
+            }
+        }
+        return true;
+    }
+
+    /** Puts `file` on the tablet in `folder`, then shows it in the Library. */
+    private void send(File file, Library.Folder folder) {
+        final String name = Browse.title(file);
+        say("", "Uploading " + name + "…");
+        final String[] id = {""};
+        final int[] shown = {0};
+        change(t -> id[0] = t.upload(file, name, folder.id, (done, total) -> {
+            int percent = total > 0 ? (int) (done * 100 / total) : 100;
+            // A word every quarter, not every buffer.
+            if (percent / 25 > shown[0] / 25 && percent < 100) {
+                shown[0] = percent;
+                handler.post(() -> say("", "Uploading " + name + " · " + percent + "%"));
+            }
+        }), () -> {
+            screen = LIBRARY;
+            fileId = id[0];
+            say("Uploaded", "  " + name);
+        });
+    }
+
     @Override
     public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(request, permissions, results);
+        if (request == STORAGE_UPLOAD) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+                openUpload();
+                render();
+            } else {
+                say("", "Storage permission denied");
+            }
+            return;
+        }
         if (request != STORAGE) return;
         String name = pendingDownload;
         pendingDownload = "";
