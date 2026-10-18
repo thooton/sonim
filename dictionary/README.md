@@ -1,12 +1,12 @@
 # Dictionary, for the Sonim XP3
 
-An offline English dictionary for the XP3's 240x320 screen and d-pad, with Anniversary Gregg shorthand: a home page with the Word of the Day under a search capsule, each word's page with Definitions, Thesaurus and Shorthand tabs, and a search with recent searches and suggestions as you type, which reads what you type both as English and as a shorthand outline. It has no permissions and no dependencies.
+An offline English dictionary for the XP3's 240x320 screen and d-pad, with Anniversary Gregg shorthand: a home page with the Word of the Day under a search capsule, each word's page with Definitions, Thesaurus and Shorthand tabs, a search with recent searches and suggestions as you type, and a shorthand search that reads what you type as a Gregg outline. It has no permissions and no dependencies.
 
 | Key | Home | A word's page | Searching |
 | --- | --- | --- | --- |
-| Menu | A menu: Word of the Day or Search | A menu: Pronounce (read the word aloud) or Search | Close it |
+| Menu | A menu: Word of the Day, Search or Shorthand | A menu: Pronounce (read the word aloud), Search or Shorthand | A menu: switch to the other search (Shorthand or Words), keeping what was typed |
 | OK | Open the Word of the Day | | Open the row picked, or else the best match |
-| Up / Down | Scroll; Up from the top moves into the search box | Scroll; Up from the top moves into the search box | Move through Clear and the rows |
+| Up / Down | Scroll; Up from the top moves into the search box | Scroll; Up from the top moves into the search box (the shorthand search from the Shorthand tab) | Move through Clear and the rows |
 | Left / Right | | Definitions / Thesaurus / Shorthand | Move the cursor |
 | Back | Leave | Back a page | Close it and go back to where you were |
 
@@ -17,7 +17,7 @@ The Word of the Day is picked from the date: a plain word of six to twelve lette
 Outlines are written in [Grascii](https://github.com/grascii/grascii), Gregg shorthand spelled in ASCII (`'ABT` is habit, `A~` a reversed circle, `^` a disjoiner), from its Anniversary (1929) dictionary.
 
 - **English to shorthand.** A word's Shorthand tab lists its outlines, each with the strokes Grascii reads in it (`' · A · B · T`). The 1,549 words the shorthand dictionary has and WordNet doesn't (could, theirs, into) are in the search too, and open on a page with only that tab.
-- **Shorthand to English.** Whatever is typed in the search is also read as an outline: under Shorthand are the outlines it is, then the longer ones it begins, then those with similar strokes (each at most one step away in Grascii's similarity graph, as its search's uncertainty 1), each with its English. Case doesn't matter, and annotations and aspirates are ignored, as in Grascii's default search. Typed in capitals or with Grascii's marks in it, the Shorthand rows come first, and OK opens the first of them; otherwise they follow the words.
+- **Shorthand to English.** The shorthand search is its own search, so outlines and words never mix: Shorthand in the menu opens it (as does Up from a Shorthand tab), with a pen in the search button and capitals on. What is typed is read as an outline, and the rows are the outlines it is, then the longer ones it begins, then those with similar strokes (each at most one step away in Grascii's similarity graph, as its search's uncertainty 1), each with its English; OK opens the first. Case doesn't matter, and annotations and aspirates are ignored, as in Grascii's default search. Menu switches between it and the word search without losing what was typed.
 
 ## Data
 

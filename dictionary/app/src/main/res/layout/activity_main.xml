@@ -54,6 +54,7 @@
                 android:textSize="11.5sp" />
 
             <ImageView
+                android:id="@+id/search_icon"
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:layout_gravity="right"
