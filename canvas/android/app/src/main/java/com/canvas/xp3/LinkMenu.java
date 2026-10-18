@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * What OK on a link in a teacher's text offers: read it here, or save it to
- * the phone's Download folder. An assignment link simply opens it.
+ * the Download folder on the SD card. An assignment link simply opens it.
  */
 final class LinkMenu {
 
@@ -34,7 +34,7 @@ final class LinkMenu {
         List<Sheet.Choice> choices = new ArrayList<>();
         choices.add(new Sheet.Choice("Open", R.drawable.ic_open, link.kind == Link.WEB ? link.site() : null,
             () -> open(app, link, title)));
-        choices.add(new Sheet.Choice("Save to Download", R.drawable.ic_folder, null,
+        choices.add(new Sheet.Choice("Save to SD card", R.drawable.ic_folder, null,
             () -> app.withPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, () -> save(app, link, title))));
         Sheet.menu(app, title, choices);
     }
@@ -48,9 +48,9 @@ final class LinkMenu {
         app.say("Downloading…");
         app.background(() -> {
             File kept = link.kind == Link.FILE ? app.backend.download(link.id, null) : app.backend.fetchLink(link, title);
-            File saved = app.backend.saveToDownloads(kept);
+            File saved = app.backend.saveToCard(com.xp3.common.ui.Card.root(app), kept);
             android.media.MediaScannerConnection.scanFile(app, new String[] { saved.getPath() }, null, null);
             return saved;
-        }, (saved, failure) -> app.say(saved != null ? "Saved to Download/" + saved.getName() : failure));
+        }, (saved, failure) -> app.say(saved != null ? "Saved to SD card/Download/" + saved.getName() : failure));
     }
 }
