@@ -112,7 +112,6 @@ public final class MainActivity extends Tonal {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
-        softKeys();
         query = (EditText) findViewById(R.id.query);
         searchBox = findViewById(R.id.search);
         searchIcon = (ImageView) findViewById(R.id.search_icon);
@@ -155,7 +154,6 @@ public final class MainActivity extends Tonal {
             @Override
             public void afterTextChanged(Editable s) {
                 searchClear.setVisibility(s.length() > 0 ? View.VISIBLE : View.GONE);
-                showKeys();
             }
         });
         showMode();
@@ -309,7 +307,6 @@ public final class MainActivity extends Tonal {
         boolean typing = picked < 0 && !Download.searching();
         searchBox.setActivated(typing);
         searchIcon.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(typing ? R.color.accent : R.color.text_muted)));
-        showKeys();
     }
 
     /** The status line, the spinner and the options chip. */
@@ -340,53 +337,6 @@ public final class MainActivity extends Tonal {
             chip.setCompoundDrawablesRelative(icon(icon, R.color.text_muted, 11), null, null, null);
         }
         header.setVisibility(text.length() == 0 && option == null && !searching ? View.GONE : View.VISIBLE);
-    }
-
-    /** The soft keys: Options, what OK does here, what Back does here. */
-    private void showKeys() {
-        int icon = 0;
-        String centre = null;
-        if (Download.searching() && mine()) {
-            centre = "Stop";
-            icon = R.drawable.ic_stop;
-        } else if (picked < 0) {
-            if (query.getText().toString().trim().length() == 0 && hitsBehindLog()) {
-                centre = "Results";
-            } else {
-                centre = "Search";
-                icon = R.drawable.ic_search;
-            }
-        } else if (screen == RESULTS) {
-            String key = keyAt(picked);
-            switch (Download.state(key)) {
-                case Download.QUEUED:
-                case Download.RUNNING:
-                    centre = "Open";
-                    break;
-                case Download.SAVED:
-                    centre = books() ? "Read" : "Play";
-                    icon = books() ? R.drawable.ic_book : R.drawable.ic_play;
-                    break;
-                case Download.FAILED:
-                    centre = "Retry";
-                    icon = R.drawable.ic_refresh;
-                    break;
-                default:
-                    centre = "Get";
-                    icon = R.drawable.ic_download;
-            }
-        } else if (picked < verbs.size()) {
-            centre = verbs.get(picked);
-            icon = verbIcons.get(picked);
-        }
-        keys("Options", icon, centre, backLabel());
-    }
-
-    private String backLabel() {
-        if (Download.searching()) return "Stop";
-        if (picked >= 0) return "Back";
-        if (hitsBehindLog()) return "Results";
-        return "Exit";
     }
 
     // ---- The screens.

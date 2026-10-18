@@ -2,6 +2,7 @@ package com.source.xp3;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
@@ -17,7 +18,7 @@ import java.util.Locale;
 
 /**
  * What can be done with saved files: play music in the phone's player, read
- * a book in the Books app, and how full the phone's storage is.
+ * a book in the Books app, and how full the SD card is.
  */
 final class Files {
 
@@ -44,17 +45,18 @@ final class Files {
         return null;
     }
 
-    /** Where a saved file is, from the top of the phone's storage: "Music/Artist/Song.mp3". */
-    static String shown(String path) {
-        String root = Environment.getExternalStorageDirectory().getAbsolutePath() + "/";
+    /** Where a saved file is, from the top of the SD card: "Music/Artist/Song.mp3". */
+    static String shown(Context context, String path) {
+        File card = card(context);
+        String root = (card != null ? card : Environment.getExternalStorageDirectory()).getAbsolutePath() + "/";
         return path.startsWith(root) ? path.substring(root.length()) : path;
     }
 
     /** The folder a download went into, as shown: an album's own folder, or a song's. */
-    static String folderOf(List<String> files) {
+    static String folderOf(Context context, List<String> files) {
         if (files.isEmpty()) return "";
         String parent = new File(files.get(0)).getParent();
-        return parent == null ? "" : shown(parent);
+        return parent == null ? "" : shown(context, parent);
     }
 
     /** Plays a music file in whatever plays music, once the media scanner knows it. */
@@ -102,10 +104,32 @@ final class Files {
         }
     }
 
-    /** The phone's shared storage: how much is free, of how much. */
-    static long[] space() {
+    /**
+     * The SD card, where downloads are saved: the shared volume that is not
+     * the phone's own. Null when there is no card, or it isn't in yet.
+     */
+    static File card(Context context) {
+        File main = Environment.getExternalStorageDirectory();
+        File[] volumes = context.getExternalFilesDirs(null);
+        if (volumes != null) {
+            for (File dir : volumes) {
+                if (dir == null) continue;
+                String path = dir.getAbsolutePath();
+                int cut = path.indexOf("/Android/");
+                if (cut <= 0) continue;
+                File root = new File(path.substring(0, cut));
+                if (!root.getAbsolutePath().equals(main.getAbsolutePath())) return root;
+            }
+        }
+        return null;
+    }
+
+    /** How full the SD card is: how much is free, of how much. No card, all used. */
+    static long[] space(Context context) {
         try {
-            StatFs stat = new StatFs(Environment.getExternalStorageDirectory().getAbsolutePath());
+            File card = card(context);
+            if (card == null) return new long[] {0, 0};
+            StatFs stat = new StatFs(card.getAbsolutePath());
             return new long[] {stat.getAvailableBytes(), stat.getTotalBytes()};
         } catch (IllegalArgumentException e) {
             return new long[] {0, 0};

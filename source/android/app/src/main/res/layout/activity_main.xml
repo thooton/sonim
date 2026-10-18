@@ -197,6 +197,4 @@
             android:orientation="vertical"
             android:visibility="gone" />
     </FrameLayout>
-
-    <include layout="@layout/softkeys" />
 </LinearLayout>

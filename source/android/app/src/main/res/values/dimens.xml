@@ -4,7 +4,6 @@
          the list pages predictably under the d-pad. -->
     <dimen name="tabs_height">30dp</dimen>
     <dimen name="search_height">30dp</dimen>
-    <dimen name="softkeys_height">26dp</dimen>
     <dimen name="gutter">6dp</dimen>
 
     <dimen name="text_row">12.5sp</dimen>
