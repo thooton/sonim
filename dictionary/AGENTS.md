@@ -7,7 +7,9 @@ first, and `README.md` for the keys and the data.
   page, the search, and the keys), `Spans` (how an entry is drawn: sense numbers,
   example rules, synonym underlines, the bundled fonts) and `Dictionary`
   (reads the asset format; also the search's suggestions and the Word of
-  the Day).
+  the Day) and `Shorthand` (Grascii's Anniversary Gregg shorthand
+  dictionary: outlines by word, and a typed outline read stroke by stroke
+  and matched as Grascii's search matches it).
 - `../DESIGN.md` describes the look. The icons are Material Symbols (Apache
   License 2.0) and the launcher icon is the app's own; the fonts in
   `res/font` are IBM Plex (OFL), subset to Latin-1, which is all the WordNet
@@ -16,7 +18,11 @@ first, and `README.md` for the keys and the data.
   `tools/build_dict.py`, whose docstring documents the format. They are
   stored uncompressed in the APK (`noCompress "dat"`) so the app can seek
   straight to a block; change the format in the script and `Dictionary`
-  together, then rebuild the assets as `README.md` describes.
+  together, then rebuild the assets as `README.md` describes. `shorthand.dat`
+  likewise comes from `tools/build_shorthand.py`, which reads each outline
+  with Grascii's own parser; `Shorthand.split` reads typed ones the same way
+  (all but 23 of 17,766 outlines agree, and an outline typed exactly as
+  written always matches). Only the Anniversary edition is used.
 - Unlike the other apps, Dictionary has no `android/` level, no `:core` and
   no dependencies at all, not even `common/`.
 

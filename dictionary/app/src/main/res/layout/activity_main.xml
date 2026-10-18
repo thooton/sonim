@@ -149,7 +149,8 @@
             </LinearLayout>
         </ScrollView>
 
-        <!-- A word: headword, tabs, and the open tab's text. -->
+        <!-- A word: headword, tabs (Definitions, Thesaurus, Shorthand), and the
+             open tab's text. -->
         <ScrollView
             android:id="@+id/entry"
             android:layout_width="match_parent"
@@ -193,9 +194,9 @@
                         android:id="@+id/tab_definitions"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:paddingLeft="8dp"
+                        android:paddingLeft="7dp"
                         android:paddingTop="6dp"
-                        android:paddingRight="8dp"
+                        android:paddingRight="7dp"
                         android:paddingBottom="6dp"
                         android:text="@string/definitions"
                         android:textColor="@color/ink"
@@ -205,12 +206,25 @@
                         android:id="@+id/tab_thesaurus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginLeft="6dp"
-                        android:paddingLeft="8dp"
+                        android:layout_marginLeft="2dp"
+                        android:paddingLeft="7dp"
                         android:paddingTop="6dp"
-                        android:paddingRight="8dp"
+                        android:paddingRight="7dp"
                         android:paddingBottom="6dp"
                         android:text="@string/thesaurus"
+                        android:textColor="@color/ink"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tab_shorthand"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="2dp"
+                        android:paddingLeft="7dp"
+                        android:paddingTop="6dp"
+                        android:paddingRight="7dp"
+                        android:paddingBottom="6dp"
+                        android:text="@string/shorthand"
                         android:textColor="@color/ink"
                         android:textSize="12sp" />
                 </LinearLayout>
