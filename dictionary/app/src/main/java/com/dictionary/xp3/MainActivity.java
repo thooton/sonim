@@ -38,36 +38,50 @@ import java.util.TimeZone;
 /**
  * The dictionary: home, a word's page, and the search, under a search capsule.
  *
- * Home is the Word of the Day; OK opens it. A word's page has the headword and two tabs,
- * Definitions and Thesaurus, which Left and Right switch between. Up and
+ * Home is the Word of the Day; OK opens it. A word's page has the headword and up to three
+ * tabs, Definitions, Thesaurus and Shorthand (its Gregg outlines in Grascii),
+ * which Left and Right switch between. Up and
  * Down scroll a page, and Up from its top moves into the search box. Menu
  * opens a menu over the page: the Word of the Day or Search at home,
  * Pronounce or Search on a word. OK opens nothing on a word. The search
- * lists recent searches and, as a query is typed, the words it could mean;
- * OK opens the one picked, or the best match. Back goes back a page, and
- * leaves from home.
+ * lists recent searches and, as a query is typed, the words it could mean
+ * and the shorthand outlines it could be read as; OK opens the one picked,
+ * or the best match. Back goes back a page, and leaves from home.
  */
 public class MainActivity extends Activity {
 
     private static final int HOME = -1;
     private static final int RECENTS = 20;
     private static final int SUGGESTIONS = 8;
+    private static final int OUTLINES = 12;
     /** In a list of rows, the Clear button rather than a word. */
     private static final int CLEAR = -2;
+    /**
+     * Pages from here down are words only the shorthand dictionary has ("could",
+     * "theirs"): page ONLY_SHORTHAND - g is its group g.
+     */
+    private static final int ONLY_SHORTHAND = -10;
+
+    private static final int DEFINITIONS = 0;
+    private static final int THESAURUS = 1;
+    private static final int SHORTHAND = 2;
 
     private Dictionary dictionary;
+    private Shorthand shorthand;
     private SharedPreferences prefs;
     private TextToSpeech tts;
     private boolean speaks;
 
     private int page = HOME;
     private final List<Integer> back = new ArrayList<>();
-    private boolean thesaurus;
+    private int tab = DEFINITIONS;
     private boolean searching;
     private int wordOfTheDay;
 
-    // The search's rows: word indexes, or CLEAR; and which one the d-pad is on.
+    // The search's rows: pages, or CLEAR, and the tab each opens on; and
+    // which one the d-pad is on.
     private final List<Integer> items = new ArrayList<>();
+    private final List<Integer> itemTabs = new ArrayList<>();
     private final List<View> itemViews = new ArrayList<>();
     private int picked = -1;
 
@@ -88,6 +102,7 @@ public class MainActivity extends Activity {
     private TextView headword;
     private TextView tabDefinitions;
     private TextView tabThesaurus;
+    private TextView tabShorthand;
     private TextView body;
     private ScrollView results;
     private LinearLayout rows;
@@ -110,6 +125,7 @@ public class MainActivity extends Activity {
         headword = findViewById(R.id.headword);
         tabDefinitions = findViewById(R.id.tab_definitions);
         tabThesaurus = findViewById(R.id.tab_thesaurus);
+        tabShorthand = findViewById(R.id.tab_shorthand);
         body = findViewById(R.id.body);
         results = findViewById(R.id.results);
         rows = findViewById(R.id.rows);
@@ -122,6 +138,7 @@ public class MainActivity extends Activity {
 
         try {
             dictionary = new Dictionary(getAssets());
+            shorthand = new Shorthand(getAssets());
         } catch (IOException e) {
             throw new IllegalStateException("The bundled dictionary is unreadable", e);
         }
@@ -198,17 +215,21 @@ public class MainActivity extends Activity {
         }
         if (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
             if (first && page != HOME) {
-                boolean right = key == KeyEvent.KEYCODE_DPAD_RIGHT;
-                if (right != thesaurus && tabThesaurus.getVisibility() == View.VISIBLE) {
-                    thesaurus = right;
-                    showEntry();
+                TextView[] tabs = {tabDefinitions, tabThesaurus, tabShorthand};
+                int step = key == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1;
+                for (int next = tab + step; next >= 0 && next < tabs.length; next += step) {
+                    if (tabs[next].getVisibility() == View.VISIBLE) {
+                        tab = next;
+                        showEntry();
+                        break;
+                    }
                 }
             }
             return true;
         }
         // OK opens the Word of the Day at home, and nothing on a word.
         if (isOk(key)) {
-            if (first && page == HOME) open(wordOfTheDay);
+            if (first && page == HOME) open(wordOfTheDay, DEFINITIONS);
             return true;
         }
         if (key == KeyEvent.KEYCODE_MENU) {
@@ -247,10 +268,10 @@ public class MainActivity extends Activity {
 
     // Pages
 
-    private void open(int index) {
+    private void open(int index, int onTab) {
         if (index != page) back.add(page);
         page = index;
-        thesaurus = false;
+        tab = onTab;
         show();
     }
 
@@ -260,7 +281,7 @@ public class MainActivity extends Activity {
             return;
         }
         page = back.remove(back.size() - 1);
-        thesaurus = false;
+        tab = DEFINITIONS;
         show();
     }
 
@@ -281,23 +302,67 @@ public class MainActivity extends Activity {
     }
 
     private void showEntry() {
-        List<Dictionary.Sense> senses = dictionary.senses(page);
-        String word = display(page, senses);
+        boolean wordNet = page >= 0;
+        List<Dictionary.Sense> senses = wordNet ? dictionary.senses(page) : new ArrayList<>();
+        int group = group(page);
+        String word = wordNet ? display(page, senses) : shorthand.name(group);
         headword.setText(word);
-        // A word WordNet gives no synonyms for has no Thesaurus tab.
+        // A word WordNet gives no synonyms for has no Thesaurus tab, one
+        // Grascii has no outline for no Shorthand tab, and one only Grascii
+        // has no Definitions.
         boolean any = false;
         for (Dictionary.Sense sense : senses) any |= !synonyms(word, sense).isEmpty();
-        thesaurus &= any;
-        tabThesaurus.setVisibility(any ? View.VISIBLE : View.GONE);
-        styleTab(tabDefinitions, !thesaurus);
-        styleTab(tabThesaurus, thesaurus);
-        body.setText(thesaurus ? thesaurus(word, senses) : definitions(senses));
+        boolean[] shown = {wordNet, any, group >= 0};
+        if (!shown[tab]) tab = wordNet ? DEFINITIONS : SHORTHAND;
+        TextView[] tabs = {tabDefinitions, tabThesaurus, tabShorthand};
+        boolean firstShown = true;
+        for (int t = 0; t < tabs.length; t++) {
+            tabs[t].setVisibility(shown[t] ? View.VISIBLE : View.GONE);
+            ((LinearLayout.LayoutParams) tabs[t].getLayoutParams()).leftMargin = firstShown ? 0 : dp(2);
+            firstShown &= !shown[t];
+            styleTab(tabs[t], t == tab);
+        }
+        if (tab == THESAURUS) body.setText(thesaurus(word, senses));
+        else if (tab == SHORTHAND) body.setText(outlines(group));
+        else body.setText(definitions(senses));
         entry.scrollTo(0, 0);
     }
 
     private void styleTab(TextView tab, boolean open) {
         tab.setTypeface(open ? semibold : sans);
         tab.setBackgroundResource(open ? R.drawable.tab_selected : 0);
+    }
+
+    /** The shorthand group for a page, or -1 for a word Grascii has no outline for. */
+    private int group(int page) {
+        if (page <= ONLY_SHORTHAND) return ONLY_SHORTHAND - page;
+        return shorthand.find(dictionary.word(page));
+    }
+
+    /** The page a shorthand group opens: the word's own page when WordNet has it. */
+    private int pageFor(int group) {
+        String key = shorthand.key(group);
+        int at = dictionary.lowerBound(key);
+        if (at < dictionary.size() && dictionary.word(at).equals(key)) return at;
+        return ONLY_SHORTHAND - group;
+    }
+
+    /** A page's word, as the search and its recents compare them. */
+    private String key(int page) {
+        return page <= ONLY_SHORTHAND ? shorthand.key(ONLY_SHORTHAND - page) : dictionary.word(page);
+    }
+
+    /** A page's word, as the page writes it. */
+    private String name(int page) {
+        return page <= ONLY_SHORTHAND ? shorthand.name(ONLY_SHORTHAND - page) : display(page, null);
+    }
+
+    /** The page for a word, either dictionary's, or -1. */
+    private int pageOf(String word) {
+        int at = dictionary.lowerBound(word);
+        if (at < dictionary.size() && dictionary.word(at).equals(word)) return at;
+        int group = shorthand.find(word);
+        return group >= 0 ? ONLY_SHORTHAND - group : -1;
     }
 
     /**
@@ -313,7 +378,7 @@ public class MainActivity extends Activity {
         menu.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
             if (id == R.string.pronounce) tts.speak(headword.getText(), TextToSpeech.QUEUE_FLUSH, null, "word");
-            else if (id == R.string.word_of_the_day_item) open(wordOfTheDay);
+            else if (id == R.string.word_of_the_day_item) open(wordOfTheDay, DEFINITIONS);
             else openSearch();
             return true;
         });
@@ -361,7 +426,10 @@ public class MainActivity extends Activity {
         ime.hideSoftInputFromWindow(search.getWindowToken(), 0);
     }
 
-    /** OK while searching: the row picked, or else the best match for the query. */
+    /**
+     * OK while searching: the row picked, or else the best match for the
+     * query: the word, or what it reads as when it is written as shorthand.
+     */
     private void choose() {
         if (picked >= 0) {
             int item = items.get(picked);
@@ -369,19 +437,67 @@ public class MainActivity extends Activity {
                 prefs.edit().remove("recent").apply();
                 showRows();
             } else {
-                found(item);
+                found(item, itemTabs.get(picked));
             }
             return;
         }
-        if (Dictionary.normalize(search.getText().toString()).isEmpty()) return;
-        int found = dictionary.find(search.getText().toString());
-        if (found >= 0) found(found);
+        String query = search.getText().toString();
+        if (Dictionary.normalize(query).isEmpty()) return;
+        List<Shorthand.Match> read = shorthand.read(query, 1);
+        if (looksLikeShorthand(query) && !read.isEmpty()) {
+            found(pageFor(shorthand.group(read.get(0).entry)), SHORTHAND);
+            return;
+        }
+        int found = dictionary.find(query);
+        if (found >= 0) {
+            found(found, DEFINITIONS);
+            return;
+        }
+        List<Integer> suggestions = suggest(query);
+        if (!suggestions.isEmpty()) found(suggestions.get(0), DEFINITIONS);
+        else if (!read.isEmpty()) found(pageFor(shorthand.group(read.get(0).entry)), SHORTHAND);
     }
 
-    private void found(int index) {
-        remember(dictionary.word(index));
+    private void found(int index, int onTab) {
+        remember(key(index));
         endSearch();
-        open(index);
+        open(index, onTab);
+    }
+
+    /**
+     * The words to offer for a query: WordNet's, with those only the
+     * shorthand dictionary has ("could", "theirs") among them in order.
+     */
+    private List<Integer> suggest(String query) {
+        List<Integer> out = dictionary.suggest(query, SUGGESTIONS);
+        String q = Dictionary.normalize(query);
+        // A base form WordNet puts first (mice: mouse) stays first.
+        int from = !out.isEmpty() && !key(out.get(0)).startsWith(q) ? 1 : 0;
+        for (int group : shorthand.prefixed(query, SUGGESTIONS)) {
+            int page = pageFor(group);
+            if (page >= 0) continue;
+            int at = from;
+            while (at < out.size() && key(out.get(at)).compareTo(shorthand.key(group)) < 0) at++;
+            out.add(at, page);
+        }
+        while (out.size() > SUGGESTIONS) out.remove(out.size() - 1);
+        return out;
+    }
+
+    /**
+     * Whether a query is more likely an outline than a word: typed in
+     * capitals, as Grascii is written, or with its marks in it.
+     */
+    private static boolean looksLikeShorthand(String query) {
+        String q = query.trim();
+        boolean letters = false;
+        for (int i = 0; i < q.length(); i++) {
+            char c = q.charAt(i);
+            if (",.|~_()^&'".indexOf(c) >= 0) return true;
+            if (Character.isLowerCase(c)) return false;
+            letters |= Character.isUpperCase(c);
+        }
+        return letters && q.length() > 1;
     }
 
     private List<String> recent() {
@@ -401,6 +517,7 @@ public class MainActivity extends Activity {
     private void showRows() {
         rows.removeAllViews();
         items.clear();
+        itemTabs.clear();
         itemViews.clear();
         picked = -1;
         String query = search.getText().toString();
@@ -409,23 +526,53 @@ public class MainActivity extends Activity {
             search.setTextColor(getColor(R.color.ink));
             List<Integer> recent = new ArrayList<>();
             for (String word : recent()) {
-                int at = dictionary.lowerBound(word);
-                if (at < dictionary.size() && dictionary.word(at).equals(word)) recent.add(at);
+                int at = pageOf(word);
+                if (at != -1) recent.add(at);
             }
             if (recent.isEmpty()) return;
             rows.addView(recentHeader());
             for (int index : recent) addRow(index, R.drawable.ic_history, null);
         } else {
-            List<Integer> suggestions = dictionary.suggest(query, SUGGESTIONS);
-            search.setTextColor(getColor(suggestions.isEmpty() ? R.color.not_found : R.color.ink));
-            if (suggestions.isEmpty()) {
-                TextView none = text(getString(R.string.no_results), 12.5f, R.color.text_muted, sans);
-                none.setPadding(dp(12), dp(10), dp(12), dp(10));
-                rows.addView(none);
+            List<Integer> suggestions = suggest(query);
+            List<Shorthand.Match> outlines = shorthand.read(query, OUTLINES);
+            boolean none = suggestions.isEmpty() && outlines.isEmpty();
+            search.setTextColor(getColor(none ? R.color.not_found : R.color.ink));
+            if (none) {
+                TextView empty = text(getString(R.string.no_results), 12.5f, R.color.text_muted, sans);
+                empty.setPadding(dp(12), dp(10), dp(12), dp(10));
+                rows.addView(empty);
+            }
+            // What was typed as Grascii reads it first as shorthand, and the
+            // words then sit under a heading of their own.
+            boolean outlinesFirst = looksLikeShorthand(query);
+            if (outlinesFirst) addOutlines(outlines);
+            if (outlinesFirst && !suggestions.isEmpty() && !outlines.isEmpty()) {
+                rows.addView(sectionHeader(getString(R.string.words)));
             }
             for (int index : suggestions) addRow(index, R.drawable.ic_search_thin, q);
+            if (!outlinesFirst) addOutlines(outlines);
         }
         results.scrollTo(0, 0);
+    }
+
+    /** The outlines a query reads as, under a Shorthand heading: each outline and its English. */
+    private void addOutlines(List<Shorthand.Match> outlines) {
+        if (outlines.isEmpty()) return;
+        rows.addView(sectionHeader(getString(R.string.shorthand)));
+        for (Shorthand.Match match : outlines) {
+            String outline = shorthand.outline(match.entry);
+            SpannableStringBuilder s = new SpannableStringBuilder();
+            append(s, outline, new Spans.Font(semibold));
+            s.append("  ");
+            append(s, shorthand.translation(match.entry), new ForegroundColorSpan(getColor(R.color.text_muted)));
+            addRow(pageFor(shorthand.group(match.entry)), SHORTHAND, R.drawable.ic_shorthand, s);
+        }
+    }
+
+    private View sectionHeader(String title) {
+        TextView header = text(title, 12f, R.color.ink, semibold);
+        header.setPadding(dp(12), dp(8), dp(8), dp(4));
+        return header;
     }
 
     private View recentHeader() {
@@ -438,12 +585,25 @@ public class MainActivity extends Activity {
         clear.setPadding(dp(4), dp(2), dp(4), dp(2));
         header.addView(clear);
         items.add(CLEAR);
+        itemTabs.add(DEFINITIONS);
         itemViews.add(clear);
         return header;
     }
 
-    /** A row: an icon, the word, and an arrow, over a hairline. */
+    /** A word's row: the rest of a suggestion, past what was typed, set in semibold. */
     private void addRow(int index, int icon, String typed) {
+        String word = name(index);
+        CharSequence label = word;
+        if (typed != null && word.toLowerCase(Locale.ROOT).startsWith(typed) && typed.length() < word.length()) {
+            SpannableStringBuilder s = new SpannableStringBuilder(word);
+            s.setSpan(new Spans.Font(semibold), typed.length(), word.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            label = s;
+        }
+        addRow(index, DEFINITIONS, icon, label);
+    }
+
+    /** A row: an icon, the label, and an arrow, over a hairline. */
+    private void addRow(int index, int onTab, int icon, CharSequence text) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
         LinearLayout line = new LinearLayout(this);
@@ -452,16 +612,10 @@ public class MainActivity extends Activity {
         ImageView start = new ImageView(this);
         start.setImageResource(icon);
         line.addView(start, new LinearLayout.LayoutParams(dp(13), dp(13)));
-        String word = display(index, null);
-        TextView label = text(word, 12.5f, R.color.ink, sans);
+        TextView label = text("", 12.5f, R.color.ink, sans);
+        label.setText(text);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
-        if (typed != null && word.toLowerCase(Locale.ROOT).startsWith(typed) && typed.length() < word.length()) {
-            // The rest of a suggestion is set in semibold, past what was typed.
-            SpannableStringBuilder s = new SpannableStringBuilder(word);
-            s.setSpan(new Spans.Font(semibold), typed.length(), word.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            label.setText(s);
-        }
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
         lp.leftMargin = dp(9);
         lp.rightMargin = dp(6);
@@ -478,6 +632,7 @@ public class MainActivity extends Activity {
         row.addView(rule, rp);
         rows.addView(row);
         items.add(index);
+        itemTabs.add(onTab);
         itemViews.add(line);
     }
 
@@ -564,6 +719,27 @@ public class MainActivity extends Activity {
             for (String other : others) {
                 append(text, other, new Spans.Synonym(dp(2), dp(1), dp(10), getColor(R.color.synonym)));
                 text.append(" ");
+            }
+        }
+        return text;
+    }
+
+    /**
+     * 'ABT
+     * ' · A · B · T
+     */
+    private CharSequence outlines(int group) {
+        SpannableStringBuilder text = new SpannableStringBuilder();
+        int muted = getColor(R.color.text_muted);
+        for (int entry : shorthand.entries(group)) {
+            gap(text, 8);
+            String outline = shorthand.outline(entry);
+            append(text, outline, new Spans.Font(semibold), size(18));
+            // How Grascii reads it, stroke by stroke.
+            List<String> strokes = Shorthand.split(outline);
+            if (strokes != null && strokes.size() > 1) {
+                text.append("\n");
+                append(text, TextUtils.join("  ·  ", strokes), new ForegroundColorSpan(muted), size(11));
             }
         }
         return text;

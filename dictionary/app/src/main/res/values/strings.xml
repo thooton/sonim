@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Dictionary</string>
-    <string name="search_hint">Search a word or phrase</string>
+    <string name="search_hint">Search a word or shorthand</string>
     <string name="word_of_the_day">WORD OF THE DAY</string>
     <string name="meaning_and_examples">Meaning and examples</string>
     <string name="word_of_the_day_item">Word of the Day</string>
@@ -9,6 +9,8 @@
     <string name="search">Search</string>
     <string name="definitions">Definitions</string>
     <string name="thesaurus">Thesaurus</string>
+    <string name="shorthand">Shorthand</string>
+    <string name="words">Words</string>
     <string name="recent_searches">Recent Searches</string>
     <string name="clear">Clear</string>
     <string name="no_results">No results</string>

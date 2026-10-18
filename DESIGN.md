@@ -221,7 +221,9 @@ its own:
   speech as a serif heading, senses numbered in grey in a hanging margin, and
   examples in italics behind a pale grey rule. Thesaurus, shown only when
   WordNet has synonyms: "noun *as in* gist" and the synonyms over a thick
-  green (`#00B414`) rule.
+  green (`#00B414`) rule. Shorthand, shown only when Grascii has an outline
+  (and the only tab for a word only it has): each outline at 18sp SemiBold,
+  its strokes under it in grey, parted by middle dots.
 - **Menu holds the actions.** Menu opens a stock popup menu over the page
   (Word of the Day and Search at home, Pronounce and Search on a word). OK
   opens the Word of the Day at home and nothing on a word. Up from the top of a page moves into the search
@@ -229,7 +231,8 @@ its own:
 - **The search.** Recent Searches, with Clear in dark red, each row a faint
   clock, the word, and a faint arrow over an inset hairline; while typing,
   the same rows with a magnifier and the rest of each suggestion in
-  SemiBold. The row under the d-pad is washed in a pale blue (`#EBF2FF`).
+  SemiBold, then under a Shorthand heading the outlines it reads as, each
+  after a faint pen, the outline in SemiBold and its English in grey. The row under the d-pad is washed in a pale blue (`#EBF2FF`).
 - **Its icon.** An open book with a gold ribbon on blue.
 
 ## Source: Tonal
