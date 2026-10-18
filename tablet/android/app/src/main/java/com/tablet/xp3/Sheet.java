@@ -44,6 +44,8 @@ final class Sheet extends FrameLayout {
     static final int VIEW = 2;
     static final int RETRY = 3;
     static final int REMOVE = 4;
+    static final int DOWNLOAD_DOCX = 5;
+    static final int DOWNLOAD_PDF = 6;
 
     final int kind;
     private final LinearLayout body;
@@ -262,7 +264,7 @@ final class Sheet extends FrameLayout {
         s.head(job.stateLabel(), job.heading());
         String from = job.from();
         String detail = job.status == Job.DONE && job.result.length() > 0 ? "Saved as " + job.result + ". " + summary + "."
-            : job.status == Job.RUNNING ? job.step() + ", " + job.percent + "%." : summary;
+            : job.status == Job.RUNNING ? job.step() + "." : summary;
         s.note(from.length() > 0 ? from + ". " + detail : detail, 4);
         switch (job.status) {
             case Job.RUNNING:
@@ -271,6 +273,9 @@ final class Sheet extends FrameLayout {
                 break;
             case Job.DONE:
                 if (job.tablet.length() > 0) s.jobChoice(R.drawable.ic_eye, "View result", VIEW);
+                // The Word document is what gets handed in; the PDF is what the tablet has.
+                if (job.docx().length() > 0) s.jobChoice(R.drawable.ic_download, "Download Word", DOWNLOAD_DOCX).note.setText(".docx");
+                if (job.pdf().length() > 0) s.jobChoice(R.drawable.ic_download, "Download PDF", DOWNLOAD_PDF).note.setText(".pdf");
                 s.jobChoice(R.drawable.ic_x, "Remove from list", REMOVE);
                 break;
             default:
@@ -281,9 +286,10 @@ final class Sheet extends FrameLayout {
         return s;
     }
 
-    private void jobChoice(int icon, String label, int what) {
-        choice(icon, label);
+    private Parts.Action jobChoice(int icon, String label, int what) {
+        Parts.Action a = choice(icon, label);
         does.add(what);
+        return a;
     }
 
     /** What the picked choice on a job's sheet does. */

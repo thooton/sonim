@@ -14,7 +14,9 @@ Tablet reaches the tablet through the Delta command center, which the tablet syn
 | 4 / 6 | Preview: previous, next page |
 | * / # / 0 | Preview: zoom out, zoom in, fit the page |
 
-Transforms is the list of jobs, running ones first. OK on one opens its menu: a running job can be cancelled (the menu opens on "Keep it running", so OK, OK never cancels one), a finished one viewed or tried again, and removed from the list.
+Transforms is the list of jobs, running ones first. OK on one opens its menu: a running job can be cancelled (the menu opens on "Keep it running", so OK, OK never cancels one), a finished one viewed, downloaded, or tried again, and removed from the list. A running job shows how far along it is as a ring, with the percentage inside.
+
+**Download Word** and **Download PDF** save a finished job's result into the phone's Download folder, where Canvas's file picker finds it under Downloads. Hand in the Word document; if the result needs more work, write on the PDF on the tablet and transform it again. A job has a Word document when the agent made one.
 
 ## Build
 

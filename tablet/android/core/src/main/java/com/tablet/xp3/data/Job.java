@@ -114,10 +114,25 @@ public final class Job {
         return at > 0 ? When.day(at, now, zone, hours24) : "";
     }
 
-    /** The second line of a job in the list, for one the d-pad isn't on. */
+    /** The result's PDF in Delta's Files, or "". */
+    public String pdf() {
+        return file(".pdf");
+    }
+
+    /** The Word document the result was made from, in Delta's Files, or "" when it was made as a PDF. */
+    public String docx() {
+        return file(".docx");
+    }
+
+    private String file(String ext) {
+        for (String f : files) if (f.toLowerCase(java.util.Locale.US).endsWith(ext)) return f;
+        return "";
+    }
+
+    /** The second line of a job in the list. A running job's percentage is its ring, not words. */
     public String summary(long now, TimeZone zone, boolean hours24) {
         switch (status) {
-            case RUNNING: return step() + " · " + percent + "%";
+            case RUNNING: return step();
             case DONE:
                 String when = finished(now, zone, hours24);
                 return when.length() == 0 ? "On your tablet" : "On your tablet since " + when;

@@ -1,6 +1,7 @@
 package com.tablet.xp3;
 
 import com.tablet.xp3.data.Doc;
+import com.tablet.xp3.data.Downloads;
 import com.tablet.xp3.data.Job;
 import com.tablet.xp3.data.Jobs;
 import com.tablet.xp3.data.Library;
@@ -120,16 +121,19 @@ public final class SelfTest {
         Job essay = jobs.find("t1");
         check.same("the agent's title", "MLA paper", essay.heading());
         check.same("from", "From Essay draft", essay.from());
-        check.same("summary", "Transcribing page 9 of 12 · 58%", essay.summary(NOW, UTC, true));
+        check.same("summary", "Transcribing page 9 of 12", essay.summary(NOW, UTC, true));
         Job fresh = jobs.find("t4");
         check.same("before the agent reports, the document", "Lease agreement", fresh.heading());
         check.same("and no from line", "", fresh.from());
-        check.same("starting", "Starting · 0%", fresh.summary(NOW, UTC, true));
+        check.same("starting", "Starting", fresh.summary(NOW, UTC, true));
         Job done = jobs.find("t2");
         check.same("done", Job.DONE, done.status);
         check.same("done summary", "On your tablet since 10:42", done.summary(NOW, UTC, true));
         check.same("result on the tablet", "d9", done.tablet);
         check.same("both files", 2, done.files.size());
+        check.same("its PDF", "Lease summary.pdf", done.pdf());
+        check.same("its Word document", "Lease summary.docx", done.docx());
+        check.same("no Word document while running", "", essay.docx());
         Job failed = jobs.find("t3");
         check.same("failed says why", "Couldn't start it: no account has room left", failed.summary(NOW, UTC, true));
         check.same("state", "Failed", failed.stateLabel());
@@ -186,6 +190,10 @@ public final class SelfTest {
             if (path.equals("/remarkable/d3/pages/1")) {
                 return TestServer.Reply.of(404, "application/json", "{\"error\":\"nothing is written on it\"}").header("X-Pages: 0");
             }
+            if (request.method.equals("GET") && path.equals("/files/Lease%20summary%2Edocx")) {
+                return TestServer.Reply.of(200, "application/octet-stream", "PK the word document");
+            }
+            if (path.startsWith("/files/")) return TestServer.Reply.of(404, "application/json", "{\"error\":\"not found\"}");
             return TestServer.Reply.of(404, "application/json", "{\"error\":\"no such document on the reMarkable\"}");
         });
         try {
@@ -228,6 +236,17 @@ public final class SelfTest {
             }
             check.fails("a missing document's page", "No such document", () -> tablet.page("nope", 1, new File(dir, "x.pdf")));
             check.ok("nothing saved for it", !new File(dir, "x.pdf").exists());
+
+            File word = new File(dir, "Lease summary.docx");
+            tablet.download("Lease summary.docx", word);
+            check.same("a result downloaded", "PK the word document", new String(Files.readAllBytes(word.toPath()), "UTF-8"));
+            check.ok("no part file left of it", !new File(dir, "Lease summary.docx.part").exists());
+            check.fails("a result no longer in Files", "no longer in Delta's Files",
+                () -> tablet.download("Gone.pdf", new File(dir, "Gone.pdf")));
+            check.ok("nothing saved for that", !new File(dir, "Gone.pdf").exists());
+            check.same("a free name", "Essay.docx", Downloads.free(dir, "Essay.docx").getName());
+            check.same("a taken name is numbered", "Lease summary (2).docx", Downloads.free(dir, "Lease summary.docx").getName());
+            check.same("a name can't leave the folder", "x.pdf", Downloads.free(dir, "../x.pdf").getName());
 
             check.fails("a wrong token", "refused the token", () -> new Center(base, "bad").library());
         } finally {

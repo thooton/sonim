@@ -30,6 +30,8 @@ public final class Center {
 
     /** More than one page of any PDF the tablet would show, scans included. */
     static final long MAX_PAGE = 40000000;
+    /** More than any document a transform makes. */
+    static final long MAX_FILE = 200000000;
     private static final int QUICK = 30000;
     /** A page of a long PDF takes the command center a moment to draw. */
     private static final int SLOW = 120000;
@@ -114,28 +116,49 @@ public final class Center {
                     : "It has " + pages + (pages == 1 ? " page." : " pages."));
             }
             if (status < 200 || status >= 300) fail(status, small(stream.stream()), "show the page");
-            File part = new File(dest.getPath() + ".part");
-            long total = 0;
-            InputStream in = stream.stream();
-            OutputStream out = new FileOutputStream(part);
-            try {
-                byte[] buffer = new byte[64 * 1024];
-                for (int count; (count = in.read(buffer)) != -1; ) {
-                    if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-                    total += count;
-                    if (total > MAX_PAGE) throw new IOException("That page is too big to show.");
-                    out.write(buffer, 0, count);
-                }
-            } finally {
-                out.close();
-            }
-            if (!part.renameTo(dest)) {
-                part.delete();
-                throw new IOException("Couldn't save the page.");
-            }
+            save(stream.stream(), dest, MAX_PAGE, "That page is too big to show.");
             return Math.max(pages, n);
         } finally {
             stream.close();
+        }
+    }
+
+    /**
+     * Saves `name` from Delta's Files (a transform's result: its PDF, or the
+     * Word document it was made from) to `dest`.
+     */
+    public void download(String name, File dest) throws IOException, InterruptedException {
+        Http.Stream stream = http.stream(request("/files/" + segment(name), SLOW));
+        try {
+            int status = stream.status();
+            if (status == 404) throw new IOException("That file is no longer in Delta's Files.");
+            if (status < 200 || status >= 300) fail(status, small(stream.stream()), "download it");
+            save(stream.stream(), dest, MAX_FILE, "That file is too big to download here.");
+        } finally {
+            stream.close();
+        }
+    }
+
+    /** Writes `in` to `dest` through a part file, so a broken download leaves nothing behind. */
+    private static void save(InputStream in, File dest, long max, String tooBig) throws IOException, InterruptedException {
+        File part = new File(dest.getPath() + ".part");
+        long total = 0;
+        boolean saved = false;
+        OutputStream out = new FileOutputStream(part);
+        try {
+            byte[] buffer = new byte[64 * 1024];
+            for (int count; (count = in.read(buffer)) != -1; ) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                total += count;
+                if (total > max) throw new IOException(tooBig);
+                out.write(buffer, 0, count);
+            }
+            out.close();
+            saved = part.renameTo(dest);
+            if (!saved) throw new IOException("Couldn't save it.");
+        } finally {
+            out.close();
+            if (!saved) part.delete();
         }
     }
 
