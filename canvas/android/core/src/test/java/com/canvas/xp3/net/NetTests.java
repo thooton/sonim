@@ -29,6 +29,7 @@ public final class NetTests {
         check.run("canvas auth", () -> auth(check));
         check.run("canvas ids", () -> ids(check));
         check.run("canvas due", () -> due(check));
+        check.run("web links", () -> web(check));
     }
 
     // ------------------------------------------------------------------
@@ -393,5 +394,64 @@ public final class NetTests {
         check.fails("a fraction is not an id", () -> {
             Canvas.id(Json.object(Json.parse("{\"a\":1.5}")), "a");
         });
+    }
+
+    private static void web(Check check) throws Exception {
+        TestServer server = new TestServer(request -> {
+            if (request.path.equals("/share")) return TestServer.Reply.of(302, "text/plain", "").header("Location: /files/notes.pdf");
+            if (request.path.equals("/files/notes.pdf")) {
+                return TestServer.Reply.of(200, "application/pdf", "%PDF-1.4 handout")
+                    .header("Content-Disposition: attachment; filename=\"Week 3 notes.pdf\"");
+            }
+            if (request.path.equals("/loop")) return TestServer.Reply.of(302, "text/plain", "").header("Location: /loop");
+            if (request.path.equals("/away")) {
+                return TestServer.Reply.of(301, "text/plain", "").header("Location: https://elsewhere.example/x");
+            }
+            if (request.path.equals("/private")) return TestServer.Reply.of(403, "text/html", "no");
+            return TestServer.Reply.of(200, "text/html; charset=ISO-8859-1", "<p>hi</p>");
+        });
+        try {
+            Web web = new Web(new Http());
+            web.scheme = "http";
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            Web.Got got = web.fetch(server.uri("/share"), out, 1000, null);
+            check.same("follows a redirect to the file", "%PDF-1.4 handout", out.toString("UTF-8"));
+            check.same("server's name", "Week 3 notes.pdf", got.name);
+            check.ok("a file is not a page", !got.page());
+            check.same("named for keeping", "Week 3 notes.pdf", Web.fileName(got, "the notes"));
+            for (TestServer.Request seen : server.seen) {
+                check.same("no cookie sent", "", seen.header("Cookie") == null ? "" : seen.header("Cookie"));
+                check.same("no auth sent", "", seen.header("Authorization") == null ? "" : seen.header("Authorization"));
+            }
+
+            out.reset();
+            Web.Got page = web.fetch(server.uri("/article"), out, 1000, null);
+            check.ok("html is a page", page.page());
+            check.same("page charset", "ISO-8859-1", page.charset());
+            check.same("a page keeps the link's words", "Read this.html", Web.fileName(page, "Read this"));
+
+            check.fails("too large refused", () -> web.fetch(server.uri("/files/notes.pdf"),
+                new java.io.ByteArrayOutputStream(), 5, null));
+            check.fails("redirect loop refused", () -> web.fetch(server.uri("/loop"),
+                new java.io.ByteArrayOutputStream(), 1000, null));
+            check.fails("forbidden is an error", () -> web.fetch(server.uri("/private"),
+                new java.io.ByteArrayOutputStream(), 1000, null));
+            // The real client only ever speaks https; a hop to plain http is refused.
+            web.scheme = "https";
+            check.fails("http refused", () -> web.fetch(server.uri("/share"), new java.io.ByteArrayOutputStream(), 1000,
+                null));
+        } finally {
+            server.close();
+        }
+
+        check.same("name from address", "slides.pdf", Web.name("", URI.create("https://a.example/x/slides.pdf")));
+        check.same("no name without an extension", null, Web.name("", URI.create("https://a.example/view")));
+        check.same("encoded name", "Lab 2.docx", Web.name("attachment; filename*=UTF-8''Lab%202.docx",
+            URI.create("https://a.example/d")));
+        check.same("a path in the name is dropped", "x.pdf", Web.name("attachment; filename=\"../../x.pdf\"",
+            URI.create("https://a.example/d")));
+        Web.Got pdf = new Web.Got("application/pdf", null, URI.create("https://a.example/d"));
+        check.same("type gives the extension", "Syllabus.pdf", Web.fileName(pdf, "Syllabus"));
+        check.same("odd characters dropped", "a b.pdf", Web.fileName(pdf, "a/b"));
     }
 }

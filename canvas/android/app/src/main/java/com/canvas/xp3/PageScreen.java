@@ -19,6 +19,7 @@ final class PageScreen extends Screen {
     private final String pageId;
     private String body;
     private String problem;
+    private View rest;
 
     PageScreen(MainActivity app, Course course, String title, String pageId) {
         super(app);
@@ -48,14 +49,7 @@ final class PageScreen extends Screen {
 
     @Override
     boolean onKey(KeyEvent event) {
-        int code = event.getKeyCode();
-        if (scroll != null && (code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN)) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                scroll.smoothScrollBy(0, (code == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1) * v.dp(60));
-            }
-            return true;
-        }
-        return false;
+        return rest != null && read(event, rest);
     }
 
     @Override
@@ -77,6 +71,7 @@ final class PageScreen extends Screen {
             page.addView(wait, Views.wide());
         }
         root.setFocusable(true);
+        rest = root;
         return root;
     }
 

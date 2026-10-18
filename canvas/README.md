@@ -2,7 +2,7 @@
 
 Week Strip: a calm, planner-style Canvas app for the XP3's 240x320 screen, d-pad and keypad.
 
-The home screen is the week: Assigned work on a timeline under a strip of days, with Missing and Done beside it. This semester's classes (worked out from Canvas's term names) have Stream, Classwork, People and Grades. An assignment page shows the due date, instructions and the teacher's files. You can add typed answers, photos of paper work (saved as one PDF), audio, files and links, then turn them in. Grades, private comments, class comments, classic quizzes, notifications and opt-in reminders are all here. Everything is kept for offline use. A turn-in made with no signal waits on the phone and finishes when the phone reconnects.
+The home screen is the week: Assigned work on a timeline under a strip of days, with Missing and Done beside it. This semester's classes (worked out from Canvas's term names) have Stream, Classwork, People and Grades. An assignment page shows the due date, instructions and the teacher's files. Links in a teacher's text are stops for Up and Down: OK opens one (a PDF, a picture or a web page's text) or saves it to Download. You can add typed answers, photos of paper work (saved as one PDF), audio, files and links, then turn them in. Grades, private comments, class comments, classic quizzes, notifications and opt-in reminders are all here. Everything is kept for offline use. A turn-in made with no signal waits on the phone and finishes when the phone reconnects.
 
 ## Build and test
 
@@ -27,4 +27,4 @@ Open **Options → Settings → Account** and enter the Canvas origin, the cooki
 | 1–7, 0 | Jump to a day of the week, or back to today |
 | Back / Clear | Back one screen (deletes a character in a text field) |
 
-What the app sends to Canvas is limited to the student's own work: submissions, comments on them, discussion replies, planner check marks and classic quiz answers. A locally built APK may contain live bundled credentials, so treat it like a password. Bricolage Grotesque is under the SIL Open Font License (`OFL.txt`).
+What the app sends to Canvas is limited to the student's own work: submissions, comments on them, discussion replies, planner check marks and classic quiz answers. A link outside Canvas is fetched only when you open or save it, with no login sent. A locally built APK may contain live bundled credentials, so treat it like a password. Bricolage Grotesque is under the SIL Open Font License (`OFL.txt`).

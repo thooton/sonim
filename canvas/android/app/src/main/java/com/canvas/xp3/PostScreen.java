@@ -27,6 +27,7 @@ final class PostScreen extends Screen {
     private List<Detail.Comment> replies;
     private String problem;
     private EditText field;
+    private View rest;
     private String typed = "";
     private boolean sending;
 
@@ -124,6 +125,8 @@ final class PostScreen extends Screen {
             v.pad(closed, 12, 6, 12, 6);
             root.addView(closed, Views.wide());
         }
+        root.setFocusable(true);
+        rest = root;
         return root;
     }
 
@@ -141,18 +144,9 @@ final class PostScreen extends Screen {
                 if (event.getAction() == KeyEvent.ACTION_UP) send();
                 return true;
             }
-            if ((code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN) && scroll != null
-                && field.getLineCount() <= 1) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    scroll.smoothScrollBy(0, (code == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1) * v.dp(60));
-                }
-                return true;
-            }
-        } else if (scroll != null && (code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN)) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                scroll.smoothScrollBy(0, (code == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1) * v.dp(60));
-            }
-            return true;
+            if (field.getLineCount() <= 1) return read(event, field);
+        } else if (rest != null) {
+            return read(event, field != null ? field : rest);
         }
         return false;
     }

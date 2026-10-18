@@ -395,6 +395,20 @@ public final class Store {
         return new File(folder, fileId + "-" + safe);
     }
 
+    /**
+     * A finished download kept under `fileId`, whatever it was named: a web
+     * link's name is only known once it has been fetched. Null if none.
+     */
+    public File kept(String fileId) {
+        File[] all = new File(directory, DOWNLOADS).listFiles();
+        if (all == null) return null;
+        for (File file : all) {
+            String name = file.getName();
+            if (name.startsWith(fileId + "-") && !name.endsWith(".part") && file.length() > 0) return file;
+        }
+        return null;
+    }
+
     /** Everything written about this account, for Settings' sign-out. */
     public void clear() {
         new File(directory, SETTINGS).delete();
