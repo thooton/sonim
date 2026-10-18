@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A homework sheet, ticked, on the app's wine accent, in the rounded square
+<!-- The home screen's week strip in miniature: ink, the day in view in the
+     highlighter's yellow with a tick on it, the days beside it dim, and
+     under it course-coloured dots for the work due. In the rounded square
      the other apps' icons share. Shapes are few and thick because the
      launcher draws this at 48px on the XP3's mdpi screen: an earlier easel
      with thin legs turned to mush at that size. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#8E1F48" android:pathData="M10,4h28a6,6 0,0 1,6 6v28a6,6 0,0 1,-6 6h-28a6,6 0,0 1,-6 -6v-28a6,6 0,0 1,6 -6z" />
-    <!-- The sheet, its top right corner folded over. -->
-    <path android:fillColor="#FFFFFF" android:pathData="M14,8h15l7,7v23a2,2 0,0 1,-2 2h-20a2,2 0,0 1,-2 -2v-28a2,2 0,0 1,2 -2z" />
-    <path android:fillColor="#E3BFCE" android:pathData="M29,8v5a2,2 0,0 0,2 2h5z" />
-    <!-- Two lines of writing, then the tick. -->
-    <path android:fillColor="#D8CCD1" android:pathData="M17,14h9v2.5h-9zM17,19.5h14v2.5h-14z" />
-    <path android:strokeColor="#8E1F48" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M17.5,29.5l4.5,4.5l9,-9" />
+    <path android:fillColor="#101828" android:pathData="M10,4h28a6,6 0,0 1,6 6v28a6,6 0,0 1,-6 6h-28a6,6 0,0 1,-6 -6v-28a6,6 0,0 1,6 -6z" />
+    <!-- The days either side. -->
+    <path android:fillColor="#2A3346" android:pathData="M9,11h3a2,2 0,0 1,2 2v14a2,2 0,0 1,-2 2h-3a2,2 0,0 1,-2 -2v-14a2,2 0,0 1,2 -2zM36,11h3a2,2 0,0 1,2 2v14a2,2 0,0 1,-2 2h-3a2,2 0,0 1,-2 -2v-14a2,2 0,0 1,2 -2z" />
+    <!-- The day in view, and the tick. -->
+    <path android:fillColor="#FFE45C" android:pathData="M21,8h6a5,5 0,0 1,5 5v16a5,5 0,0 1,-5 5h-6a5,5 0,0 1,-5 -5v-16a5,5 0,0 1,5 -5z" />
+    <path android:strokeColor="#101828" android:strokeWidth="3.5" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M19.5,21.5l3,3l5.5,-6" />
+    <!-- Three classes' work, in the first three course colours. -->
+    <path android:fillColor="#FF5A36" android:pathData="M14,38.5a2.5,2.5 0,1 1,5 0a2.5,2.5 0,1 1,-5 0z" />
+    <path android:fillColor="#3D5AFE" android:pathData="M21.5,38.5a2.5,2.5 0,1 1,5 0a2.5,2.5 0,1 1,-5 0z" />
+    <path android:fillColor="#00A389" android:pathData="M29,38.5a2.5,2.5 0,1 1,5 0a2.5,2.5 0,1 1,-5 0z" />
 </vector>
