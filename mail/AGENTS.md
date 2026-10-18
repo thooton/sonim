@@ -54,9 +54,14 @@ The scope is `gmail.modify`: nothing can be deleted for good, only trashed
 - **People** (`mail`: `people`) are the addresses seen in listed mail and
   those written to (first), for Menu → Add recipient.
 - **Attachments** are fetched whole (the shared `Http` caps a response at
-  8 MB, so about 6 MB of file) and written to the Download folder on the
-  SD card (`Card`), asking for storage access on first use. Never to the
-  phone's own storage: with no card in, nothing is saved.
+  8 MB, so about 6 MB of file) and written to the SD card (`Card`), never
+  the phone's own storage: with no card in, nothing is saved. Android 8.1
+  refuses plain file writes on a removable card outside an app's own
+  folder, so the first save asks for the card's Download folder with
+  `StorageVolume.createAccessIntent`, keeps the grant (`mail`:
+  `card_folder`, one card's) and writes through `DocumentsContract`. If
+  that is refused, the file goes to Mail's own folder on the card
+  (`Android/data/com.mail.xp3/files/Download`) instead.
 
 If the CLI's addressing, quoting or forwarding changes, change `Outgoing`
 here and keep the test in step.

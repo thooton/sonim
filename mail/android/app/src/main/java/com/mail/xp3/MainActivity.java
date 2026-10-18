@@ -1,11 +1,11 @@
 package com.mail.xp3;
 
-import android.Manifest;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
+import android.content.UriPermission;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -14,6 +14,9 @@ import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.storage.StorageManager;
+import android.os.storage.StorageVolume;
+import android.provider.DocumentsContract;
 import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -87,7 +90,7 @@ public final class MainActivity extends BaseActivity {
     private static final int LIST = 0;
     private static final int READ = 1;
     private static final int WRITE = 2;
-    private static final int ASK_STORAGE = 1;
+    private static final int ASK_FOLDER = 1;
     /** A long message is cut here on screen; its whole text still goes into a reply. */
     private static final int MAX_SHOWN = 20000;
     /** The list is fetched again on coming back to the app after this long. */
@@ -1410,23 +1413,119 @@ public final class MainActivity extends BaseActivity {
         listDialog("Save to SD card", shown, which -> saveAttachment(all.get(which)), null);
     }
 
+    /**
+     * Saves to the SD card, never the phone. Android lets an app write in the
+     * card's Download folder only once the user has allowed it, so that is
+     * asked for on the first save; refused, the file goes to Mail's own
+     * folder on the card instead.
+     */
     private void saveAttachment(final Attachment attachment) {
-        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            pendingSave = attachment;
-            requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, ASK_STORAGE);
-            return;
-        }
-        // Only ever the SD card: with none in, nothing is saved to the phone instead.
-        File card = Card.root(this);
+        final File card = Card.root(this);
         if (card == null) {
             toast("No SD card: put one in to save files");
             return;
         }
-        final File folder = new File(card, Environment.DIRECTORY_DOWNLOADS);
+        final Uri tree = cardFolder(card);
+        if (tree == null) {
+            askForCardFolder(attachment, card);
+            return;
+        }
+        final Gmail client = gmail();
+        final ContentResolver resolver = getContentResolver();
+        start("Saving " + attachment.name + "…", () -> {
+            byte[] data = client.attachment(attachment);
+            Uri parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
+            // Octet-stream keeps the name as it is; the provider adds " (1)" and so on when it is taken.
+            Uri doc = DocumentsContract.createDocument(resolver, parent, "application/octet-stream", Mime.safeName(attachment.name));
+            if (doc == null) throw new IOException("Couldn't write to the SD card's Download folder.");
+            try {
+                OutputStream out = resolver.openOutputStream(doc);
+                if (out == null) throw new IOException("Couldn't write to the SD card's Download folder.");
+                try {
+                    out.write(data);
+                } finally {
+                    out.close();
+                }
+            } catch (IOException | RuntimeException e) {
+                DocumentsContract.deleteDocument(resolver, doc);
+                throw e;
+            }
+            // "0403-0201:Download/test (1).pdf": the path on the card follows the colon.
+            String id = DocumentsContract.getDocumentId(doc);
+            final File file = new File(card, id.substring(id.indexOf(':') + 1));
+            MediaScannerConnection.scanFile(this, new String[] {file.getPath()}, null, null);
+            return () -> {
+                say("");
+                toast("Saved to SD card/Download/" + file.getName());
+            };
+        });
+    }
+
+    /** The card's Download folder, if the user has let Mail write there; null if not. */
+    private Uri cardFolder(File card) {
+        String kept = prefs().getString("card_folder", "");
+        if (kept.length() == 0) return null;
+        Uri tree = Uri.parse(kept);
+        // A grant is for one card: another card in the slot has another id.
+        if (!DocumentsContract.getTreeDocumentId(tree).startsWith(card.getName() + ":")) return null;
+        for (UriPermission grant : getContentResolver().getPersistedUriPermissions()) {
+            if (grant.getUri().equals(tree) && grant.isWritePermission()) return tree;
+        }
+        return null;
+    }
+
+    /** Android's "Allow Mail to access Download on SD card?", once; the save carries on after. */
+    private void askForCardFolder(Attachment attachment, File card) {
+        StorageVolume volume = getSystemService(StorageManager.class).getStorageVolume(card);
+        Intent ask = volume == null ? null : volume.createAccessIntent(Environment.DIRECTORY_DOWNLOADS);
+        if (ask != null) {
+            try {
+                pendingSave = attachment;
+                startActivityForResult(ask, ASK_FOLDER);
+                return;
+            } catch (ActivityNotFoundException e) {
+                pendingSave = null;
+            }
+        }
+        saveToOwnFolder(attachment, card);
+    }
+
+    @Override
+    protected void onActivityResult(int request, int result, Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request != ASK_FOLDER) return;
+        Attachment attachment = pendingSave;
+        pendingSave = null;
+        if (attachment == null) return;
+        Uri tree = result == RESULT_OK && data != null ? data.getData() : null;
+        if (tree != null) {
+            getContentResolver().takePersistableUriPermission(tree,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            prefs().edit().putString("card_folder", tree.toString()).apply();
+            saveAttachment(attachment);
+            return;
+        }
+        File card = Card.root(this);
+        if (card == null) toast("No SD card: put one in to save files");
+        else saveToOwnFolder(attachment, card);
+    }
+
+    /** Mail's own folder on the card, which needs no one's leave: for when the Download folder is refused. */
+    private void saveToOwnFolder(final Attachment attachment, File card) {
+        File own = null;
+        for (File dir : getExternalFilesDirs(Environment.DIRECTORY_DOWNLOADS)) {
+            if (dir != null && dir.getPath().startsWith(card.getPath() + "/")) own = dir;
+        }
+        if (own == null) {
+            toast("Couldn't open Mail's folder on the SD card");
+            return;
+        }
+        final File folder = own;
+        final String shown = "SD card" + folder.getPath().substring(card.getPath().length());
         final Gmail client = gmail();
         start("Saving " + attachment.name + "…", () -> {
             byte[] data = client.attachment(attachment);
-            if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't open the SD card's Download folder.");
+            if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't open Mail's folder on the SD card.");
             final File file = unused(folder, Mime.safeName(attachment.name));
             OutputStream out = new FileOutputStream(file);
             try {
@@ -1437,7 +1536,7 @@ public final class MainActivity extends BaseActivity {
             MediaScannerConnection.scanFile(this, new String[] {file.getPath()}, null, null);
             return () -> {
                 say("");
-                toast("Saved to SD card/Download/" + file.getName());
+                toast("Saved to " + shown + "/" + file.getName());
             };
         });
     }
@@ -1450,17 +1549,6 @@ public final class MainActivity extends BaseActivity {
         File file = new File(folder, name);
         for (int i = 2; file.exists(); i++) file = new File(folder, stem + " (" + i + ")" + ext);
         return file;
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
-        super.onRequestPermissionsResult(request, permissions, results);
-        if (request != ASK_STORAGE) return;
-        Attachment attachment = pendingSave;
-        pendingSave = null;
-        if (attachment == null) return;
-        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) saveAttachment(attachment);
-        else toast("Mail needs storage access to save files");
     }
 
     /** The message in view's links: a web one opens in the browser, an address starts a message to it. */
