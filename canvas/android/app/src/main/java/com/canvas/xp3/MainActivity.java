@@ -687,7 +687,7 @@ public final class MainActivity extends BaseActivity {
                 queue(backend.draft(draft.key));
                 return;
             } else {
-                tell("Couldn't turn in", problem + " Your work is saved on the phone. Press OK, then try again.");
+                tell("Couldn't turn in", problem + " Your work is saved on the phone.");
             }
             redraw();
         });

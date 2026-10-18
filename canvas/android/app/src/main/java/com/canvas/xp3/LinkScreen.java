@@ -98,9 +98,6 @@ final class LinkScreen extends Screen {
             chips.addView(chip, v.margins(Views.wrap(), 0, 0, 4, 0));
         }
         root.addView(chips, Views.wide());
-        TextView help = v.text("Press Down to reach these, then OK to add one.", 9, look.regular, look.muted);
-        v.pad(help, 12, 5, 12, 0);
-        root.addView(help, Views.wide());
 
         TextView named = v.label("Title (optional)");
         v.pad(named, 12, 10, 12, 3);

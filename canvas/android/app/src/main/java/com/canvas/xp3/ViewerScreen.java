@@ -166,7 +166,7 @@ final class ViewerScreen extends Screen {
         String kind = kind();
         if ("other".equals(kind) || problem != null) {
             area.addView(parts.empty(0, problem != null ? problem : "This file can't be shown on the phone",
-                problem != null ? null : "It's kept on the phone; open it on a computer to read it."),
+                null),
                 new FrameLayout.LayoutParams(-1, -1));
             return root;
         }
