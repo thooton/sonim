@@ -242,9 +242,9 @@ public final class Markdown {
                 }
             }
 
-            // Links keep their text and lose their target: there is no browser
-            // worth opening on this phone, so the underline is there to say
-            // "this was a link" and nothing more.
+            // Links keep their text, underlined, and carry their target in the
+            // span: there is no browser worth opening on this phone, so it is
+            // up to the app showing them whether a link does anything.
             if (c == '[') {
                 int close = text.indexOf(']', i + 1);
                 if (
@@ -257,7 +257,7 @@ public final class Markdown {
                         span(
                             out,
                             inline(text.substring(i + 1, close)),
-                            new UnderlineSpan()
+                            new Link(text.substring(close + 2, target).trim())
                         );
                         i = target + 1;
                         continue;
@@ -269,6 +269,15 @@ public final class Markdown {
             i++;
         }
         return out;
+    }
+
+    /** A link's underline, and where it pointed, as the source wrote it. */
+    public static final class Link extends UnderlineSpan {
+        public final String target;
+
+        Link(String target) {
+            this.target = target;
+        }
     }
 
     private void span(SpannableStringBuilder out, CharSequence inner, Object mark) {

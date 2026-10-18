@@ -26,6 +26,7 @@ public final class DataTests {
         check.run("sections", () -> sections(check));
         check.run("mapping", () -> mapping(check));
         check.run("html", () -> html(check));
+        check.run("links", () -> links(check));
         check.run("store", () -> store(check));
         check.run("sync", () -> sync(check));
     }
@@ -403,5 +404,50 @@ public final class DataTests {
         } finally {
             server.close();
         }
+    }
+
+    private static void links(Check check) {
+        java.net.URI canvas = java.net.URI.create("https://canvas.asu.edu");
+        Link file = Link.of("/courses/12/files/345/download?wrap=1", canvas, canvas);
+        check.same("relative canvas file", Link.FILE, file.kind);
+        check.same("file id", "345", file.id);
+        check.same("preview file", "77",
+            Link.of("https://canvas.asu.edu/courses/12/files?preview=77", canvas, canvas).id);
+        Link work = Link.of("https://canvas.asu.edu/courses/12/assignments/9", canvas, canvas);
+        check.same("assignment", Link.ASSIGNMENT, work.kind);
+        check.same("assignment class", "12", work.course);
+        check.same("other canvas page", Link.CANVAS,
+            Link.of("https://canvas.asu.edu/courses/12/pages/week-1", canvas, canvas).kind);
+        check.same("mail is nothing", Link.NONE, Link.of("mailto:prof@asu.edu", canvas, canvas).kind);
+        check.same("anchor is nothing", Link.NONE, Link.of("#top", canvas, canvas).kind);
+        check.same("script is nothing", Link.NONE, Link.of("javascript:alert(1)", canvas, canvas).kind);
+        check.same("credentials refused", Link.NONE, Link.of("https://a:b@example.com/x", canvas, canvas).kind);
+        check.same("garbage is nothing", Link.NONE, Link.of("http://[bad", canvas, canvas).kind);
+
+        Link web = Link.of("http://example.com/handout.pdf", canvas, canvas);
+        check.same("web link", Link.WEB, web.kind);
+        check.same("http fetched over https", "https://example.com/handout.pdf", web.fetch.toString());
+        check.same("site", "example.com", Link.of("https://www.example.com/a", canvas, canvas).site());
+        check.same("relative to a web page", "https://news.example/b/c.pdf",
+            Link.of("c.pdf", java.net.URI.create("https://news.example/b/a.html"), canvas).fetch.toString());
+        check.same("spaces survive", "https://example.com/my%20notes.pdf",
+            Link.of("https://example.com/my notes.pdf", canvas, canvas).fetch.toString());
+        check.same("no canvas set up: still the web", Link.WEB,
+            Link.of("https://canvas.asu.edu/courses/1/files/2", null, null).kind);
+
+        check.same("drive file", "https://drive.usercontent.google.com/download?id=1AbCdEfGhIjKlMnOp&export=download&confirm=t",
+            Link.of("https://drive.google.com/file/d/1AbCdEfGhIjKlMnOp/view?usp=sharing", canvas, canvas).fetch.toString());
+        check.same("drive open", "https://drive.usercontent.google.com/download?id=1AbCdEfGhIjKlMnOp&export=download&confirm=t",
+            Link.of("https://drive.google.com/open?id=1AbCdEfGhIjKlMnOp", canvas, canvas).fetch.toString());
+        check.same("google doc", "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOp/export?format=pdf",
+            Link.of("https://docs.google.com/document/d/1AbCdEfGhIjKlMnOp/edit?usp=sharing", canvas, canvas)
+                .fetch.toString());
+        check.same("google slides", "https://docs.google.com/presentation/d/1AbCdEfGhIjKlMnOp/export/pdf",
+            Link.of("https://docs.google.com/presentation/u/1/d/1AbCdEfGhIjKlMnOp/edit#slide=id.p", canvas, canvas)
+                .fetch.toString());
+        check.same("google form left alone", "https://docs.google.com/forms/d/e/1AbCdEfGhIjKlMnOp/viewform",
+            Link.of("https://docs.google.com/forms/d/e/1AbCdEfGhIjKlMnOp/viewform", canvas, canvas).fetch.toString());
+        check.same("dropbox", "https://www.dropbox.com/scl/fi/abc/notes.pdf?rlkey=k&dl=1",
+            Link.of("https://www.dropbox.com/scl/fi/abc/notes.pdf?rlkey=k&dl=0", canvas, canvas).fetch.toString());
     }
 }

@@ -47,6 +47,10 @@ rationale comments beside the implementation.
     `Http` (`common/core`).
     `grading`, `enrollment`, `gradingStandard` and `due` are unused leftovers
     from the chat; they remain tested.
+  - `data/Link.java` reads a link in a teacher's text: a Canvas file, an
+    assignment, another Canvas page, or the web (with Google Drive, Docs and
+    Dropbox viewer links pointed at the file behind them). `net/Web.java`
+    fetches web links.
   - `data/Course`, `ClassData`, `Detail`, `Draft`, `Notice`, `Prefs`,
     `Quiz` and `Reminders` model classes, class pages, an assignment's page,
     saved work and how it becomes one submission (`Draft.plan`),
@@ -60,6 +64,11 @@ rationale comments beside the implementation.
     `Item` (a focusable row and how it shows focus), `MarkText` (the
     highlighter), `WeekStrip` and `Sheet` (menus, choices, questions) are
     the visual system. Everything is built in code; there are no layouts.
+  - `LinkText` puts each followable link in Markdown text in reach of the
+    d-pad (an invisible `Item` over its words, the highlighter under them);
+    `LinkMenu` is what OK on one offers and `WebScreen` shows a fetched web
+    page. Reading screens that scroll by hand use `Screen.read` so Up and
+    Down stop at links on screen.
   - `TurnInJob` sends queued turn-ins when the phone reconnects; `Alarms`
     posts the reminders chosen in Settings.
   - `Backend.java` is the only bridge from the UI to disk and network work.
@@ -137,6 +146,10 @@ Treat these as code-level guarantees, not prompt suggestions:
   after a connection failure (a duplicate is a second attempt the teacher
   sees). Upload storage hosts and download redirects never get the cookie
   unless they are Canvas's own host and path.
+- Links outside Canvas are fetched only when the student picks Open or Save
+  on one, by `Web`: a GET with no cookie, token or Canvas header, every hop
+  https, at most six hops, bounded like a Canvas download. Never give it the
+  session or anything else of the student's.
 - Validate Canvas pagination against the configured origin and `/api/v1/`
   path. Do not follow redirects carrying credentials.
 - Both user-configured endpoints remain HTTPS-only; the manifest also disables

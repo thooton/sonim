@@ -4,6 +4,7 @@ import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.ClassData;
 import com.canvas.xp3.data.Detail;
 import com.canvas.xp3.data.Draft;
+import com.canvas.xp3.data.Link;
 import com.canvas.xp3.data.Notice;
 import com.canvas.xp3.data.Prefs;
 import com.canvas.xp3.data.Quiz;
@@ -12,6 +13,7 @@ import com.canvas.xp3.data.Sync;
 import com.canvas.xp3.net.Canvas;
 import com.canvas.xp3.net.Config;
 import com.canvas.xp3.net.Parallel;
+import com.canvas.xp3.net.Web;
 import com.xp3.common.Http;
 import com.xp3.common.Json;
 
@@ -44,6 +46,7 @@ final class Backend {
 
     private final Store store;
     private final Http http = new Http();
+    private final Web web = new Web(http);
 
     // Written on the main thread when the settings change, read on the workers.
     // Each background method takes its own copy first, so a save landing part
@@ -280,6 +283,76 @@ final class Backend {
             out.close();
         }
         if (!partial.renameTo(target)) throw new IOException("Could not save the file on the phone.");
+        return target;
+    }
+
+    /**
+     * Fetches a link from outside Canvas and keeps it, so a handout read once
+     * reads again with no signal. A page is fetched afresh while there is
+     * signal, since pages change, and the last copy is the fallback; a file
+     * is fetched once.
+     */
+    File fetchLink(Link link, String label) throws IOException, InterruptedException {
+        String key = "w" + digest(link.fetch.toString());
+        File kept = store.kept(key);
+        if (kept != null && !kept.getName().endsWith(".html")) return kept;
+        File partial = store.download(key, "link.part");
+        Web.Got got;
+        OutputStream out = new FileOutputStream(partial);
+        try {
+            got = web.fetch(link.fetch, out, MAX_DOWNLOAD, null);
+        } catch (IOException e) {
+            partial.delete();
+            if (kept != null) return kept;
+            throw e;
+        } finally {
+            out.close();
+        }
+        File target = store.download(key, Web.fileName(got, label));
+        if (kept != null && !kept.equals(target)) kept.delete();
+        if (!partial.renameTo(target)) throw new IOException("Could not save the file on the phone.");
+        return target;
+    }
+
+    private static String digest(String text) {
+        try {
+            byte[] sum = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (int i = 0; i < 8; i++) hex.append(String.format(java.util.Locale.US, "%02x", sum[i] & 0xff));
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return Integer.toHexString(text.hashCode());
+        }
+    }
+
+    /**
+     * Copies a file kept by the app into the phone's Download folder, where
+     * other apps and a computer can find it, under a name not already taken.
+     */
+    File saveToDownloads(File kept) throws IOException {
+        File folder = android.os.Environment.getExternalStoragePublicDirectory(
+            android.os.Environment.DIRECTORY_DOWNLOADS);
+        if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't open the Download folder.");
+        // Kept files are named "<id>-<name>"; the id is the app's business.
+        String name = kept.getName().substring(kept.getName().indexOf('-') + 1);
+        int dot = name.lastIndexOf('.');
+        String stem = dot > 0 ? name.substring(0, dot) : name;
+        String ext = dot > 0 ? name.substring(dot) : "";
+        File target = new File(folder, name);
+        for (int i = 2; target.exists(); i++) target = new File(folder, stem + " (" + i + ")" + ext);
+        InputStream in = new FileInputStream(kept);
+        try {
+            OutputStream out = new FileOutputStream(target);
+            try {
+                byte[] buffer = new byte[32768];
+                for (int count; (count = in.read(buffer)) >= 0; ) out.write(buffer, 0, count);
+            } finally {
+                out.close();
+            }
+        } finally {
+            in.close();
+        }
         return target;
     }
 

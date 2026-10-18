@@ -13,6 +13,12 @@ import android.widget.TextView;
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Course;
 import com.canvas.xp3.data.Detail;
+import com.canvas.xp3.data.Link;
+import com.xp3.common.ui.Markdown;
+
+import java.net.URI;
+import java.util.Arrays;
+import java.util.Comparator;
 
 /**
  * The row shapes the screens share: a work row with its course dot, a row
@@ -24,6 +30,8 @@ final class Parts {
     private final MainActivity app;
     private final Views v;
     private final Look look;
+    /** Links numbered down the screen, so each keeps its key across a redraw. */
+    private int links;
 
     Parts(MainActivity app) {
         this.app = app;
@@ -272,9 +280,57 @@ final class Parts {
      * is adapted here rather than changed there.
      */
     void markdown(LinearLayout host, String source) {
+        markdown(host, source, app.backend.config().canvasBase());
+    }
+
+    /** The same, for text that came from `base`, against which its relative links are read. */
+    void markdown(LinearLayout host, String source, URI base) {
         int start = host.getChildCount();
-        new com.xp3.common.ui.Markdown(app, 12, 11).into(host, source == null ? "" : source);
-        for (int i = start; i < host.getChildCount(); i++) restyle(host.getChildAt(i));
+        new Markdown(app, 12, 11).into(host, source == null ? "" : source);
+        int end = host.getChildCount();
+        for (int i = start; i < end; i++) restyle(host.getChildAt(i));
+        for (int i = start; i < end; i++) links(host.getChildAt(i), base);
+    }
+
+    /** Puts every link the phone can follow in reach of the d-pad (see LinkText). */
+    private void links(View view, URI base) {
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) links(group.getChildAt(i), base);
+            return;
+        }
+        if (!(view instanceof TextView) || !(((TextView) view).getText() instanceof android.text.Spanned)) return;
+        TextView text = (TextView) view;
+        final android.text.Spanned spanned = (android.text.Spanned) text.getText();
+        Markdown.Link[] found = spanned.getSpans(0, spanned.length(), Markdown.Link.class);
+        if (found.length == 0) return;
+        Arrays.sort(found, new Comparator<Markdown.Link>() {
+            @Override
+            public int compare(Markdown.Link a, Markdown.Link b) {
+                return spanned.getSpanStart(a) - spanned.getSpanStart(b);
+            }
+        });
+        URI canvas = app.backend.config().canvasBase();
+        LinkText wrapped = null;
+        for (Markdown.Link span : found) {
+            final Link link = Link.of(span.target, base, canvas);
+            if (link.kind == Link.NONE) continue;
+            int from = spanned.getSpanStart(span);
+            int to = spanned.getSpanEnd(span);
+            if (to <= from) continue;
+            if (wrapped == null) {
+                android.view.ViewGroup parent = (android.view.ViewGroup) text.getParent();
+                int at = parent.indexOfChild(text);
+                android.view.ViewGroup.LayoutParams params = text.getLayoutParams();
+                parent.removeViewAt(at);
+                wrapped = new LinkText(app, text, look.markStroke);
+                parent.addView(wrapped, at, params);
+            }
+            final String label = spanned.subSequence(from, to).toString().trim();
+            Item stop = new Item(app, "link:" + links++, "Open",
+                () -> LinkMenu.show(app, link, label));
+            wrapped.add(from, to, stop);
+        }
     }
 
     private void restyle(View view) {

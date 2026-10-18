@@ -1,5 +1,7 @@
 package com.canvas.xp3;
 
+import android.graphics.Rect;
+import android.view.FocusFinder;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -91,6 +93,48 @@ abstract class Screen {
 
     /** A step this screen opened has finished with something for it. */
     void result(Object value) {}
+
+    /**
+     * Up and Down on a page that is read rather than chosen from: to the next
+     * link if it is on screen or a step away, otherwise a step of scrolling.
+     * A focused link scrolled out of sight hands focus to `rest`, so OK never
+     * acts on a link the student can no longer see.
+     */
+    boolean read(KeyEvent event, View rest) {
+        int code = event.getKeyCode();
+        if (scroll == null || (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN)) return false;
+        if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
+        int step = (code == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1) * v.dp(60);
+        View focused = app.getCurrentFocus();
+        View from = focused != null && inside(focused, scroll) ? focused : null;
+        View next = FocusFinder.getInstance().findNextFocus(scroll, from,
+            step < 0 ? View.FOCUS_UP : View.FOCUS_DOWN);
+        if (next != null && onScreen(next, scroll.getScrollY(), Math.abs(step))) {
+            next.requestFocus();
+            return true;
+        }
+        View content = scroll.getChildAt(0);
+        int most = content == null ? 0 : Math.max(0, content.getHeight() - scroll.getHeight());
+        int after = Math.max(0, Math.min(most, scroll.getScrollY() + step));
+        scroll.smoothScrollBy(0, step);
+        if (from != null && !onScreen(from, after, 0)) rest.requestFocus();
+        return true;
+    }
+
+    private static boolean inside(View view, View ancestor) {
+        for (Object at = view; at instanceof View; at = ((View) at).getParent()) {
+            if (at == ancestor) return true;
+        }
+        return false;
+    }
+
+    /** Whether `view` shows, or is within `slack` of showing, with the page scrolled to `top`. */
+    private boolean onScreen(View view, int top, int slack) {
+        Rect rect = new Rect();
+        view.getDrawingRect(rect);
+        scroll.offsetDescendantRectToMyCoords(view, rect);
+        return rect.bottom + slack > top && rect.top - slack < top + scroll.getHeight();
+    }
 
     // ------------------------------------------------------------------
 
