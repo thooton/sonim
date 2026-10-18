@@ -49,6 +49,7 @@ import com.mail.xp3.net.Outgoing;
 import com.mail.xp3.net.People;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Card;
 import com.xp3.common.ui.Family;
 import com.xp3.common.ui.Ui;
 import java.io.File;
@@ -1406,7 +1407,7 @@ public final class MainActivity extends BaseActivity {
         }
         List<String> shown = new ArrayList<String>();
         for (Attachment attachment : all) shown.add(attachment.label());
-        listDialog("Save to Download", shown, which -> saveAttachment(all.get(which)), null);
+        listDialog("Save to SD card", shown, which -> saveAttachment(all.get(which)), null);
     }
 
     private void saveAttachment(final Attachment attachment) {
@@ -1415,11 +1416,17 @@ public final class MainActivity extends BaseActivity {
             requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, ASK_STORAGE);
             return;
         }
+        // Only ever the SD card: with none in, nothing is saved to the phone instead.
+        File card = Card.root(this);
+        if (card == null) {
+            toast("No SD card: put one in to save files");
+            return;
+        }
+        final File folder = new File(card, Environment.DIRECTORY_DOWNLOADS);
         final Gmail client = gmail();
         start("Saving " + attachment.name + "…", () -> {
             byte[] data = client.attachment(attachment);
-            File folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-            if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't open the Download folder.");
+            if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't open the SD card's Download folder.");
             final File file = unused(folder, Mime.safeName(attachment.name));
             OutputStream out = new FileOutputStream(file);
             try {
@@ -1430,7 +1437,7 @@ public final class MainActivity extends BaseActivity {
             MediaScannerConnection.scanFile(this, new String[] {file.getPath()}, null, null);
             return () -> {
                 say("");
-                toast("Saved to Download/" + file.getName());
+                toast("Saved to SD card/Download/" + file.getName());
             };
         });
     }
