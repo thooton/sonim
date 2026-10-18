@@ -327,13 +327,13 @@ final class Backend {
     }
 
     /**
-     * Copies a file kept by the app into the phone's Download folder, where
-     * other apps and a computer can find it, under a name not already taken.
+     * Copies a file kept by the app into the Download folder on the SD card,
+     * where downloads go on this phone, under a name not already taken.
      */
-    File saveToDownloads(File kept) throws IOException {
-        File folder = android.os.Environment.getExternalStoragePublicDirectory(
-            android.os.Environment.DIRECTORY_DOWNLOADS);
-        if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't open the Download folder.");
+    File saveToCard(File card, File kept) throws IOException {
+        if (card == null) throw new IOException("No SD card");
+        File folder = new File(card, "Download");
+        if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't open Download on the SD card.");
         // Kept files are named "<id>-<name>"; the id is the app's business.
         String name = kept.getName().substring(kept.getName().indexOf('-') + 1);
         int dot = name.lastIndexOf('.');
