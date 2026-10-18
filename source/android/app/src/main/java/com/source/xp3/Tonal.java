@@ -13,9 +13,10 @@ import com.xp3.common.ui.BaseActivity;
 
 /**
  * What every screen of Source shares: the Tonal look (DESIGN.md, "Source:
- * Tonal"), its dark theme, the command center login, and watching Download. The dark theme is the platform's night resources
- * (values-night), switched on for this app alone, since the phone has no
- * dark setting of its own.
+ * Tonal"), its dark theme, the command center login, and watching
+ * Download. The dark theme is the platform's night resources (values-night),
+ * switched on for this app alone, since the phone has no dark setting of
+ * its own.
  */
 abstract class Tonal extends BaseActivity implements Download.Listener {
 
@@ -36,6 +37,7 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
     static final int[] COVERS = {R.color.cover_1, R.color.cover_2, R.color.cover_3, R.color.cover_4, R.color.cover_5, R.color.cover_6};
     static final int[] INKS = {R.color.cover_1_ink, R.color.cover_2_ink, R.color.cover_3_ink, R.color.cover_4_ink, R.color.cover_5_ink, R.color.cover_6_ink};
 
+    protected Login login = Login.blank();
 
     @Override
     protected void attachBaseContext(Context base) {
