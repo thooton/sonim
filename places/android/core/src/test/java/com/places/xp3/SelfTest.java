@@ -1,6 +1,7 @@
 package com.places.xp3;
 
 import com.places.xp3.net.Anchor;
+import com.places.xp3.net.Link;
 import com.places.xp3.net.Place;
 import com.places.xp3.net.Places;
 import com.xp3.common.Check;
@@ -126,6 +127,30 @@ public final class SelfTest {
                 String.format(java.util.Locale.US, "%.1f %s, %s: %s", review.rating, review.author, review.ago, review.text));
             check.same("hours sections", 2, p.hours().size());
         });
+        check.run("links", () -> {
+            Link place = Link.parse("https://www.google.com/maps/place/Cartel+Coffee+Lab/@33.4210,-111.9400,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x1!8m2!3d33.4215!4d-111.9391!16s%2Fg%2F1tf");
+            check.same("place name", "Cartel Coffee Lab", place.query);
+            check.close("the pin, not the view", 33.4215, place.near.lat, 1e-9);
+            check.same("no id", null, place.placeId);
+            Link api = Link.parse("https://www.google.com/maps/search/?api=1&query=Joe%27s+Diner&query_place_id=ChIJabc_123");
+            check.same("api query", "Joe's Diner", api.query);
+            check.same("api place id", "ChIJabc_123", api.placeId);
+            check.same("q", "1 Mill Ave, Tempe", Link.parse("https://maps.google.com/?q=1+Mill+Ave,+Tempe").query);
+            check.same("place_id in q", "ChIJxyz", Link.parse("https://maps.google.com/maps?q=place_id:ChIJxyz").placeId);
+            Link point = Link.parse("https://maps.google.com/?q=33.42,-111.94");
+            check.ok("a point in q", point.query == null && point.near != null && point.near.lng == -111.94);
+            check.close("a view", 40.7, Link.parse("https://www.google.com/maps/@40.7,-74.0,15z").near.lat, 1e-9);
+            check.same("directions go to the last stop", "Tempe Town Lake",
+                Link.parse("https://www.google.com/maps/dir/Home/Tempe+Town+Lake/@33.4,-111.9,14z/data=!4m2").query);
+            Link geo = Link.parse("geo:33.42,-111.94?q=33.42,-111.94(Cartel%20Coffee)");
+            check.ok("geo label", "Cartel Coffee".equals(geo.query) && geo.near.lat == 33.42);
+            Link address = Link.parse("geo:0,0?q=1+Mill+Ave+Tempe");
+            check.ok("geo address", "1 Mill Ave Tempe".equals(address.query) && address.near == null);
+            check.ok("geo point", Link.parse("geo:33.42,-111.94").near != null);
+            check.ok("nothing to look up", Link.parse("https://www.google.com/maps") == null);
+            check.ok("short", Link.isShort("https://maps.app.goo.gl/AbC123") && Link.isShort("https://goo.gl/maps/AbC"));
+            check.ok("not short", !Link.isShort("https://goo.gl/xyz") && !Link.isShort("https://www.google.com/maps/@1,2,3z"));
+        });
         check.run("client", () -> {
             final AtomicInteger keys = new AtomicInteger();
             final String[] key = {"key-1"};
@@ -135,6 +160,9 @@ public final class SelfTest {
                     if (!request.header("Authorization").equals("Bearer tok")) return TestServer.Reply.of(401, "text/plain", "no");
                     keys.incrementAndGet();
                     return TestServer.Reply.json("{\"key\":\"" + key[0] + "\"}");
+                }
+                if (request.path.equals("/short/AbC")) {
+                    return TestServer.Reply.of(302, "text/html", "").header("Location: /maps/place/Joe%27s/@33.4,-111.9,17z");
                 }
                 if (request.path.equals("/v1/img/one.jpg")) {
                     return TestServer.Reply.of(request.header("X-Goog-Api-Key") == null || request.header("X-Goog-Api-Key").isEmpty() ? 200 : 400, "image/jpeg", "JPEG");
@@ -218,6 +246,10 @@ public final class SelfTest {
                 check.close("rating floor sent", 4.5, Json.number(filtered, "minRating"), 1e-9);
                 places.search("coffee", tempe, null);
                 check.ok("no filters, none sent", !Json.object(Json.parse(last(server).body)).containsKey("openNow"));
+
+                check.same("a short link followed", base + "/maps/place/Joe%27s/@33.4,-111.9,17z", places.expand(base + "/short/AbC"));
+                check.same("a full link as it is", "https://maps.google.com/?q=x", places.expand("https://maps.google.com/?q=x"));
+                check.fails("only Google is followed", "not a Google Maps link", () -> places.expand("https://example.com/maps"));
 
                 Places stranger = new Places(base + "/cc", "wrong", base + "/v1");
                 check.fails("a bad token says so", "login", () -> stranger.search("coffee", null, null));

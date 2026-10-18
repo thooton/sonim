@@ -184,6 +184,41 @@ public final class Places {
         }
     }
 
+    /**
+     * The full link a short Maps link (maps.app.goo.gl/...) stands for,
+     * found by following its redirects by hand, since the HTTP client follows
+     * none. Nothing is sent with them, and only Google's own hosts are
+     * followed. A link that is not short is returned as it is.
+     */
+    public String expand(String link) throws IOException, InterruptedException {
+        String at = link.trim();
+        // Google answers plain http only to send it to https.
+        if (at.regionMatches(true, 0, "http://", 0, 7)) {
+            String secure = "https://" + at.substring(7);
+            try {
+                if (Link.isGoogle(new URI(secure))) at = secure;
+            } catch (Exception e) {
+                // Not a link at all: refused below.
+            }
+        }
+        for (int hop = 0; hop < 5 && (Link.isShort(at) || Link.parse(at) == null); hop++) {
+            URI uri;
+            try {
+                uri = new URI(at);
+            } catch (Exception e) {
+                throw new IOException("That link is not a Google Maps link.");
+            }
+            if (!Link.isGoogle(uri) && (uri.getHost() == null || !uri.getHost().equals(URI.create(google).getHost()))) {
+                throw new IOException("That link is not a Google Maps link.");
+            }
+            Http.Response response = http.send(Http.Request.to(uri).timeout(30000));
+            String next = response.header("Location");
+            if (response.status() / 100 != 3 || next == null || next.length() == 0) break;
+            at = uri.resolve(next.trim()).toString();
+        }
+        return at;
+    }
+
     /** The key, from the command center the first time and from memory after. */
     String key() throws IOException, InterruptedException {
         String known = key;

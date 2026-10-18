@@ -27,6 +27,7 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import com.places.xp3.net.Anchor;
+import com.places.xp3.net.Link;
 import com.places.xp3.net.Place;
 import com.places.xp3.net.Places;
 import com.xp3.common.Json;
@@ -191,6 +192,14 @@ public final class MainActivity extends BaseActivity {
         query.requestFocus();
         if (!login.ready()) say("No command center");
         refresh();
+        if (state == null) follow(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        follow(intent);
     }
 
     /** TEMPORARY: see LocationTest. Runs the test once location is allowed, or says it wasn't. */
@@ -355,6 +364,56 @@ public final class MainActivity extends BaseActivity {
                 say(results.isEmpty() ? "No results for “" + what + "”" + (at == null ? "" : " near " + at.label) : "");
                 list.setSelection(0);
                 refresh();
+            };
+        });
+    }
+
+    /**
+     * A Google Maps link opened from elsewhere (a text message, say), since
+     * the phone's own Maps is disabled: a short link is followed to the full
+     * one, which is read for a place's id, a name or a point. A place's id
+     * opens that place; a name is searched for near the link's point and the
+     * best match opened, with the rest of the results behind it.
+     */
+    private void follow(Intent intent) {
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction()) || intent.getData() == null) return;
+        final String link = intent.getDataString();
+        if (!login.ready()) {
+            askLogin();
+            return;
+        }
+        if (showing) close();
+        final Places client = places();
+        say("Opening the link…");
+        start(() -> {
+            String full = client.expand(link);
+            final Link found = Link.parse(full);
+            if (found == null) throw new java.io.IOException("Couldn't tell what that link points at.");
+            final Place exact = found.placeId != null ? client.details(found.placeId) : null;
+            final String what = exact != null ? exact.name() : found.query != null ? found.query : found.near.label;
+            final Places.Page page = exact != null ? null : client.search(what, found.near, null);
+            return () -> {
+                results.clear();
+                if (exact != null) {
+                    results.add(exact);
+                    details.put(exact.id(), exact);
+                    nextPage = null;
+                } else {
+                    results.addAll(page.places);
+                    nextPage = page.next;
+                }
+                searched = what;
+                searchedNear = found.near;
+                searchedOpen = false;
+                searchedRated = false;
+                picked = 0;
+                query.setText(what);
+                remember(what);
+                say(results.isEmpty() ? "No results for “" + what + "”" : "");
+                zone = results.isEmpty() ? Zone.QUERY : Zone.LIST;
+                list.setSelection(0);
+                refresh();
+                if (!results.isEmpty()) open();
             };
         });
     }

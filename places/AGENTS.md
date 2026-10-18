@@ -37,6 +37,15 @@ again on the next request, in case it was replaced.
   Photos), so only a place's first photo is shown, on its page, fetched at
   240px and kept in memory by `Photos`.
 
+- **A Maps link** opened from elsewhere (a text message, say: the phone's
+  own Maps is disabled) comes to `MainActivity` through the manifest's
+  VIEW filters for maps.google.com, maps.app.goo.gl, google.com/maps,
+  goo.gl/maps and geo:. `Places.expand` follows a short link's redirects by
+  hand (only to Google's hosts, sending nothing), and `Link` reads the full
+  one for a place's id, a name or address, and a point. An id opens that
+  place's page; otherwise the name (or the point) is searched for near the
+  point and the first result opened, with the rest behind it.
+
 Field masks decide what Google bills, so keep them the CLI's: search asks
 for nothing past the Enterprise tier, only a place's details ask for
 reviews and the other Atmosphere fields. The additions are `priceRange`,
@@ -56,7 +65,7 @@ ranges use one too: the app writes no en or em dashes of its own.
   (Google's object, read lazily: an open/closed status,
   the CLI's sections of a place as text, and the same facts in pieces for
   the details screen: hours, about, amenities as yes/no options, reviews),
-  `Anchor` (where to search near, distances). Tests in `src/test` run via
+  `Anchor` (where to search near, distances), `Link` (a Maps link read). Tests in `src/test` run via
   `:core:selfTest`, against a loopback server standing in for both the
   command center and Google.
 - `android/app`: `MainActivity` (the one screen: the header, the filter
