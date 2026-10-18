@@ -7,15 +7,13 @@ import android.content.res.Configuration;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.widget.TextView;
 import com.source.xp3.net.Music;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
 
 /**
  * What every screen of Source shares: the Tonal look (DESIGN.md, "Source:
- * Tonal"), its dark theme, the soft-key bar, the command center login, and
- * watching Download. The dark theme is the platform's night resources
+ * Tonal"), its dark theme, the command center login, and watching Download. The dark theme is the platform's night resources
  * (values-night), switched on for this app alone, since the phone has no
  * dark setting of its own.
  */
@@ -38,10 +36,6 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
     static final int[] COVERS = {R.color.cover_1, R.color.cover_2, R.color.cover_3, R.color.cover_4, R.color.cover_5, R.color.cover_6};
     static final int[] INKS = {R.color.cover_1_ink, R.color.cover_2_ink, R.color.cover_3_ink, R.color.cover_4_ink, R.color.cover_5_ink, R.color.cover_6_ink};
 
-    protected Login login = Login.blank();
-    private TextView keyLeft;
-    private TextView keyCentre;
-    private TextView keyRight;
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -60,13 +54,6 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
         loadFonts();
         Download.init(this);
         login = loadLogin(prefs());
-    }
-
-    /** Called once the screen's views are set, to find its soft-key bar. */
-    protected final void softKeys() {
-        keyLeft = (TextView) findViewById(R.id.key_left);
-        keyCentre = (TextView) findViewById(R.id.key_centre);
-        keyRight = (TextView) findViewById(R.id.key_right);
     }
 
     @Override
@@ -130,29 +117,6 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
             }
         }
         return Login.parse(prefs.getString("login", ""));
-    }
-
-    /**
-     * What the soft keys do here: Menu on the left, OK in the centre pill
-     * (with its icon, 0 for none), Back on the right. A null label leaves
-     * that key's place empty; a null centre hides the pill.
-     */
-    protected final void keys(String left, int icon, String centre, String right) {
-        keyLeft.setText(left == null ? "" : left);
-        keyRight.setText(right == null ? "" : right);
-        if (centre == null) {
-            keyCentre.setVisibility(android.view.View.INVISIBLE);
-            return;
-        }
-        keyCentre.setVisibility(android.view.View.VISIBLE);
-        keyCentre.setText(centre);
-        Drawable drawn = null;
-        if (icon != 0) {
-            drawn = getDrawable(icon).mutate();
-            drawn.setTint(getColor(R.color.on_accent));
-            drawn.setBounds(0, 0, dp(13), dp(13));
-        }
-        keyCentre.setCompoundDrawablesRelative(drawn, null, null, null);
     }
 
     /** A passing word, as a toast. */

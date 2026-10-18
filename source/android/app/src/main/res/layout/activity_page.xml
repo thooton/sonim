@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A page under the list: a slim bar saying where you are, the page, and
-     the soft keys. The page itself is built in code. -->
+<!-- A page under the list: a slim bar saying where you are, the page. The
+     page itself is built in code. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -47,6 +47,4 @@
             android:orientation="vertical"
             android:paddingBottom="8dp" />
     </ScrollView>
-
-    <include layout="@layout/softkeys" />
 </LinearLayout>

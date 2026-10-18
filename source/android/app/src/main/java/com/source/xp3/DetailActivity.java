@@ -68,7 +68,6 @@ public final class DetailActivity extends Tonal {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_page);
-        softKeys();
         body = (ScrollView) findViewById(R.id.body);
         page = (LinearLayout) findViewById(R.id.page);
         key = getIntent().getStringExtra(KEY);
@@ -427,7 +426,7 @@ public final class DetailActivity extends Tonal {
             }
             case Download.SAVED: {
                 List<String> files = job != null && job.state == Download.SAVED ? job.files : savedFiles();
-                String where = files.isEmpty() ? "" : files.size() == 1 ? Files.shown(files.get(0)) : Files.folderOf(files);
+                String where = files.isEmpty() ? "" : files.size() == 1 ? Files.shown(this, files.get(0)) : Files.folderOf(this, files);
                 String top = where.indexOf('/') > 0 ? where.substring(0, where.indexOf('/')) : "";
                 String title = job != null && job.note.length() > 0 ? job.note : top.length() > 0 ? "Saved to " + top : "Saved";
                 if (job == null && entry != null && entry.time > 0) {
@@ -472,7 +471,6 @@ public final class DetailActivity extends Tonal {
         }
         logView.setText(text);
         logView.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
-        showKeys(state);
     }
 
     private List<String> savedFiles() {
@@ -516,29 +514,6 @@ public final class DetailActivity extends Tonal {
             line += " · about " + (seconds < 60 ? Math.max(1, seconds) + " sec" : (seconds + 30) / 60 + " min") + " left";
         }
         return line;
-    }
-
-    private void showKeys(int state) {
-        boolean isBook = Download.BOOK.equals(kind());
-        switch (state) {
-            case Download.SAVED:
-                keys("Options", isBook ? R.drawable.ic_book : R.drawable.ic_play, isBook ? "Read" : "Play", "Back");
-                break;
-            case Download.FAILED:
-                keys("Options", R.drawable.ic_refresh, "Retry", "Back");
-                break;
-            case Download.QUEUED:
-            case Download.RUNNING:
-                keys("Options", 0, null, "Back");
-                break;
-            default:
-                if (hit == null && book == null) {
-                    keys("Options", 0, null, "Back");
-                } else {
-                    String what = book != null ? "Get " + book.extension.toUpperCase(Locale.US) : "Get";
-                    keys("Options", R.drawable.ic_download, what, "Back");
-                }
-        }
     }
 
     // ---- Doing things.

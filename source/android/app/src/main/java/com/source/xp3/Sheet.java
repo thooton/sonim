@@ -6,7 +6,6 @@ import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -87,13 +86,6 @@ final class Sheet {
         int most = activity.getResources().getDisplayMetrics().heightPixels * 2 / 3;
         int tall = Math.min(most, rows.size() * Ui.dp(activity, 30) + Ui.dp(activity, 4));
         sheet.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, tall));
-
-        View keys = LayoutInflater.from(activity).inflate(R.layout.softkeys, sheet, false);
-        ((TextView) keys.findViewById(R.id.key_left)).setText("");
-        ((TextView) keys.findViewById(R.id.key_centre)).setText("Select");
-        ((TextView) keys.findViewById(R.id.key_right)).setText("Close");
-        keys.setBackgroundResource(android.R.color.transparent);
-        sheet.addView(keys);
 
         dialog.setContentView(sheet, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         Window window = dialog.getWindow();

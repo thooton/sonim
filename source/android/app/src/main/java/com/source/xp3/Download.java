@@ -3,7 +3,6 @@ package com.source.xp3;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.media.MediaScannerConnection;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -35,7 +34,8 @@ import java.util.Set;
  * book results, and every download of this session with its own state and
  * log. Downloads wait their turn in a queue; a search goes ahead of the queue
  * but waits for the download that is running, since two runs at once would
- * log the command center's Soulseek account in twice. Saved downloads are
+ * log the command center's Soulseek account in twice. Everything is saved
+ * onto the SD card, never the phone's own storage. Saved downloads are
  * remembered across restarts in History. Activities attach a Listener to
  * watch; everything they are told arrives on the main thread, which owns all
  * of this state.
@@ -44,11 +44,11 @@ import java.util.Set;
  * and ends with the results to pick from. Downloading one is three steps, as
  * `delta music` does them: the command center downloads it and streams its
  * log, then the app fetches the job's files as a tar straight into the
- * shared Music folder, then it removes the job.
+ * Music folder on the SD card, then it removes the job.
  *
  * Books are `delta books`: the phone logs in to the book source with the
  * account kept on the command center, searches, and downloads the chosen
- * result into the shared Books folder.
+ * result into the Books folder on the SD card.
  */
 final class Download {
 
@@ -56,7 +56,7 @@ final class Download {
         void changed();
     }
 
-    /** Where books are saved: a folder of their own beside Music. */
+    /** Where books are saved: a folder of their own on the SD card. */
     static final String BOOKS_FOLDER = "Books";
     static final String BOOK = "book";
 
@@ -530,7 +530,7 @@ final class Download {
         }
     }
 
-    /** Downloads a music result into the shared Music folder, its log in the job. */
+    /** Downloads a music result into the Music folder on the SD card, its log in the job. */
     private static void runMusic(Job job, Music music) throws IOException, InterruptedException {
         String id = null;
         try {
@@ -538,7 +538,7 @@ final class Download {
             id = result.job;
             if (id != null) {
                 long total = result.bytes > 0 ? result.bytes : job.hit.bytes();
-                progress(job, "Saving to the phone", 0, total);
+                progress(job, "Saving to the SD card", 0, total);
                 Saved saved = save(job, music, id, total);
                 try {
                     music.delete(id);
@@ -546,7 +546,7 @@ final class Download {
                     // Jobs left behind are removed by the command center after a day.
                 }
                 id = null;
-                String where = saved.folder == null ? "Music" : "Music/" + saved.folder;
+                String where = saved.folder == null ? MUSIC_FOLDER : MUSIC_FOLDER + "/" + saved.folder;
                 String done = "Saved " + saved.count + (saved.count == 1 ? " file" : " files") + " to " + where;
                 if (saved.kept > 0) done += ", " + saved.kept + " already there";
                 say(job, "✓ " + done);
@@ -567,15 +567,20 @@ final class Download {
         }
     }
 
+    /** Where music is saved: a folder of its own on the SD card. */
+    static final String MUSIC_FOLDER = "Music";
+
     private static final class Saved {
         int count;
         int kept;
         String folder;
     }
 
-    /** Fetches the job's files into the shared Music folder. */
+    /** Fetches the job's files into the Music folder on the SD card. */
     private static Saved save(final Job job, final Music music, String id, final long total) throws IOException, InterruptedException {
-        final File root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC);
+        File card = Files.card(app);
+        if (card == null) throw new IOException("No SD card in the phone.");
+        final File root = new File(card, MUSIC_FOLDER);
         if (!root.isDirectory() && !root.mkdirs()) throw new IOException("Can't open the Music folder.");
         final Saved saved = new Saved();
         final List<String> scan = new ArrayList<String>();
@@ -610,7 +615,7 @@ final class Download {
                     long now = System.currentTimeMillis();
                     if (now - last > 500) {
                         last = now;
-                        progress(job, "Saving to the phone", done[0], total);
+                        progress(job, "Saving to the SD card", done[0], total);
                     }
                 }
                 out.close();
@@ -627,7 +632,7 @@ final class Download {
             scan.add(target.getAbsolutePath());
             say(job, "  " + (dir.equals(root) ? "" : dir.getName() + "/") + target.getName());
             arrived(job, name, target);
-            progress(job, "Saving to the phone", done[0], total);
+            progress(job, "Saving to the SD card", done[0], total);
         });
         if (!scan.isEmpty()) {
             MediaScannerConnection.scanFile(app, scan.toArray(new String[0]), null, null);
@@ -700,7 +705,9 @@ final class Download {
     }
 
     private static void runBook(Job job, Books books) throws IOException, InterruptedException {
-        File folder = new File(Environment.getExternalStorageDirectory(), BOOKS_FOLDER);
+        File card = Files.card(app);
+        if (card == null) throw new IOException("No SD card in the phone.");
+        File folder = new File(card, BOOKS_FOLDER);
         Books.Saved saved = books.download(job.book, folder, (done, total) -> progress(job, "Downloading", done, total));
         if (!saved.kept) {
             MediaScannerConnection.scanFile(app, new String[] {saved.file.getAbsolutePath()}, null, null);

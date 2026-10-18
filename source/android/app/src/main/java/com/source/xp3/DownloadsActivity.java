@@ -34,7 +34,6 @@ public final class DownloadsActivity extends Tonal {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_page);
-        softKeys();
         ((TextView) findViewById(R.id.title)).setText("Downloads");
         // The page is a list rather than the shared scrolling page.
         View body = findViewById(R.id.body);
@@ -94,7 +93,6 @@ public final class DownloadsActivity extends Tonal {
         if (at < 0) at = next(-1, 1);
         setPicked(at);
         adapter.notifyDataSetChanged();
-        showKeys();
     }
 
     /** The next pickable row from `from` going `step`, or -1. */
@@ -118,21 +116,6 @@ public final class DownloadsActivity extends Tonal {
         setPicked(at);
         adapter.notifyDataSetChanged();
         list.smoothScrollToPosition(at);
-        showKeys();
-    }
-
-    private void showKeys() {
-        Object item = pickedItem;
-        if (item instanceof History.Entry) {
-            boolean book = Download.BOOK.equals(((History.Entry) item).kind);
-            keys("Options", book ? R.drawable.ic_book : R.drawable.ic_play, book ? "Read" : "Play", "Back");
-        } else if (item instanceof Download.Job && ((Download.Job) item).state == Download.FAILED) {
-            keys("Options", R.drawable.ic_refresh, "Retry", "Back");
-        } else if (item instanceof Download.Job) {
-            keys("Options", 0, "Open", "Back");
-        } else {
-            keys("Options", 0, null, "Back");
-        }
     }
 
     private void ok() {
