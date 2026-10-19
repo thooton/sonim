@@ -1,9 +1,7 @@
 package com.source.xp3;
 
-import android.Manifest;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
@@ -39,20 +37,20 @@ import java.util.List;
  * pill tabs over a search pill. Type "Artist - Title" (or "Artist - Album")
  * and press OK, and the command center searches Soulseek while its log
  * scrolls by below; then the results take the log's place, best first by the
- * music config's preferences, the first one picked. Every row ends in a state
- * button: OK on a row gets it (or plays it, opens it, or tries it again), and
- * downloads queue up behind one another. Books work the same way, by title,
+ * music config's preferences, the first one picked. OK on a row opens its
+ * page, where it is downloaded (or plays a saved one); a row being downloaded
+ * ends in its state, and downloads queue up behind one another. Books work the same way, by title,
  * author or ISBN. Before a search the screen shows what is downloading, the
  * recent searches, and how full the phone is.
  *
- * Keys: OK does what the centre soft key says; Up and Down move between the
+ * Keys: OK searches, or opens the picked row; Up and Down move between the
  * box and the rows (or scroll the log); Left and Right switch between Song,
  * Album and Book while the keys aren't typing, and turn the page of book
- * results; Back does what the right soft key says; Menu opens Options.
+ * results; Back stops a search, goes back to the box, or leaves; Menu opens
+ * Options.
  */
 public final class MainActivity extends Tonal {
 
-    private static final int ASK_STORAGE = 1;
     private static final String BOOK = Download.BOOK;
     private static final String[] MODES = {Music.SONG, Music.ALBUM, BOOK};
     private static final int[] TAB_NAMES = {R.string.tab_song, R.string.tab_album, R.string.tab_book};
@@ -97,7 +95,6 @@ public final class MainActivity extends Tonal {
     /** A passing word for the status line, until the next search. */
     private String said = "";
     private Recents recents;
-    private Runnable whenAllowed;
     /** The home screen's or empty state's rows that can be picked, with what OK does on each. */
     private final List<View> pickable = new ArrayList<View>();
     private final List<Runnable> actions = new ArrayList<Runnable>();
@@ -700,26 +697,15 @@ public final class MainActivity extends Tonal {
         return i < 0 || i >= list.size() ? "" : list.get(i).link;
     }
 
-    /** OK on a result: get it, open it while it downloads, play or read it once saved, or try it again. */
-    private void act(final int i) {
+    /**
+     * OK on a result: play or read it once saved, else open its page, where
+     * it can be looked over before it is downloaded.
+     */
+    private void act(int i) {
         String key = keyAt(i);
-        switch (Download.state(key)) {
-            case Download.QUEUED:
-            case Download.RUNNING:
-                openDetail(key);
-                return;
-            case Download.SAVED:
-                open(this, key);
-                return;
-            default:
-                if (!login.ready()) {
-                    askLogin();
-                    return;
-                }
-                if (needStorage(() -> act(i))) return;
-                if (books()) Download.get(login, Download.results().books.get(i));
-                else Download.get(login, hitList().get(i));
-        }
+        if (key.length() == 0) return;
+        if (Download.state(key) == Download.SAVED) open(this, key);
+        else openDetail(key);
     }
 
     /** Plays or reads what was saved for `key`. */
@@ -759,27 +745,6 @@ public final class MainActivity extends Tonal {
             return;
         }
         Download.search(login, page.query, next, page.format);
-    }
-
-    /** Asks for storage once, running `then` when it is granted; true while asking. */
-    private boolean needStorage(Runnable then) {
-        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) return false;
-        whenAllowed = then;
-        requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, ASK_STORAGE);
-        return true;
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
-        if (code != ASK_STORAGE) return;
-        boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
-        Runnable then = whenAllowed;
-        whenAllowed = null;
-        if (granted && then != null) {
-            then.run();
-        } else if (!granted) {
-            say("No storage access");
-        }
     }
 
     private void movePick(int step) {

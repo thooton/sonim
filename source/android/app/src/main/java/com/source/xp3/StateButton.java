@@ -9,12 +9,12 @@ import android.os.SystemClock;
 import android.view.View;
 
 /**
- * The round button at the end of every row: both what OK does there and
- * where the result stands. Get is tonal, or filled with primary on the row
- * under the d-pad; downloading is a ring that fills, with the percentage in
- * it (or an arc going round while the size isn't known); queued an outline;
- * saved the success container with a tick; failed the error container with
- * a retry arrow.
+ * The round button at the end of a download's row: where it stands.
+ * Downloading is a ring that fills, with the percentage in it (or an arc
+ * going round while the size isn't known); queued an outline; saved the
+ * success container with a tick; failed the error container with a retry
+ * arrow. Not yet asked for (a result's rows hide it then) is a tonal download
+ * arrow, filled with primary on the row under the d-pad.
  */
 final class StateButton extends View {
 

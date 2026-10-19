@@ -31,8 +31,9 @@ import java.util.Locale;
  * saying where it stands (downloading with the wavy bar and what is left,
  * queued, saved and where to, or why it failed), an album's tracks each with
  * its own state, a book's other formats to choose between with Left and
- * Right, and the download's own log from the command center. OK does what the
- * centre soft key says: Get, Play, Read or Retry.
+ * Right, and the download's own log from the command center. Under the card
+ * is the button OK presses: Download, Try again, Play or Read (none while it
+ * is downloading). Results are downloaded only from here.
  */
 public final class DetailActivity extends Tonal {
 
@@ -55,6 +56,8 @@ public final class DetailActivity extends Tonal {
     private TextView cardFigure;
     private Wavy wavy;
     private TextView cardLine;
+    private LinearLayout action;
+    private TextView actionLabel;
     private TextView logView;
     private final List<StateButton> trackStates = new ArrayList<StateButton>();
     private final List<TextView> formatChips = new ArrayList<TextView>();
@@ -152,6 +155,17 @@ public final class DetailActivity extends Tonal {
         cardLine.setPadding(0, dp(5), 0, 0);
         card.addView(cardLine);
         page.addView(card, margins(ViewGroup.LayoutParams.MATCH_PARENT, 8, 8));
+
+        action = new LinearLayout(this);
+        action.setGravity(Gravity.CENTER);
+        action.setBackgroundResource(R.drawable.button_primary);
+        action.setMinimumHeight(dp(32));
+        actionLabel = text("", 13, getColor(R.color.on_accent));
+        actionLabel.setTypeface(BOLD);
+        actionLabel.setSingleLine(true);
+        actionLabel.setCompoundDrawablePadding(dp(6));
+        action.addView(actionLabel);
+        page.addView(action, margins(ViewGroup.LayoutParams.MATCH_PARENT, 10, 12));
 
         if (hit != null && hit.album()) buildTracks();
         if (entry != null && hit == null && book == null && entry.files.size() > 1) buildFiles();
@@ -447,6 +461,8 @@ public final class DetailActivity extends Tonal {
                 break;
         }
 
+        showAction(state);
+
         for (int i = 0; i < trackStates.size(); i++) {
             String name = hit.tracks.get(i).name();
             List<String> parts = Names.parts(name);
@@ -471,6 +487,33 @@ public final class DetailActivity extends Tonal {
         }
         logView.setText(text);
         logView.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
+    }
+
+    /** The button: what OK does in this state, or gone while it is downloading. */
+    private void showAction(int state) {
+        boolean gettable = hit != null || book != null;
+        boolean read = Download.BOOK.equals(kind());
+        switch (state) {
+            case Download.SAVED:
+                showAction(read ? "Read" : "Play", read ? R.drawable.ic_article : R.drawable.ic_play);
+                return;
+            case Download.FAILED:
+                if (gettable) showAction("Try again", R.drawable.ic_refresh);
+                else action.setVisibility(View.GONE);
+                return;
+            case Download.IDLE:
+                if (gettable) showAction("Download", R.drawable.ic_download);
+                else action.setVisibility(View.GONE);
+                return;
+            default:
+                action.setVisibility(View.GONE);
+        }
+    }
+
+    private void showAction(String label, int icon) {
+        actionLabel.setText(label);
+        actionLabel.setCompoundDrawablesRelative(icon(icon, R.color.on_accent, 15), null, null, null);
+        action.setVisibility(View.VISIBLE);
     }
 
     private List<String> savedFiles() {

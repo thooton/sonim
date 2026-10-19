@@ -241,14 +241,14 @@ its own:
 ## Source: Tonal
 
 Source takes its look from the Tonal proposal: Material 3's colour roles
-generated from `#6750A4`, built around the d-pad and the soft keys. It keeps
+generated from `#6750A4`, built around the d-pad. It keeps
 the family's rules on words (nothing explains itself, no em dashes) and
 departs from it where the proposal does:
 
 - **Light chrome, tonal surfaces.** No band: the status bar is the page
   (`surface`, `#FEF7FF`) with dark icons. Colour comes from soft tinted
   containers (`container`, `container_high`); saturated `accent` is kept for
-  the one action that matters, the centre soft key, focus rings and
+  the one action that matters, a page's button, focus rings and
   progress. The family's names (`primary`, `focus_fill`, `row`...) are kept,
   pointed at the matching roles, for the shared drawables and dialogs.
 - **A dark theme.** `values-night` holds Material 3's dark roles for the same
@@ -256,23 +256,23 @@ departs from it where the proposal does:
   the app's activities a night configuration (`Tonal.attachBaseContext`).
 - **DM Sans, and Bold rather than Medium.** The proposal's face, bundled as
   static instances of Google Fonts' variable DM Sans at its 14pt optical
-  size (OFL): row titles, the picked tab, page titles and the soft-key pill
-  in Bold, labels and the soft keys' sides in SemiBold, tabs at rest in
+  size (OFL): row titles, the picked tab, page titles and a page's button
+  in Bold, labels in SemiBold, tabs at rest in
   Medium, everything else regular (`Tonal.FONT` and the rest, and
   `@font/dm_sans_family` in the theme).
 - **Pill tabs** in a tonal track, each with the icon of what it finds, and a
   pill search field with a search icon that rings in `accent` while it takes
   the keys.
-- **The soft-key bar.** Always at the foot: what Menu (the left soft key)
-  does, a filled pill saying what OK does (Search, Get, Play, Read, Retry,
-  Stop), and what Back (the right soft key) does. Labels for keys are not a
-  lesson in using the app: they name what the key does here, as a feature
-  phone's soft keys always have.
-- **State on every row.** Each result ends in `StateButton`: Get (tonal,
-  filled when the row is picked), a ring filling with the percentage, an
-  outline with a clock while queued, the success container with a tick once
-  saved, the error container with a retry arrow when it failed. The picked
-  row is a filled 14dp block of `accent_container`, not an outlined card.
+- **No soft-key bar.** The rows get the full height. A result's page has
+  one filled pill of `accent` under its card saying what OK does there
+  (Download, Try again, Play, Read), gone while it downloads.
+- **Look before you get.** OK on a result opens its page (or plays a saved
+  one); it is downloaded only from there, never straight from the list.
+- **State once asked for.** A result's row ends in `StateButton` only once
+  it is downloading: a ring filling with the percentage, an outline with a
+  clock while queued, the success container with a tick once saved, the
+  error container with a retry arrow when it failed. The picked row is a
+  filled 14dp block of `accent_container`, not an outlined card.
 - **Drawn covers.** Soulseek and the book source send no artwork, so `Cover`
   draws the name's initials on one of six tones: a square for a song, a
   square with a record behind it for an album, 2:3 with a spine for a book. A
