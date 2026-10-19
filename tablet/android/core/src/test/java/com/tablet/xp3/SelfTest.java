@@ -198,6 +198,12 @@ public final class SelfTest {
             if (request.method.equals("GET") && path.equals("/files/Lease%20summary%2Edocx")) {
                 return TestServer.Reply.of(200, "application/octet-stream", "PK the word document");
             }
+            if (request.method.equals("GET") && path.equals("/remarkable/d1/pdf")) {
+                return TestServer.Reply.of(200, "application/pdf", "%PDF-1.4 the whole essay");
+            }
+            if (request.method.equals("GET") && path.equals("/remarkable/d3/pdf")) {
+                return TestServer.Reply.of(404, "application/json", "{\"error\":\"nothing is written on it, and the tablet lays out its pages itself\"}");
+            }
             if (path.startsWith("/files/")) return TestServer.Reply.of(404, "application/json", "{\"error\":\"not found\"}");
             return TestServer.Reply.of(404, "application/json", "{\"error\":\"no such document on the reMarkable\"}");
         });
@@ -249,6 +255,12 @@ public final class SelfTest {
             check.fails("a result no longer in Files", "File not found",
                 () -> tablet.download("Gone.pdf", new File(dir, "Gone.pdf")));
             check.ok("nothing saved for that", !new File(dir, "Gone.pdf").exists());
+            File whole = new File(dir, "Essay.pdf");
+            tablet.pdf("d1", whole);
+            check.same("a file downloaded as one PDF", "%PDF-1.4 the whole essay", new String(Files.readAllBytes(whole.toPath()), "UTF-8"));
+            check.fails("an ePub with nothing written has no PDF", "Couldn't download it: Nothing is written on it",
+                () -> tablet.pdf("d3", new File(dir, "e.pdf")));
+            check.ok("nothing saved for the ePub", !new File(dir, "e.pdf").exists());
             File pdf = new File(dir, "Reading 4 & notes.pdf");
             Files.write(pdf.toPath(), "%PDF-1.4 from the phone".getBytes("UTF-8"));
             final long[] sent = {0};
@@ -270,6 +282,9 @@ public final class SelfTest {
             check.ok("a Word document isn't", !Browse.takes("x.docx"));
             check.same("the name on the tablet", "Reading 4 & notes", Browse.title(pdf));
 
+            check.same("a file's PDF name", "Essay.pdf", Downloads.pdfName("Essay"));
+            check.same("not .pdf twice", "Scan.PDF", Downloads.pdfName("Scan.PDF"));
+            check.same("no slash in a file name", "Math - Unit 2.pdf", Downloads.pdfName("Math / Unit 2"));
             check.same("a free name", "Essay.docx", Downloads.free(dir, "Essay.docx").getName());
             check.same("a taken name is numbered", "Lease summary (2).docx", Downloads.free(dir, "Lease summary.docx").getName());
             check.same("a name can't leave the folder", "x.pdf", Downloads.free(dir, "../x.pdf").getName());

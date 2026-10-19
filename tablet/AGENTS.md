@@ -28,6 +28,11 @@ reads and writes its storage, so the app sees what the tablet last synced.
 
 - `GET /remarkable`: the Library (`Library`), every document not in the
   trash, newest edit first, and the folders for Move.
+- `GET /remarkable/{id}/pdf`: a whole document as the tablet shows it, as
+  one PDF, which Download PDF in a file's menu saves into `Documents` on
+  the SD card as for a job's result (below), named after the file
+  (`Downloads.pdfName`). An ePub with nothing written on it has none, and
+  the command center's words say so.
 - `GET /remarkable/{id}/pages/{n}`: one page as the tablet shows it, as a
   one-page PDF, with `X-Pages` for the count. `Pages` keeps them on disk by
   document id and edit time and draws them with `PdfRenderer`; covers are

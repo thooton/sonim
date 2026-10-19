@@ -128,6 +128,22 @@ public final class Center {
     }
 
     /**
+     * Saves document `id` whole, as the tablet shows it with what is written
+     * on it, to `dest` as one PDF. An ePub with nothing written on it has
+     * none, and the command center says so.
+     */
+    public void pdf(String id, File dest) throws IOException, InterruptedException {
+        Http.Stream stream = http.stream(request("/remarkable/" + segment(id) + "/pdf", SLOW));
+        try {
+            int status = stream.status();
+            if (status < 200 || status >= 300) fail(status, small(stream.stream()), "download it");
+            save(stream.stream(), dest, MAX_FILE, "File too big");
+        } finally {
+            stream.close();
+        }
+    }
+
+    /**
      * Puts a PDF or ePub from the phone on the tablet, as `name`, in folder
      * `parent` ("" for the top), streamed rather than read into memory, and
      * returns its id. `sending` hears how much has gone.

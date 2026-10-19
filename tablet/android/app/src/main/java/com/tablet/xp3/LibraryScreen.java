@@ -25,13 +25,14 @@ final class LibraryScreen extends FrameLayout {
     /** The file's menu, in order. */
     static final int OPEN = 0;
     static final int TRANSFORM = 1;
-    static final int RENAME = 2;
-    static final int MOVE = 3;
-    static final int DETAILS = 4;
-    static final int DELETE = 5;
-    static final String[] LABELS = {"Open", "Transform", "Rename", "Move to folder…", "Details", "Delete"};
-    static final int[] ICONS = {R.drawable.ic_eye, R.drawable.ic_sparkle, R.drawable.ic_pen, R.drawable.ic_move, R.drawable.ic_info,
-        R.drawable.ic_trash};
+    static final int DOWNLOAD = 2;
+    static final int RENAME = 3;
+    static final int MOVE = 4;
+    static final int DETAILS = 5;
+    static final int DELETE = 6;
+    static final String[] LABELS = {"Open", "Transform", "Download PDF", "Rename", "Move to folder…", "Details", "Delete"};
+    static final int[] ICONS = {R.drawable.ic_eye, R.drawable.ic_sparkle, R.drawable.ic_download, R.drawable.ic_pen, R.drawable.ic_move,
+        R.drawable.ic_info, R.drawable.ic_trash};
 
     /** Where the title sits, in dp from the top: just under the shelf's dots. */
     private static final float CAPTION_TOP = 237;
