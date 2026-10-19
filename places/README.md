@@ -1,10 +1,10 @@
 # Places, for the Sonim XP3
 
 Finds places with Google Maps: pizza in Denver, a pharmacy near 85281, coffee
-by Union Station. It is the phone end of `delta maps` in
-[thooton/delta](https://github.com/thooton/delta): the Google Maps key is the
-one `delta maps key set` keeps on the command center, and the app signs in
-with the same delta token.
+by Union Station. It works the way the delta CLI's former `delta maps` did
+([thooton/delta](https://github.com/thooton/delta)): the Google Maps key is
+the one kept on the command center (`PUT /maps-key` sets it), and the app
+signs in with the delta token.
 
 It takes its look from Google Maps in its dark theme, in Google Sans, laid
 out for a d-pad: what to find in the header, filter chips under it, then

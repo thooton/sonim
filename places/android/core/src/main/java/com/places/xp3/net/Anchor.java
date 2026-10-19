@@ -78,7 +78,7 @@ public final class Anchor {
         return 2 * r * Math.asin(Math.min(1, Math.sqrt(h)));
     }
 
-    /** "500 ft", "2.4 mi", "31 mi", as `delta maps` writes them. */
+    /** "500 ft", "2.4 mi", "31 mi", as `delta maps` wrote them. */
     public static String distance(double meters) {
         double miles = meters / 1609.344;
         if (miles < 0.1) return String.format(Locale.US, "%.0f ft", meters / 0.3048);

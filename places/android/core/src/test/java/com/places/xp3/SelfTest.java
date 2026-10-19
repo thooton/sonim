@@ -261,7 +261,7 @@ public final class SelfTest {
                 : TestServer.Reply.json("{}"));
             try {
                 String base = empty.uri("").toString();
-                check.fails("no key on the command center", "delta maps key set",
+                check.fails("no key on the command center", "PUT /maps-key",
                     () -> new Places(base, "tok", base).search("coffee", null, null));
             } finally {
                 empty.close();

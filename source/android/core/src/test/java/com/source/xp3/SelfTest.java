@@ -332,7 +332,7 @@ public final class SelfTest {
 
                 noAccount[0] = true;
                 final Books unset = new Books(center, Books.Session.none(), keeper, "http", domains);
-                check.fails("no account", "delta books login set", () -> {
+                check.fails("no account", "PUT /books-login", () -> {
                     unset.search("x", 1, null);
                 });
             } finally {

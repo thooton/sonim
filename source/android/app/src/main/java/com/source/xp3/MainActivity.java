@@ -883,7 +883,7 @@ public final class MainActivity extends Tonal {
         sheet.show();
     }
 
-    /** As `delta music re-login`: only when downloads keep failing to connect. */
+    /** POST /music-login: only when downloads keep failing to connect. */
     private void confirmRelogin() {
         if (!login.ready()) {
             askLogin();

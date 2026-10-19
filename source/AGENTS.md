@@ -1,7 +1,7 @@
 # AGENTS.md
 
 A small, dependency-free Android app for the Sonim XP3 that downloads music
-and e-books through Delta. A sibling of `../delta`, `../list` and the rest,
+and e-books through Delta. A sibling of `../places`, `../list` and the rest,
 under the same constraints: 240x320 mdpi, d-pad driven, no AndroidX or
 third-party libraries, `:core` plain Java `--release 8` running on API 27.
 It used to be called Music (`com.music.xp3`).
@@ -9,8 +9,8 @@ It used to be called Music (`com.music.xp3`).
 ## How it works
 
 Music speaks the command center's music routes (`cmd/delta-cc/music_run.go`
-in thooton/delta), with the delta token. Unlike `delta music`, which takes
-the best match by name, it lets the user choose: `POST /music-search` streams
+in thooton/delta), with the delta token. Unlike a download by name, which
+takes the best match, it lets the user choose: `POST /music-search` streams
 JSON lines (`stdout`, `stderr`, `{}` keepalives, then `done` with `error`
 and `results`, every result that meets the command center's music config,
 best first by its preferences); `POST /music` with `{"link"}`, a result's
@@ -22,18 +22,19 @@ these routes, and the app doesn't either: the user sees the engine's log,
 Soulseek, and who shares each result. Keep it that way. If the routes change
 there, change `Music` here and keep its test in step.
 
-Books work as `delta books` does (`cmd/delta/books.go`, `books_source.go`,
-`cmd/delta-cc/books.go`): the book source's account lives on the command
-center (`GET /books-login`), and the phone fetches it only to log in to the
-source itself, then keeps the session (SharedPreferences `books`) and reuses
+Books work as the delta CLI's former `delta books` did (`cmd/delta/books.go`
+and `books_source.go` in thooton/delta's history; `cmd/delta-cc/books.go`
+keeps the account), and Source is now the only client. The book source's
+account lives on the command center (`GET /books-login`; `PUT` sets it), and
+the phone fetches it only to log in to the source itself, then keeps the session (SharedPreferences `books`) and reuses
 it, logging in again once when a call fails on it. Logins are rate-limited by
 the source (about ten an hour), so never log in when the stored session would
 do. Search, download link and download are the source's own `/eapi` endpoints,
-with the CLI's headers, cookies, redirects and domain selection; if the CLI's
-client changes, change `Books` here and keep its test in step.
+with the CLI's headers, cookies, redirects and domain selection, as it had
+them. `Books` is now the reference: keep its test in step with it.
 
 - `android/core`: `net/` — over the shared `Http`, `Json` and `Login` (the
-  command center address and token, validated as Delta's `Config` does;
+  command center address and token, validated as `Login` does;
   `../common/core`): `Music` (the music routes, and the results' wording),
   `Books` (the book source client, file names, and a result's other
   formats), `Tar` (a minimal reader), `Names` (makes job paths safe under the
@@ -62,7 +63,7 @@ shows the folders it sits in, as the sharer named them; keep it that way.
 ## Credentials
 
 `app/build.gradle` bakes the login into a generated `Bundled.java` under
-`build/`, from the same places as the Delta app plus the `DELTA_SERVER` /
+`build/`, from the same places as Places and Mail plus the `DELTA_SERVER` /
 `DELTA_TOKEN` environment (`deltaCenter` in `../gradle/bundled.gradle`). A bundled login is adopted once per revision.
 Never print, commit or attach the config files, the generated source, the
 book account or session, or the APK.
