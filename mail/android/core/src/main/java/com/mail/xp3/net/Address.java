@@ -46,6 +46,22 @@ public final class Address {
         return out;
     }
 
+    /** Where each comma between addresses is in what was typed: not those in a quoted name or in angle brackets. */
+    public static List<Integer> commas(String text) {
+        List<Integer> out = new ArrayList<Integer>();
+        boolean quoted = false;
+        boolean angled = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\\' && quoted) i++;
+            else if (c == '"') quoted = !quoted;
+            else if (c == '<' && !quoted) angled = true;
+            else if (c == '>' && !quoted) angled = false;
+            else if (c == ',' && !quoted && !angled) out.add(i);
+        }
+        return out;
+    }
+
     private static List<String> split(String text) {
         List<String> out = new ArrayList<String>();
         StringBuilder piece = new StringBuilder();

@@ -46,15 +46,17 @@ final class Pills implements TextWatcher {
     @Override
     public void onTextChanged(CharSequence text, int start, int before, int count) {}
 
-    /** Every "address," gets a pill; what is still being typed after the last comma does not. */
+    /**
+     * Every "address," gets a pill; what is still being typed after the last
+     * comma does not. A comma in a quoted name ("Doe, Jane" <j@x.com>) is
+     * part of it.
+     */
     @Override
     public void afterTextChanged(Editable text) {
         for (Pill pill : text.getSpans(0, text.length(), Pill.class)) text.removeSpan(pill);
         int from = 0;
         String all = text.toString();
-        while (true) {
-            int comma = all.indexOf(',', from);
-            if (comma < 0) break;
+        for (int comma : Address.commas(all)) {
             int start = from;
             while (start < comma && Character.isWhitespace(all.charAt(start))) start++;
             if (start < comma) {

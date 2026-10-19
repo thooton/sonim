@@ -53,17 +53,56 @@ public final class People {
         while (known.size() > MAX) known.remove(known.size() - 1);
     }
 
-    /** Everyone whose name or address has `typed` in it, in order. */
+    /**
+     * Everyone whose name or address has `typed` in it, in order: first those
+     * where it starts a word of the name or the address, as Gmail suggests.
+     */
     public List<Address> matching(String typed) {
+        return matching(known, typed);
+    }
+
+    /** Those among `people` matching `typed`, ranked as {@link #matching(String)} ranks them. */
+    public static List<Address> matching(List<Address> people, String typed) {
         String want = typed == null ? "" : typed.trim().toLowerCase(Locale.US);
+        List<Address> starts = new ArrayList<Address>();
+        List<Address> inside = new ArrayList<Address>();
+        for (Address address : people) {
+            int rank = rank(address, want);
+            if (rank == 0) starts.add(address);
+            else if (rank == 1) inside.add(address);
+        }
+        starts.addAll(inside);
+        return starts;
+    }
+
+    /**
+     * What to offer as `typed` is written: the known people matching it,
+     * then those found elsewhere (the user's organisation) not already among
+     * them, at most `max`.
+     */
+    public List<Address> suggest(String typed, List<Address> found, int max) {
         List<Address> out = new ArrayList<Address>();
-        for (Address address : known) {
-            if (want.length() == 0 || address.email.toLowerCase(Locale.US).contains(want)
-                || address.name.toLowerCase(Locale.US).contains(want)) {
-                out.add(address);
-            }
+        for (Address address : matching(typed)) {
+            if (out.size() >= max) return out;
+            out.add(address);
+        }
+        for (Address address : found) {
+            if (out.size() >= max) break;
+            if (Address.contains(out, address.email)) continue;
+            out.add(address);
         }
         return out;
+    }
+
+    /** 0 when `want` starts a word of the name or the address, 1 when it is inside one, 2 when neither. */
+    private static int rank(Address address, String want) {
+        if (want.length() == 0) return 0;
+        String name = address.name.toLowerCase(Locale.US);
+        String email = address.email.toLowerCase(Locale.US);
+        if (email.startsWith(want) || name.startsWith(want)) return 0;
+        for (String word : name.split("[\\s,.'\"()-]+")) if (word.startsWith(want)) return 0;
+        for (String word : email.split("[@._+-]+")) if (word.startsWith(want)) return 0;
+        return email.contains(want) || name.contains(want) ? 1 : 2;
     }
 
     private int find(Address address) {

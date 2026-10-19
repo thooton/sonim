@@ -17,9 +17,11 @@ import android.os.Environment;
 import android.os.storage.StorageManager;
 import android.os.storage.StorageVolume;
 import android.provider.DocumentsContract;
+import android.text.Editable;
 import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.text.Spanned;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
@@ -28,6 +30,7 @@ import android.text.style.UnderlineSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
@@ -62,6 +65,7 @@ import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -97,6 +101,10 @@ public final class MainActivity extends BaseActivity {
     private static final long STALE_MS = 120000;
     /** The folder pane's counts are fetched again when it opens after this long. */
     private static final long COUNTS_MS = 60000;
+    /** People offered under To or Cc at once: as many as fit above the message. */
+    private static final int SUGGESTIONS = 4;
+    /** How long typing pauses before the organisation is searched. */
+    private static final long FIND_AFTER_MS = 300;
     /** The menu's key for opening the folder pane: Left, not a keypad key. */
     private static final char LEFT = '◀';
 
@@ -130,6 +138,7 @@ public final class MainActivity extends BaseActivity {
     private EditText subjectField;
     private TextView filesView;
     private EditText bodyField;
+    private LinearLayout suggestView;
     private View scrim;
     private View drawer;
     private ListView foldersView;
@@ -142,6 +151,8 @@ public final class MainActivity extends BaseActivity {
     private final ExecutorService changes = Ui.worker("mail-changes");
     /** The folder pane's counts, fetched beside the rest. */
     private final ExecutorService counter = Ui.worker("mail-counts");
+    /** Searches of the user's organisation for whom to write to, beside the rest. */
+    private final ExecutorService finder = Ui.worker("mail-people");
 
     private Login login = Login.blank();
     private Gmail gmail;
@@ -182,6 +193,15 @@ public final class MainActivity extends BaseActivity {
     private int writeFrom = LIST;
     private boolean sending;
 
+    // People offered as an address is typed: under which field, for what, who, and which the d-pad is on (-1: none).
+    private EditText suggestFor;
+    private String suggestTyped = "";
+    private final List<Address> suggestions = new ArrayList<Address>();
+    private int suggestPick = -1;
+    /** What the organisation's search found, by what was typed, while the app runs. */
+    private final Map<String, List<Address>> found = new HashMap<String, List<Address>>();
+    private final Runnable findPeople = this::findPeople;
+
     private Attachment pendingSave;
     private Future<?> job;
     private String doing = "";
@@ -216,6 +236,7 @@ public final class MainActivity extends BaseActivity {
         subjectField = (EditText) findViewById(R.id.subject);
         filesView = (TextView) findViewById(R.id.files);
         bodyField = (EditText) findViewById(R.id.body);
+        suggestView = (LinearLayout) findViewById(R.id.suggestions);
         scrim = findViewById(R.id.scrim);
         drawer = findViewById(R.id.drawer);
         foldersView = (ListView) findViewById(R.id.folders);
@@ -231,6 +252,8 @@ public final class MainActivity extends BaseActivity {
         filesView.setCompoundDrawablesRelative(small(R.drawable.ic_attachment), null, null, null);
         Pills.attach(toField, color(R.color.pill_wash), color(R.color.focus_rule), color(R.color.draft), dp(4));
         Pills.attach(ccField, color(R.color.pill_wash), color(R.color.focus_rule), color(R.color.draft), dp(4));
+        offerPeople(toField);
+        offerPeople(ccField);
 
         SharedPreferences prefs = prefs();
         login = loadLogin(prefs);
@@ -266,6 +289,7 @@ public final class MainActivity extends BaseActivity {
     protected void onDestroy() {
         worker.shutdownNow();
         counter.shutdownNow();
+        finder.shutdownNow();
         changes.shutdown();
         if (gmail != null) gmail.close();
         super.onDestroy();
@@ -1338,6 +1362,7 @@ public final class MainActivity extends BaseActivity {
     /** Back to where writing began; what it changed (a reply, a draft) is fetched again. */
     private void finishWriting(boolean changedMail) {
         prefs().edit().remove("compose").apply();
+        hideSuggestions();
         String thread = writing.threadId;
         View focus = getCurrentFocus();
         if (focus != null) {
@@ -1363,6 +1388,187 @@ public final class MainActivity extends BaseActivity {
         say("");
         refresh();
         if (changedMail || items.isEmpty()) load();
+    }
+
+    // ---- Whom to write to, offered as it is typed ----
+
+    /**
+     * As Gmail does: typing in To or Cc offers the people whose name or
+     * address starts with what is typed after the last comma, those known
+     * from mail first, then the user's organisation and the people Gmail
+     * saved, found once typing pauses.
+     */
+    private void offerPeople(final EditText field) {
+        field.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence text, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable text) {
+                suggest(field);
+            }
+        });
+        field.setOnFocusChangeListener((view, focused) -> {
+            if (!focused && suggestFor == field) hideSuggestions();
+        });
+    }
+
+    /** What is being typed in the field: after its last comma. */
+    private static String typedAddress(EditText field) {
+        String text = field.getText().toString();
+        List<Integer> commas = Address.commas(text);
+        return (commas.isEmpty() ? text : text.substring(commas.get(commas.size() - 1) + 1)).trim();
+    }
+
+    private void suggest(EditText field) {
+        String typed = typedAddress(field);
+        if (screen != WRITE || !field.hasFocus() || typed.length() == 0) {
+            hideSuggestions();
+            return;
+        }
+        boolean same = field == suggestFor && typed.equalsIgnoreCase(suggestTyped);
+        Address was = suggestPick >= 0 && same ? suggestions.get(suggestPick) : null;
+        suggestFor = field;
+        suggestTyped = typed;
+        suggestions.clear();
+        suggestions.addAll(people.suggest(typed, foundFor(typed), SUGGESTIONS));
+        suggestPick = -1;
+        for (int i = 0; was != null && i < suggestions.size(); i++) if (suggestions.get(i).is(was.email)) suggestPick = i;
+        showSuggestions();
+        toField.removeCallbacks(findPeople);
+        if (typed.length() >= 2 && !found.containsKey(typed.toLowerCase(Locale.US)) && login.ready()) {
+            toField.postDelayed(findPeople, FIND_AFTER_MS);
+        }
+    }
+
+    /** The organisation's people for what is typed: as found for it, or for the longest start of it, narrowed. */
+    private List<Address> foundFor(String typed) {
+        String key = typed.toLowerCase(Locale.US);
+        for (int end = key.length(); end >= 2; end--) {
+            List<Address> known = found.get(key.substring(0, end));
+            if (known != null) return end == key.length() ? known : People.matching(known, typed);
+        }
+        return new ArrayList<Address>();
+    }
+
+    private void findPeople() {
+        if (suggestFor == null) return;
+        final Gmail client = gmail();
+        if (!client.searchesPeople()) return;
+        final String typed = suggestTyped;
+        final String key = typed.toLowerCase(Locale.US);
+        if (found.containsKey(key)) return;
+        finder.submit(() -> {
+            final List<Address> people;
+            try {
+                people = client.people(typed);
+            } catch (InterruptedException e) {
+                return;
+            } catch (Exception e) {
+                // Offline, or Google failed: what is known from mail is still offered.
+                return;
+            }
+            runOnUiThread(() -> {
+                if (found.size() > 100) found.clear();
+                found.put(key, people);
+                if (suggestFor != null && suggestTyped.equalsIgnoreCase(typed)) suggest(suggestFor);
+            });
+        });
+    }
+
+    /** The people offered, right under the field being typed in. */
+    private void showSuggestions() {
+        if (suggestions.isEmpty() || suggestFor == null) {
+            suggestView.setVisibility(View.GONE);
+            return;
+        }
+        ViewGroup form = (ViewGroup) compose;
+        int under = form.indexOfChild((View) suggestFor.getParent()) + 1;
+        if (form.indexOfChild(suggestView) != under) {
+            form.removeView(suggestView);
+            form.addView(suggestView, form.indexOfChild((View) suggestFor.getParent()) + 1);
+        }
+        suggestView.removeAllViews();
+        LayoutInflater inflater = getLayoutInflater();
+        for (int i = 0; i < suggestions.size(); i++) {
+            Address address = suggestions.get(i);
+            View row = inflater.inflate(R.layout.row_suggestion, suggestView, false);
+            ((TextView) row.findViewById(R.id.avatar)).setText(Avatar.letter(address.display()));
+            ((TextView) row.findViewById(R.id.name)).setText(address.display());
+            TextView email = (TextView) row.findViewById(R.id.email);
+            email.setText(address.email);
+            email.setVisibility(address.name.length() > 0 ? View.VISIBLE : View.GONE);
+            row.setBackgroundColor(color(i == suggestPick ? R.color.focus_fill : R.color.row));
+            suggestView.addView(row);
+        }
+        suggestView.setVisibility(View.VISIBLE);
+    }
+
+    private boolean suggesting() {
+        return suggestFor != null && !suggestions.isEmpty() && suggestFor.hasFocus();
+    }
+
+    private void hideSuggestions() {
+        toField.removeCallbacks(findPeople);
+        suggestFor = null;
+        suggestTyped = "";
+        suggestions.clear();
+        suggestPick = -1;
+        suggestView.setVisibility(View.GONE);
+    }
+
+    /** The person in place of what was typed, as a pill, ready for the next. */
+    private void pickSuggestion(int which) {
+        EditText field = suggestFor;
+        Address address = suggestions.get(which);
+        String text = field.getText().toString();
+        List<Integer> commas = Address.commas(text);
+        String before = commas.isEmpty() ? "" : text.substring(0, commas.get(commas.size() - 1) + 1).trim() + " ";
+        hideSuggestions();
+        field.setText(before + Address.field(Collections.singletonList(address)) + ", ");
+        field.setSelection(field.length());
+    }
+
+    /**
+     * Keys while people are offered: Down and Up go through them (Up past the
+     * first back to the field), OK takes the one picked, or the first when
+     * what is typed isn't an address yet, and Back puts them away.
+     */
+    private boolean suggestionKey(KeyEvent event, int key, boolean down, boolean first) {
+        switch (key) {
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                if (down) {
+                    suggestPick = Math.min(suggestions.size() - 1, suggestPick + 1);
+                    showSuggestions();
+                }
+                return true;
+            case KeyEvent.KEYCODE_DPAD_UP:
+                if (suggestPick < 0) return false;
+                if (down) {
+                    suggestPick--;
+                    showSuggestions();
+                }
+                return true;
+            case KeyEvent.KEYCODE_BACK:
+                if (!down && !event.isCanceled()) hideSuggestions();
+                return true;
+            default:
+                if (!Ui.isOk(key)) return false;
+                if (suggestPick < 0 && isAddress(suggestTyped)) return false;
+                if (first) pickSuggestion(Math.max(0, suggestPick));
+                return true;
+        }
+    }
+
+    private static boolean isAddress(String typed) {
+        try {
+            return Address.typed(typed).size() == 1;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     /** Someone known, into To or Cc (whichever has the cursor), matching what is typed after the last comma. */
@@ -1695,6 +1901,7 @@ public final class MainActivity extends BaseActivity {
      * takes the first release to finish it.
      */
     private boolean writeKey(KeyEvent event, int key, boolean down, boolean first) {
+        if (suggesting() && suggestionKey(event, key, down, first)) return true;
         if (key == KeyEvent.KEYCODE_BACK) {
             if (!down && !event.isCanceled()) leaveWriting();
             return true;

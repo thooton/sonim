@@ -52,7 +52,18 @@ The scope is `gmail.modify`: nothing can be deleted for good, only trashed
   The message being written is kept in SharedPreferences (`mail`:
   `compose`) while the app is stopped.
 - **People** (`mail`: `people`) are the addresses seen in listed mail and
-  those written to (first), for Menu → Add recipient.
+  those written to (first), for Menu → Add recipient and the suggestions.
+- **Suggestions** are offered under To or Cc as an address is typed, as
+  Gmail does: `People.suggest` puts the known people matching what follows
+  the last comma (`Address.commas`) first, a word's start before its
+  middle, then `Gmail.people`: the People API's `searchDirectoryPeople`
+  (the user's organization, with `directory.readonly`) and
+  `otherContacts:search` (with `contacts.other.readonly`), asked once
+  typing pauses for 300 ms and kept by query while the app runs. Both
+  scopes are asked for by `delta gmail login` and both are optional: a
+  search Google refuses (an older login, the People API not enabled in the
+  OAuth client's project, an organization hiding its directory) is
+  dropped for the session, and only known people are offered.
 - **Attachments** are fetched whole (the shared `Http` caps a response at
   8 MB, so about 6 MB of file) and written to the SD card (`Card`), never
   the phone's own storage: with no card in, nothing is saved. Android 8.1

@@ -29,13 +29,18 @@ phone's 240x320 screen and its keys. Three screens, and the folder pane:
   Each finished address in To and Cc (ending in a comma) is drawn as a
   pill, red if it isn't an address. A reply's quote and a forward's copy of
   the original (with its attachments) are added under what you write when
-  it is sent. Menu → Add recipient picks someone you have written to or
-  heard from, matching what is typed after the last comma. What you are
+  it is sent. As you type a name or address in To or Cc, up to four
+  people are suggested under it, as Gmail does: those you have written to
+  or heard from, then people in your organization's directory and those
+  Gmail saved from your mail. Down and Up pick one, OK takes it (or the
+  first, while what is typed isn't a whole address yet), Back puts the
+  suggestions away. Menu → Add recipient lists everyone you have written
+  to or heard from. What you are
   writing is kept if the app is closed.
 
 | Key | List | Conversation | Writing |
 | --- | --- | --- | --- |
-| OK | Open (a draft opens to edit) | Menu | Next field; a new line in the message |
+| OK | Open (a draft opens to edit) | Menu | Next field (or the suggested person); a new line in the message |
 | Up / Down | Pick (past the last loads more) | Scroll | Move between fields |
 | Left | Folder pane | Previous conversation | Move the cursor |
 | Right | Open | Next conversation | Move the cursor |
@@ -84,4 +89,8 @@ The APK contains a live token, so treat it like a password; it is
 gitignored.
 
 Gmail itself has to be set up once on the command center with
-`delta gmail login` (see the delta README's Gmail section).
+`delta gmail login` (see the delta README's Gmail section). Suggestions
+from your organization need the People API enabled in that OAuth client's
+Google Cloud project, and a login made since `delta gmail login` began
+asking for it; without them, only people from your own mail are
+suggested.
