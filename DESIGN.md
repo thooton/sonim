@@ -224,7 +224,7 @@ its own:
   green (`#00B414`) rule. Shorthand, shown only when Grascii has an outline
   (and the only tab for a word only it has): each outline at 18sp SemiBold,
   its strokes under it in grey, parted by middle dots.
-- **Menu holds the actions.** Menu opens a stock popup menu over the page
+- **Menu holds the actions.** Menu opens a stock popup menu under the search capsule
   (Word of the Day, Search and Shorthand at home, Pronounce, Search and
   Shorthand on a word; while searching, the other search). OK
   opens the Word of the Day at home and nothing on a word. Up from the top of a page moves into the search
