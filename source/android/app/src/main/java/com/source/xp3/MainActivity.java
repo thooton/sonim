@@ -279,7 +279,7 @@ public final class MainActivity extends Tonal {
         else if (screen == LOG) showLog();
         if (picked >= rows()) picked = rows() - 1;
         adapter.notifyDataSetChanged();
-        if (screen == RESULTS && picked >= 0) resultList.post(() -> resultList.smoothScrollToPosition(picked));
+        if (screen == RESULTS && picked >= 0) keepInView(resultList, picked);
         showPicked();
         showHeader();
         query.setEnabled(!Download.searching());
@@ -794,7 +794,7 @@ public final class MainActivity extends Tonal {
         if (screen == RESULTS) {
             if (picked >= 0) resultsPicked = picked;
             adapter.notifyDataSetChanged();
-            if (picked >= 0) resultList.smoothScrollToPosition(picked);
+            if (picked >= 0) keepInView(resultList, picked);
         }
         showPicked();
     }
