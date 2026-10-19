@@ -50,6 +50,7 @@ public final class SelfTest {
             check.same("header encoding", "=?UTF-8?B?UmVuw6k=?= <rene@z.fr>", list.get(2).header());
             check.fails("typo", "Not an address: bob@", () -> Address.typed("jane@x.com, bob@"));
             check.same("typed allows a trailing comma", 1, Address.typed("jane@x.com, ").size());
+            check.same("commas between addresses only", Arrays.asList(24, 35), Address.commas("\"Doe, Jane\" <jane@x.com>, bob@y.org, jo"));
         });
         check.run("mime", () -> {
             check.same("q words", "Café au lait", Mime.words("=?utf-8?q?Caf=C3=A9_au?= =?utf-8?q?_lait?="));
@@ -215,7 +216,14 @@ public final class SelfTest {
             check.same("written to first", "bob@y.org", people.all().get(0).email);
             check.same("keeps the name", "Bob", people.all().get(0).name);
             check.same("matching", "jane@x.com", people.matching("doe").get(0).email);
-            check.same("round trip", 2, People.parse(people.toJson()).all().size());
+            people.wrote(Arrays.asList(new Address("Ado Bee", "ab@z.org")));
+            check.same("a word's start before the middle of one", "jane@x.com", people.matching("do").get(0).email);
+            check.same("then the middle", "ab@z.org", people.matching("do").get(1).email);
+            List<Address> offered = people.suggest("jane", Arrays.asList(new Address("Jane Doe", "jane@x.com"),
+                new Address("Janet Roe", "janet@asu.edu")), 5);
+            check.same("known first, the organisation after, once each", "jane@x.com, janet@asu.edu", Address.emails(offered));
+            check.same("at most", 1, people.suggest("jane", offered, 1).size());
+            check.same("round trip", 3, People.parse(people.toJson()).all().size());
         });
         check.run("gmail", () -> gmail(check));
         if (!check.report()) System.exit(1);
@@ -226,6 +234,7 @@ public final class SelfTest {
     static void gmail(Check check) throws Exception {
         final AtomicInteger tokens = new AtomicInteger();
         final AtomicInteger refuse = new AtomicInteger();
+        final AtomicInteger hidden = new AtomicInteger();
         try (TestServer server = new TestServer(request -> {
             String path = request.path;
             if (path.equals("/center/gmail-login")) {
@@ -241,6 +250,18 @@ public final class SelfTest {
             if (!request.header("Authorization").startsWith("Bearer at")) return TestServer.Reply.of(401, "application/json", "{}");
             if (refuse.getAndDecrement() > 0) {
                 return TestServer.Reply.of(401, "application/json", "{\"error\":{\"message\":\"Invalid Credentials\"}}");
+            }
+            if (path.startsWith("/v1/") && hidden.get() > 0) {
+                return TestServer.Reply.of(403, "application/json", "{\"error\":{\"message\":\"Request had insufficient authentication scopes.\"}}");
+            }
+            if (path.startsWith("/v1/people:searchDirectoryPeople?query=jo&")) {
+                return TestServer.Reply.json("{\"people\":[{\"names\":[{\"displayName\":\"Jo March\"}],"
+                    + "\"emailAddresses\":[{\"value\":\"jmarch@asu.edu\"},{\"value\":\"jo@asu.edu\"}]},{\"names\":[{\"displayName\":\"No Mail\"}]}]}");
+            }
+            if (path.startsWith("/v1/otherContacts:search?query=&")) return TestServer.Reply.json("{}");
+            if (path.startsWith("/v1/otherContacts:search?query=jo&")) {
+                return TestServer.Reply.json("{\"results\":[{\"person\":{\"emailAddresses\":[{\"value\":\"jo@asu.edu\"}]}},"
+                    + "{\"person\":{\"names\":[{\"displayName\":\"Joan\"}],\"emailAddresses\":[{\"value\":\"joan@x.com\"}]}}]}");
             }
             String me = "/gmail/v1/users/me";
             if (path.equals(me + "/settings/sendAs")) {
@@ -342,7 +363,24 @@ public final class SelfTest {
             check.same("no draft", null, gmail.draftId("m0"));
             gmail.discard("d1");
             check.ok("discard", seen(server, "DELETE", "/drafts/d1"));
+
+            List<Address> found = gmail.people("jo ");
+            check.same("the organisation, then other contacts, once each", "jmarch@asu.edu, jo@asu.edu, joan@x.com", Address.emails(found));
+            check.same("named", "Jo March", found.get(0).name);
+            check.ok("both sources asked", seen(server, "sources=DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE") && seen(server, "otherContacts:search?query=jo&"));
+            check.ok("other contacts warmed first", seen(server, "otherContacts:search?query=&"));
+            check.same("nothing typed asks nothing", 0, gmail.people(" ").size());
             gmail.close();
+
+            Gmail older = new Gmail(base + "/center", "delta-token", base, base + "/token");
+            hidden.set(1);
+            check.same("a login without the permission finds nobody", 0, older.people("jo").size());
+            check.ok("and stops asking", !older.searchesPeople());
+            int asked = server.seen.size();
+            older.people("jo");
+            check.same("not even once more", asked, server.seen.size());
+            hidden.set(0);
+            older.close();
 
             Gmail stranger = new Gmail(base + "/center", "wrong", base, base + "/token");
             check.fails("command center refuses", "Command center HTTP 401", () -> stranger.unread());

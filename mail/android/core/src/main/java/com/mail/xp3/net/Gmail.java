@@ -33,6 +33,8 @@ public final class Gmail {
 
     public static final String API = "https://gmail.googleapis.com";
     public static final String TOKEN = "https://oauth2.googleapis.com/token";
+    /** The People API: the user's organisation, and the people Gmail saved from mail. */
+    public static final String PEOPLE = "https://people.googleapis.com";
     /** Conversations per page of a list. */
     public static final int PAGE = 20;
     /** Http refuses a response past 8 MB, and base64 makes a file a third bigger. */
@@ -45,6 +47,7 @@ public final class Gmail {
     private final String center;
     private final String token;
     private final String api;
+    private final String peopleApi;
     private final String tokenUrl;
     /** A few lookups at once: one per conversation in a list, as the CLI does. */
     private final ExecutorService pool = Executors.newFixedThreadPool(5, runnable -> {
@@ -57,6 +60,10 @@ public final class Gmail {
     private String access;
     private long accessUntil;
     private volatile Me me;
+    /** Whether the login may search the organisation, and the people Gmail saved; found out on the first try. */
+    private volatile boolean noDirectory;
+    private volatile boolean noOthers;
+    private volatile boolean othersWarm;
 
     public Gmail(Login login) {
         this(login.server(), login.token(), API, TOKEN);
@@ -68,6 +75,7 @@ public final class Gmail {
         this.center = center;
         this.token = token;
         this.api = api;
+        this.peopleApi = api.equals(API) ? PEOPLE : api;
         this.tokenUrl = tokenUrl;
     }
 
@@ -281,6 +289,111 @@ public final class Gmail {
         return Mime.decode(data == null ? "" : data);
     }
 
+    // ---- People ----
+
+    /** Whether {@link #people} can find anyone: false once Google has refused both of its searches. */
+    public boolean searchesPeople() {
+        return !noDirectory || !noOthers;
+    }
+
+    /**
+     * People whose name or address starts with `typed`, as Gmail suggests
+     * them while an address is typed: those in the user's organisation (its
+     * directory, with the `directory.readonly` permission) and those Gmail
+     * saved from mail ("other contacts", with `contacts.other.readonly`),
+     * at most ten of each. A search the login isn't allowed (an older login,
+     * the People API not enabled, or an organisation that hides its
+     * directory) is left out, and not tried again.
+     */
+    public List<Address> people(final String typed) throws IOException, InterruptedException {
+        final String query = typed.trim();
+        List<Address> out = new ArrayList<Address>();
+        if (query.length() == 0) return out;
+        Future<List<Address>> directory = noDirectory ? null : pool.submit(() -> {
+            Map<String, Object> found = person("/v1/people:searchDirectoryPeople", "query=" + encode(query)
+                + "&readMask=names,emailAddresses&pageSize=10&sources=DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE"
+                + "&sources=DIRECTORY_SOURCE_TYPE_DOMAIN_CONTACT");
+            if (found == null) {
+                noDirectory = true;
+                return null;
+            }
+            return addresses(Json.children(found, "people"));
+        });
+        List<Address> others = null;
+        if (!noOthers) {
+            // Google asks for one empty search first, to ready its cache.
+            if (!othersWarm && person("/v1/otherContacts:search", "query=&readMask=names,emailAddresses") == null) {
+                noOthers = true;
+            } else {
+                othersWarm = true;
+                Map<String, Object> found = person("/v1/otherContacts:search", "query=" + encode(query)
+                    + "&readMask=names,emailAddresses&pageSize=10");
+                if (found == null) {
+                    noOthers = true;
+                } else {
+                    List<Object> people = new ArrayList<Object>();
+                    for (Object result : Json.children(found, "results")) people.add(Json.child(Json.object(result), "person"));
+                    others = addresses(people);
+                }
+            }
+        }
+        if (directory != null) {
+            try {
+                List<Address> found = directory.get();
+                if (found != null) out.addAll(found);
+            } catch (ExecutionException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof IOException) throw (IOException) cause;
+                throw new IOException(cause == null ? "Google failed." : String.valueOf(cause.getMessage()));
+            } finally {
+                directory.cancel(true);
+            }
+        }
+        if (others != null) {
+            for (Address address : others) if (!Address.contains(out, address.email)) out.add(address);
+        }
+        return out;
+    }
+
+    /** Each person's name and every address they have. */
+    private static List<Address> addresses(List<Object> people) {
+        List<Address> out = new ArrayList<Address>();
+        for (Object item : people) {
+            Map<String, Object> person = Json.object(item);
+            String name = "";
+            for (Object one : Json.children(person, "names")) {
+                String shown = Json.text(Json.object(one), "displayName");
+                if (shown != null && shown.length() > 0) {
+                    name = shown;
+                    break;
+                }
+            }
+            for (Object one : Json.children(person, "emailAddresses")) {
+                String email = Json.text(Json.object(one), "value");
+                if (email != null && email.indexOf('@') > 0 && !Address.contains(out, email)) out.add(new Address(name, email));
+            }
+        }
+        return out;
+    }
+
+    /** A People API search, or null when the login may not make it. */
+    private Map<String, Object> person(String path, String query) throws IOException, InterruptedException {
+        Http.Response response = exchange("GET", peopleApi + path + "?" + query, null, null);
+        int status = response.status();
+        if (status / 100 == 2) {
+            try {
+                return Json.object(Json.parse(response.body().trim().length() == 0 ? "{}" : response.body()));
+            } catch (RuntimeException e) {
+                throw new IOException("Google sent something unreadable.");
+            }
+        }
+        // 403: no permission, the API isn't enabled, or the organisation hides its directory; 400: no such search.
+        if (status == 403 || status == 400 || status == 404) return null;
+        if (status == 429) throw new IOException("Google: too many requests");
+        String message = problem(response);
+        throw new IOException("Google: " + (message.length() > 0 ? message : "HTTP " + status));
+    }
+
     // ---- Changing ----
 
     public void change(String threadId, Change change) throws IOException, InterruptedException {
@@ -381,6 +494,28 @@ public final class Gmail {
         throws IOException, InterruptedException {
         String url = api + (path.startsWith("/upload/") ? path : "/gmail/v1/users/me" + path)
             + (query.length() > 0 ? "?" + query : "");
+        Http.Response response = exchange(method, url, body, type);
+        int status = response.status();
+        if (status / 100 == 2) {
+            if (response.body().trim().length() == 0) return Json.map();
+            try {
+                return Json.object(Json.parse(response.body()));
+            } catch (RuntimeException e) {
+                throw new IOException("Gmail sent something unreadable.");
+            }
+        }
+        String message = problem(response);
+        if (status == 404) throw new Gone("Gmail: that isn't there any more.");
+        if (status == 401) throw new IOException("Gmail rejected the login. Run `delta gmail login` again on a computer.");
+        if (status == 403 && message.toLowerCase(Locale.US).matches(".*(scope|permission).*")) {
+            throw new IOException("The Gmail login lacks a permission. Run `delta gmail login` again and allow everything.");
+        }
+        if (status == 429) throw new IOException("Gmail: too many requests");
+        throw new IOException("Gmail: " + (message.length() > 0 ? message : "HTTP " + status));
+    }
+
+    /** One call to Google with the access token, and once more with a fresh one if it is refused. */
+    private Http.Response exchange(String method, String url, String body, String type) throws IOException, InterruptedException {
         for (int attempt = 0; ; attempt++) {
             String bearer = access();
             Http.Request request = Http.Request.to(URI.create(url)).method(method)
@@ -396,28 +531,12 @@ public final class Gmail {
                 }
                 throw e;
             }
-            int status = response.status();
-            if (status == 401 && attempt == 0) {
+            if (response.status() == 401 && attempt == 0) {
                 // Revoked or expired early: a fresh token, once.
                 forget(bearer);
                 continue;
             }
-            if (status / 100 == 2) {
-                if (response.body().trim().length() == 0) return Json.map();
-                try {
-                    return Json.object(Json.parse(response.body()));
-                } catch (RuntimeException e) {
-                    throw new IOException("Gmail sent something unreadable.");
-                }
-            }
-            String message = problem(response);
-            if (status == 404) throw new Gone("Gmail: that isn't there any more.");
-            if (status == 401) throw new IOException("Gmail rejected the login. Run `delta gmail login` again on a computer.");
-            if (status == 403 && message.toLowerCase(Locale.US).matches(".*(scope|permission).*")) {
-                throw new IOException("The Gmail login lacks a permission. Run `delta gmail login` again and allow everything.");
-            }
-            if (status == 429) throw new IOException("Gmail: too many requests");
-            throw new IOException("Gmail: " + (message.length() > 0 ? message : "HTTP " + status));
+            return response;
         }
     }
 
