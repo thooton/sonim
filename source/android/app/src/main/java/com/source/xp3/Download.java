@@ -41,14 +41,14 @@ import java.util.Set;
  * of this state.
  *
  * Music starts with a search on the command center, which streams its log
- * and ends with the results to pick from. Downloading one is three steps, as
- * `delta music` does them: the command center downloads it and streams its
- * log, then the app fetches the job's files as a tar straight into the
- * Music folder on the SD card, then it removes the job.
+ * and ends with the results to pick from. Downloading one is three steps:
+ * the command center downloads it and streams its log, then the app fetches
+ * the job's files as a tar straight into the Music folder on the SD card,
+ * then it removes the job.
  *
- * Books are `delta books`: the phone logs in to the book source with the
- * account kept on the command center, searches, and downloads the chosen
- * result into the Books folder on the SD card.
+ * Books: the phone logs in to the book source with the account kept on the
+ * command center, searches, and downloads the chosen result into the Books
+ * folder on the SD card.
  */
 final class Download {
 

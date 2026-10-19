@@ -18,8 +18,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The command center's music routes, the same ones `delta music` uses
- * (cmd/delta/music.go and cmd/delta-cc/music_run.go in thooton/delta):
+ * The command center's music routes (cmd/delta-cc/music_run.go in
+ * thooton/delta):
  *
  *   POST   /music-search      {"mode": "song"|"album", "query": "..."}; streams
  *                             JSON lines: {"stdout"}, {"stderr"}, {} keepalives
@@ -33,7 +33,7 @@ import java.util.Set;
  *
  * A search finds every result that meets the command center's music config,
  * best first by its preferences (a broader second try when there are none),
- * and the user picks one to download. Unlike `delta music`, Source sees the
+ * and the user picks one to download. Unlike a download by name, Source sees the
  * engine's log as it is, Soulseek and all. Dropping the connection while a
  * run streams stops it on the command center too.
  */

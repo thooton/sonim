@@ -1,16 +1,17 @@
 # AGENTS.md
 
 A small, dependency-free Android app for the Sonim XP3 that finds places
-with Google Maps. A sibling of `../source`, `../delta` and the rest, under
+with Google Maps. A sibling of `../source`, `../mail` and the rest, under
 the same constraints: 240x320 mdpi, d-pad driven, no AndroidX or third-party
 libraries, `:core` plain Java `--release 8` running on API 27.
 
 ## How it works
 
-Places works the way `delta maps` does (`cmd/delta/maps.go`,
-`cmd/delta-cc/maps.go` in thooton/delta). The Google Maps Platform key lives
+Places works the way the delta CLI's former `delta maps` did
+(`cmd/delta/maps.go` in thooton/delta's history; `cmd/delta-cc/maps.go`
+keeps the key). It is now the only client. The Google Maps Platform key lives
 on the command center: `GET /maps-key` with the delta token answers
-`{"key"}` (404 while none is set; `delta maps key set` sets it). The app
+`{"key"}` (404 while none is set; `PUT /maps-key` sets it). The app
 fetches it the first time it needs it and keeps it in memory only, never on
 disk, then calls the Places API (New) itself, so the command center never
 sees a search. A key Google refuses (400, 401, 403) is dropped and fetched

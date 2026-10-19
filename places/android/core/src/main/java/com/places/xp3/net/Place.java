@@ -13,7 +13,7 @@ import java.util.Map;
 
 /**
  * One place as the Places API (New) describes it, read the way `delta maps`
- * reads it (cmd/delta/maps.go in thooton/delta) and written out for a 240px
+ * read it (cmd/delta/maps.go in thooton/delta's history) and written out for a 240px
  * screen.
  *
  * It keeps Google's object as it came and reads fields as they are asked

@@ -27,11 +27,12 @@ import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
 /**
- * Ebooks, the way `delta books` gets them (cmd/delta/books.go and
- * books_source.go in thooton/delta): the book source's account lives on the
- * command center (GET /books-login, behind the delta token), the phone logs in
- * to the source with it only when it has to, keeps the session it gets, and
- * then searches and downloads from the source directly. Logins are
+ * Ebooks, the way the delta CLI's former `delta books` got them
+ * (cmd/delta/books.go and books_source.go in thooton/delta's history): the
+ * book source's account lives on the command center (GET /books-login,
+ * behind the delta token), the phone logs in to the source with it only
+ * when it has to, keeps the session it gets, and then searches and
+ * downloads from the source directly. Logins are
  * rate-limited by the source (about ten an hour), so the session is reused for
  * as long as it works, and a call that fails on a stored session logs in again
  * once and retries.
@@ -414,7 +415,7 @@ public final class Books {
             .header("Accept", "application/json")
             .timeout(30000));
         if (response.status() == 404) {
-            throw new IOException("No book account is set on the command center: set one with `delta books login set`.");
+            throw new IOException("No book account is set on the command center: put one there with PUT /books-login.");
         }
         Music.require(response.status(), response.body());
         Map<String, Object> root;
@@ -678,7 +679,7 @@ public final class Books {
         }
     }
 
-    // ---- Names, as `delta books` gives them.
+    // ---- Names, as `delta books` gave them.
 
     private static final List<String> EXTENSIONS = Arrays.asList(
         "txt", "pdf", "fb2", "epub", "lit", "mobi", "rtf", "djv", "djvu", "azw", "azw3",

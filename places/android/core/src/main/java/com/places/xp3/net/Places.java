@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Finds places with the Google Places API (New), as `delta maps` does
- * (cmd/delta/maps.go in thooton/delta).
+ * Finds places with the Google Places API (New), as the delta CLI's former
+ * `delta maps` did (cmd/delta/maps.go in thooton/delta's history).
  *
  * The API key lives on the command center (GET /maps-key, with the delta
  * token). It is fetched the first time it is needed and kept in memory only,
@@ -227,7 +227,7 @@ public final class Places {
             .header("Authorization", "Bearer " + token)
             .timeout(30000));
         if (response.status() == 404) {
-            throw new IOException("The command center has no Google Maps key. Set one with `delta maps key set`.");
+            throw new IOException("The command center has no Google Maps key. Put one there with PUT /maps-key.");
         }
         Http.requireSuccess(response.status(), "Command center");
         String fetched;
