@@ -41,7 +41,7 @@ client changes, change `Books` here and keep its test in step.
   `Recents` (the last few searches), `Monogram` (a drawn cover's initials and
   tone). Tests in `src/test` run via `:core:selfTest`.
 - `android/app`: `Tonal` (the base of every screen: the look, the dark
-  theme, the soft-key bar, the login, watching `Download`), `MainActivity`
+  theme, the login, watching `Download`), `MainActivity`
   (the list screen: tabs, search, home, log, results, empty states, keys,
   Options), `DetailActivity` (one result or download), `DownloadsActivity`
   (storage, then active, failed and saved downloads), `Download` (one search

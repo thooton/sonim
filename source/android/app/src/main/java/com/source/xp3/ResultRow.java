@@ -16,7 +16,8 @@ import java.util.Date;
 
 /**
  * A row of results or downloads, at the proposal's sizes: the drawn cover,
- * the lines that tell one result from another, and the state button. A music
+ * the lines that tell one result from another, and the state button (on a
+ * result, only once it is being downloaded: it is got from its page). A music
  * result shows its name, the folders it sits in (from the deepest up, which
  * say the most), then a format tag with its bitrate and size and who shares
  * it (its length, and how fast it comes, are on its page). A book shows its title, then a format
@@ -143,7 +144,7 @@ final class ResultRow extends LinearLayout {
         meta.setText(join(hit.brief(), hit.free ? hit.user : hit.user + " (queued)"));
         ((View) meta.getParent()).setVisibility(VISIBLE);
         show(extra, null);
-        button.set(state, progress, picked);
+        state(state, progress, picked);
         picked(picked);
     }
 
@@ -156,8 +157,14 @@ final class ResultRow extends LinearLayout {
         meta.setText(join(book.author, book.size));
         ((View) meta.getParent()).setVisibility(VISIBLE);
         show(extra, null);
-        button.set(state, progress, picked);
+        state(state, progress, picked);
         picked(picked);
+    }
+
+    /** A result's state, or nothing while it hasn't been asked for. */
+    private void state(int state, float progress, boolean picked) {
+        button.set(state, progress, picked);
+        button.setVisibility(state == Download.IDLE ? GONE : VISIBLE);
     }
 
     /** A download of this session, running, queued or failed. */
@@ -169,6 +176,7 @@ final class ResultRow extends LinearLayout {
         ((View) meta.getParent()).setVisibility(GONE);
         show(extra, progressLine(job));
         button.set(job.state, job.progress(), picked);
+        button.setVisibility(VISIBLE);
         picked(picked);
     }
 
@@ -183,6 +191,7 @@ final class ResultRow extends LinearLayout {
         String when = entry.time > 0 ? DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(entry.time)) : "";
         show(extra, join(entry.bytes > 0 ? Download.human(entry.bytes) : "", when));
         button.set(Download.SAVED, -1, picked);
+        button.setVisibility(VISIBLE);
         picked(picked);
     }
 
