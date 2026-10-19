@@ -1,0 +1,7 @@
+// The printing itself: finding printers, speaking IPP, PJL and LPD, and
+// turning page images into the formats printers take.
+apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    api project(":common:core")
+}

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A printer in three-quarter view, from the Keypad Grid proposal's product renders. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="120dp" android:height="84dp" android:viewportWidth="120" android:viewportHeight="84">
+    <path android:pathData="M2,76a58,6.5 0 1 0 116,0a58,6.5 0 1 0 -116,0z">
+      <aapt:attr name="android:fillColor">
+        <gradient android:type="radial" android:centerX="60" android:centerY="76" android:gradientRadius="58" android:startColor="#52000000" android:endColor="#00000000" />
+      </aapt:attr>
+    </path>
+    <path android:pathData="M15,33 L22.5,15.5 Q23.5,13.5 26.5,13.5 H93.5 Q96.5,13.5 97.5,15.5 L105,33 Z">
+      <aapt:attr name="android:fillColor">
+        <gradient android:type="linear" android:startX="0" android:startY="13.5" android:endX="0" android:endY="33" android:startColor="#5A5C64" android:endColor="#2D2E33" />
+      </aapt:attr>
+    </path>
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.07" android:pathData="M30,15.5 H58 L50,31 H23 Z" />
+    <path android:pathData="M13,30h94a6,6 0 0 1 6,6v32a6,6 0 0 1 -6,6h-94a6,6 0 0 1 -6,-6v-32a6,6 0 0 1 6,-6z">
+      <aapt:attr name="android:fillColor">
+        <gradient android:type="linear" android:startX="0" android:startY="30" android:endX="0" android:endY="74" android:startColor="#45474E" android:endColor="#17181B" />
+      </aapt:attr>
+    </path>
+    <path android:pathData="M13,30h94a6,6 0 0 1 6,6v32a6,6 0 0 1 -6,6h-94a6,6 0 0 1 -6,-6v-32a6,6 0 0 1 6,-6z">
+      <aapt:attr name="android:fillColor">
+        <gradient android:type="linear" android:startX="7" android:startY="0" android:endX="113" android:endY="0">
+          <item android:offset="0" android:color="#1A000000" />
+          <item android:offset="0.12" android:color="#00000000" />
+          <item android:offset="0.88" android:color="#00000000" />
+          <item android:offset="1" android:color="#1F000000" />
+        </gradient>
+      </aapt:attr>
+    </path>
+    <path android:fillColor="#202125" android:pathData="M10.75,30h98.5a3.75,3.75 0 0 1 3.75,3.75v0.0a3.75,3.75 0 0 1 -3.75,3.75h-98.5a3.75,3.75 0 0 1 -3.75,-3.75v-0.0a3.75,3.75 0 0 1 3.75,-3.75z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.4" android:pathData="M10,38.5h100v0.8h-100z" />
+    <path android:fillColor="#15171D" android:pathData="M75.2,41h27.6a2.2,2.2 0 0 1 2.2,2.2v6.1a2.2,2.2 0 0 1 -2.2,2.2h-27.6a2.2,2.2 0 0 1 -2.2,-2.2v-6.1a2.2,2.2 0 0 1 2.2,-2.2z" />
+    <path android:fillColor="#3D86F5" android:pathData="M77,43h14a1,1 0 0 1 1,1v4.5a1,1 0 0 1 -1,1h-14a1,1 0 0 1 -1,-1v-4.5a1,1 0 0 1 1,-1z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.7" android:pathData="M77.5,44.5h9v1.2h-9z" />
+    <path android:fillColor="#6B7180" android:pathData="M97.2,46.2a1.8,1.8 0 1 0 3.6,0a1.8,1.8 0 1 0 -3.6,0z" />
+    <path android:fillColor="#2BD46B" android:pathData="M13,44a1.5,1.5 0 1 0 3,0a1.5,1.5 0 1 0 -3,0z" />
+    <path android:fillColor="#050506" android:pathData="M21.6,56h76.8a2.6,2.6 0 0 1 2.6,2.6v2.3a2.6,2.6 0 0 1 -2.6,2.6h-76.8a2.6,2.6 0 0 1 -2.6,-2.6v-2.3a2.6,2.6 0 0 1 2.6,-2.6z" />
+    <path android:fillColor="#4C4E55" android:pathData="M25.2,62.5h69.6a1.2,1.2 0 0 1 1.2,1.2v0.8000000000000003a1.2,1.2 0 0 1 -1.2,1.2h-69.6a1.2,1.2 0 0 1 -1.2,-1.2v-0.8000000000000003a1.2,1.2 0 0 1 1.2,-1.2z" />
+    <path android:fillColor="#000000" android:fillAlpha="0.08" android:pathData="M7,68h106v0.8h-106z" />
+</vector>
