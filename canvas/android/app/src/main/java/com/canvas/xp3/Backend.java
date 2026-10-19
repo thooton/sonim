@@ -8,6 +8,7 @@ import com.canvas.xp3.data.Link;
 import com.canvas.xp3.data.Notice;
 import com.canvas.xp3.data.Prefs;
 import com.canvas.xp3.data.Quiz;
+import com.canvas.xp3.data.Rich;
 import com.canvas.xp3.data.Store;
 import com.canvas.xp3.data.Sync;
 import com.canvas.xp3.net.Canvas;
@@ -414,7 +415,7 @@ final class Backend {
                 final String pieceId = piece.id;
                 String uploaded;
                 if (Draft.TEXT.equals(piece.kind)) {
-                    byte[] bytes = String.valueOf(piece.text).getBytes("UTF-8");
+                    byte[] bytes = piece.plain().getBytes("UTF-8");
                     uploaded = client.upload(item.courseId, item.assignmentId, safeName(piece.name) + ".txt",
                         bytes.length, "text/plain", new java.io.ByteArrayInputStream(bytes),
                         (done, total) -> progress.at(pieceId, done, total));
@@ -454,9 +455,9 @@ final class Backend {
         client().comment(item.courseId, item.assignmentId, text);
     }
 
-    void reply(String courseId, String topicId, String text) throws IOException, InterruptedException {
-        client().reply(courseId, topicId, "<p>" + text.trim().replace("&", "&amp;").replace("<", "&lt;")
-            .replace(">", "&gt;").replace("\n", "<br>") + "</p>");
+    /** Posts an answer kept in `Rich`'s form, its formatting as Canvas's editor writes it. */
+    void reply(String courseId, String topicId, String stored) throws IOException, InterruptedException {
+        client().reply(courseId, topicId, Rich.html(stored));
     }
 
     void markDone(Assignment item, String override, boolean done) throws IOException, InterruptedException {

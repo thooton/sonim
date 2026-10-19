@@ -28,7 +28,7 @@ public final class Draft {
         public final String id;
         public final String kind;
         public final String name;
-        /** The typed answer, for TEXT. */
+        /** The typed answer, for TEXT: in `Rich`'s form when mime is Rich.MIME. */
         public final String text;
         /** The address, for LINK. */
         public final String url;
@@ -76,6 +76,25 @@ public final class Draft {
             return new Piece(id, kind, name, value, url, file, mime, size, amount, null);
         }
 
+        /** A typed answer with its formatting, in `Rich`'s form. */
+        public Piece withRich(String stored) {
+            return new Piece(id, kind, name, stored, url, file, Rich.MIME, size, amount, null);
+        }
+
+        public boolean rich() {
+            return Rich.MIME.equals(mime);
+        }
+
+        /** The typed answer in `Rich`'s form, whether or not it was written with formatting. */
+        public String stored() {
+            return text == null ? "" : rich() ? text : Rich.literal(text);
+        }
+
+        /** The typed answer without its formatting. */
+        public String plain() {
+            return text == null ? "" : rich() ? Rich.plain(text) : text;
+        }
+
         public Piece withUpload(String canvasId) {
             return new Piece(id, kind, name, text, url, file, mime, size, amount, canvasId);
         }
@@ -86,7 +105,7 @@ public final class Draft {
 
         /** Words in a typed answer, as the editor counts them. */
         public int words() {
-            return Draft.words(text);
+            return Draft.words(plain());
         }
 
         Map<String, Object> toMap() {
@@ -178,10 +197,16 @@ public final class Draft {
         return key.replace(':', '-');
     }
 
-    static int words(String text) {
+    /** Words as the editor counts them: a bullet is not one. */
+    public static int words(String text) {
         if (text == null) return 0;
         String trimmed = text.trim();
-        return trimmed.length() == 0 ? 0 : trimmed.split("\\s+").length;
+        if (trimmed.length() == 0) return 0;
+        int words = 0;
+        for (String word : trimmed.split("\\s+")) {
+            if (!word.equals(Rich.BULLET.trim())) words++;
+        }
+        return words;
     }
 
     // ------------------------------------------------------------------
@@ -263,7 +288,7 @@ public final class Draft {
     /**
      * Typed answers as the one HTML document a text submission is. Each
      * answer's name is its heading when there is more than one, and every
-     * line break the student typed is kept.
+     * line break and format the student typed is kept.
      */
     public String html() {
         StringBuilder out = new StringBuilder();
@@ -274,10 +299,7 @@ public final class Draft {
         for (Piece piece : pieces) {
             if (!TEXT.equals(piece.kind)) continue;
             if (texts > 1) out.append("<h3>").append(escape(piece.name)).append("</h3>");
-            for (String paragraph : String.valueOf(piece.text).split("\n\\s*\n")) {
-                if (paragraph.trim().length() == 0) continue;
-                out.append("<p>").append(escape(paragraph.trim()).replace("\n", "<br>")).append("</p>");
-            }
+            out.append(Rich.html(piece.stored()));
         }
         return out.toString();
     }

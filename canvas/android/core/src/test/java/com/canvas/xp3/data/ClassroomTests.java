@@ -20,6 +20,7 @@ public final class ClassroomTests {
         check.run("course names", () -> courses(check));
         check.run("week strip", () -> week(check));
         check.run("draft plans", () -> plans(check));
+        check.run("formatted answers", () -> formatting(check));
         check.run("reminders", () -> reminders(check));
         check.run("notices", () -> notices(check));
         check.run("details", () -> details(check));
@@ -121,6 +122,46 @@ public final class ClassroomTests {
         check.ok("two answers each get a heading", two.html().startsWith("<h3>Answers</h3>"));
         check.same("removing a piece", 1, two.without("u", 4).pieces.size());
         check.same("words are counted", 3, Draft.Piece.text("x", "x", " a b  c ").words());
+    }
+
+    private static void formatting(Check check) {
+        List<Rich.Run> runs = Arrays.asList(new Rich.Run(0, 4, Rich.BOLD), new Rich.Run(2, 7, Rich.ITALIC),
+            new Rich.Run(8, 10, Rich.UNDERLINE));
+        String stored = Rich.write("bold it\n*u+", runs);
+        check.same("styles become markers, literals are escaped", "**bo*ld** it*\n++\\*u++\\+", stored);
+        Rich.Styled back = Rich.parse(stored);
+        check.same("and read back to the same text", "bold it\n*u+", back.text);
+        check.same("with the same styles", stored, Rich.write(back.text, back.runs));
+        check.same("a marker left open ends with its line", "a\nb", Rich.plain("**a\nb"));
+        check.same("the plain answer", "a b", Rich.plain("**a** *b*"));
+
+        check.same("formats become Canvas's own tags", "<p><strong>Big</strong> <em>and</em> <u>lined</u></p>",
+            Rich.html("**Big** *and* ++lined++"));
+        check.same("bullets and numbers become lists",
+            "<p>Intro</p><ul><li>one</li><li><strong>two</strong></li></ul><ol start=\"3\"><li>three</li></ol>",
+            Rich.html("Intro\n\u2022 one\n\u2022 **two**\n3. three"));
+        check.same("lines stay breaks, blank lines paragraphs", "<p>a<br>b</p><p>c &lt;d&gt;</p>",
+            Rich.html("a\nb\n\n c <d> "));
+
+        Draft.Piece old = Draft.Piece.text("t", "A", "5*3 = 15 \\o/");
+        check.same("an older answer's stars are kept as typed", "<p>5*3 = 15 \\o/</p>",
+            Draft.empty("1:2").with(old, 1).html());
+        Draft.Piece rich = old.withRich("**Yes**\n\u2022 one");
+        check.ok("a formatted answer says so", rich.rich() && !old.rich());
+        check.same("its .txt has no markers", "Yes\n\u2022 one", rich.plain());
+        check.same("and bullets aren't words", 2, rich.words());
+
+        check.same("pasted Markdown keeps what Canvas can show",
+            "**Title**\n\u2022 **bold** and *it* and ++u++\n\u2022 item\n2. next\n*mix **both***",
+            Rich.fromMarkdown("# Title\n- __bold__ and _it_ and <u>u</u>\n* item\n2) next\n*mix **both***"));
+        check.same("plain text passes through", "2 \\* 3 \\* 4 = snake_case\\+1",
+            Rich.fromMarkdown("2 * 3 * 4 = snake_case+1"));
+        check.same("code, quotes, links and fences become text", "see x\nquote\nGoogle (https://g.co)\ncode \\*",
+            Rich.fromMarkdown("see `x`\n> quote\n[Google](https://g.co)\n```\ncode *\n```"));
+        check.same("***both*** at once", "***both***", Rich.write(Rich.parse(Rich.fromMarkdown("***both***")).text,
+            Rich.parse(Rich.fromMarkdown("***both***")).runs));
+        check.same("pasted rich text", "**Hi** ++there++\n\n\u2022 one",
+            Rich.fromHtml("<p><b>Hi</b> <u>there</u></p><ul><li>one</li></ul>"));
     }
 
     private static void reminders(Check check) {
