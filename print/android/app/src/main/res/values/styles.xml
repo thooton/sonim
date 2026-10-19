@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The Keypad Grid proposal: white pages under a light bar, the status
+         bar the same near-white with dark icons. Everything else is drawn
+         in code (Look). -->
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">#FAFAFB</item>
+        <item name="android:colorPrimaryDark">#FAFAFB</item>
+        <item name="android:colorAccent">#1A57D6</item>
+        <item name="android:colorControlHighlight">#241A57D6</item>
+        <item name="android:statusBarColor">#FAFAFB</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>

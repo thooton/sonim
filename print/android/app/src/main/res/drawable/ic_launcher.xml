@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A home tile: the indigo-to-teal gradient of the six tiles, with the
+     printer glyph in white and a page coming out. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:pathData="M10,4h28a6,6 0,0 1,6 6v28a6,6 0,0 1,-6 6h-28a6,6 0,0 1,-6 -6v-28a6,6 0,0 1,6 -6z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="4" android:startY="4" android:endX="44" android:endY="44"
+                android:startColor="#5A62CF" android:endColor="#24A9B0" />
+        </aapt:attr>
+    </path>
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="2.4" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M17,20V13h14v7M15,20h18a3,3 0,0 1,3 3v8a3,3 0,0 1,-3 3h-2M17,34h-2a3,3 0,0 1,-3 -3v-8a3,3 0,0 1,3 -3" />
+    <path android:fillColor="#FFFFFF" android:pathData="M18,28h12v10h-12z" />
+    <path android:strokeColor="#3F7AD8" android:strokeWidth="1.2" android:strokeLineCap="round" android:pathData="M20.5,31.5h7M20.5,34.5h5" />
+</vector>

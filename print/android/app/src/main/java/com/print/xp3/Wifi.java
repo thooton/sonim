@@ -1,0 +1,34 @@
+package com.print.xp3;
+
+import android.content.Context;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+
+/** The phone's Wi-Fi, for naming the network printers are looked for on. */
+final class Wifi {
+
+    private Wifi() {}
+
+    static boolean on(Context context) {
+        WifiManager wifi = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        return wifi != null && wifi.isWifiEnabled();
+    }
+
+    /** The network's name, or null when Android won't say (it needs the location permission to). */
+    static String ssid(Context context) {
+        WifiManager wifi = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        if (wifi == null) return null;
+        WifiInfo info = wifi.getConnectionInfo();
+        if (info == null) return null;
+        String ssid = info.getSSID();
+        if (ssid == null || ssid.isEmpty() || ssid.equals("<unknown ssid>") || ssid.equals("0x")) return null;
+        if (ssid.startsWith("\"") && ssid.endsWith("\"") && ssid.length() >= 2) ssid = ssid.substring(1, ssid.length() - 1);
+        return ssid;
+    }
+
+    /** "“Hollis-5G”", or "the same Wi-Fi as this phone" when the name isn't known. */
+    static String name(Context context) {
+        String ssid = ssid(context);
+        return ssid == null ? "the same Wi-Fi as this phone" : "“" + ssid + "”";
+    }
+}

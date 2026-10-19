@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From the Keypad Grid proposal's icon set: 24-unit strokes, tinted where used. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.7 16a5 5 0 0 1 6.6 0" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M11.0,19.3a1.0,1.0 0 1 0 2.0,0a1.0,1.0 0 1 0 -2.0,0z" />
+</vector>
