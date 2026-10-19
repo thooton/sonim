@@ -15,6 +15,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -76,12 +78,13 @@ public final class Center {
     }
 
     /**
-     * Starts a transform job on document `id`. The command center starts a
+     * Starts a transform job on document `id`, making `formats` (Formats;
+     * the PDF is made whether listed or not). The command center starts a
      * session for it, which takes a few seconds; `server` tells that session
      * where to reach the command center, which is where this reaches it.
      */
-    public Job start(String id) throws IOException, InterruptedException {
-        String body = Json.write(Json.map("document", id, "server", server));
+    public Job start(String id, List<String> formats) throws IOException, InterruptedException {
+        String body = Json.write(Json.map("document", id, "formats", new ArrayList<Object>(formats), "server", server));
         return Jobs.job(check(http.send(request("/transforms", SLOW).post(body)), "start it").body());
     }
 

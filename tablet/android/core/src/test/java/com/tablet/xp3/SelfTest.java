@@ -4,6 +4,7 @@ import com.tablet.xp3.data.Doc;
 import com.tablet.xp3.data.Browse;
 import com.tablet.xp3.data.Downloads;
 import com.tablet.xp3.data.Job;
+import com.tablet.xp3.data.Formats;
 import com.tablet.xp3.data.Jobs;
 import com.tablet.xp3.data.Library;
 import com.tablet.xp3.data.Viewport;
@@ -15,6 +16,7 @@ import com.xp3.common.TestServer;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -47,7 +49,8 @@ public final class SelfTest {
         + "\"updated\":\"2026-10-17T14:58:00Z\",\"title\":\"MLA paper\",\"progress\":\"Transcribing page 9 of 12\",\"percent\":58},"
         + "{\"id\":\"t2\",\"document\":\"d2\",\"name\":\"Lease agreement\",\"status\":\"done\",\"created\":\"2026-10-17T10:30:00Z\","
         + "\"updated\":\"2026-10-17T10:42:00Z\",\"title\":\"Lease summary\",\"percent\":100,\"result\":\"Lease summary\","
-        + "\"tablet\":\"d9\",\"files\":[\"Lease summary.pdf\",\"Lease summary.docx\"]},"
+        + "\"tablet\":\"d9\",\"files\":[\"Lease summary.pdf\",\"Lease summary.docx\",\"Lease summary.txt\","
+        + "\"Lease summary 1.jpg\",\"Lease summary 2.jpg\"],\"formats\":[\"pdf\",\"docx\",\"txt\",\"jpg\",\"gif\"]},"
         + "{\"id\":\"t3\",\"document\":\"d3\",\"name\":\"Invisible Cities\",\"status\":\"failed\",\"created\":\"2026-10-17T12:00:00Z\","
         + "\"updated\":\"2026-10-17T12:01:00Z\",\"percent\":0,\"error\":\"Couldn't start it: no account has room left\"},"
         + "{\"id\":\"t4\",\"document\":\"d2\",\"name\":\"Lease agreement\",\"status\":\"running\",\"created\":\"2026-10-17T14:59:00Z\",\"percent\":0}"
@@ -131,10 +134,15 @@ public final class SelfTest {
         check.same("done", Job.DONE, done.status);
         check.same("done summary", "10:42", done.summary(NOW, UTC, true));
         check.same("result on the tablet", "d9", done.tablet);
-        check.same("both files", 2, done.files.size());
-        check.same("its PDF", "Lease summary.pdf", done.pdf());
-        check.same("its Word document", "Lease summary.docx", done.docx());
-        check.same("no Word document while running", "", essay.docx());
+        check.same("every file", 5, done.files.size());
+        check.same("its PDF", "[Lease summary.pdf]", done.files("pdf").toString());
+        check.same("its page images, in order", "[Lease summary 1.jpg, Lease summary 2.jpg]", done.files(Formats.JPG).toString());
+        check.same("the formats it made", "[pdf, docx, txt, jpg]", done.made().toString());
+        check.same("the formats asked for, known ones only", "[pdf, docx, txt, jpg]", done.formats.toString());
+        check.ok("no Word document while running", essay.files("docx").isEmpty());
+        check.ok("an old job asked for none", essay.formats.isEmpty());
+        check.same("a format by extension", "jpg", Formats.of("Scan 3.JPEG"));
+        check.same("not a format", "", Formats.of("notes.zip"));
         Job failed = jobs.find("t3");
         check.same("failed says why", "Couldn't start it: no account has room left", failed.summary(NOW, UTC, true));
         check.same("state", "Failed", failed.stateLabel());
@@ -213,13 +221,15 @@ public final class SelfTest {
             check.same("library", 3, Library.parse(tablet.library()).docs.size());
             check.same("jobs", 4, Jobs.parse(tablet.jobs()).ordered().size());
 
-            Job started = tablet.start("d1");
+            Job started = tablet.start("d1", Arrays.asList("docx", "txt"));
+            check.same("start sends the formats", "[docx, txt]",
+                Json.children(Json.object(Json.parse(lastBody[0])), "formats").toString());
             check.same("started", "t9", started.id);
             check.ok("running", started.active());
             check.same("tells the job where the command center is", base,
                 Json.text(Json.object(Json.parse(lastBody[0])), "server"));
             check.fails("the command center's own words", "Couldn't start it: That document is in the trash.",
-                () -> tablet.start("d4"));
+                () -> tablet.start("d4", Arrays.asList("pdf")));
 
             tablet.forget("t1");
             tablet.rename("d1", "Essay, final");

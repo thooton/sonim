@@ -1,8 +1,6 @@
 package com.tablet.xp3;
 
 import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.Paint;
 import android.graphics.drawable.GradientDrawable;
 import android.text.InputType;
 import android.text.TextUtils;
@@ -15,18 +13,18 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.tablet.xp3.data.Doc;
+import com.tablet.xp3.data.Formats;
 import com.tablet.xp3.data.Job;
 import com.tablet.xp3.data.Library;
-import com.tablet.xp3.data.Viewport;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * A sheet risen over the screen: for one file, its menu (what OK on a
- * cover opens), then starting a transform, its details, renaming, moving
- * or deleting it; a job's menu; the folder an upload goes into; or the
- * settings. The page behind is
+ * cover opens), then the formats a transform makes, its details, renaming,
+ * moving or deleting it; a job's menu, and its files to download; the
+ * folder an upload goes into; or the settings. The page behind is
  * dimmed; Up and Down pick a choice, OK takes it, Back closes the sheet.
  */
 final class Sheet extends FrameLayout {
@@ -40,6 +38,8 @@ final class Sheet extends FrameLayout {
     static final int JOB = 6;
     static final int DELETE = 7;
     static final int UPLOAD = 8;
+    static final int FORMATS = 9;
+    static final int FILES = 10;
 
     /** What the choices on a job's sheet do. */
     static final int KEEP = 0;
@@ -47,16 +47,17 @@ final class Sheet extends FrameLayout {
     static final int VIEW = 2;
     static final int RETRY = 3;
     static final int REMOVE = 4;
-    static final int DOWNLOAD_DOCX = 5;
-    static final int DOWNLOAD_PDF = 6;
+    static final int DOWNLOAD = 5;
+    /** On the Download sheet, every file; the other choices are a format's index in Formats.ALL. */
+    static final int ALL_FILES = -1;
 
     final int kind;
     private final LinearLayout body;
     private final List<Parts.Action> choices = new ArrayList<>();
     /** The name being typed, on the Rename sheet. */
     EditText field;
-    /** The top of page 1, on the Transform sheet. */
-    private TopOfPage top;
+    /** Which formats are ticked, on the Formats sheet, by their index in Formats.ALL. */
+    private boolean[] ticked;
     /** What each choice does, on a job's sheet. */
     private final List<Integer> does = new ArrayList<>();
     int picked;
@@ -152,64 +153,52 @@ final class Sheet extends FrameLayout {
         return s;
     }
 
-    /**
-     * Before a transform starts: the top of page 1, where the instruction is
-     * written, so it can be checked before anything runs; or, with a job
-     * already running on the file, how that one is going.
-     */
-    static Sheet transform(Context c, Doc doc, Page first, Job running) {
+    /** A transform already running on the file: how it is going. */
+    static Sheet transform(Context c, Doc doc, Job running) {
         Sheet s = new Sheet(c, TRANSFORM);
         s.head("Transform", doc.name);
-        if (running != null) {
-            s.rows(new String[][] {{"Status", running.step()}, {"Progress", running.percent + "%"}});
-            s.choice(R.drawable.ic_check, "OK");
-        } else {
-            s.top = new TopOfPage(c, first);
-            LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Look.dp(c, 54));
-            lp.setMargins(Look.dp(c, 9), Look.dp(c, 8), Look.dp(c, 9), Look.dp(c, 4));
-            s.body.addView(s.top, lp);
-            s.choice(R.drawable.ic_play, "Start");
-            s.choice(R.drawable.ic_x, "Cancel");
-        }
+        s.rows(new String[][] {{"Status", running.step()}, {"Progress", running.percent + "%"}});
+        s.choice(R.drawable.ic_check, "OK");
         s.pick(0);
         return s;
     }
 
-    /** Page 1 has arrived, for the Transform sheet. */
-    void first(Page page) {
-        if (top != null) top.show(page);
+    /**
+     * What a transform makes, as boxes OK ticks: the PDF always, the rest
+     * unticked every time. Start is under them, and picked, so OK, OK makes
+     * a PDF.
+     */
+    static Sheet formats(Context c, Doc doc) {
+        Sheet s = new Sheet(c, FORMATS);
+        s.head("Transform", doc.name);
+        s.ticked = new boolean[Formats.ALL.length];
+        s.ticked[0] = true;
+        for (int i = 0; i < Formats.ALL.length; i++) {
+            Parts.Action a = s.choice(i == 0 ? R.drawable.ic_square_check : R.drawable.ic_square, Formats.LABELS[i]);
+            a.note.setText(i == 0 ? "Always" : "." + Formats.ALL[i]);
+        }
+        s.choice(R.drawable.ic_play, "Start");
+        s.pick(Formats.ALL.length);
+        return s;
     }
 
-    /** The top of a page, full width, behind an ink rule as the proposal sets a quote. */
-    private static final class TopOfPage extends View {
-        private Page page;
-        private final Paint rule = new Paint();
+    /** On the Formats sheet: whether Start is picked. */
+    boolean onStart() {
+        return picked == Formats.ALL.length;
+    }
 
-        TopOfPage(Context c, Page page) {
-            super(c);
-            this.page = page;
-            rule.setColor(Look.INK);
-        }
+    /** On the Formats sheet: ticks or unticks the picked format; the PDF stays ticked. */
+    void toggle() {
+        if (picked <= 0 || picked >= ticked.length) return;
+        ticked[picked] = !ticked[picked];
+        choices.get(picked).icon(ticked[picked] ? R.drawable.ic_square_check : R.drawable.ic_square);
+    }
 
-        void show(Page next) {
-            page = next;
-            invalidate();
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            float bar = Look.px(getContext(), 2);
-            float w = getWidth() - bar * 3;
-            canvas.drawRect(0, 0, bar, getHeight(), rule);
-            canvas.save();
-            canvas.translate(bar * 3, 0);
-            canvas.clipRect(0, 0, w, getHeight());
-            canvas.drawColor(Look.PAGE);
-            float scale = w / Viewport.PAGE_W;
-            canvas.scale(scale, scale);
-            page.draw(canvas);
-            canvas.restore();
-        }
+    /** On the Formats sheet: the formats ticked. */
+    List<String> chosen() {
+        List<String> out = new ArrayList<>();
+        for (int i = 0; i < ticked.length; i++) if (ticked[i]) out.add(Formats.ALL[i]);
+        return out;
     }
 
     static Sheet details(Context c, Doc doc, String edited) {
@@ -281,9 +270,7 @@ final class Sheet extends FrameLayout {
             case Job.DONE:
                 s.rows(new String[][] {{"From", job.from()}, {"Saved as", job.result}, {"Finished", finished}});
                 if (job.tablet.length() > 0) s.jobChoice(R.drawable.ic_eye, "View", VIEW);
-                // The Word document is what gets handed in; the PDF is what the tablet has.
-                if (job.docx().length() > 0) s.jobChoice(R.drawable.ic_download, "Download Word", DOWNLOAD_DOCX).note.setText(".docx");
-                if (job.pdf().length() > 0) s.jobChoice(R.drawable.ic_download, "Download PDF", DOWNLOAD_PDF).note.setText(".pdf");
+                if (!job.files.isEmpty()) s.jobChoice(R.drawable.ic_download, "Download…", DOWNLOAD);
                 s.jobChoice(R.drawable.ic_x, "Remove", REMOVE);
                 break;
             default:
@@ -305,6 +292,21 @@ final class Sheet extends FrameLayout {
     /** What the picked choice on a job's sheet does. */
     int doing() {
         return does.get(picked);
+    }
+
+    /** A finished job's files: all of them, when it made more than one format, then each format. */
+    static Sheet files(Context c, Job job) {
+        Sheet s = new Sheet(c, FILES);
+        s.head("Download", job.heading());
+        List<String> made = job.made();
+        if (made.size() > 1) s.jobChoice(R.drawable.ic_download, "All", ALL_FILES).note.setText(job.files.size() + " files");
+        for (String format : made) {
+            int n = job.files(format).size();
+            s.jobChoice(R.drawable.ic_download, Formats.LABELS[Formats.index(format)], Formats.index(format))
+                .note.setText(n > 1 ? n + " ." + format : "." + format);
+        }
+        s.pick(0);
+        return s;
     }
 
     /** Which of the tablet's folders a file from the phone goes into; the top first. */

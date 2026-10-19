@@ -44,9 +44,11 @@ reads and writes its storage, so the app sees what the tablet last synced.
   The route is PATCH, which `HttpURLConnection` can't send; the command
   center takes POST the same.
 - `GET /files/{name}`: a finished job's result from Delta's Files (its
-  `files`: the PDF, and the Word document when the agent made one), which a
-  job's menu downloads into `Documents` on the SD card, never the phone's
-  own storage (`Card.root` in common; no card, no download).
+  `files`: the PDF and each other format asked for, page images numbered),
+  which a job's Download sheet (`Sheet.files`: All, then each format)
+  saves onto the SD card, never the phone's own storage (`Card.root` in
+  common; no card, no download): documents into `Documents`, page images
+  into `DCIM/Camera`, where the gallery and messages find them.
   `Downloads.free` numbers a name already taken. Canvas's file picker
   reaches it (SD card, Documents), so the `.docx` can be handed in straight
   from there: many of the user's teachers take only Word documents. The PDF
@@ -59,7 +61,8 @@ reads and writes its storage, so the app sees what the tablet last synced.
   and the SD card, then their folders and the files the tablet takes
   (`Browse`), folders first. Back goes up a folder. Once it is up, the
   Library opens on it. Reading storage asks for it the first time.
-- `GET /transforms`, `POST /transforms`, `DELETE /transforms/{id}`: the jobs.
+- `GET /transforms`, `POST /transforms` (with the `formats` ticked),
+  `DELETE /transforms/{id}`: the jobs.
   They are read every 5 seconds while one runs (every minute otherwise),
   and a job that finishes is announced and the Library read again, since
   its result is a new file.
@@ -70,9 +73,14 @@ which its agent can't submit anything. The agent's own words are what the
 job's row shows: its title for the job (until then the document's
 name) and its status line. Its percentage is never words: a running job's
 glyph is a ring (`Ring`) that fills clockwise from the top, with the number
-in the middle. The command center can't read
-the instruction before a job starts, so the Transform sheet shows the top
-of page 1 itself, where the instruction is written.
+in the middle.
+
+Transform in a file's menu opens the Formats sheet (`Sheet.formats`): a
+box for each of `Formats.ALL`, PDF ticked and fixed, the rest unticked
+every time, and Start under them, picked, so OK, OK makes a PDF. OK on a
+box ticks it. The agent makes exactly what is ticked (the command center
+enforces it), and Try again asks for the same formats. With a job already
+running on the file, Transform shows how it is going instead.
 
 The proposal's other open questions: results go beside the original (the
 command center's choice); there are no alerts while the app is closed; any
@@ -95,7 +103,8 @@ comes to the front.
 ## Layout
 
 - `android/core`: `data/` - `Doc` (a file), `Library` (the listing and
-  its folders), `Job` and `Jobs` (the transform jobs and their wording), `Downloads`
+  its folders), `Job` and `Jobs` (the transform jobs and their wording), `Formats`
+  (what a job makes), `Downloads`
   (where a result is saved), `Browse` (the phone's folders, for Upload),
   `When` (times in words), `Viewport` (the preview's zoom levels, panning
   and clamping, for a page of any height); `net/Center` (the command
@@ -105,8 +114,8 @@ comes to the front.
   network calls and the key routing (left soft key is `KEYCODE_MENU`, right
   is `KEYCODE_BACK`), over `LibraryScreen` (with `Shelf`, the sliding
   covers), `TransformsScreen` (with `Ring`), `UploadScreen`, `PageView` (the preview, its chrome drawn over
-  the page), `Drawer` and `Sheet` (the file menu, Transform, Details,
-  Rename, Move, Settings, a job's menu). `Pages` fetches and draws pages; `Look` is the
+  the page), `Drawer` and `Sheet` (the file menu, Formats, Details,
+  Rename, Move, Settings, a job's menu and its Download sheet). `Pages` fetches and draws pages; `Look` is the
   palette, fonts and scale; `Mark` the highlighter stroke; `Parts` shared
   pieces. Everything is built in code; there are no layouts.
 

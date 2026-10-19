@@ -84,7 +84,8 @@ final class Parts {
     static final class Action extends LinearLayout {
         final Mark label;
         final TextView note;
-        private final int icon;
+        private int icon;
+        private boolean lit;
 
         Action(Context c, int icon, String text) {
             super(c);
@@ -111,11 +112,18 @@ final class Parts {
         }
 
         void on(boolean value) {
+            lit = value;
             label.mark(value);
             label.setTypeface(value ? Look.uiBold : Look.ui);
             if (icon != 0) {
                 label.setCompoundDrawables(Look.icon(getContext(), icon, value ? Look.INK : Look.GRAPHITE, 12), null, null, null);
             }
+        }
+
+        /** Draws it with another icon: a box ticked or unticked. */
+        void icon(int next) {
+            icon = next;
+            on(lit);
         }
     }
 
