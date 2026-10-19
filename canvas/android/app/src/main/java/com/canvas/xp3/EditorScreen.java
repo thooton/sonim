@@ -1,14 +1,11 @@
 package com.canvas.xp3;
 
-import android.content.ClipboardManager;
-import android.content.Context;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -23,14 +20,16 @@ import java.util.List;
  *
  * It saves to the phone a moment after every pause, so a dropped call or a
  * flat battery costs a sentence at most, and the footer says so: a running
- * word count on the left, "Saved on phone" on the right. Insert adds a
- * numbered line or a symbol, the things a keypad makes slow.
+ * word count on the left, "Saved on phone" on the right. Options formats
+ * the answer as Canvas's own editor does (bold, italic, underline, lists),
+ * pastes Markdown or rich text in formatted, and adds a new line or a
+ * symbol, the things a keypad makes slow.
  */
 final class EditorScreen extends Screen {
 
     private final Assignment work;
     private Draft.Piece piece;
-    private EditText field;
+    private AnswerField field;
     private TextView count;
     private TextView saved;
     private final Runnable save = this::saveNow;
@@ -50,7 +49,7 @@ final class EditorScreen extends Screen {
 
     @Override
     String left() {
-        return "Insert";
+        return "Format";
     }
 
     @Override
@@ -88,7 +87,7 @@ final class EditorScreen extends Screen {
         title.setLetterSpacing(-0.01f);
         v.pad(title, 12, 0, 12, 0);
         root.addView(title, Views.wide());
-        field = Fields.box(app, v, piece.text == null ? "" : piece.text, "Type your answer",
+        field = Fields.answer(app, v, piece.stored(), "Type your answer",
             InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         field.setBackground(Fields.background(v, look.mark, 3));
         field.setOnFocusChangeListener(null);
@@ -103,6 +102,7 @@ final class EditorScreen extends Screen {
         saved.setGravity(Gravity.RIGHT);
         foot.addView(saved);
         root.addView(foot, Views.wide());
+        field.formatted = this::changed;
         field.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int n, int after) {}
@@ -113,14 +113,18 @@ final class EditorScreen extends Screen {
             @Override
             public void afterTextChanged(Editable s) {
                 counted();
-                saved.setText("");
-                app.main.removeCallbacks(save);
-                app.main.postDelayed(save, 2000);
+                changed();
             }
         });
         counted();
         saved.setText(piece.text != null && piece.text.length() > 0 ? "✓ Saved on phone" : "");
         return root;
+    }
+
+    private void changed() {
+        saved.setText("");
+        app.main.removeCallbacks(save);
+        app.main.postDelayed(save, 2000);
     }
 
     @Override
@@ -131,15 +135,14 @@ final class EditorScreen extends Screen {
     }
 
     private void counted() {
-        String text = field.getText().toString().trim();
-        int words = text.length() == 0 ? 0 : text.split("\\s+").length;
+        int words = Draft.words(field.getText().toString());
         count.setText(words + (words == 1 ? " word" : " words"));
     }
 
     private void saveNow() {
         app.main.removeCallbacks(save);
         String text = field.getText().toString();
-        piece = piece.withText(text);
+        piece = piece.withRich(field.stored());
         if (text.trim().length() == 0) return;
         Draft draft = app.backend.draft(work.id);
         try {
@@ -193,38 +196,15 @@ final class EditorScreen extends Screen {
     @Override
     List<Sheet.Choice> options() {
         List<Sheet.Choice> out = new ArrayList<>();
-        out.add(new Sheet.Choice("Numbered line", R.drawable.ic_assignment, null, this::numbered));
+        field.choices(app, out);
         out.add(new Sheet.Choice("New line", R.drawable.ic_edit, null, () -> insert("\n")));
         out.add(new Sheet.Choice("Symbol", R.drawable.ic_add, null, this::symbols));
-        ClipboardManager clipboard = (ClipboardManager) app.getSystemService(Context.CLIPBOARD_SERVICE);
-        if (clipboard != null && clipboard.hasPrimaryClip()) {
-            out.add(new Sheet.Choice("Paste", R.drawable.ic_doc, null, () -> {
-                CharSequence text = clipboard.getPrimaryClip().getItemAt(0).coerceToText(app);
-                if (text != null) insert(text.toString());
-            }));
-        }
         out.add(new Sheet.Choice("Rename", R.drawable.ic_edit, null, () -> app.push(new FieldScreen(app, "Rename",
             piece.name, "Name", value -> {
                 if (value.trim().length() > 0) piece = piece.renamed(value.trim());
                 saveNow();
             }))));
         return out;
-    }
-
-    /** Starts a line numbered one past the last numbered line above it. */
-    private void numbered() {
-        String before = field.getText().toString().substring(0, field.getSelectionStart());
-        int next = 1;
-        String[] lines = before.split("\n");
-        for (int i = lines.length - 1; i >= 0; i--) {
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(\\d+)\\. ").matcher(lines[i]);
-            if (m.find()) {
-                next = Integer.parseInt(m.group(1)) + 1;
-                break;
-            }
-        }
-        boolean fresh = before.length() == 0 || before.endsWith("\n");
-        insert((fresh ? "" : "\n") + next + ". ");
     }
 
     private void symbols() {

@@ -6,7 +6,6 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -40,7 +39,7 @@ final class AssignmentScreen extends Screen {
     private boolean loading;
     private String problem;
     private Draft draft;
-    private EditText answer;
+    private AnswerField answer;
 
     AssignmentScreen(MainActivity app, Assignment item, String back) {
         super(app);
@@ -92,6 +91,7 @@ final class AssignmentScreen extends Screen {
         List<Sheet.Choice> out = new ArrayList<>();
         View focus = app.getCurrentFocus();
         final String key = focus instanceof Item ? ((Item) focus).key : null;
+        if (focus != null && focus == answer) answer.choices(app, out);
         if (key != null && key.startsWith("piece:") && !draft.queued) {
             final Draft.Piece piece = draft.piece(key.substring(6));
             if (piece != null) {
@@ -723,10 +723,11 @@ final class AssignmentScreen extends Screen {
         TextView label = v.label("Your answer");
         v.pad(label, 12, 2, 12, 3);
         page.addView(label, Views.wide());
-        answer = Fields.box(app, v, draft.pieces.isEmpty() ? "" : String.valueOf(draft.pieces.get(0).text),
+        answer = Fields.answer(app, v, draft.pieces.isEmpty() ? "" : draft.pieces.get(0).stored(),
             "Write your answer", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
                 | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         answer.setMinLines(3);
+        answer.formatted = this::keepAnswer;
         answer.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -736,13 +737,7 @@ final class AssignmentScreen extends Screen {
 
             @Override
             public void afterTextChanged(Editable s) {
-                Draft.Piece piece = Draft.Piece.text("answer", "Answer", s.toString());
-                draft = draft.with(piece, System.currentTimeMillis());
-                try {
-                    app.backend.saveDraft(draft);
-                } catch (java.io.IOException e) {
-                    // Kept on screen; the next keystroke tries again.
-                }
+                keepAnswer();
             }
         });
         page.addView(answer, v.margins(Views.wide(), 12, 0, 12, 0));
@@ -750,15 +745,25 @@ final class AssignmentScreen extends Screen {
         page.addView(post, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 10, 8, 10, 0));
     }
 
+    private void keepAnswer() {
+        Draft.Piece piece = Draft.Piece.text("answer", "Answer", "").withRich(answer.stored());
+        draft = draft.with(piece, System.currentTimeMillis());
+        try {
+            app.backend.saveDraft(draft);
+        } catch (java.io.IOException e) {
+            // Kept on screen; the next keystroke tries again.
+        }
+    }
+
     private void postAnswer(final Assignment work) {
-        final String text = answer == null ? "" : answer.getText().toString().trim();
-        if (text.length() == 0) {
+        if (answer == null || answer.getText().toString().trim().length() == 0) {
             app.say("Write your answer first.");
             return;
         }
+        final String stored = answer.stored();
         Sheet.ask(app, "Post your answer?", "Everyone in " + (app.course(work.courseId) == null ? "the class"
             : app.course(work.courseId).code) + " can read it.", "Post", "Cancel", () -> app.background(() -> {
-                app.backend.reply(work.courseId, work.topicId, text);
+                app.backend.reply(work.courseId, work.topicId, stored);
                 return Boolean.TRUE;
             }, (ok, failure) -> {
                 if (ok == null) {
