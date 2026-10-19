@@ -7,6 +7,8 @@ import android.content.res.Configuration;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.ListView;
 import com.source.xp3.net.Music;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
@@ -165,5 +167,27 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
         public void updateDrawState(android.text.TextPaint paint) {
             paint.setTypeface(face);
         }
+    }
+
+    /**
+     * Scrolls a list just far enough to show row `at` whole, at once. A
+     * smooth scroll started on every press, while the rows were being bound
+     * again, would sometimes run from the top back down to it.
+     */
+    protected static void keepInView(final ListView list, final int at) {
+        list.post(() -> {
+            if (at < 0 || at >= list.getCount()) return;
+            int first = list.getFirstVisiblePosition();
+            View row = list.getChildAt(at - first);
+            int height = list.getHeight();
+            if (row != null && row.getTop() >= 0 && row.getBottom() <= height) return;
+            if (at <= first) {
+                list.setSelectionFromTop(at, 0);
+            } else {
+                View any = row != null ? row : list.getChildAt(0);
+                int rowHeight = any == null ? 0 : any.getHeight();
+                list.setSelectionFromTop(at, Math.max(0, height - rowHeight));
+            }
+        });
     }
 }

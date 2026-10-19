@@ -110,12 +110,12 @@ public final class DownloadsActivity extends Tonal {
         int at = next(picked, step);
         if (at < 0) {
             // Up from the first download shows the storage card again.
-            if (step < 0) list.smoothScrollToPosition(0);
+            if (step < 0) keepInView(list, 0);
             return;
         }
         setPicked(at);
         adapter.notifyDataSetChanged();
-        list.smoothScrollToPosition(at);
+        keepInView(list, at);
     }
 
     private void ok() {
