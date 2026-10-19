@@ -1,7 +1,7 @@
 # AGENTS.md
 
 A small, dependency-free Android app for the Sonim XP3 that reads and sends
-the user's Gmail. A sibling of `../places`, `../source`, `../delta` and the
+the user's Gmail. A sibling of `../places`, `../source` and the
 rest, under the same constraints: 240x320 mdpi, d-pad driven, no AndroidX or
 third-party libraries, `:core` plain Java `--release 8` running on API 27.
 Keep it simple: a mail client a flip phone can drive, not Gmail's every

@@ -1,7 +1,0 @@
-// The login, the cloud session protocol, the command center's routes and
-// the transcript built from them.
-apply from: rootProject.file("gradle/core.gradle")
-
-dependencies {
-    api project(":common:core")
-}

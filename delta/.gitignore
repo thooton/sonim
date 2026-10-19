@@ -1,5 +1,0 @@
-# Credentials kept beside the app. gradle/bundled.gradle bakes the command
-# center into the APK, so every APK is ignored too, at the root.
-cloud-auth.json
-auth.json
-delta-center.json
