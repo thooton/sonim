@@ -132,7 +132,7 @@ public final class MainActivity extends Activity {
     private TextView toast;
 
     /** The result waiting on the storage permission, or "". */
-    private String pendingDownload = "";
+    private Runnable pendingDownload;
 
     private final Runnable hideToast = () -> toast.setVisibility(View.GONE);
     private final Runnable poll = this::pollJobs;
@@ -719,6 +719,10 @@ public final class MainActivity extends Activity {
                         case LibraryScreen.TRANSFORM:
                             openSheet(Sheet.transform(this, doc, cover(doc), jobs.runningOn(doc.id)), doc);
                             break;
+                        case LibraryScreen.DOWNLOAD:
+                            closeSheet();
+                            downloadPdf(doc);
+                            break;
                         case LibraryScreen.RENAME: openSheet(Sheet.rename(this, doc), doc); break;
                         case LibraryScreen.MOVE: openSheet(Sheet.move(this, doc, lib.folders), doc); break;
                         case LibraryScreen.DELETE: openSheet(Sheet.delete(this, doc), doc); break;
@@ -829,10 +833,10 @@ public final class MainActivity extends Activity {
                 }
                 break;
             case Sheet.DOWNLOAD_DOCX:
-                download(job.docx());
+                download(job.docx(), job.docx(), (t, dest) -> t.download(job.docx(), dest));
                 break;
             case Sheet.DOWNLOAD_PDF:
-                download(job.pdf());
+                download(job.pdf(), job.pdf(), (t, dest) -> t.download(job.pdf(), dest));
                 break;
             case Sheet.VIEW:
                 Doc result = lib.find(job.tablet);
@@ -844,15 +848,22 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /** A file from the Library, as the tablet shows it, as one PDF, into Documents on the SD card. */
+    private void downloadPdf(Doc doc) {
+        String name = Downloads.pdfName(doc.name);
+        download(doc.name, name, (t, dest) -> t.pdf(doc.id, dest));
+    }
+
     /**
-     * Saves a result from Delta's Files into Documents on the SD card, never
-     * the phone's own storage; Canvas's file picker finds it there (SD card,
-     * Documents) for handing in. Asks for storage first, once.
+     * Saves a file as `name` into Documents on the SD card, never the
+     * phone's own storage; Canvas's file picker finds it there (SD card,
+     * Documents) for handing in. `fetch` writes it; `said` is what the
+     * toast calls it while it comes. Asks for storage first, once.
      */
-    private void download(String name) {
+    private void download(String said, String name, Fetch fetch) {
         if (name.length() == 0) return;
         if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            pendingDownload = name;
+            pendingDownload = () -> download(said, name, fetch);
             requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE);
             return;
         }
@@ -867,14 +878,14 @@ public final class MainActivity extends Activity {
             return;
         }
         final File folder = new File(card, DOWNLOADS);
-        say("", "Downloading " + name + "…");
+        say("", "Downloading " + said + "…");
         worker.execute(() -> {
             String error = null;
             File dest = null;
             try {
                 if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't make the " + DOWNLOADS + " folder");
                 dest = Downloads.free(folder, name);
-                with.download(name, dest);
+                fetch.run(with, dest);
             } catch (IOException e) {
                 error = message(e);
             } catch (InterruptedException e) {
@@ -892,6 +903,10 @@ public final class MainActivity extends Activity {
                 say("Saved", "  SD card/" + DOWNLOADS + "/" + saved.getName());
             });
         });
+    }
+
+    private interface Fetch {
+        void run(Center tablet, File dest) throws IOException, InterruptedException;
     }
 
     // ---- Upload.
@@ -1011,9 +1026,10 @@ public final class MainActivity extends Activity {
             return;
         }
         if (request != STORAGE) return;
-        String name = pendingDownload;
-        pendingDownload = "";
-        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) download(name);
+        Runnable pending = pendingDownload;
+        pendingDownload = null;
+        if (pending == null) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) pending.run();
         else say("", "Storage permission denied");
     }
 
