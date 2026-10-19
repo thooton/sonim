@@ -2,7 +2,7 @@
 
 A small, dependency-free Android app for the Sonim XP3 that keeps the other
 apps in this repository up to date from GitHub. A sibling of `../list`,
-`../delta` and the rest, under the same constraints: 240x320 mdpi, d-pad
+`../source` and the rest, under the same constraints: 240x320 mdpi, d-pad
 driven, no AndroidX or third-party libraries, `:core` plain Java
 `--release 8` running on API 27.
 

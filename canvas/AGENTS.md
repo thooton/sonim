@@ -72,7 +72,7 @@ rationale comments beside the implementation.
   - `TurnInJob` sends queued turn-ins when the phone reconnects; `Alarms`
     posts the reminders chosen in Settings.
   - `Backend.java` is the only bridge from the UI to disk and network work.
-  - The shared `Markdown` (`common/ui`, also used by Delta) renders the
+  - The shared `Markdown` (`common/ui`, also used by other apps) renders the
     dialect emitted by core `Html.java`; changes to one side often require
     checking the other.
 - `android/core/src/test`: the framework-free desktop test suite and local HTTP

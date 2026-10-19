@@ -37,7 +37,7 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew selfTest assembleRelease
 ```
 
 builds every app and runs every self-test. One app is `:<app>:app` (and
-`:<app>:core`), as in `./gradlew :delta:core:selfTest :delta:app:assembleRelease`.
+`:<app>:core`), as in `./gradlew :source:core:selfTest :source:app:assembleRelease`.
 `settings.gradle` finds the modules itself: a directory's `app`, `core` and
 `ui` at `<dir>/android/<module>` or `<dir>/<module>`.
 
@@ -50,8 +50,7 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
   are a plain `SelfTest` main class, `com.<app>.xp3.SelfTest`, run by
   `:core:selfTest`; there is no test framework.
 - `gradle/bundled.gradle`: bakes a deployment's login into an app as a
-  generated `Bundled` class (Canvas, Charge, Delta, Mail, Places, Source,
-  Tablet). The files it reads are gitignored, and CI has none, so its APKs
+  generated `Bundled` class (Canvas, Charge, Mail, Places, Source, Tablet). The files it reads are gitignored, and CI has none, so its APKs
   carry no login.
 
 ## Shared code
@@ -94,6 +93,14 @@ that reads the manifest. A new Gradle app is built and published as soon as
 it exists; nothing needs adding to the workflow (an app whose sources aren't
 in a directory of its release name goes in `DIRS` in the script, as the
 launcher's `AppDrawer` does).
+
+So shipping a change to the phone is: bump the app's version, push to
+master, and let the build finish. The Updater offers it from there; there is
+nothing to upload anywhere, and APKs are not put on the command center.
+
+(There used to be a Delta app here, `delta/`, which started agent sessions
+from the phone. It has been retired: sessions are started from the Delta
+website, which the command center in thooton/delta serves.)
 
 ## Shared rules
 
