@@ -30,6 +30,7 @@ import android.widget.TextView;
 import com.tablet.xp3.data.Browse;
 import com.tablet.xp3.data.Doc;
 import com.tablet.xp3.data.Downloads;
+import com.tablet.xp3.data.Formats;
 import com.tablet.xp3.data.Job;
 import com.tablet.xp3.data.Jobs;
 import com.tablet.xp3.data.Library;
@@ -43,6 +44,7 @@ import com.xp3.common.ui.Ui;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
@@ -77,8 +79,10 @@ public final class MainActivity extends Activity {
     private static final int STORAGE = 1;
     /** Asking for storage, to read it for Upload. */
     private static final int STORAGE_UPLOAD = 2;
-    /** The folder on the SD card that results are downloaded into. */
+    /** The folder on the SD card that documents are downloaded into. */
     private static final String DOWNLOADS = "Documents";
+    /** And page images, where the camera's photos are. */
+    private static final String CAMERA = "DCIM/Camera";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private ExecutorService worker;
@@ -143,10 +147,7 @@ public final class MainActivity extends Activity {
         Look.load(this);
         worker = Ui.worker("tablet");
         pages = new Pages(this);
-        pages.onChange(() -> {
-            library.shelf.invalidate();
-            if (sheet != null && sheet.kind == Sheet.TRANSFORM && sheetDoc != null) sheet.first(cover(sheetDoc));
-        });
+        pages.onChange(() -> library.shelf.invalidate());
         login = loadLogin(prefs());
         signIn();
         String saved = Disk.read(listingFile(), 8000000);
@@ -717,7 +718,8 @@ public final class MainActivity extends Activity {
                             openPreview(doc.id, doc.modified, doc.name, 0, LIBRARY);
                             break;
                         case LibraryScreen.TRANSFORM:
-                            openSheet(Sheet.transform(this, doc, cover(doc), jobs.runningOn(doc.id)), doc);
+                            Job running = jobs.runningOn(doc.id);
+                            openSheet(running != null ? Sheet.transform(this, doc, running) : Sheet.formats(this, doc), doc);
                             break;
                         case LibraryScreen.DOWNLOAD:
                             closeSheet();
@@ -733,9 +735,19 @@ public final class MainActivity extends Activity {
                             openSheet(Sheet.details(this, doc, edited), doc);
                     }
                     return;
-                case Sheet.TRANSFORM:
-                    if (picked == 0 && jobs.runningOn(doc.id) == null) start(doc.id, doc.name);
+                case Sheet.FORMATS:
+                    if (!sheet.onStart()) {
+                        sheet.toggle();
+                        return;
+                    }
+                    if (jobs.runningOn(doc.id) == null) start(doc.id, doc.name, sheet.chosen());
                     break;
+                case Sheet.FILES:
+                    Job finished = sheetJob;
+                    int which = sheet.doing();
+                    closeSheet();
+                    downloadResult(finished, which);
+                    return;
                 case Sheet.RENAME:
                     String name = sheet.field.getText().toString().trim();
                     if (picked == 0 && name.length() > 0 && !name.equals(doc.name)) {
@@ -789,10 +801,10 @@ public final class MainActivity extends Activity {
     }
 
     /** Starts a transform job on a document, and says so once the command center has. */
-    private void start(String id, String name) {
+    private void start(String id, String name, List<String> formats) {
         say("", "Starting…");
         final Job[] started = new Job[1];
-        change(t -> started[0] = t.start(id), () -> {
+        change(t -> started[0] = t.start(id, formats), () -> {
             jobs = jobs.with(started[0]);
             say("", "Transform started");
             render();
@@ -829,14 +841,13 @@ public final class MainActivity extends Activity {
                 if (lib.find(job.document) == null && updated > 0) {
                     say("", "File no longer on the tablet");
                 } else {
-                    start(job.document, job.name);
+                    // The same formats again; a job from before there was a choice, what it made.
+                    start(job.document, job.name, job.formats.isEmpty() ? job.made() : job.formats);
                 }
                 break;
-            case Sheet.DOWNLOAD_DOCX:
-                download(job.docx(), job.docx(), (t, dest) -> t.download(job.docx(), dest));
-                break;
-            case Sheet.DOWNLOAD_PDF:
-                download(job.pdf(), job.pdf(), (t, dest) -> t.download(job.pdf(), dest));
+            case Sheet.DOWNLOAD:
+                openSheet(Sheet.files(this, job), null);
+                sheetJob = job;
                 break;
             case Sheet.VIEW:
                 Doc result = lib.find(job.tablet);
@@ -851,19 +862,34 @@ public final class MainActivity extends Activity {
     /** A file from the Library, as the tablet shows it, as one PDF, into Documents on the SD card. */
     private void downloadPdf(Doc doc) {
         String name = Downloads.pdfName(doc.name);
-        download(doc.name, name, (t, dest) -> t.pdf(doc.id, dest));
+        download(doc.name, Collections.singletonList(new Item(DOWNLOADS, name, (t, dest) -> t.pdf(doc.id, dest))));
     }
 
     /**
-     * Saves a file as `name` into Documents on the SD card, never the
-     * phone's own storage; Canvas's file picker finds it there (SD card,
-     * Documents) for handing in. `fetch` writes it; `said` is what the
-     * toast calls it while it comes. Asks for storage first, once.
+     * A finished job's files in one format (its index in Formats.ALL), or
+     * all of them (Sheet.ALL_FILES): documents into Documents, page images
+     * into DCIM/Camera, where the gallery and messages find them.
      */
-    private void download(String said, String name, Fetch fetch) {
-        if (name.length() == 0) return;
+    private void downloadResult(Job job, int which) {
+        List<Item> items = new ArrayList<>();
+        for (String format : job.made()) {
+            if (which != Sheet.ALL_FILES && which != Formats.index(format)) continue;
+            String into = format.equals(Formats.JPG) ? CAMERA : DOWNLOADS;
+            for (String name : job.files(format)) items.add(new Item(into, name, (t, dest) -> t.download(name, dest)));
+        }
+        if (items.isEmpty()) return;
+        download(items.size() == 1 ? items.get(0).name : job.heading(), items);
+    }
+
+    /**
+     * Saves files onto the SD card, never the phone's own storage, each
+     * into its folder there; Canvas's file picker finds Documents (SD card,
+     * Documents) for handing in. `said` is what the toast calls them while
+     * they come. Asks for storage first, once.
+     */
+    private void download(String said, List<Item> items) {
         if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            pendingDownload = () -> download(said, name, fetch);
+            pendingDownload = () -> download(said, items);
             requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE);
             return;
         }
@@ -877,32 +903,51 @@ public final class MainActivity extends Activity {
             say("", "No SD card");
             return;
         }
-        final File folder = new File(card, DOWNLOADS);
         say("", "Downloading " + said + "…");
         worker.execute(() -> {
             String error = null;
-            File dest = null;
+            List<String> saved = new ArrayList<>();
             try {
-                if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't make the " + DOWNLOADS + " folder");
-                dest = Downloads.free(folder, name);
-                fetch.run(with, dest);
+                for (Item item : items) {
+                    File folder = new File(card, item.into);
+                    if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't make the " + item.into + " folder");
+                    File dest = Downloads.free(folder, item.name);
+                    item.fetch.run(with, dest);
+                    saved.add(dest.getPath());
+                }
             } catch (IOException e) {
                 error = message(e);
             } catch (InterruptedException e) {
                 return;
             }
             final String why = error;
-            final File saved = dest;
             handler.post(() -> {
+                // So other apps (Canvas's picker, the gallery, the file manager) see them straight away.
+                if (!saved.isEmpty()) MediaScannerConnection.scanFile(this, saved.toArray(new String[0]), null, null);
                 if (why != null) {
                     say("", why);
-                    return;
+                } else if (items.size() == 1) {
+                    say("Saved", "  SD card/" + items.get(0).into + "/" + new File(saved.get(0)).getName());
+                } else {
+                    boolean oneFolder = true;
+                    for (Item item : items) oneFolder &= item.into.equals(items.get(0).into);
+                    say("Saved", "  " + items.size() + " files, SD card" + (oneFolder ? "/" + items.get(0).into : ""));
                 }
-                // So other apps (Canvas's picker, the file manager) see it straight away.
-                MediaScannerConnection.scanFile(this, new String[] {saved.getPath()}, null, null);
-                say("Saved", "  SD card/" + DOWNLOADS + "/" + saved.getName());
             });
         });
+    }
+
+    /** A file to download: the folder on the SD card it goes into, its name, and what fetches it. */
+    private static final class Item {
+        final String into;
+        final String name;
+        final Fetch fetch;
+
+        Item(String into, String name, Fetch fetch) {
+            this.into = into;
+            this.name = name;
+            this.fetch = fetch;
+        }
     }
 
     private interface Fetch {

@@ -38,11 +38,14 @@ public final class Job {
     /** The result's name and id on the tablet, once done. */
     public final String result;
     public final String tablet;
-    /** The result's files in Delta's Files (a PDF, and the Word document it came from). */
+    /** The result's files in Delta's Files: its PDF and the other formats asked for, page images in order. */
     public final List<String> files;
+    /** The formats the user asked for (Formats); none for a job from before there was a choice. */
+    public final List<String> formats;
 
     Job(String id, String document, String name, int status, long created, long updated, String title,
-        String progress, int percent, String error, String result, String tablet, List<String> files) {
+        String progress, int percent, String error, String result, String tablet, List<String> files,
+        List<String> formats) {
         this.id = id;
         this.document = document;
         this.name = name;
@@ -56,6 +59,7 @@ public final class Job {
         this.result = result;
         this.tablet = tablet;
         this.files = files;
+        this.formats = formats;
     }
 
     static Job parse(Map<String, Object> o) {
@@ -63,13 +67,15 @@ public final class Job {
         Double percent = Json.number(o, "percent");
         List<String> files = new ArrayList<>();
         for (Object f : Json.children(o, "files")) if (f instanceof String) files.add((String) f);
+        List<String> formats = new ArrayList<>();
+        for (Object f : Json.children(o, "formats")) if (f instanceof String && Formats.index((String) f) >= 0) formats.add((String) f);
         int state = "done".equals(status) ? DONE : "failed".equals(status) ? FAILED : RUNNING;
         return new Job(Json.string(o, "id"), orEmpty(Json.text(o, "document")), orEmpty(Json.text(o, "name")),
             state, Json.instant(o, "created"), Json.instant(o, "updated"),
             orEmpty(Json.text(o, "title")).trim(), orEmpty(Json.text(o, "progress")).trim(),
             percent == null ? 0 : Math.max(0, Math.min(100, percent.intValue())),
             orEmpty(Json.text(o, "error")).trim(), orEmpty(Json.text(o, "result")),
-            orEmpty(Json.text(o, "tablet")), Collections.unmodifiableList(files));
+            orEmpty(Json.text(o, "tablet")), Collections.unmodifiableList(files), Collections.unmodifiableList(formats));
     }
 
     private static String orEmpty(String s) {
@@ -114,19 +120,18 @@ public final class Job {
         return at > 0 ? When.day(at, now, zone, hours24) : "";
     }
 
-    /** The result's PDF in Delta's Files, or "". */
-    public String pdf() {
-        return file(".pdf");
+    /** The result's files in `format` (Formats), in order: one, or a page image each. */
+    public List<String> files(String format) {
+        List<String> out = new ArrayList<>();
+        for (String f : files) if (Formats.of(f).equals(format)) out.add(f);
+        return out;
     }
 
-    /** The Word document the result was made from, in Delta's Files, or "" when it was made as a PDF. */
-    public String docx() {
-        return file(".docx");
-    }
-
-    private String file(String ext) {
-        for (String f : files) if (f.toLowerCase(java.util.Locale.US).endsWith(ext)) return f;
-        return "";
+    /** The formats it has files in, in Formats order. */
+    public List<String> made() {
+        List<String> out = new ArrayList<>();
+        for (String format : Formats.ALL) if (!files(format).isEmpty()) out.add(format);
+        return out;
     }
 
     /** The second line of a job in the list. A running job's percentage is its ring, not words. */

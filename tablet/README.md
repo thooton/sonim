@@ -1,6 +1,6 @@
 # Tablet, for the Sonim XP3
 
-A reMarkable 2 companion: browse the files on the tablet, read a page up close, and send a file to **Transform**. An agent reads the instruction written at the top of page 1 ("Transcribe this + format in MLA"), makes what it asks for, and puts the finished file back on the tablet beside the original.
+A reMarkable 2 companion: browse the files on the tablet, read a page up close, and send a file to **Transform**. Tick the formats you want (PDF always; Word, Markdown, Text and Images if you like), and an agent reads the instruction written at the top of page 1 ("Transcribe this + format in MLA"), makes what it asks for in those formats, and puts the finished PDF back on the tablet beside the original. With nothing written as an instruction, it types up what is handwritten.
 
 Tablet reaches the tablet through the Delta command center, which the tablet syncs with (through rmfakecloud) and which runs the transform jobs. It signs in with the same address and token as Delta: baked in at build time, or entered from Menu → Settings.
 
@@ -14,13 +14,13 @@ Tablet reaches the tablet through the Delta command center, which the tablet syn
 | 4 / 6 | Preview: previous, next page |
 | * / # / 0 | Preview: zoom out, zoom in, fit the page |
 
-Transforms is the list of jobs, running ones first. OK on one opens its menu: a running job can be cancelled (the menu opens on "Keep it running", so OK, OK never cancels one), a finished one viewed, downloaded, or tried again, and removed from the list. A file's menu also has Delete, which moves it to the tablet's trash.
+Transforms is the list of jobs, running ones first. OK on one opens its menu: a running job can be cancelled (the menu opens on "Keep it running", so OK, OK never cancels one), a finished one viewed, downloaded (Download… lists All and each format), or tried again with the same formats, and removed from the list. A file's menu also has Delete, which moves it to the tablet's trash.
 
 **Upload** (in the drawer) puts a PDF or ePub from the phone on the tablet: pick Phone or SD card, go into folders with OK (Back goes up one), pick the file, then the tablet folder it goes into. A running job shows how far along it is as a ring, with the percentage inside.
 
 **Download PDF** in a file's menu saves the whole file, as it looks on the tablet with what is written on it, as one PDF into Documents on the SD card.
 
-**Download Word** and **Download PDF** save a finished job's result into Documents on the SD card (never the phone's own storage), where Canvas's file picker finds it under SD card. Hand in the Word document; if the result needs more work, write on the PDF on the tablet and transform it again. A job has a Word document when the agent made one.
+A finished job's **Download…** saves its files onto the SD card (never the phone's own storage): documents into Documents, where Canvas's file picker finds them under SD card, and page images into DCIM/Camera, where the gallery finds them. If the result needs more work, write on the PDF on the tablet and transform it again.
 
 ## Build
 
