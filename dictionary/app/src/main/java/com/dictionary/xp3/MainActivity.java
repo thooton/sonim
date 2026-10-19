@@ -379,13 +379,15 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Menu on a page: a menu over it. At home, the Word of the Day, Search or
+     * Menu on a page: a menu under the search capsule, where it has the
+     * screen to itself (from the Word of the Day card it was squeezed into
+     * what was left below it). At home, the Word of the Day, Search or
      * Shorthand; on a word, Pronounce (greyed when the phone cannot speak),
      * Search or Shorthand.
      */
     private void showActions() {
         boolean atHome = page == HOME;
-        PopupMenu menu = new PopupMenu(this, atHome ? findViewById(R.id.wotd) : headword);
+        PopupMenu menu = new PopupMenu(this, findViewById(R.id.pill));
         if (atHome) menu.getMenu().add(0, R.string.word_of_the_day_item, 0, R.string.word_of_the_day_item);
         else menu.getMenu().add(0, R.string.pronounce, 0, R.string.pronounce).setEnabled(speaks);
         menu.getMenu().add(0, R.string.search, 1, R.string.search);
@@ -473,7 +475,7 @@ public class MainActivity extends Activity {
 
     /**
      * OK while searching: the row picked, or else the best match for the
-     * query: the word, or in the shorthand search the first word it reads as.
+     * query: the word, or in the shorthand search its first row.
      */
     private void choose() {
         if (picked >= 0) {
@@ -489,8 +491,8 @@ public class MainActivity extends Activity {
         String query = search.getText().toString();
         if (Dictionary.normalize(query).isEmpty()) return;
         if (outlineSearch) {
-            List<Shorthand.Match> read = shorthand.read(query, 1);
-            if (!read.isEmpty()) found(pageFor(shorthand.group(read.get(0).entry)), SHORTHAND);
+            // The first row: the best reading, or a phrase's first that opens.
+            if (!items.isEmpty()) found(items.get(0), itemTabs.get(0));
             return;
         }
         int found = dictionary.find(query);
@@ -563,6 +565,8 @@ public class MainActivity extends Activity {
                 if (outlineSearch) addRow(index, SHORTHAND, R.drawable.ic_history, name(index));
                 else addRow(index, R.drawable.ic_history, null);
             }
+        } else if (outlineSearch && q.indexOf(' ') >= 0) {
+            showPhrase(q.split(" "));
         } else if (outlineSearch) {
             List<Shorthand.Match> outlines = shorthand.read(query, OUTLINES);
             showNone(outlines.isEmpty());
@@ -582,6 +586,49 @@ public class MainActivity extends Activity {
         TextView empty = text(getString(R.string.no_results), 12.5f, R.color.text_muted, sans);
         empty.setPadding(dp(12), dp(10), dp(12), dp(10));
         rows.addView(empty);
+    }
+
+    /**
+     * Outlines typed apart, as a phrase is written: the English each reads as
+     * first, together ("TH S": this is), then each outline's own rows. Should
+     * they make one outline, those come first (Grascii joins a few phrases,
+     * IS'US: ice house). A '?' stands for an outline that reads as nothing.
+     */
+    private void showPhrase(String[] typed) {
+        List<Shorthand.Match> joined = shorthand.read(TextUtils.join("", typed), OUTLINES);
+        List<List<Shorthand.Match>> words = new ArrayList<>();
+        StringBuilder english = new StringBuilder();
+        boolean any = false;
+        for (String outline : typed) {
+            List<Shorthand.Match> read = shorthand.read(outline, Math.max(2, OUTLINES / typed.length));
+            words.add(read);
+            if (english.length() > 0) english.append(' ');
+            english.append(read.isEmpty() ? "?" : shorthand.translation(read.get(0).entry));
+            any |= !read.isEmpty();
+        }
+        showNone(!any && joined.isEmpty());
+        if (!any && joined.isEmpty()) return;
+        for (Shorthand.Match match : joined) {
+            if (match.kind == Shorthand.EXACT) addOutline(match.entry);
+        }
+        if (any) {
+            // The phrase opens when a dictionary has it ("ice cream"), and
+            // otherwise is only read.
+            int page = pageOf(Dictionary.normalize(english.toString()));
+            SpannableStringBuilder s = new SpannableStringBuilder();
+            append(s, english.toString(), new Spans.Font(semibold));
+            if (page != -1) {
+                addRow(page, DEFINITIONS, R.drawable.ic_search_thin, s);
+            } else {
+                TextView reading = text("", 12.5f, R.color.ink, sans);
+                reading.setText(s);
+                reading.setPadding(dp(12), dp(6), dp(12), dp(4));
+                rows.addView(reading);
+            }
+        }
+        for (List<Shorthand.Match> read : words) {
+            for (Shorthand.Match match : read) addOutline(match.entry);
+        }
     }
 
     /** A row of the shorthand search: the outline in semibold, then its English in grey. */
