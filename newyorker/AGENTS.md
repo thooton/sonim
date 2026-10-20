@@ -76,10 +76,10 @@ as PNGs (`res/drawable-*/ic_launcher.png`).
 
 - Lists: Up/Down move, OK opens, Left/Right change tab, Menu (or the left
   softkey, `SOFT_LEFT`) opens the popup menu on release.
-- Lists: Up/Down are taken over (`MainActivity.move`): a fixed 40% of the
-  screen per press unless the next story is already wholly visible, the
+- Lists: Up/Down are taken over (`MainActivity.move`): a fixed 36dp per
+  press unless the next story is already wholly visible, the
   selection following once a story is well onto the screen.
-- Article: Down/Up move four lines; Right/Left turn a screen, keeping two lines of the
+- Article: Down/Up move two lines; Right/Left turn a screen, keeping two lines of the
   last; * and # change the text size (kept in the `settings` preferences);
   Menu opens its menu. Both screens take these in `dispatchKeyEvent`, before
   the ListView or ScrollView can.
