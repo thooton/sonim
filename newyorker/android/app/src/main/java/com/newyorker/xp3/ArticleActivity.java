@@ -45,9 +45,9 @@ import java.util.concurrent.ExecutorService;
  * picture, then the text in Caslon, each section opening on a drop cap and
  * the last paragraph ending on the magazine's diamond.
  *
- * What the list knew of the story (its headline, rubric, picture) shows at
- * once while the page is fetched. A saved article opens from its saved copy,
- * without the network.
+ * While the page is fetched the screen holds only a spinner, and the article
+ * appears whole once it is in: nothing is shown first and then replaced. A
+ * saved article opens from its saved copy, without the network.
  *
  * Down and Up move a few lines at a time; Right and Left turn a screen,
  * keeping two lines of the last in view;
@@ -105,6 +105,8 @@ public final class ArticleActivity extends BaseActivity {
         scroll.setSmoothScrollingEnabled(true);
         page = vertical();
         page.setPadding(0, dp(10), 0, dp(24));
+        // The page fills the screen, so the spinner can sit in its middle.
+        scroll.setFillViewport(true);
         scroll.addView(page, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         // The menu opens from the top right corner: anchored to the page, it would open below the screen.
         FrameLayout root = new FrameLayout(this);
@@ -163,7 +165,17 @@ public final class ArticleActivity extends BaseActivity {
     private void render() {
         int keep = scroll.getScrollY();
         page.removeAllViews();
-        Story head = article != null ? article.story() : story;
+        // Loading, or failed: the spinner (or the error) alone, in the middle of the screen.
+        page.setGravity(article == null ? Gravity.CENTER : Gravity.TOP);
+        if (article == null) {
+            ProgressBar spinner = new ProgressBar(this);
+            spinner.setIndeterminateTintList(getColorStateList(R.color.ink));
+            LinearLayout.LayoutParams placed = new LinearLayout.LayoutParams(dp(28), dp(28));
+            placed.gravity = Gravity.CENTER_HORIZONTAL;
+            page.addView(spinner, placed);
+            return;
+        }
+        Story head = article.story();
 
         if (!head.rubric.isEmpty()) {
             TextView rubric = Look.rubric(this, 11);
@@ -190,25 +202,16 @@ public final class ArticleActivity extends BaseActivity {
             byline.setText(head.byline);
             add(byline, 12, 2, 12, 3);
         }
-        if (article != null && !article.date.isEmpty()) {
+        if (!article.date.isEmpty()) {
             TextView date = Look.text(this, Look.sans(this, false), 9.5f, R.color.muted);
             date.setGravity(Gravity.CENTER_HORIZONTAL);
             date.setText(article.date);
             add(date, 12, 0, 12, 0);
         }
         if (!head.image.isEmpty()) {
-            picture(head.image, article != null ? article.caption : "", 12);
+            picture(head.image, article.caption, 12);
         }
 
-        if (article == null) {
-            ProgressBar spinner = new ProgressBar(this);
-            spinner.setIndeterminateTintList(getColorStateList(R.color.ink));
-            LinearLayout.LayoutParams placed = new LinearLayout.LayoutParams(dp(24), dp(24));
-            placed.gravity = Gravity.CENTER_HORIZONTAL;
-            placed.topMargin = dp(20);
-            page.addView(spinner, placed);
-            return;
-        }
         body();
         scroll.post(() -> scroll.scrollTo(0, keep));
     }
@@ -360,8 +363,8 @@ public final class ArticleActivity extends BaseActivity {
     }
 
     private void failed(String error) {
-        // Keep the header; the spinner, last, becomes the error and a way to try again.
-        page.removeViewAt(page.getChildCount() - 1);
+        // The spinner becomes the error and a way to try again.
+        page.removeAllViews();
         TextView message = Look.text(this, Look.sans(this, false), 11, R.color.muted);
         message.setGravity(Gravity.CENTER_HORIZONTAL);
         message.setText(error);
@@ -384,7 +387,6 @@ public final class ArticleActivity extends BaseActivity {
         placed.gravity = Gravity.CENTER_HORIZONTAL;
         page.addView(button, placed);
         button.requestFocus();
-        scroll.post(() -> scroll.smoothScrollTo(0, page.getHeight()));
     }
 
     /**
