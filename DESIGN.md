@@ -331,10 +331,14 @@ sampled from the site's styles (`res/values/colors.xml`):
   `#DB3334` for the rubric over a headline and nothing else. The row under
   the d-pad is washed in a deeper step (`#ECE6D9`) of the site's cream
   `#F6F4EF`.
-- **Caslon for words, Inter for labels.** Headlines, deks and the text in
-  Libre Caslon Text; the masthead, section titles and drop caps in Libre
-  Caslon Display; rubrics, bylines (in spaced capitals), dates, captions and
-  the tabs in Inter.
+- **Caslon for words, Irvin for headlines.** Headlines, deks and the text
+  in the site's own TNY Adobe Caslon Pro; the masthead, section titles and
+  lead headline in its TNY Irvin Pro Heading, as the site sets them; rubrics,
+  bylines (in spaced capitals), dates, captions and the tabs in its Graphik.
+  These are the faces served by newyorker.com itself, bundled as TTF; see
+  the note in the app's `assets/fonts`. A section's opening drop cap is set
+  in the Caslon, at the body's three-line depth, as the site's first-letter
+  rule does.
 - **Today.** "The New Yorker" set centred in the bar. The front page's lead
   story has its picture across the screen; each section after it is a heavy
   ink rule and the section's name, then rows: rubric, headline, two lines of

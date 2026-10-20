@@ -7,13 +7,13 @@ import android.util.TypedValue;
 import android.widget.TextView;
 
 /**
- * The New Yorker's type, as near as free fonts come.
+ * The New Yorker's own type, as the site sets it.
  *
  * The magazine sets its text in its own cut of Adobe Caslon, its labels in
- * Graphik and its titles in Irvin, none of which can be bundled. Libre Caslon
- * Text stands in for the Caslon and Libre Caslon Display for the titles
- * (both OFL), and Inter for Graphik, as in Books. Licences are beside them
- * in assets/fonts.
+ * Graphik and its headlines and masthead in Irvin. These are the site's web
+ * faces, served from www.newyorker.com/.design/fonts and converted to TTF:
+ * the family's usual free stand-ins are not used here. They are proprietary
+ * faces; see the note beside them in assets/fonts.
  */
 final class Look {
 
@@ -40,15 +40,15 @@ final class Look {
     }
 
     static synchronized Typeface display(Context context) {
-        if (display == null) display = load(context, "caslon_display", Typeface.SERIF, Typeface.NORMAL);
+        if (display == null) display = load(context, "irvin_heading", Typeface.SERIF, Typeface.NORMAL);
         return display;
     }
 
     static synchronized Typeface sans(Context context, boolean bold) {
         if (sans == null) {
             sans = new Typeface[] {
-                load(context, "inter_regular", Typeface.SANS_SERIF, Typeface.NORMAL),
-                load(context, "inter_bold", Typeface.SANS_SERIF, Typeface.BOLD),
+                load(context, "graphik_regular", Typeface.SANS_SERIF, Typeface.NORMAL),
+                load(context, "graphik_medium", Typeface.SANS_SERIF, Typeface.BOLD),
             };
         }
         return sans[bold ? 1 : 0];

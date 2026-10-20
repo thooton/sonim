@@ -59,9 +59,13 @@ within www.newyorker.com (the shared `Http` never follows them).
 
 ## Look
 
-See the New Yorker section of `../DESIGN.md`. Libre Caslon Text and Libre
-Caslon Display (OFL) stand in for the magazine's Caslon and Irvin, and Inter
-(OFL, as in Books) for Graphik; the licences are in `assets/fonts`. The
+See the New Yorker section of `../DESIGN.md`. The fonts are the site's own
+web faces, served by www.newyorker.com and converted to TTF: TNY Adobe
+Caslon Pro for text, TNY Irvin Pro Heading for the masthead, section titles
+and lead headlines, and Graphik for rubrics, bylines, dates and tabs. They
+are proprietary (Condé Nast) and there is no licence file: the note in
+`assets/fonts` says what they are and that they are not for redistribution.
+The
 icon is the app's own (a magazine page on ink), not the magazine's artwork,
 and the masthead is set in type rather than copied from its logo.
 
