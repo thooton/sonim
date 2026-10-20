@@ -64,11 +64,14 @@ within www.newyorker.com (the shared `Http` never follows them).
 
 See the New Yorker section of `../DESIGN.md`. The fonts are the site's own
 web faces, served by www.newyorker.com and converted to TTF: TNY Adobe
-Caslon Pro for text, TNY Irvin Pro Heading for the masthead, section titles
-and lead headlines, and Graphik for rubrics, bylines, dates and tabs. They
-are proprietary (Condé Nast) and there is no licence file: the note in
-`assets/fonts` says what they are and that they are not for redistribution.
-The launcher icon is the New Yorker app's own mark from the stores: Eustace
+Caslon Pro for text and deks (the deks in italic), TNY Irvin Pro Heading
+for the masthead, section titles, rubrics and headlines, Graphik for dates,
+captions and the tabs, and Neutraface New Yorker SemiBold for bylines. The
+sizes and leading, weights and case are the site's own as its design tokens
+set them (its `--font-consumption-` and `--font-discovery-` styles), cut to
+the phone's 240-pixel screen. They are proprietary (Condé Nast) and there
+is no licence file: the note in `assets/fonts` says what they are. The
+launcher icon is the New Yorker app's own mark from the stores: Eustace
 Tilly, monocle to his eye and phone in hand, in ink on the site's red, kept
 as PNGs (`res/drawable-*/ic_launcher.png`).
 

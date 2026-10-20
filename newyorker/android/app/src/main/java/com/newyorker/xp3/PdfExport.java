@@ -58,7 +58,6 @@ final class PdfExport {
     private float y;
 
     private final int ink;
-    private final int soft;
     private final int muted;
     private final int red;
 
@@ -66,7 +65,6 @@ final class PdfExport {
         this.context = context;
         this.article = article;
         ink = context.getColor(R.color.ink);
-        soft = context.getColor(R.color.ink_soft);
         muted = context.getColor(R.color.muted);
         red = context.getColor(R.color.rubric);
     }
@@ -133,7 +131,8 @@ final class PdfExport {
 
     private void header() throws InterruptedException {
         if (!article.rubric.isEmpty()) {
-            TextPaint paint = paint(Look.sans(context, false), 9, red);
+            // The rubric as the site's context sets it: Irvin, normal case, in the red.
+            TextPaint paint = paint(Look.display(context), 9, red);
             text(new SpannableStringBuilder(article.rubric), paint, Layout.Alignment.ALIGN_CENTER, 1.2f, 0, 0, 1);
             y += 8;
         }
@@ -141,19 +140,20 @@ final class PdfExport {
         text(new SpannableStringBuilder(article.hed), hed, Layout.Alignment.ALIGN_CENTER, 1.08f, 20, 20, 1);
         y += 10;
         if (!article.dek.isEmpty()) {
-            TextPaint dek = paint(Look.caslon(context, Look.REGULAR), 13, soft);
-            text(new SpannableStringBuilder(article.dek), dek, Layout.Alignment.ALIGN_CENTER, 1.25f, 30, 30, 1);
+            // The dek is the Caslon's italic, as description-core sets it.
+            TextPaint dek = paint(Look.caslon(context, Look.ITALIC), 13, ink);
+            text(new SpannableStringBuilder(article.dek), dek, Layout.Alignment.ALIGN_CENTER, 1.33f, 30, 30, 1);
             y += 10;
         }
         if (!article.byline.isEmpty()) {
-            TextPaint byline = paint(Look.sans(context, false), 8.5f, ink);
-            byline.setLetterSpacing(0.08f);
-            String upper = article.byline.toUpperCase(java.util.Locale.US);
-            text(new SpannableStringBuilder(upper), byline, Layout.Alignment.ALIGN_CENTER, 1.2f, 0, 0, 1);
+            // The byline as the site's accreditation sets it: Neutraface, normal case.
+            TextPaint byline = paint(Look.neutra(context), 9f, ink);
+            text(new SpannableStringBuilder(article.byline), byline, Layout.Alignment.ALIGN_CENTER, 1.2f, 0, 0, 1);
             y += 3;
         }
         if (!article.date.isEmpty()) {
-            text(new SpannableStringBuilder(article.date), paint(Look.sans(context, false), 8.5f, muted),
+            // The date in Graphik Medium.
+            text(new SpannableStringBuilder(article.date), paint(Look.sans(context, true), 8.5f, muted),
                 Layout.Alignment.ALIGN_CENTER, 1.2f, 0, 0, 1);
         }
         y += 16;
@@ -185,8 +185,10 @@ final class PdfExport {
                     y += 10;
                     // Kept with at least two lines of what follows: a heading never ends a page.
                     if (y + 60 > HEIGHT - BOTTOM) newPage();
-                    text(ArticleActivity.styled(context, block, false), paint(Look.caslon(context, Look.BOLD), BODY + 1.5f, ink),
-                        Layout.Alignment.ALIGN_NORMAL, 1.25f, 0, 0, 1);
+                    // A section head as the site's subhed-break-primary: the Caslon at
+                    // its own weight, a cut above the body's size.
+                    text(ArticleActivity.styled(context, block, false), paint(Look.caslon(context, Look.REGULAR), BODY + 2.5f, ink),
+                        Layout.Alignment.ALIGN_NORMAL, 1.125f, 0, 0, 1);
                     y += 4;
                     break;
                 case Block.QUOTE:

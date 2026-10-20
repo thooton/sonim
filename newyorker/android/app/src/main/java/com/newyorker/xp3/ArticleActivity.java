@@ -40,9 +40,10 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 
 /**
- * One article, laid out as the New Yorker app sets it: the rubric in red,
- * the headline large, the dek, the byline in capitals and the date, the lead
- * picture, then the text in Caslon, each section opening on a drop cap and
+ * One article, laid out as the New Yorker app sets it: the rubric in
+ * Irvin's red, the headline in Irvin, the dek in the italic Caslon, the
+ * byline in Neutraface and the date in Graphik Medium, the lead picture,
+ * then the text in Caslon, each section opening on a drop cap and
  * the last paragraph ending on the magazine's diamond.
  *
  * While the page is fetched the screen holds only a spinner, and the article
@@ -178,21 +179,23 @@ public final class ArticleActivity extends BaseActivity {
         Story head = article.story();
 
         if (!head.rubric.isEmpty()) {
-            TextView rubric = Look.rubric(this, 11);
+            TextView rubric = Look.rubric(this, 10);
             rubric.setSingleLine(false);
             rubric.setGravity(Gravity.CENTER_HORIZONTAL);
             rubric.setText(head.rubric);
             add(rubric, 12, 0, 12, 6);
         }
-        TextView hed = Look.text(this, Look.caslon(this, Look.REGULAR), 21, R.color.ink);
+        // The site's hed-standard: Irvin, a touch over the body's height, with little leading.
+        TextView hed = Look.text(this, Look.display(this), 19, R.color.ink);
         hed.setGravity(Gravity.CENTER_HORIZONTAL);
-        hed.setLineSpacing(0, 1.05f);
+        hed.setLineSpacing(0, 1.13f);
         hed.setText(head.hed);
         add(hed, 12, 0, 12, 8);
         if (!head.dek.isEmpty()) {
-            TextView dek = Look.text(this, Look.caslon(this, Look.REGULAR), 13, R.color.ink_soft);
+            // The dek is the Caslon in its italic, as description-core sets it.
+            TextView dek = Look.text(this, Look.caslon(this, Look.ITALIC), 11.5f, R.color.ink);
             dek.setGravity(Gravity.CENTER_HORIZONTAL);
-            dek.setLineSpacing(0, 1.15f);
+            dek.setLineSpacing(0, 1.33f);
             dek.setText(head.dek);
             add(dek, 14, 0, 14, 8);
         }
@@ -203,7 +206,8 @@ public final class ArticleActivity extends BaseActivity {
             add(byline, 12, 2, 12, 3);
         }
         if (!article.date.isEmpty()) {
-            TextView date = Look.text(this, Look.sans(this, false), 9.5f, R.color.muted);
+            // The date in Graphik Medium, a shade grey, tracking a hair closed.
+            TextView date = Look.text(this, Look.sans(this, true), 9.5f, R.color.muted);
             date.setGravity(Gravity.CENTER_HORIZONTAL);
             date.setText(article.date);
             add(date, 12, 0, 12, 0);
@@ -233,9 +237,11 @@ public final class ArticleActivity extends BaseActivity {
                     page.addView(gap, new LinearLayout.LayoutParams(1, dp(12)));
                     break;
                 case Block.HEADING: {
-                    TextView view = Look.text(this, Look.caslon(this, Look.BOLD), SIZES[size] + 2, R.color.ink);
+                    // A section head as subhed-break-primary sets it: the Caslon at its
+                    // own weight, the size a cut above the body's.
+                    TextView view = Look.text(this, Look.caslon(this, Look.REGULAR), SIZES[size] + 4, R.color.ink);
                     view.setText(styled(this, block, false));
-                    view.setLineSpacing(0, 1.1f);
+                    view.setLineSpacing(0, 1.125f);
                     add(view, 10, 10, 10, 6);
                     break;
                 }
@@ -268,7 +274,7 @@ public final class ArticleActivity extends BaseActivity {
 
     private TextView paragraph(Block block, boolean drop, boolean end) {
         TextView view = Look.text(this, Look.caslon(this, Look.REGULAR), SIZES[size], R.color.ink);
-        view.setLineSpacing(0, 1.28f);
+        view.setLineSpacing(0, 1.43f);
         view.setIncludeFontPadding(true);
         SpannableStringBuilder text = styled(this, block, end);
         if (drop) dropCap(view, text);
@@ -430,7 +436,7 @@ public final class ArticleActivity extends BaseActivity {
             // The Try again button, at the foot: Up leaves it to read.
             scroll.requestFocus();
         }
-        int line = Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, SIZES[size], getResources().getDisplayMetrics()) * 1.28f * 1.2f);
+        int line = Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, SIZES[size], getResources().getDisplayMetrics()) * 1.43f * 1.2f);
         int step = whole ? Math.max(line, scroll.getHeight() - 2 * line) : STEP_LINES * line;
         // At once, not animated: the text is where it will stay as soon as the key is pressed.
         scroll.scrollBy(0, direction * step);
