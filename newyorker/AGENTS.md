@@ -54,7 +54,10 @@ within www.newyorker.com (the shared `Http` never follows them).
   `files/today.json` and `files/magazine.json`, refreshing a tab older than
   15 minutes when it is opened), `StoryAdapter` (section titles, the lead
   story and story rows), `ArticleActivity` (the article, its keys, text size
-  and saving), `DropCap`, `Pictures` (background loading, an in-memory LRU),
+  and saving), `PdfExport` (Save as PDF: PdfDocument and StaticLayout on
+  US Letter, into `Download/New Yorker`, pictures fetched again at print
+  size; it shares `ArticleActivity.styled` and `DropCap` with the screen),
+  `DropCap`, `Pictures` (background loading, an in-memory LRU),
   `Net`, `Look` (fonts and text helpers).
 
 ## Look

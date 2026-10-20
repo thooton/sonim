@@ -22,8 +22,12 @@ Reading:
 | Down / Up | A few lines on / back |
 | Right / Left | Next / previous screen |
 | \* / # | Smaller / larger text |
-| Menu | Save (or remove), text size, update the saved copy, back to top |
+| Menu | Save (or remove), text size, update the saved copy, save as PDF, back to top |
 | Back | Back to the list |
+
+## PDFs
+
+Save as PDF, on an article's menu, lays the article out on US Letter pages (Caslon, justified, drop caps, pictures with their captions, page numbers) and puts it in `Download/New Yorker` on the phone, named for its headline. The first time, the phone asks to let the app use storage.
 
 ## Offline
 

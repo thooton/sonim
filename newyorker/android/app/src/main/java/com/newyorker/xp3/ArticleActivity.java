@@ -1,8 +1,11 @@
 package com.newyorker.xp3;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.media.MediaScannerConnection;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.os.Bundle;
@@ -32,6 +35,7 @@ import com.newyorker.xp3.news.Story;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 
@@ -47,7 +51,7 @@ import java.util.concurrent.ExecutorService;
  *
  * Down and Up move a few lines at a time; Right and Left turn a screen,
  * keeping two lines of the last in view;
- * * and # make the text smaller and larger; Menu saves it.
+ * * and # make the text smaller and larger; Menu saves it, or saves it as a PDF.
  */
 public final class ArticleActivity extends BaseActivity {
 
@@ -227,7 +231,7 @@ public final class ArticleActivity extends BaseActivity {
                     break;
                 case Block.HEADING: {
                     TextView view = Look.text(this, Look.caslon(this, Look.BOLD), SIZES[size] + 2, R.color.ink);
-                    view.setText(styled(block, false));
+                    view.setText(styled(this, block, false));
                     view.setLineSpacing(0, 1.1f);
                     add(view, 10, 10, 10, 6);
                     break;
@@ -263,7 +267,7 @@ public final class ArticleActivity extends BaseActivity {
         TextView view = Look.text(this, Look.caslon(this, Look.REGULAR), SIZES[size], R.color.ink);
         view.setLineSpacing(0, 1.28f);
         view.setIncludeFontPadding(true);
-        SpannableStringBuilder text = styled(block, end);
+        SpannableStringBuilder text = styled(this, block, end);
         if (drop) dropCap(view, text);
         view.setText(text);
         return view;
@@ -286,15 +290,18 @@ public final class ArticleActivity extends BaseActivity {
             0, text.length(), Spanned.SPAN_INCLUSIVE_EXCLUSIVE);
     }
 
-    /** The block's runs in their italic and bold, and the end mark after the article's last words. */
-    private SpannableStringBuilder styled(Block block, boolean end) {
+    /**
+     * The block's runs in their italic and bold, and the end mark after the
+     * article's last words. Shared with the PDF.
+     */
+    static SpannableStringBuilder styled(Context context, Block block, boolean end) {
         SpannableStringBuilder text = new SpannableStringBuilder();
         for (Block.Run run : block.runs) {
             int start = text.length();
             text.append(run.text);
             int style = (run.style & Block.Run.BOLD) != 0 ? Look.BOLD : (run.style & Block.Run.ITALIC) != 0 ? Look.ITALIC : Look.REGULAR;
             if (style != Look.REGULAR) {
-                text.setSpan(new Face(Look.caslon(this, style)), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                text.setSpan(new Face(Look.caslon(context, style)), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
         if (end) text.append(" ♦");
@@ -447,6 +454,7 @@ public final class ArticleActivity extends BaseActivity {
         if (size < SIZES.length - 1) menu.add(0, 2, 0, "Larger text");
         if (size > 0) menu.add(0, 3, 0, "Smaller text");
         if (kept) menu.add(0, 4, 0, "Update saved copy");
+        if (article != null) menu.add(0, 6, 0, "Save as PDF");
         menu.add(0, 5, 0, "Back to top");
         popup.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
@@ -474,11 +482,61 @@ public final class ArticleActivity extends BaseActivity {
                 case 5:
                     scroll.scrollTo(0, 0);
                     return true;
+                case 6:
+                    pdf();
+                    return true;
                 default:
                     return false;
             }
         });
         popup.show();
+    }
+
+    private static final int ASK_STORAGE = 1;
+    private boolean exporting;
+
+    /**
+     * Saves the article as a PDF in Download/New Yorker, asking for storage
+     * the first time. Made in the background, since its pictures are
+     * fetched again at print size.
+     */
+    private void pdf() {
+        if (article == null || exporting) return;
+        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, ASK_STORAGE);
+            return;
+        }
+        exporting = true;
+        final Article from = article;
+        toast("Making the PDF\u2026");
+        worker.execute(() -> {
+            File file = null;
+            String error = null;
+            try {
+                file = PdfExport.write(getApplicationContext(), from);
+                MediaScannerConnection.scanFile(getApplicationContext(),
+                    new String[] {file.getAbsolutePath()}, new String[] {"application/pdf"}, null);
+            } catch (InterruptedException e) {
+                return;
+            } catch (Exception | OutOfMemoryError e) {
+                error = e.getMessage() == null ? "Something went wrong." : e.getMessage();
+            }
+            final File done = file;
+            final String failure = error;
+            runOnUiThread(() -> {
+                exporting = false;
+                if (failure != null) toast("Couldn\u2019t make the PDF: " + failure);
+                else toast("Saved to Download/New Yorker/" + done.getName());
+            });
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        if (request != ASK_STORAGE) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) pdf();
+        else toast("Saving a PDF needs access to storage");
     }
 
     @Override
