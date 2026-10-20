@@ -300,7 +300,43 @@ public final class MainActivity extends BaseActivity {
             if (!down && !event.isCanceled()) menu();
             return true;
         }
+        if ((keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_DPAD_UP)
+            && list.getParent() != null && list.hasFocus() && list.getSelectedItemPosition() >= 0) {
+            if (down) move(keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : -1);
+            return true;
+        }
         return super.dispatchKeyEvent(event);
+    }
+
+    /**
+     * Up and Down on a list. The next story is chosen straight away when it
+     * is already wholly on screen. Otherwise the list moves a fixed distance,
+     * the same every time, rather than jumping to bring the next story into
+     * full view, and the next story is chosen once it has come far enough
+     * onto the screen: its top past the lower part of the screen going down,
+     * its bottom past the upper part going up. Section titles and the issue's
+     * date, which can't be chosen, come into view the same way.
+     */
+    private void move(int direction) {
+        int selected = list.getSelectedItemPosition();
+        int target = adapter.nextStory(selected, direction);
+        int height = list.getHeight();
+        View view = childAt(target);
+        if (view != null && view.getTop() >= 0 && view.getBottom() <= height) {
+            list.setSelectionFromTop(target, view.getTop());
+            return;
+        }
+        list.scrollListBy(direction * Math.round(height * 0.4f));
+        view = childAt(target);
+        if (view == null) return;
+        boolean far = direction > 0 ? view.getTop() < height * 0.6f : view.getBottom() > height * 0.4f;
+        if (far) list.setSelectionFromTop(target, view.getTop());
+    }
+
+    /** The row at `position` if it is laid out on screen, else null. */
+    private View childAt(int position) {
+        if (position < 0) return null;
+        return list.getChildAt(position - list.getFirstVisiblePosition());
     }
 
     static boolean isMenu(int keyCode) {

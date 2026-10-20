@@ -75,6 +75,14 @@ final class StoryAdapter extends BaseAdapter {
         return position >= 0 && position < items.size() ? items.get(position).story : null;
     }
 
+    /** The next story after `position` (or before it, for a negative `direction`), or -1. */
+    int nextStory(int position, int direction) {
+        for (int i = position + direction; i >= 0 && i < items.size(); i += direction) {
+            if (items.get(i).story != null) return i;
+        }
+        return -1;
+    }
+
     /** Where the story at `url` is now, or the first story when it is gone. */
     int positionOf(String url) {
         int first = -1;
