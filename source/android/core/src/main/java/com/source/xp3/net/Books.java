@@ -6,7 +6,6 @@ import com.xp3.common.Login;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -275,10 +274,15 @@ public final class Books {
      * different one with that name gets " (2)".
      */
     public Saved download(final Book book, final File folder, final Progress progress) throws IOException, InterruptedException {
-        return attempt(() -> fetch(book, folder, progress));
+        return download(book, folder, Store.PLAIN, progress);
     }
 
-    private Saved fetch(Book book, File folder, Progress progress) throws IOException, InterruptedException {
+    /** As download(), writing through `store`. */
+    public Saved download(final Book book, final File folder, final Store store, final Progress progress) throws IOException, InterruptedException {
+        return attempt(() -> fetch(book, folder, store, progress));
+    }
+
+    private Saved fetch(Book book, File folder, Store store, Progress progress) throws IOException, InterruptedException {
         Map<String, Object> r = api("GET", "/eapi/book/" + segment(book.id) + "/" + segment(book.hash) + "/file", null);
         String link = null;
         if (r.get("file") instanceof Map) link = flex(Json.object(r.get("file")).get("downloadLink"));
@@ -288,7 +292,7 @@ public final class Books {
         }
         if (link.startsWith("/")) link = base() + link;
 
-        if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Can't open the " + folder.getName() + " folder.");
+        store.mkdirs(folder);
         Reply reply = exchange("GET", link, null, true, 30000, 60000, true);
         File part = new File(folder, ".source-" + Long.toHexString(System.nanoTime()) + ".part");
         long n = 0;
@@ -299,7 +303,7 @@ public final class Books {
             }
             long total = reply.encoded ? -1 : reply.length;
             if (total <= 0 && book.bytes > 0) total = book.bytes;
-            OutputStream out = new FileOutputStream(part);
+            OutputStream out = store.create(part);
             try {
                 byte[] buffer = new byte[64 * 1024];
                 long last = 0;
@@ -329,7 +333,7 @@ public final class Books {
             }
             if (n == 0) throw new IOException("The download was empty.");
         } catch (IOException | InterruptedException | RuntimeException e) {
-            part.delete();
+            store.delete(part);
             throw e;
         } finally {
             reply.close();
@@ -341,14 +345,16 @@ public final class Books {
             File dest = new File(folder, filename(book, ext, i));
             if (dest.exists()) {
                 if (dest.isFile() && dest.length() == n) {
-                    part.delete();
+                    store.delete(part);
                     return new Saved(dest, true, n); // The same book, already downloaded.
                 }
                 continue; // Another book has this name.
             }
-            if (!part.renameTo(dest)) {
-                part.delete();
-                throw new IOException("Can't save " + dest.getName() + ".");
+            try {
+                dest = store.rename(part, dest);
+            } catch (IOException | RuntimeException e) {
+                store.delete(part);
+                throw e;
             }
             return new Saved(dest, false, n);
         }

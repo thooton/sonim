@@ -1,8 +1,12 @@
 package com.source.xp3;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -40,6 +44,11 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
     static final int[] INKS = {R.color.cover_1_ink, R.color.cover_2_ink, R.color.cover_3_ink, R.color.cover_4_ink, R.color.cover_5_ink, R.color.cover_6_ink};
 
     protected Login login = Login.blank();
+
+    private static final int ASK_STORAGE = 1;
+    private static final int ASK_CARD = 2;
+    /** What waits for storage access or the SD card's grant. */
+    private Runnable pendingWrite;
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -121,6 +130,55 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
             }
         }
         return Login.parse(prefs.getString("login", ""));
+    }
+
+    /**
+     * Runs `then`, a download, once Source may save onto the SD card: storage
+     * access, which reads the card, then Android's grant to write on it
+     * (CardStore), each asked for once.
+     */
+    final void whenWritable(Runnable then) {
+        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            pendingWrite = then;
+            requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, ASK_STORAGE);
+            return;
+        }
+        if (!CardStore.ready(this)) {
+            Intent ask = CardStore.ask(this);
+            if (ask != null) {
+                try {
+                    pendingWrite = then;
+                    startActivityForResult(ask, ASK_CARD);
+                    return;
+                } catch (ActivityNotFoundException e) {
+                    pendingWrite = null;
+                }
+            }
+        }
+        // No card, or no way to ask: the download says why it can't save.
+        then.run();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(code, permissions, results);
+        if (code != ASK_STORAGE) return;
+        Runnable then = pendingWrite;
+        pendingWrite = null;
+        if (then == null) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) whenWritable(then);
+        else note("No storage access");
+    }
+
+    @Override
+    protected void onActivityResult(int code, int result, Intent data) {
+        super.onActivityResult(code, result, data);
+        if (code != ASK_CARD) return;
+        Runnable then = pendingWrite;
+        pendingWrite = null;
+        if (then == null) return;
+        if (CardStore.answered(this, result, data)) then.run();
+        else note("Source can't save to the SD card unless it is allowed");
     }
 
     /** A passing word, as a toast. */

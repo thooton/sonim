@@ -10,10 +10,10 @@ import com.source.xp3.data.History;
 import com.source.xp3.net.Books;
 import com.source.xp3.net.Music;
 import com.source.xp3.net.Names;
+import com.source.xp3.net.Store;
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -580,8 +580,9 @@ final class Download {
     private static Saved save(final Job job, final Music music, String id, final long total) throws IOException, InterruptedException {
         File card = Files.card(app);
         if (card == null) throw new IOException("No SD card in the phone.");
+        final Store store = store(card);
         final File root = new File(card, MUSIC_FOLDER);
-        if (!root.isDirectory() && !root.mkdirs()) throw new IOException("Can't open the Music folder.");
+        store.mkdirs(root);
         final Saved saved = new Saved();
         final List<String> scan = new ArrayList<String>();
         final long[] done = {0};
@@ -590,7 +591,7 @@ final class Download {
             if (parts.isEmpty()) return;
             File dir = root;
             for (int i = 0; i < parts.size() - 1; i++) dir = new File(dir, parts.get(i));
-            if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Can't make the folder " + dir.getName() + ".");
+            store.mkdirs(dir);
             if (parts.size() > 1 && saved.folder == null) saved.folder = parts.get(0);
             String name = parts.get(parts.size() - 1);
             File target = new File(dir, name);
@@ -603,8 +604,9 @@ final class Download {
                 return;
             }
             for (int n = 2; target.exists(); n++) target = new File(dir, Names.numbered(name, n));
-            File part = new File(dir, "." + target.getName() + ".part");
-            OutputStream out = new FileOutputStream(part);
+            // A plain name, so the card takes it as it is.
+            File part = new File(dir, ".source-" + Long.toHexString(System.nanoTime()) + ".part");
+            OutputStream out = store.create(part);
             try {
                 byte[] buffer = new byte[64 * 1024];
                 long last = 0;
@@ -621,12 +623,14 @@ final class Download {
                 out.close();
             } catch (IOException | InterruptedException e) {
                 try { out.close(); } catch (IOException ignored) { /* already failing */ }
-                part.delete();
+                store.delete(part);
                 throw e;
             }
-            if (!part.renameTo(target)) {
-                part.delete();
-                throw new IOException("Can't save " + target.getName() + ".");
+            try {
+                target = store.rename(part, target);
+            } catch (IOException e) {
+                store.delete(part);
+                throw e;
             }
             saved.count++;
             scan.add(target.getAbsolutePath());
@@ -638,6 +642,13 @@ final class Download {
             MediaScannerConnection.scanFile(app, scan.toArray(new String[0]), null, null);
         }
         return saved;
+    }
+
+    /** Writing onto the SD card, which Source must have been let do; DetailActivity asks first. */
+    private static Store store(File card) throws IOException {
+        Store store = CardStore.open(app, card);
+        if (store == null) throw new IOException("Source isn't allowed to write to this SD card. Download it again and choose Allow.");
+        return store;
     }
 
     /** One of a job's files is on the phone: `name` as it was shared, `file` where it is. */
@@ -708,7 +719,7 @@ final class Download {
         File card = Files.card(app);
         if (card == null) throw new IOException("No SD card in the phone.");
         File folder = new File(card, BOOKS_FOLDER);
-        Books.Saved saved = books.download(job.book, folder, (done, total) -> progress(job, "Downloading", done, total));
+        Books.Saved saved = books.download(job.book, folder, store(card), (done, total) -> progress(job, "Downloading", done, total));
         if (!saved.kept) {
             MediaScannerConnection.scanFile(app, new String[] {saved.file.getAbsolutePath()}, null, null);
         }

@@ -51,7 +51,14 @@ them. `Books` is now the reference: keep its test in step with it.
   for the running download rather than run beside it, since two runs would
   log the command center's Soulseek account in twice; music goes straight
   into shared `Music/` through `.part` files, books into shared `Books/`, both
-  handed to the media scanner, and saved ones kept in `History`), and the
+  handed to the media scanner, and saved ones kept in `History`),
+  `CardStore` (writes onto the SD card through Android's grant for it, the
+  core's `Store`: Android 8.1 refuses plain file writes on a removable card
+  outside an app's own folder, so `Tonal.whenWritable` asks before the first
+  download for the whole card with `StorageVolume.createAccessIntent(null)`,
+  keeps the grant (`card`: `tree`, one card's), and every folder, part file
+  and rename goes through `DocumentsContract`; reading stays plain files,
+  under storage access), and the
   drawn pieces: `ResultRow`, `Cover`, `StateButton`, `Wavy`, `StorageCard`,
   `Sheet` (the options sheet), `Files` (play, read, storage).
 

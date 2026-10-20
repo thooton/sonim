@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Internet, for the command center and the book source. Storage, to
-         save downloads into the shared Music folder, where the music player
-         finds them, and the Books folder beside it; asked for the first time a
-         download starts. A partial wake lock keeps a download of a few minutes
+         read the SD card's Music folder, where the music player finds
+         downloads, and the Books folder beside it; asked for the first time a
+         download starts, with Android's grant to write on the card
+         (CardStore). A partial wake lock keeps a download of a few minutes
          going with the phone shut. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
