@@ -334,25 +334,33 @@ in `res/drawable-*`.
   `#DB3334` for the rubric over a headline and nothing else. The row under
   the d-pad is washed in a deeper step (`#ECE6D9`) of the site's cream
   `#F6F4EF`.
-- **Caslon for words, Irvin for headlines.** Headlines, deks and the text
-  in the site's own TNY Adobe Caslon Pro; the masthead, section titles and
-  lead headline in its TNY Irvin Pro Heading, as the site sets them; rubrics,
-  bylines (in spaced capitals), dates, captions and the tabs in its Graphik.
-  These are the faces served by newyorker.com itself, bundled as TTF; see
-  the note in the app's `assets/fonts`. A section's opening drop cap is set
-  in the Caslon, at the body's three-line depth, as the site's first-letter
-  rule does.
+- **Caslon for words, Irvin for headlines.** Text and deks in the site's
+  own TNY Adobe Caslon Pro, the deks in its italic as the site's
+  `description-core` sets them; the masthead, section titles, rubrics and
+  headlines in its TNY Irvin Pro Heading; the date and captions in its
+  Graphik (the date in the Medium, as `context-tertiary` does, a shade
+  grey); bylines in its Neutraface New Yorker SemiBold, normal case, no
+  tracking. These are the faces served by newyorker.com itself, bundled as
+  TTF; see the note in the app's `assets/fonts`. Leading follows the site's
+  tokens cut to the phone: a headline at 1.13 (article) or 1.27 (rows), a
+  dek at 1.41, the body at 1.43; a section's opening drop cap in the
+  Caslon, at the body's three-line depth, as the site's first-letter rule
+  does; the head of a text section (subhed-break) in the Caslon at its own
+  weight, not bolded, a cut above the body's size; the headline of an
+  article set in Irvin (hed-standard), not the Caslon the list rows use.
 - **Today.** "The New Yorker" set centred in the bar. The front page's lead
   story has its picture across the screen; each section after it is a heavy
-  ink rule and the section's name, then rows: rubric, headline, two lines of
-  dek, byline, and a square picture on the right, hairlines between them.
+  ink rule and the section's name (Irvin, at its own leading), then rows:
+  rubric (Irvin, red), headline, two lines of italic dek, byline
+  (Neutraface), and a square picture on the right, hairlines between them.
 - **The Magazine.** The same rows under the issue's date and the issue's own
   sections (The Talk of the Town, Reporting & Essays, The Critics...).
 - **Tabs at the foot.** Today, Magazine, Saved, as the app's bottom bar,
   the open one in ink under a short ink rule; Left and Right move between
   them.
-- **The article as the magazine sets it.** Centred rubric, a large headline,
-  the dek, "BY ..." and the date, the lead picture and its credit; then the
+- **The article as the magazine sets it.** Centred rubric, a large headline
+  in Irvin, the dek in the italic Caslon, the byline (Neutraface) and the
+  date (Graphik Medium, grey), the lead picture and its credit; then the
   text, each section opening on a three-line drop cap, and the last
   paragraph ending on the diamond. Down and Up move two lines, Right and
   Left a screen; on the lists each press moves the same distance.

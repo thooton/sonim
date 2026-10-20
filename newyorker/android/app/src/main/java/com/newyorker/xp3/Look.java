@@ -24,8 +24,15 @@ final class Look {
     private static Typeface[] caslon;
     private static Typeface display;
     private static Typeface[] sans;
+    private static Typeface neutraface;
 
     private Look() {}
+
+    /** The with-byline face, as the site's accreditation does. */
+    static synchronized Typeface neutra(Context context) {
+        if (neutraface == null) neutraface = load(context, "neutraface_semibold", Typeface.SANS_SERIF, Typeface.BOLD);
+        return neutraface;
+    }
 
     static synchronized Typeface caslon(Context context, int style) {
         if (caslon == null) {
@@ -75,19 +82,16 @@ final class Look {
         return view;
     }
 
-    /** A rubric, "The Political Scene", in the site's red. */
+    /** A rubric, "The Political Scene", in the site's red, as its context sets it: Irvin, normal case. */
     static TextView rubric(Context context, float sp) {
-        TextView view = text(context, sans(context, false), sp, R.color.rubric);
+        TextView view = text(context, display(context), sp, R.color.rubric);
         view.setSingleLine(true);
         view.setEllipsize(TextUtils.TruncateAt.END);
         return view;
     }
 
-    /** A byline, in spaced capitals as the site sets them. */
+    /** A byline, as the site's accreditation sets it: Neutraface, normal case, no tracking. */
     static TextView byline(Context context, float sp) {
-        TextView view = text(context, sans(context, false), sp, R.color.ink_soft);
-        view.setAllCaps(true);
-        view.setLetterSpacing(0.06f);
-        return view;
+        return text(context, neutra(context), sp, R.color.ink);
     }
 }

@@ -167,7 +167,8 @@ final class StoryAdapter extends BaseAdapter {
             LinearLayout.LayoutParams ruled = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(2));
             ruled.setMargins(dp(10), 0, dp(10), 0);
             box.addView(rule, ruled);
-            TextView name = Look.text(context, Look.display(context), 18, R.color.ink);
+            TextView name = Look.text(context, Look.display(context), 16, R.color.ink);
+            name.setLineSpacing(0, 1.09f);
             name.setPadding(dp(10), dp(6), dp(10), dp(2));
             box.addView(name);
         }
@@ -252,15 +253,17 @@ final class StoryAdapter extends BaseAdapter {
     }
 
     private void words(Holder holder, LinearLayout box, float hedSize, boolean lead) {
-        holder.rubric = Look.rubric(context, lead ? 11 : 10);
+        holder.rubric = Look.rubric(context, lead ? 10 : 9.5f);
         holder.rubric.setPadding(dp(10), 0, dp(10), dp(3));
         box.addView(holder.rubric);
+        // Card headlines are the Caslon at hed-core's leading; a lead is the Irvin of hed-feature.
         holder.hed = Look.text(context, Look.caslon(context, Look.REGULAR), hedSize, R.color.ink);
-        holder.hed.setLineSpacing(0, 1.05f);
+        holder.hed.setLineSpacing(0, lead ? 1.14f : 1.27f);
         holder.hed.setPadding(dp(10), 0, dp(10), 0);
         box.addView(holder.hed);
-        holder.dek = Look.text(context, Look.caslon(context, Look.REGULAR), lead ? 12.5f : 11.5f, R.color.ink_soft);
-        holder.dek.setLineSpacing(0, 1.12f);
+        // The dek is the Caslon's italic, as the site's description-core sets it.
+        holder.dek = Look.text(context, Look.caslon(context, Look.ITALIC), lead ? 12.5f : 11.5f, R.color.ink);
+        holder.dek.setLineSpacing(0, 1.41f);
         holder.dek.setEllipsize(TextUtils.TruncateAt.END);
         holder.dek.setPadding(dp(10), dp(4), dp(10), 0);
         box.addView(holder.dek);
