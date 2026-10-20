@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A page of a magazine in the shape of the other apps' square icons: on
+     ink, a white page with a red rubric, a heavy headline and its column of
+     text. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#231F20" android:pathData="M10,4h28a6,6 0,0 1,6 6v28a6,6 0,0 1,-6 6h-28a6,6 0,0 1,-6 -6v-28a6,6 0,0 1,6 -6z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M13,9h22v30h-22z" />
+    <path android:fillColor="#DB3334" android:pathData="M16,12.5h7v1.6h-7z" />
+    <path android:fillColor="#231F20" android:pathData="M16,16h16v3h-16zM16,20.5h11v3h-11z" />
+    <path android:fillColor="#9A9595" android:pathData="M16,27h16v1.2h-16zM16,29.8h16v1.2h-16zM16,32.6h16v1.2h-16zM16,35.4h10v1.2h-10z" />
+</vector>

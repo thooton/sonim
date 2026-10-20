@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- White page, white bars, dark status icons, as the New Yorker app is. -->
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/page</item>
+        <item name="android:colorPrimaryDark">@color/page</item>
+        <item name="android:colorAccent">@color/ink</item>
+        <item name="android:colorControlHighlight">@color/focus</item>
+        <item name="android:statusBarColor">@color/page</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/page</item>
+        <item name="android:windowBackground">@color/page</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:textColor">@color/ink</item>
+    </style>
+</resources>

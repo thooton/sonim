@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sampled from newyorker.com's own styles: its ink, its hairline grey, the
+     cream it sets panels on, and the red of its rubrics. -->
+<resources>
+    <color name="page">#FFFFFF</color>
+    <color name="ink">#231F20</color>
+    <color name="ink_soft">#4A4646</color>
+    <color name="muted">#6F6B6B</color>
+    <color name="rule">#DADADA</color>
+    <color name="cream">#F6F4EF</color>
+    <!-- The row under the d-pad: the cream, a step deeper so it shows on the phone's screen. -->
+    <color name="focus">#ECE6D9</color>
+    <color name="rubric">#DB3334</color>
+</resources>
