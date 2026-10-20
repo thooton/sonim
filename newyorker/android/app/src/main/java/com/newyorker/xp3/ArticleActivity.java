@@ -64,7 +64,7 @@ public final class ArticleActivity extends BaseActivity {
     private static final String IMAGE = "image";
 
     /** The body's sizes, in sp, smallest first; * and # step through them. */
-    private static final float[] SIZES = {11.5f, 12.5f, 13.5f, 15f, 16.5f};
+    private static final float[] SIZES = {12.5f, 14f, 15.5f, 17f, 18.5f};
 
     private final ExecutorService worker = Ui.worker("article");
     private ScrollView scroll;
