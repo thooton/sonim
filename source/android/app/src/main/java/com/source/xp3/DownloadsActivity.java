@@ -134,8 +134,10 @@ public final class DownloadsActivity extends Tonal {
             note("No command center");
             return;
         }
-        if (job.hit != null) Download.get(login, job.hit);
-        else Download.get(login, job.book);
+        whenWritable(() -> {
+            if (job.hit != null) Download.get(login, job.hit);
+            else Download.get(login, job.book);
+        });
     }
 
     private void detail(String key) {

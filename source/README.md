@@ -8,6 +8,8 @@ The tabs show what OK fetches: **Song**, **Album** or **Book**. Left and Right s
 
 **Books.** Type a title, author or ISBN and press OK. The results replace the search, the first one picked: Up and Down move, OK gets the picked book into the phone's **Books** folder as `Author - Title.epub` (and once saved, opens the Books app to read it), and Left and Right turn the page. A book's page (Options → Details) shows its other formats on the page, to choose between with Left and Right. Searches look for EPUBs, which reflow on a small screen, and show every format when there are none (Options → Formats to always do that). The book account is the one kept on the command center (`PUT /books-login` sets it); it has a daily download limit, and a download that gets a web page instead of a book says the limit is probably used up.
 
+The first download asks two things of Android: storage access, and "Allow Source to access SD card?". Say Allow to both; everything is saved onto the SD card.
+
 Before a search, the screen shows what is downloading, the last few searches (OK runs one again), and how full the phone is; OK on that card opens **Downloads**, which lists what is downloading, what failed, and everything saved, newest first. Options also switches between the light and dark themes.
 
 | Key | |

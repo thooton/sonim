@@ -1,7 +1,5 @@
 package com.source.xp3;
 
-import android.Manifest;
-import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.text.TextUtils;
@@ -38,7 +36,6 @@ import java.util.Locale;
 public final class DetailActivity extends Tonal {
 
     static final String KEY = "key";
-    private static final int ASK_STORAGE = 1;
 
     private String key;
     private Music.Hit hit;
@@ -580,19 +577,12 @@ public final class DetailActivity extends Tonal {
             note("No command center");
             return;
         }
-        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, ASK_STORAGE);
-            return;
-        }
-        if (hit != null) Download.get(login, hit);
-        else Download.get(login, book);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
-        if (code != ASK_STORAGE) return;
-        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) get();
-        else note("No storage access");
+        final Music.Hit song = hit;
+        final Books.Book chosen = book;
+        whenWritable(() -> {
+            if (song != null) Download.get(login, song);
+            else Download.get(login, chosen);
+        });
     }
 
     /** Left and Right: the book's previous or next format. */
