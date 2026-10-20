@@ -23,7 +23,7 @@ every article whole for clients that run no script:
   read from its `*__hed-link`, `*__hed`, `*__dek`, `rubric__name` and
   `byline__name` parts. Duplicates, non-articles and empty sections are
   dropped.
-- **An article** (`Article.parse`) takes its header from data-testid
+- **An article** shows only a spinner until its page is in, then appears whole (no partial header first). It (`Article.parse`) takes its header from data-testid
   attributes (`ContentHeaderHed`, `ContentHeaderRubric`, `BylinesWrapper`,
   `ContentHeaderPublishDate`, `ContentHeaderLeadAsset`) and its body from
   every `body__inner-container`, in order. `Blocks` turns that into
