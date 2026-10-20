@@ -10,7 +10,7 @@ In the lists:
 
 | Key | |
 | --- | --- |
-| Up / Down | Choose a story |
+| Up / Down | Move a fixed distance; the next story is chosen as it comes into view |
 | OK | Read it |
 | Left / Right | Today, Magazine, Saved |
 | Menu | Open, Refresh; Remove from Saved on a saved story |
@@ -19,8 +19,8 @@ Reading:
 
 | Key | |
 | --- | --- |
-| Down, Right | Next screen |
-| Up, Left | Previous screen |
+| Down / Up | A few lines on / back |
+| Right / Left | Next / previous screen |
 | \* / # | Smaller / larger text |
 | Menu | Save (or remove), text size, update the saved copy, back to top |
 | Back | Back to the list |

@@ -45,7 +45,8 @@ import java.util.concurrent.ExecutorService;
  * once while the page is fetched. A saved article opens from its saved copy,
  * without the network.
  *
- * Down and Up turn a screen at a time, keeping two lines of the last in view;
+ * Down and Up move a few lines at a time; Right and Left turn a screen,
+ * keeping two lines of the last in view;
  * * and # make the text smaller and larger; Menu saves it.
  */
 public final class ArticleActivity extends BaseActivity {
@@ -394,9 +395,10 @@ public final class ArticleActivity extends BaseActivity {
         int direction = 0;
         if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) direction = 1;
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_LEFT) direction = -1;
+        boolean whole = keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_DPAD_LEFT;
         // On the Try again button, Up goes back to the reading and OK presses it.
         if (direction != 0 && (getCurrentFocus() == scroll || direction < 0)) {
-            if (down) turn(direction);
+            if (down) turn(direction, whole);
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_STAR || keyCode == KeyEvent.KEYCODE_POUND) {
@@ -406,16 +408,23 @@ public final class ArticleActivity extends BaseActivity {
         return super.dispatchKeyEvent(event);
     }
 
-    /** A screen on or back, keeping two lines of the one before in view. */
-    private void turn(int direction) {
+    /** Lines moved by Down and Up: few enough to keep your place while the text slides. */
+    private static final int STEP_LINES = 4;
+
+    /**
+     * Down and Up move STEP_LINES lines; a `whole` turn moves a screen,
+     * keeping two lines of the one before in view.
+     */
+    private void turn(int direction, boolean whole) {
         View focused = getCurrentFocus();
         if (focused != null && focused != scroll) {
             // The Try again button, at the foot: Up leaves it to read.
             scroll.requestFocus();
         }
         int line = Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, SIZES[size], getResources().getDisplayMetrics()) * 1.28f * 1.2f);
-        int step = Math.max(line, scroll.getHeight() - 2 * line);
-        scroll.smoothScrollBy(0, direction * step);
+        int step = whole ? Math.max(line, scroll.getHeight() - 2 * line) : STEP_LINES * line;
+        // At once, not animated: the text is where it will stay as soon as the key is pressed.
+        scroll.scrollBy(0, direction * step);
     }
 
     private void resize(int step) {
@@ -463,7 +472,7 @@ public final class ArticleActivity extends BaseActivity {
                     load();
                     return true;
                 case 5:
-                    scroll.smoothScrollTo(0, 0);
+                    scroll.scrollTo(0, 0);
                     return true;
                 default:
                     return false;
