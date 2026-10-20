@@ -324,7 +324,10 @@ than the family look: the e-ink tablet itself, on a 240x320 screen.
 
 New Yorker takes its look from the New Yorker app and newyorker.com rather
 than the family, since that is the magazine people know. Its colours were
-sampled from the site's styles (`res/values/colors.xml`):
+sampled from the site's styles (`res/values/colors.xml`), and its icon is
+the New Yorker app's own from the app stores: Eustace Tilly, monocle to
+his eye and a phone in hand, in ink and white on the site's red, as PNGs
+in `res/drawable-*`.
 
 - **White, ink and one red.** White pages and white bars with dark status
   icons; ink `#231F20`, hairlines `#DADADA`, and the site's rubric red

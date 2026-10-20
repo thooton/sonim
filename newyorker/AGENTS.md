@@ -68,9 +68,9 @@ Caslon Pro for text, TNY Irvin Pro Heading for the masthead, section titles
 and lead headlines, and Graphik for rubrics, bylines, dates and tabs. They
 are proprietary (Condé Nast) and there is no licence file: the note in
 `assets/fonts` says what they are and that they are not for redistribution.
-The
-icon is the app's own (a magazine page on ink), not the magazine's artwork,
-and the masthead is set in type rather than copied from its logo.
+The launcher icon is the New Yorker app's own mark from the stores: Eustace
+Tilly, monocle to his eye and phone in hand, in ink on the site's red, kept
+as PNGs (`res/drawable-*/ic_launcher.png`).
 
 ## Keys
 
