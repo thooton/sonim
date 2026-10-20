@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- The pages and pictures, from www.newyorker.com and media.newyorker.com. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Save as PDF writes into Download/New Yorker; asked for the first time. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
