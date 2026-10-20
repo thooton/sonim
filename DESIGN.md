@@ -319,3 +319,32 @@ than the family look: the e-ink tablet itself, on a 240x320 screen.
 - **The preview is the page.** A translucent top bar with the file, page
   and the 4 and 6 keys; round arrows where there is more to pan to; a zoom
   pill with its * # 0 keys; a minimap.
+
+## New Yorker: the New Yorker app, on a flip phone
+
+New Yorker takes its look from the New Yorker app and newyorker.com rather
+than the family, since that is the magazine people know. Its colours were
+sampled from the site's styles (`res/values/colors.xml`):
+
+- **White, ink and one red.** White pages and white bars with dark status
+  icons; ink `#231F20`, hairlines `#DADADA`, and the site's rubric red
+  `#DB3334` for the rubric over a headline and nothing else. The row under
+  the d-pad is washed in a deeper step (`#ECE6D9`) of the site's cream
+  `#F6F4EF`.
+- **Caslon for words, Inter for labels.** Headlines, deks and the text in
+  Libre Caslon Text; the masthead, section titles and drop caps in Libre
+  Caslon Display; rubrics, bylines (in spaced capitals), dates, captions and
+  the tabs in Inter.
+- **Today.** "The New Yorker" set centred in the bar. The front page's lead
+  story has its picture across the screen; each section after it is a heavy
+  ink rule and the section's name, then rows: rubric, headline, two lines of
+  dek, byline, and a square picture on the right, hairlines between them.
+- **The Magazine.** The same rows under the issue's date and the issue's own
+  sections (The Talk of the Town, Reporting & Essays, The Critics...).
+- **Tabs at the foot.** Today, Magazine, Saved, as the app's bottom bar,
+  the open one in ink under a short ink rule; Left and Right move between
+  them.
+- **The article as the magazine sets it.** Centred rubric, a large headline,
+  the dek, "BY ..." and the date, the lead picture and its credit; then the
+  text, each section opening on a three-line drop cap, and the last
+  paragraph ending on the diamond. Down and Up turn a screen at a time.

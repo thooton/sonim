@@ -1,0 +1,26 @@
+plugins {
+    id "com.android.application"
+}
+
+apply from: rootProject.file("gradle/app.gradle")
+
+android {
+    namespace "com.newyorker.xp3"
+
+    defaultConfig {
+        applicationId "com.newyorker.xp3"
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    // The fonts are already compressed glyph outlines; leaving them stored
+    // lets Typeface map them straight from the APK.
+    androidResources {
+        noCompress "ttf"
+    }
+}
+
+dependencies {
+    implementation project(":newyorker:core")
+    implementation project(":common:ui")
+}

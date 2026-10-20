@@ -1,0 +1,8 @@
+// Reading The New Yorker's pages: a forgiving HTML parser, the front page and
+// the issue as lists of stories, an article as blocks of styled text, and
+// the saved articles.
+apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    api project(":common:core")
+}
