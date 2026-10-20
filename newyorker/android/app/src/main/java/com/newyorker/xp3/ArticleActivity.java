@@ -281,7 +281,7 @@ public final class ArticleActivity extends BaseActivity {
         Rect bounds = new Rect();
         paint.getTextBounds("H", 0, 1, bounds);
         int lineHeight = Math.round(paint.getFontMetricsInt(null) * view.getLineSpacingMultiplier() + view.getLineSpacingExtra());
-        text.setSpan(new DropCap(letter, Look.display(this), color(R.color.ink), lineHeight, bounds.height(), dp(3)),
+        text.setSpan(new DropCap(letter, Look.caslon(this, Look.REGULAR), color(R.color.ink), lineHeight, bounds.height(), dp(3)),
             0, text.length(), Spanned.SPAN_INCLUSIVE_EXCLUSIVE);
     }
 
