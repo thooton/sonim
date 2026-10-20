@@ -19,7 +19,7 @@ Reading:
 
 | Key | |
 | --- | --- |
-| Down / Up | A few lines on / back |
+| Down / Up | Two lines on / back |
 | Right / Left | Next / previous screen |
 | \* / # | Smaller / larger text |
 | Menu | Save (or remove), text size, update the saved copy, save as PDF, back to top |

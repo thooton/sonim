@@ -415,8 +415,8 @@ public final class ArticleActivity extends BaseActivity {
         return super.dispatchKeyEvent(event);
     }
 
-    /** Lines moved by Down and Up: few enough to keep your place while the text slides. */
-    private static final int STEP_LINES = 4;
+    /** Lines moved by Down and Up: a small, steady step, so your place never jumps. */
+    private static final int STEP_LINES = 2;
 
     /**
      * Down and Up move STEP_LINES lines; a `whole` turn moves a screen,

@@ -354,5 +354,5 @@ in `res/drawable-*`.
 - **The article as the magazine sets it.** Centred rubric, a large headline,
   the dek, "BY ..." and the date, the lead picture and its credit; then the
   text, each section opening on a three-line drop cap, and the last
-  paragraph ending on the diamond. Down and Up move four lines, Right and
+  paragraph ending on the diamond. Down and Up move two lines, Right and
   Left a screen; on the lists each press moves the same distance.

@@ -317,6 +317,9 @@ public final class MainActivity extends BaseActivity {
      * its bottom past the upper part going up. Section titles and the issue's
      * date, which can't be chosen, come into view the same way.
      */
+    /** How far the list moves for each press that doesn't simply choose the next story. */
+    private static final int STEP_DP = 36;
+
     private void move(int direction) {
         int selected = list.getSelectedItemPosition();
         int target = adapter.nextStory(selected, direction);
@@ -326,7 +329,7 @@ public final class MainActivity extends BaseActivity {
             list.setSelectionFromTop(target, view.getTop());
             return;
         }
-        list.scrollListBy(direction * Math.round(height * 0.4f));
+        list.scrollListBy(direction * dp(STEP_DP));
         view = childAt(target);
         if (view == null) return;
         boolean far = direction > 0 ? view.getTop() < height * 0.6f : view.getBottom() > height * 0.4f;
