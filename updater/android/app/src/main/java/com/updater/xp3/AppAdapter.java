@@ -21,7 +21,7 @@ import java.util.TimeZone;
 /**
  * The app rows, as the App Store's Updates page draws them: icon, name, date
  * and a capsule button, with what's new underneath, grouped under Available,
- * Installed and Not Installed (the order MainActivity sorts them in).
+ * Not Installed and Installed (the order MainActivity sorts them in).
  *
  * As in List, the highlight is painted by the rows (their background is
  * opaque, so ListView's selector would be hidden), which means the adapter
@@ -80,15 +80,15 @@ final class AppAdapter extends BaseAdapter {
             }
         }
 
-        /** Which heading it is under: 0 Available, 1 Installed, 2 Not Installed. */
+        /** Which heading it is under: 0 Available, 1 Not Installed, 2 Installed. */
         int group() {
             if (status == Status.UPDATE) return 0;
-            if (status == Status.INSTALL) return 2;
-            return 1;
+            if (status == Status.INSTALL) return 1;
+            return 2;
         }
     }
 
-    private static final String[] GROUPS = {"Available", "Installed", "Not Installed"};
+    private static final String[] GROUPS = {"Available", "Not Installed", "Installed"};
 
     private final LayoutInflater inflater;
     private final List<Row> rows = new ArrayList<>();

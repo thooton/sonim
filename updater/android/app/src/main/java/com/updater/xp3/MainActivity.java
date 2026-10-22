@@ -46,7 +46,7 @@ import java.util.concurrent.ExecutorService;
  *
  * Drawn as the App Store's Updates page (DESIGN.md). Opening the app reads
  * the release's manifest.json and lists each app under Available (an older
- * versionName here), Installed or Not Installed, with what's new in it, which
+ * versionName here), Not Installed or Installed, with what's new in it, which
  * the manifest carries too. OK presses the row's
  * button: UPDATE, GET or OPEN. Update All sits in the bar, Up from the top
  * row. Menu, or holding OK, has the rest, What's New among it.
@@ -108,7 +108,7 @@ public final class MainActivity extends BaseActivity {
     /**
      * Set when a check has just answered: the next redraw goes back to the
      * top row, where Available leads with whatever it found, rather than
-     * staying down in Installed with the new updates out of sight.
+     * staying further down with the new updates out of sight.
      */
     private boolean toTop;
 
@@ -243,8 +243,8 @@ public final class MainActivity extends BaseActivity {
 
     private static int rank(Status status) {
         if (status == Status.UPDATE) return 0;
-        if (status == Status.INSTALL) return 2;
-        return 1;
+        if (status == Status.INSTALL) return 1;
+        return 2;
     }
 
     /** What is being done to an app, or null. */
