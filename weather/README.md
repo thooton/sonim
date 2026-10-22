@@ -18,7 +18,7 @@ CARROT's temperature scale.
 | Key | |
 | --- | --- |
 | Menu (left soft key) | The menu: Location, Hourly data, Units (°F, mph or °C, km/h), Theme (dark or light), Refresh |
-| Up, Down | Scroll the page: the sky, then the hours, then the ten days |
+| Up, Down | Scroll the page, two rows of days at a time, down to the last day |
 | Left, Right | Six hours back or on |
 | *, # | The previous or next hourly data |
 | OK | Refresh |

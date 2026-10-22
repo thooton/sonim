@@ -53,7 +53,7 @@
   <h2>Keys</h2>
   <table>
     <tr><td>Menu (left soft key)</td><td>Opens the menu: Location, Hourly data, Units, Theme, Refresh.</td></tr>
-    <tr><td>Up / Down</td><td>Scroll the page: the scene, then the hourly forecast, then ten days.</td></tr>
+    <tr><td>Up / Down</td><td>Scroll the page two rows of days at a time, down to the last day and no further.</td></tr>
     <tr><td>Left / Right</td><td>Scroll the hourly forecast through the next 48 hours.</td></tr>
     <tr><td>* and #</td><td>Previous and next hourly data (Temp, Feels like, Precip chance…), as the iOS chips do.</td></tr>
     <tr><td>OK</td><td>Refresh.</td></tr>
@@ -319,6 +319,9 @@ const W = 240, STATUS = 24, SKY = 148;
 const M = 8;                       // side margin of the forecasts
 const COLS = 6, COLW = (W - 2 * M) / COLS;
 const HOURLY_H = 88, DAY_H = 19;
+const STEP = DAY_H * 2;            // one press of Up or Down
+// The page under the status bar, from the sky to the last of ten days, less the screen.
+const MAX_SCROLL = SKY + 2 + HOURLY_H + 2 + 21 + 10 * DAY_H + 6 - (320 - STATUS);
 
 const METRICS = {
   temp:   { label: 'Temperature', short: 'Temp',          kind: 'line', v: h => h.temp,  fmt: v => v + '°', color: v => tempColor(v) },
@@ -595,8 +598,9 @@ const SECTIONS = [
   { h: 'Hourly data (Menu → Hourly data, or * and #)', frames: METRIC_FRAMES.map(([k, cap]) => ({ svg: screen(RAINY, { metric: k }), cap: `<b>${METRICS[k].label}</b>. ${cap}` })) },
   { h: 'Moving around', frames: [
     { svg: screen(MIAMI, { offset: 6 }), cap: '<b>Right</b> scrolls the hours on: 4 PM to 9 PM.' },
-    { svg: screen(MIAMI, { scroll: SKY }), cap: '<b>Down</b> scrolls the page: the sky goes, the hours and ten days stay.' },
-    { svg: screen(MIAMI, { scroll: SKY + HOURLY_H + 2, metric: 'pop' }), cap: '<b>Down</b> again, precip chance showing.' },
+    { svg: screen(MIAMI, { scroll: STEP }), cap: '<b>Down</b> moves the page two rows of days at a time.' },
+    { svg: screen(MIAMI, { scroll: 2 * STEP }), cap: '<b>Down</b> again: the sky slides up under the status bar.' },
+    { svg: screen(MIAMI, { scroll: MAX_SCROLL, metric: 'pop' }), cap: 'As far as <b>Down</b> goes: the last day at the foot of the screen, nothing past it.' },
     { svg: screen(MIAMI, { loading: true }), cap: '<b>Refreshing</b>: a thin bar under the status bar; the old forecast stays.' },
   ] },
   { h: 'Menu and location', frames: [
