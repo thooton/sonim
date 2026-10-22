@@ -1,0 +1,7 @@
+// The forecast, its units and colours, and (later) the weather service: plain
+// Java, checked on a desktop JVM.
+apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    api project(":common:core")
+}
