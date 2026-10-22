@@ -92,6 +92,70 @@ public final class SelfTest {
             check.close("exponent", 10, exp.ops.get(0)[1], 1e-6);
             check.close("dots split numbers", .5, exp.ops.get(1)[2], 1e-6);
         });
+        check.run("open-meteo", () -> {
+            String body = "{\"utc_offset_seconds\":-14400,"
+                + "\"current\":{\"temperature_2m\":69.2,\"apparent_temperature\":71.6,\"weather_code\":2,\"is_day\":0,\"wind_speed_10m\":6.6},"
+                + "\"hourly\":{\"time\":[1792641600,1792645200],\"temperature_2m\":[70.1,69.4],\"apparent_temperature\":[72,71],"
+                + "\"precipitation_probability\":[10,40],\"precipitation\":[0,0.05],\"weather_code\":[0,61],\"cloud_cover\":[5,90],"
+                + "\"wind_speed_10m\":[5,30],\"wind_direction_10m\":[90,180],\"wind_gusts_10m\":[9,40],\"relative_humidity_2m\":[80,95],"
+                + "\"dew_point_2m\":[63,66],\"pressure_msl\":[1015.5,1013],\"visibility\":[52800,null],\"uv_index\":[0,1.5],\"is_day\":[0,1]},"
+                + "\"daily\":{\"time\":[1792641600],\"weather_code\":[95],\"temperature_2m_max\":[81.8],\"temperature_2m_min\":[67.8],"
+                + "\"precipitation_probability_max\":[57]}}";
+            try (com.xp3.common.TestServer server = new com.xp3.common.TestServer(req -> {
+                if (req.path.startsWith("/v1/forecast")) return com.xp3.common.TestServer.Reply.json(body);
+                if (req.path.startsWith("/v1/search")) return com.xp3.common.TestServer.Reply.json(
+                    "{\"results\":[{\"name\":\"Portland\",\"latitude\":45.52,\"longitude\":-122.68,\"admin1\":\"Oregon\",\"country\":\"United States\",\"country_code\":\"US\"},"
+                    + "{\"name\":\"Portland\",\"latitude\":-38.34,\"longitude\":141.6,\"admin1\":\"Victoria\",\"country\":\"Australia\",\"country_code\":\"AU\"},"
+                    + "{\"name\":\"Nowhere\"}]}");
+                if (req.path.startsWith("/data/reverse")) return com.xp3.common.TestServer.Reply.json(
+                    "{\"city\":\"Miami\",\"principalSubdivision\":\"Florida\",\"countryName\":\"United States of America\",\"countryCode\":\"US\"}");
+                return com.xp3.common.TestServer.Reply.of(404, "text/plain", "no");
+            })) {
+                String base = server.uri("").toString().replaceAll("/$", "");
+                OpenMeteo om = new OpenMeteo(new com.xp3.common.Http(), base, base, base);
+                Forecast f = om.forecast(new Place("Miami, FL", "", 25.77, -80.19), NOW);
+                String asked = server.seen.get(0).path;
+                check.ok("US units", asked.contains("temperature_unit=fahrenheit") && asked.contains("wind_speed_unit=mph"));
+                check.ok("where", asked.contains("latitude=25.7700&longitude=-80.1900"));
+                check.same("place", "Miami, FL", f.place);
+                check.same("now", Condition.PARTLY_CLOUDY_NIGHT, f.now.condition);
+                check.close("temp", 69.2, f.now.temp, 1e-9);
+                check.same("offset", -14400, f.utcOffset);
+                Forecast.Hour h = f.hours.get(1);
+                check.same("windy rain is rain", Condition.RAIN, h.condition);
+                check.close("hPa to inHg", 29.92, h.pressure, .01);
+                check.close("feet to miles", 10, f.hours.get(0).visibility, 1e-9);
+                check.close("a null is nothing", 0, h.visibility, 1e-9);
+                check.same("storm day", Condition.THUNDERSTORM, f.days.get(0).condition);
+                check.close("low", 67.8, f.days.get(0).low, 1e-9);
+                List<Place> found = om.search("Portland");
+                check.same("found two", 2, found.size());
+                check.same("US state", "Portland, OR", found.get(0).name);
+                check.same("detail", "Oregon, United States", found.get(0).detail);
+                check.same("abroad", "Portland", found.get(1).name);
+                check.ok("encoded", server.seen.get(1).path.contains("name=Portland&"));
+                check.same("too short", 0, om.search("P").size());
+                Place here = om.named(25.77, -80.19);
+                check.same("here", "Miami, FL", here.name);
+            }
+            check.same("clear", Condition.CLEAR_DAY, OpenMeteo.condition(1, true, 0));
+            check.same("windy", Condition.WIND, OpenMeteo.condition(2, true, 30));
+            check.same("snow showers", Condition.SNOW, OpenMeteo.condition(85, false, 0));
+            check.same("freezing rain", Condition.SLEET, OpenMeteo.condition(66, true, 0));
+            check.same("fog", Condition.FOG, OpenMeteo.condition(45, false, 0));
+            check.fails("junk", () -> OpenMeteo.parse("{\"current\":{}}", "x", NOW));
+        });
+        check.run("places", () -> {
+            Place a = new Place("Miami, FL", "Florida", 25.77, -80.19), b = new Place("Seattle, WA", "", 47.6, -122.3);
+            List<Place> r = Place.remember(Place.remember(new java.util.ArrayList<Place>(), a, 3), b, 3);
+            r = Place.remember(r, new Place("Miami", "", 25.7701, -80.1901), 3);
+            check.same("no twice", 2, r.size());
+            check.same("newest first", "Miami", r.get(0).name);
+            List<Place> back = Place.list(Place.write(r));
+            check.same("round trip", "Seattle, WA", back.get(1).name);
+            check.ok("junk list", Place.list("[{]").isEmpty());
+            check.ok("no name", Place.fromJsonString("{\"lat\":1,\"lon\":2}") == null);
+        });
         System.exit(check.report() ? 0 : 1);
     }
 }

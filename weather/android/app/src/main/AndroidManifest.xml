@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Open-Meteo for the weather and places, BigDataCloud for the name of
+         where the phone is. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Current location: asked for only when it is chosen. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
