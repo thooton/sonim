@@ -1,6 +1,5 @@
 package com.weather.xp3;
 
-import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
@@ -63,7 +62,6 @@ final class WeatherView extends View {
 
     private float scroll;
     private int lastBar;
-    private ValueAnimator scrolling;
 
     private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG | Paint.LINEAR_TEXT_FLAG);
     private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -101,39 +99,28 @@ final class WeatherView extends View {
     /** How far one press of Up or Down moves the page: two days' rows. */
     static final float STEP = DAY_H * 2;
 
-    /** Where the page is going, so quick presses add up rather than restart. */
-    private float target;
-
     boolean scrollDown() {
         float max = maxScroll();
-        if (target >= max - .5f) return false;
-        animateTo(Math.min(max, target + STEP));
+        if (scroll >= max - .5f) return false;
+        scrollTo(Math.min(max, scroll + STEP));
         return true;
     }
 
     boolean scrollUp() {
-        if (target <= .5f) return false;
-        animateTo(Math.max(0, target - STEP));
+        if (scroll <= .5f) return false;
+        scrollTo(Math.max(0, scroll - STEP));
         return true;
     }
 
     void scrollToTop() {
-        if (scrolling != null) scrolling.cancel();
         scroll = 0;
-        target = 0;
         invalidate();
     }
 
-    private void animateTo(float to) {
-        if (scrolling != null) scrolling.cancel();
-        target = to;
-        scrolling = ValueAnimator.ofFloat(scroll, to);
-        scrolling.setDuration(120);
-        scrolling.addUpdateListener(a -> {
-            scroll = (float) a.getAnimatedValue();
-            invalidate();
-        });
-        scrolling.start();
+    /** Straight there: no easing, so each press lands at once. */
+    private void scrollTo(float to) {
+        scroll = to;
+        invalidate();
     }
 
     /** Right: on six hours. */
@@ -167,10 +154,7 @@ final class WeatherView extends View {
             drawEmpty(c);
         } else {
             float max = maxScroll();
-            if (scroll > max && (scrolling == null || !scrolling.isRunning())) {
-                scroll = max;
-                target = max;
-            }
+            if (scroll > max) scroll = max;
             c.save();
             c.translate(0, -scroll);
             String cond = forecast.now.condition;
