@@ -2,6 +2,8 @@ package com.books.xp3.book;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -343,6 +345,12 @@ public final class Epub {
         try {
             return new ZipFile(file);
         } catch (IOException e) {
+            // A file that can't be read at all is not a broken book: say so.
+            try {
+                new FileInputStream(file).close();
+            } catch (FileNotFoundException unreadable) {
+                throw new FileNotFoundException("Can\u2019t read " + file.getName());
+            }
             throw new IOException("Not an EPUB: " + file.getName() + " is not a zip file");
         }
     }

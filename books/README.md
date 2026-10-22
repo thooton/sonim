@@ -14,6 +14,8 @@ The library finds them the next time it opens, with their covers, the book you r
 
 ## Deleting and converting
 
+On the SD card, Android sometimes won't let Books open a book another app put there (a file manager's move, Source's downloads), or write beside it. The first time that matters (opening such a book, deleting a book or converting one on the card), Books asks *Allow Books to access SD card?* once; after that it reads, deletes and saves there through that permission.
+
 **Delete Book** in the library's Menu erases the book's file from the phone (it asks first, with Cancel chosen), and its place with it.
 
 **Convert to MOBI** (EPUBs only) saves a MOBI beside the book, under the same name, for a Kindle: `Books/Some Book.epub` becomes `Books/Some Book.mobi`. Converting again replaces it. The header says *Converting…* while it works and *Saved Some Book.mobi* when done. The text keeps its headings, italics, bold, lists, tables and links; the contents become a contents page the Kindle's Go To menu finds; the cover and pictures come along, PNGs and very large pictures redrawn as JPEGs a Kindle accepts. The library itself doesn't list MOBIs.

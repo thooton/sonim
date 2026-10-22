@@ -65,7 +65,9 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
 - `common/ui` (Android, `com.xp3.common.ui`): `BaseActivity` (`dp`, `color`,
   `toast`, `alert`, `vertical`, `text`, `listDialog`), `Ui` (workers, `fill`,
   `weighted`, `isOk`, `onSelect`), `Card` (the SD card, where downloads
-  go), `Tabs` (tab bar with d-pad cycling),
+  go), `CardGrant` (Android's grant for the whole card, which Android 8.1
+  wants before an app writes there, and sometimes before it reads what
+  another app put there), `Tabs` (tab bar with d-pad cycling),
   `SelectableAdapter` (rows that paint their own highlight), `Markdown`, and
   the shared tab, focus and Markdown drawables. An app's own colors and
   dimens override the defaults in its `res/values`. `Family` and the

@@ -107,7 +107,8 @@ public final class Mobi {
         return out.toByteArray();
     }
 
-    private static void convert(File epub, Images images, OutputStream out) throws IOException {
+    /** Writes `epub` as a MOBI to `out`, which the caller closes. */
+    public static void convert(File epub, Images images, OutputStream out) throws IOException {
         ZipFile zip = Epub.open(epub);
         try {
             new Writer(zip, Epub.readPackage(zip), images).write(out);

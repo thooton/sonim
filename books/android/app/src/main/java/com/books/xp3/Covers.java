@@ -10,6 +10,7 @@ import android.graphics.Rect;
 import com.books.xp3.shelf.Shelf;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -25,9 +26,11 @@ import java.io.OutputStream;
 final class Covers {
 
     private final File directory;
+    private final Shelf.Reader reader;
 
-    Covers(Context context) {
+    Covers(Context context, Shelf.Reader reader) {
         directory = new File(context.getCacheDir(), "covers");
+        this.reader = reader;
     }
 
     /** The thumbnail at exactly `width` x `height`, or null if the book has no cover. */
@@ -42,8 +45,11 @@ final class Covers {
         }
         Bitmap thumb = null;
         try {
-            byte[] bytes = Shelf.cover(entry.file());
+            byte[] bytes = Shelf.cover(reader.readable(entry.file()));
             if (bytes != null) thumb = thumbnail(bytes, width, height);
+        } catch (FileNotFoundException e) {
+            // Unreadable for now (an SD card not yet allowed): no marker, so it is tried again.
+            return null;
         } catch (IOException | RuntimeException | OutOfMemoryError e) {
             thumb = null;
         }
@@ -94,7 +100,8 @@ final class Covers {
     /** A file name for the book that changes when the book does. */
     private static String key(Shelf.Entry entry) {
         long hash = 1125899906842597L;
-        String id = entry.path + "|" + entry.size + "|" + entry.modified;
+        // "2": markers from before 1.1.1 were also left for books that couldn't be read.
+        String id = "2|" + entry.path + "|" + entry.size + "|" + entry.modified;
         for (int i = 0; i < id.length(); i++) hash = 31 * hash + id.charAt(i);
         return Long.toHexString(hash);
     }

@@ -3,7 +3,9 @@
     <!-- Storage, to find books where a file manager or a USB cable puts them
          (the Books folders of the phone and the SD card); asked for on first
          launch. Writing, to delete a book and to save one converted to MOBI
-         beside it; asked for the first time either is chosen.
+         beside it on the phone's own storage; asked for the first time either
+         is chosen. On the SD card, Android's grant for the card does both,
+         and reads what the phone won't let the app open (CardFiles).
          No network: the app has no INTERNET permission. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />

@@ -56,7 +56,8 @@ them. `Books` is now the reference: keep its test in step with it.
   core's `Store`: Android 8.1 refuses plain file writes on a removable card
   outside an app's own folder, so `Tonal.whenWritable` asks before the first
   download for the whole card with `StorageVolume.createAccessIntent(null)`,
-  keeps the grant (`card`: `tree`, one card's), and every folder, part file
+  keeps the grant (`CardGrant` in `common/ui`, one card's, shared with
+  Books), and every folder, part file
   and rename goes through `DocumentsContract`; reading stays plain files,
   under storage access), and the
   drawn pieces: `ResultRow`, `Cover`, `StateButton`, `Wavy`, `StorageCard`,
