@@ -5,7 +5,8 @@ dark mode. A sibling of `../list`, `../music` and the rest, under the same
 constraints: 240x320 mdpi, d-pad driven, no AndroidX or third-party libraries,
 `:core` plain Java `--release 8` running on API 27. No network: the manifest
 asks only for READ_EXTERNAL_STORAGE, and WRITE_EXTERNAL_STORAGE for deleting
-a book and saving one converted to MOBI.
+a book and saving one converted to MOBI on the phone's own storage. On the SD
+card those take Android's grant for the card instead (`CardFiles`).
 
 ## Layout
 
@@ -34,7 +35,26 @@ a book and saving one converted to MOBI.
   StaticLayout cut into pages), `PageView` (draws a page and the OK overlay),
   `ListPanel` (the drawn sheet and contents list), `Fonts`, `Settings`,
   `KindleImages` (images readied for MOBI: small JPEGs and GIFs kept, the
-  rest redrawn as JPEG under 127 KB).
+  rest redrawn as JPEG under 127 KB), `CardFiles` (books on the SD card
+  through `CardGrant`, below).
+
+## The SD card
+
+Android 8.1 refuses plain file writes on a removable card outside an app's
+own folder, and can refuse plain reads ("Permission denied") of files another
+app put there through Android's documents provider (a file manager's move,
+Source's downloads), while still listing them. So:
+
+- `CardFiles` is the shelf's `Shelf.Reader`: a book that opens where it lies
+  is read there; one that doesn't is copied through the card's grant into
+  `cache/card` (the newest few kept) and read from the copy. A book that
+  can't be read at all is a `FileNotFoundException` ("Can't read X"), never
+  "Not an EPUB"; the shelf leaves its title unset and Covers leave no marker,
+  so both try again once it can be read.
+- The grant (`CardGrant` in `common/ui`, shared with Source) is asked for
+  once, with `StorageVolume.createAccessIntent(null)`: when a card book is
+  opened that can't be read, or deleted or converted. Deleting and the
+  MOBI's part file and rename go through `DocumentsContract` there.
 
 ## How reading works
 

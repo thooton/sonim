@@ -76,6 +76,31 @@ public final class ShelfTests {
             check.ok("saved without it", again.save());
             check.ok("not read back", new Shelf(state).get(alpha) == null);
 
+            // A book the phone won't let the app read is not taken as untitled:
+            // once it can be read (through the SD card's grant), it is titled.
+            File refusing = new File(root, "refusing");
+            refusing.mkdirs();
+            String nestedPath = new File(byAuthor, "nested.txt").getAbsolutePath();
+            Shelf.Reader refused = file -> {
+                if (file.getAbsolutePath().equals(nestedPath)) throw new java.io.FileNotFoundException("Can't read");
+                return file;
+            };
+            Shelf locked = new Shelf(refusing);
+            locked.scan(roots, refused);
+            check.ok("unreadable book listed untitled", locked.get(nestedPath).title == null);
+            check.same("by its file name", "nested", locked.get(nestedPath).displayTitle());
+            locked.scan(roots);
+            check.same("titled once it can be read", "Nested", locked.get(nestedPath).title);
+
+            // Shelves from before 2 kept such books with an empty title: they are read again.
+            write(new File(refusing, "shelf.tsv"), "books-shelf 1\n" + Shelf.escape(nestedPath)
+                + "\t" + new File(nestedPath).length() + "\t" + new File(nestedPath).lastModified()
+                + "\t\t\t-1\t0\t0\n");
+            Shelf older = new Shelf(refusing);
+            check.ok("old empty title dropped", older.get(nestedPath).title == null);
+            older.scan(roots);
+            check.same("old untitled book titled", "Nested", older.get(nestedPath).title);
+
             write(new File(state, "shelf.tsv"), "garbage\n");
             check.same("damaged index is empty", 0, new Shelf(state).books().size());
         } finally {

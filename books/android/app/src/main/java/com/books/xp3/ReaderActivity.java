@@ -125,7 +125,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
             Book loaded = null;
             String problem = null;
             try {
-                loaded = Shelf.open(file);
+                loaded = Shelf.open(new CardFiles(this).readable(file));
             } catch (Exception | OutOfMemoryError e) {
                 problem = e.getMessage();
             }

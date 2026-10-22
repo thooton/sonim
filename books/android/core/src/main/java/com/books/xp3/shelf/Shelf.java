@@ -6,6 +6,7 @@ import com.books.xp3.book.PlainText;
 import com.xp3.common.Disk;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,9 +33,26 @@ import java.util.Map;
  */
 public final class Shelf {
 
-    private static final String HEADER = "books-shelf 1";
+    private static final String HEADER = "books-shelf 2";
+    /**
+     * Before 2, a book that couldn't be read was kept with an empty title, as
+     * if it had none, and never looked at again; empty titles from it are
+     * read again.
+     */
+    private static final String HEADER_1 = "books-shelf 1";
     private static final int MAX_DEPTH = 5;
     private static final int MAX_FILES = 5000;
+
+    /**
+     * How a book's file is read: the file itself, or a copy of it when the
+     * phone won't let the app open it where it lies (an SD card can refuse).
+     */
+    public interface Reader {
+        File readable(File file) throws IOException;
+    }
+
+    /** Reads each file where it lies. */
+    public static final Reader AS_IT_IS = file -> file;
 
     /** One book on the shelf. */
     public static final class Entry {
@@ -125,6 +143,11 @@ public final class Shelf {
      * title. A book anywhere else is not in the library.
      */
     public List<Entry> scan(List<File> folders) {
+        return scan(folders, AS_IT_IS);
+    }
+
+    /** scan(), reading each book through `reader`. */
+    public List<Entry> scan(List<File> folders, Reader reader) {
         List<File> found = new ArrayList<File>();
         for (File folder : folders) walk(folder, 0, found);
 
@@ -143,7 +166,15 @@ public final class Shelf {
                 entry.present = true;
                 continue;
             }
-            Epub.Info info = describe(file);
+            Epub.Info info;
+            boolean unread = false;
+            try {
+                info = describe(reader.readable(file), file.getName());
+            } catch (IOException e) {
+                // Not read at all (refused, or its copy failed), so not taken as untitled.
+                info = null;
+                unread = true;
+            }
             synchronized (this) {
                 if (entry == null) {
                     entry = new Entry(path);
@@ -158,7 +189,8 @@ public final class Shelf {
                 // An empty title, not null, so a book without one is not read
                 // again on every scan; the file name is shown instead.
                 String title = info == null ? null : clean(info.title);
-                entry.title = title == null ? "" : title;
+                // Null when it couldn't be read, so the next scan tries again.
+                entry.title = title == null && !unread ? "" : title;
                 entry.author = info == null ? null : clean(info.author);
                 entry.present = true;
             }
@@ -179,10 +211,13 @@ public final class Shelf {
         return out;
     }
 
-    private static Epub.Info describe(File file) {
+    /** The book's title and author, or null; throws only if it can't be read. */
+    private static Epub.Info describe(File file, String name) throws FileNotFoundException {
         try {
-            if (file.getName().toLowerCase(Locale.ROOT).endsWith(".txt")) return PlainText.info(file);
+            if (name.toLowerCase(Locale.ROOT).endsWith(".txt")) return PlainText.info(file);
             return Epub.info(file);
+        } catch (FileNotFoundException e) {
+            throw e;
         } catch (IOException | RuntimeException e) {
             return null;
         }
@@ -258,7 +293,9 @@ public final class Shelf {
         String text = Disk.read(index, 8 * 1024 * 1024);
         if (text == null) return;
         String[] lines = text.split("\n");
-        if (lines.length == 0 || !lines[0].equals(HEADER)) return;
+        if (lines.length == 0) return;
+        boolean old = lines[0].equals(HEADER_1);
+        if (!old && !lines[0].equals(HEADER)) return;
         for (int i = 1; i < lines.length; i++) {
             String[] fields = lines[i].split("\t", -1);
             if (fields.length < 8) continue;
@@ -267,6 +304,7 @@ public final class Shelf {
                 entry.size = Long.parseLong(fields[1]);
                 entry.modified = Long.parseLong(fields[2]);
                 entry.title = unescape(fields[3]);
+                if (old && entry.title.length() == 0) entry.title = null;
                 entry.author = fields[4].length() == 0 ? null : unescape(fields[4]);
                 entry.position = Long.parseLong(fields[5]);
                 entry.length = Long.parseLong(fields[6]);

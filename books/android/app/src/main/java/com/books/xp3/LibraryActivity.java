@@ -1,6 +1,7 @@
 package com.books.xp3;
 
 import android.Manifest;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -14,9 +15,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
-import com.books.xp3.book.Mobi;
 import com.books.xp3.shelf.Shelf;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.CardGrant;
 import com.xp3.common.ui.Ui;
 
 import java.io.File;
@@ -38,6 +39,7 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
 
     private static final int ASK_STORAGE = 1;
     private static final int ASK_WRITE = 2;
+    private static final int ASK_CARD = 3;
     private static final String BOOKS = "Books";
     private static final int MENU_UNREAD = 1;
     private static final int MENU_FINISHED = 2;
@@ -50,6 +52,7 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
     private static final long NOTICE_MS = 5000;
 
     private Shelf shelf;
+    private CardFiles cards;
     private Covers covers;
     private FrameLayout root;
     private LibraryView view;
@@ -61,7 +64,7 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
     private final ExecutorService conversions = Ui.worker("books-convert");
     /** True while a book is being converted; one at a time. */
     private boolean converting;
-    /** What was chosen before writing to storage was allowed: done once it is. */
+    /** What was chosen before storage or the SD card was allowed: done once it is. */
     private Runnable afterWrite;
     private final Runnable clearNotice = () -> view.setNotice(converting ? "Converting\u2026" : null);
     private boolean scanning;
@@ -73,7 +76,8 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         shelf = Shared.shelf(this);
-        covers = new Covers(this);
+        cards = new CardFiles(this);
+        covers = new Covers(this, cards);
         root = new FrameLayout(this);
         view = new LibraryView(this);
         root.addView(view, new FrameLayout.LayoutParams(
@@ -132,6 +136,21 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         }
     }
 
+    @Override
+    protected void onActivityResult(int code, int result, Intent data) {
+        super.onActivityResult(code, result, data);
+        if (code != ASK_CARD) return;
+        Runnable action = afterWrite;
+        afterWrite = null;
+        if (CardGrant.answered(this, result, data)) {
+            // Books that couldn't be read are given their titles and covers.
+            scan();
+            if (action != null) action.run();
+        } else {
+            notice("Not allowed to use the SD card");
+        }
+    }
+
     // ------------------------------------------------------------------
     // Finding books
     // ------------------------------------------------------------------
@@ -141,7 +160,7 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         scanning = true;
         final List<File> roots = roots();
         scans.execute(() -> {
-            final List<Shelf.Entry> found = shelf.scan(roots);
+            final List<Shelf.Entry> found = shelf.scan(roots, cards);
             runOnUiThread(() -> {
                 scanning = false;
                 if (isFinishing()) return;
@@ -269,10 +288,15 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
             scan();
             return;
         }
-        returning = true;
-        Intent intent = new Intent(this, ReaderActivity.class);
-        intent.putExtra(ReaderActivity.EXTRA_PATH, book.path);
-        startActivity(intent);
+        final String path = book.path;
+        Runnable open = () -> {
+            returning = true;
+            Intent intent = new Intent(this, ReaderActivity.class);
+            intent.putExtra(ReaderActivity.EXTRA_PATH, path);
+            startActivity(intent);
+        };
+        if (cards.needsGrant(book.file())) askCard(open);
+        else open.run();
     }
 
     // ------------------------------------------------------------------
@@ -350,13 +374,13 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
                 scan();
                 return;
             case MENU_CONVERT:
-                if (book != null) withWrite(() -> convert(book));
+                if (book != null) withWrite(book, () -> convert(book));
                 return;
             case MENU_DELETE:
                 if (book != null) confirmDelete(book);
                 return;
             case MENU_DELETE_NOW:
-                if (book != null) withWrite(() -> delete(book));
+                if (book != null) withWrite(book, () -> delete(book));
                 return;
             default:
                 return;
@@ -370,10 +394,17 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
     // ------------------------------------------------------------------
 
     /*
-     * Writing is in the same permission group as reading, which the library
-     * already has, so the system grants it without asking.
+     * On the phone's storage, writing is in the same permission group as
+     * reading, which the library already has, so the system grants it without
+     * asking. On the SD card it takes Android's grant for the card, asked for
+     * once (CardFiles).
      */
-    private void withWrite(Runnable action) {
+    private void withWrite(Shelf.Entry book, Runnable action) {
+        if (cards.onCard(book.file())) {
+            if (cards.granted()) action.run();
+            else askCard(action);
+            return;
+        }
         if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
             action.run();
             return;
@@ -382,10 +413,26 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, ASK_WRITE);
     }
 
+    /** Android's "Allow Books to access SD card?", then `action` if it is. */
+    private void askCard(Runnable action) {
+        Intent ask = CardGrant.ask(this);
+        if (ask != null) {
+            try {
+                afterWrite = action;
+                startActivityForResult(ask, ASK_CARD);
+                return;
+            } catch (ActivityNotFoundException e) {
+                afterWrite = null;
+            }
+        }
+        // No way to ask: the action says why it can't.
+        action.run();
+    }
+
     /** Deletes the book's file from the phone, and the book from the shelf. */
     private void delete(Shelf.Entry book) {
         File file = book.file();
-        if (!file.delete() && file.exists()) {
+        if (!cards.delete(file)) {
             notice("Couldn\u2019t delete it");
             return;
         }
@@ -413,14 +460,16 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         view.removeCallbacks(clearNotice);
         view.setNotice("Converting\u2026");
         final Context app = getApplicationContext();
+        final CardFiles files = cards;
         conversions.execute(() -> {
             String said;
             try {
-                Mobi.convert(epub, mobi, new KindleImages());
+                files.saveMobi(epub, mobi, new KindleImages());
                 MediaScannerConnection.scanFile(app, new String[] {mobi.getAbsolutePath()}, null, null);
                 said = "Saved " + mobi.getName();
             } catch (FileNotFoundException e) {
-                said = "Couldn\u2019t save it beside the book";
+                // A message says the book couldn't be read; none, that the MOBI couldn't be written.
+                said = e.getMessage() != null ? e.getMessage() : "Couldn\u2019t save it beside the book";
             } catch (IOException e) {
                 said = e.getMessage() != null ? e.getMessage() : "Couldn\u2019t convert it";
             } catch (RuntimeException | OutOfMemoryError e) {
