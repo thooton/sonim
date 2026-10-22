@@ -58,6 +58,8 @@ final class WeatherView extends View {
     String error;
     Sheet sheet;
     Chrome chrome;
+    /** While something lies over the page, it says the status bar's colour, not the page. */
+    boolean covered;
 
     private float scroll;
     private int lastBar;
@@ -170,7 +172,7 @@ final class WeatherView extends View {
             drawDaily(c, SKY + 2 + HOURLY_H + 2);
             c.restore();
             int bar = scroll > SKY - 10 ? theme.bg : Condition.card(cond);
-            if (bar != lastBar && chrome != null) {
+            if (bar != lastBar && chrome != null && !covered) {
                 lastBar = bar;
                 chrome.statusBar(bar, scroll > SKY - 10 && !theme.dark);
             }
@@ -187,7 +189,7 @@ final class WeatherView extends View {
 
     private void drawEmpty(Canvas c) {
         int bar = Colors.CARD_DAY;
-        if (bar != lastBar && chrome != null) {
+        if (bar != lastBar && chrome != null && !covered) {
             lastBar = bar;
             chrome.statusBar(bar, false);
         }
@@ -231,9 +233,10 @@ final class WeatherView extends View {
         text.setTypeface(MEDIUM);
         text.setTextSize(9.5f);
         text.setLetterSpacing(0);
-        float lw = width(m.chip, 9.5f, MEDIUM) + 14;
+        String chip = m.chip(units);
+        float lw = width(chip, 9.5f, MEDIUM) + 14;
         Art.rect(c, W - M - lw, 5, lw, 14, 7, Colors.BLUE, 1);
-        label(c, W - M - lw / 2, 15.2f, m.chip, 9.5f, MEDIUM, 0xFFFFFFFF, Paint.Align.CENTER);
+        label(c, W - M - lw / 2, 15.2f, chip, 9.5f, MEDIUM, 0xFFFFFFFF, Paint.Align.CENTER);
         // Times and icons.
         for (int i = 0; i < hs.size(); i++) {
             Forecast.Hour h = hs.get(i);
@@ -316,12 +319,6 @@ final class WeatherView extends View {
                 Forecast.Hour h = hs.get(i);
                 float cx = M + COLW * i + COLW / 2;
                 label(c, cx, 70, m.format(h.wind, units), 12, MEDIUM, theme.text, Paint.Align.CENTER);
-                if (i == 0) {
-                    text.setTextSize(12);
-                    text.setTypeface(MEDIUM);
-                    float w = text.measureText(m.format(h.wind, units));
-                    label(c, cx + w / 2 + 2, 70, units.speedUnit(), 8, REGULAR, theme.muted, Paint.Align.LEFT);
-                }
                 c.save();
                 c.translate(cx, 79);
                 c.rotate((float) h.direction + 180);

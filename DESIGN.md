@@ -364,3 +364,29 @@ in `res/drawable-*`.
   text, each section opening on a three-line drop cap, and the last
   paragraph ending on the diamond. Down and Up move two lines, Right and
   Left a screen; on the lists each press moves the same distance.
+
+## Weather: CARROT on a flip phone
+
+Weather takes its look from CARROT Weather, whose colours it uses exactly
+(read from CARROT's Android app): the card colour behind the sky for each
+condition (`#0077F8` clear, `#0045A3` cloudy, `#001986` night and rain,
+`#61A3DE` snow, `#44C5EE` fog, `#0045A2` wind), its sky effects and scenery
+palettes, its icon colours, its temperature scale (`#8A01C1` at -60°F to
+`#FFCBB0` at 130°F) and its blue `#0B84FE` for rain. The drawings are the
+app's own, in CARROT's manner.
+
+What changes from CARROT, for the screen:
+
+- **The sky runs edge to edge.** No card margin: the place, icon,
+  temperature and "Feels" sit on the sky, the scenery along its foot, and the
+  status bar takes the sky's colour.
+- **No cards below it.** The hourly and daily forecasts sit straight on the
+  page (CARROT's dark `#000000` or light `#FFFFFF`) with an 8dp margin, under
+  small grey capitals.
+- **No snark.** It would not fit.
+- **iOS's hourly chips.** The hourly forecast shows Temperature, Feels like,
+  Precip chance and the rest one at a time, named in a blue chip at the right
+  of its heading; Menu or * and # change it.
+
+`weather/mockups/index.html` is the design and is drawn by the same layout
+code as the app; see `weather/AGENTS.md`.
