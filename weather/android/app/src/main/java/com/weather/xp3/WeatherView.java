@@ -93,40 +93,42 @@ final class WeatherView extends View {
         return SKY + 2 + HOURLY_H + 2 + 21 + days * DAY_H + 6;
     }
 
-    /** Far enough down that the ten days at least start at the top. */
+    /** Far enough down that the last day sits at the foot of the screen, and no further. */
     private float maxScroll() {
-        return Math.max(SKY + 2 + HOURLY_H + 2, pageHeight() - getHeight() / scale());
+        return Math.max(0, pageHeight() - getHeight() / scale());
     }
 
-    /** Down: the sky goes, then the hours, then three days at a time. */
+    /** How far one press of Up or Down moves the page: two days' rows. */
+    static final float STEP = DAY_H * 2;
+
+    /** Where the page is going, so quick presses add up rather than restart. */
+    private float target;
+
     boolean scrollDown() {
         float max = maxScroll();
-        if (scroll >= max - .5f) return false;
-        float days = SKY + 2 + HOURLY_H + 2;
-        float to = scroll < SKY - .5f ? SKY : scroll < days - .5f ? days : scroll + DAY_H * 3;
-        animateTo(Math.min(max, to));
+        if (target >= max - .5f) return false;
+        animateTo(Math.min(max, target + STEP));
         return true;
     }
 
     boolean scrollUp() {
-        if (scroll <= 0) return false;
-        float days = SKY + 2 + HOURLY_H + 2;
-        float to = scroll <= SKY + .5f ? 0 : scroll <= days + .5f ? SKY : Math.max(days, scroll - DAY_H * 3);
-        if (to > maxScroll()) to = SKY;
-        animateTo(to);
+        if (target <= .5f) return false;
+        animateTo(Math.max(0, target - STEP));
         return true;
     }
 
     void scrollToTop() {
         if (scrolling != null) scrolling.cancel();
         scroll = 0;
+        target = 0;
         invalidate();
     }
 
     private void animateTo(float to) {
         if (scrolling != null) scrolling.cancel();
+        target = to;
         scrolling = ValueAnimator.ofFloat(scroll, to);
-        scrolling.setDuration(160);
+        scrolling.setDuration(120);
         scrolling.addUpdateListener(a -> {
             scroll = (float) a.getAnimatedValue();
             invalidate();
@@ -164,6 +166,11 @@ final class WeatherView extends View {
         if (forecast == null) {
             drawEmpty(c);
         } else {
+            float max = maxScroll();
+            if (scroll > max && (scrolling == null || !scrolling.isRunning())) {
+                scroll = max;
+                target = max;
+            }
             c.save();
             c.translate(0, -scroll);
             String cond = forecast.now.condition;
