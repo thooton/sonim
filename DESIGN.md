@@ -180,7 +180,7 @@ rules where Apple's page differs:
   colour with dark icons. Black names, iOS's secondary grey (`#8E8E93`) for
   dates, its separator grey for hairlines (inset on both sides) and its
   system blue (`#007AFF`) for everything that can be pressed.
-- **Large bold section headings.** Available, Installed and Not Installed,
+- **Large bold section headings.** Available, Not Installed and Installed,
   at 18sp bold, as "Updated Recently" is on the App Store.
 - **Apple's rows.** A rounded-square icon (an installed app's own, cropped
   to what it paints; a coloured tile with its initial for one that isn't on

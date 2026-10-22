@@ -24,7 +24,7 @@ reopening the app does):
 - **Up to date**, or **newer than** the release (a hand-installed build).
 
 The screen is drawn as the App Store's Updates page (see "Updater: as the App
-Store shows it" in `../DESIGN.md`): groups Available, Installed and Not
+Store shows it" in `../DESIGN.md`): groups Available, Not Installed and
 Installed, each row with its icon, the date of its newest change, an UPDATE,
 OPEN or GET capsule and what's new, all from the manifest. An app whose
 manifest entry has no notes shows its version in place of a date.
