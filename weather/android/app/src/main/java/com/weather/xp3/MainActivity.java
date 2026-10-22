@@ -17,11 +17,22 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 
-import com.xp3.common.ui.BaseActivity;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 
+import com.xp3.common.Disk;
+import com.xp3.common.Http;
+import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Ui;
+
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
+import java.util.concurrent.ExecutorService;
 
 /**
  * The forecast for one place, and the menu and search that change it.
@@ -39,10 +50,21 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
     private EditText field;
     private final Handler main = new Handler(Looper.getMainLooper());
 
+    private final OpenMeteo weather = new OpenMeteo(new Http());
+    private final ExecutorService worker = Ui.workers("weather", 2);
+
     private Place place;
+    /** Follow the phone: each refresh asks where it is now. */
+    private boolean here;
     private List<Place> recent = new ArrayList<>();
-    /** A made-up forecast to show, for screenshots and before the service is wired: -e sample rain. */
+    /** A made-up forecast to show, for screenshots: -e sample rain. */
     private String sample;
+    /** Bumped by each search, so an answer to an older one is dropped. */
+    private int searching;
+    private boolean fetching;
+
+    /** How old a forecast may be before coming back to the app refreshes it. */
+    private static final long STALE_MS = 30 * 60 * 1000L;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -50,6 +72,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         prefs = getSharedPreferences("weather", MODE_PRIVATE);
         sample = getIntent().getStringExtra("sample");
         place = Place.fromJsonString(prefs.getString("place", null));
+        here = prefs.getBoolean("here", false);
         recent = Place.list(prefs.getString("recent", null));
 
         FrameLayout root = new FrameLayout(this);
@@ -89,40 +112,111 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         setContentView(root);
 
         view.requestFocus();
-        if (place == null && sample == null) {
+        if (sample != null) {
+            showSample();
+        } else if (place == null) {
             openLocation();
         } else {
-            load(false);
+            showCached();
+            load(true);
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (sample == null && place != null && view.forecast != null
+            && System.currentTimeMillis() - view.forecast.fetched > STALE_MS) {
+            load(true);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        worker.shutdownNow();
     }
 
     // ------------------------------------------------------------------
     // The forecast.
     // ------------------------------------------------------------------
 
-    /** Shows the forecast for `place`; `fresh` shows the loading bar first. */
-    private void load(boolean fresh) {
-        if (fresh) {
+    private File cache() {
+        return new File(getFilesDir(), "forecast.json");
+    }
+
+    /** The last forecast fetched, at once, while a new one comes. */
+    private void showCached() {
+        String body = Disk.read(cache(), 2000000);
+        if (body == null) return;
+        try {
+            Forecast f = OpenMeteo.parse(body, place.name, prefs.getLong("fetched", 0));
+            view.forecast = f;
+            view.invalidate();
+        } catch (IOException e) {
+            // A damaged cache is no cache.
+        }
+    }
+
+    private void showSample() {
+        long now = System.currentTimeMillis();
+        int offset = java.util.TimeZone.getDefault().getOffset(now) / 1000;
+        view.forecast = Sample.of(sample, now, offset);
+        view.invalidate();
+    }
+
+    /** Fetches the forecast for `place`, with the loading bar along the top. */
+    private void load(boolean quietLocate) {
+        if (sample != null) {
             view.loading = true;
             view.invalidate();
             main.postDelayed(() -> {
                 view.loading = false;
-                show();
+                showSample();
             }, 900);
-        } else {
-            show();
+            return;
         }
-    }
-
-    private void show() {
-        long now = System.currentTimeMillis();
-        int offset = java.util.TimeZone.getDefault().getOffset(now) / 1000;
-        Forecast f = Sample.of(sample != null ? sample : "clear-day", now, offset);
-        if (place != null && sample == null) {
-            f = new Forecast(place.name, f.utcOffset, f.fetched, f.now, f.hours, f.days);
-        }
-        view.forecast = f;
+        if (place == null || fetching) return;
+        fetching = true;
+        view.loading = true;
+        view.error = null;
         view.invalidate();
+        final Place asked = place;
+        final Location fix = here && quietLocate ? lastKnown() : null;
+        worker.execute(() -> {
+            try {
+                Place p = asked;
+                if (fix != null && (Math.abs(fix.getLatitude() - p.lat) > .02 || Math.abs(fix.getLongitude() - p.lon) > .02)) {
+                    p = weather.named(fix.getLatitude(), fix.getLongitude());
+                }
+                String body = weather.forecastBody(p);
+                long now = System.currentTimeMillis();
+                Forecast f = OpenMeteo.parse(body, p.name, now);
+                Disk.write(cache(), body, false);
+                final Place got = p;
+                main.post(() -> {
+                    fetching = false;
+                    view.loading = false;
+                    if (!got.same(place) && asked.same(place)) {
+                        place = got;
+                        prefs.edit().putString("place", Place.toJsonString(got)).apply();
+                    }
+                    if (!got.same(place)) return; // Moved on to somewhere else meanwhile.
+                    prefs.edit().putLong("fetched", now).apply();
+                    view.forecast = f;
+                    view.invalidate();
+                });
+            } catch (IOException | InterruptedException e) {
+                final String why = e.getMessage();
+                main.post(() -> {
+                    fetching = false;
+                    view.loading = false;
+                    if (view.forecast == null) view.error = why;
+                    else toast(why);
+                    view.invalidate();
+                });
+            }
+        });
     }
 
     @Override
@@ -277,23 +371,44 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
     }
 
     private void search(String query) {
-        List<LocationView.Row> rows = locationView.rows;
-        rows.clear();
+        final List<LocationView.Row> rows = locationView.rows;
+        final int ask = ++searching;
         locationView.selected = -1;
         locationView.message = null;
-        String q = query.trim().toLowerCase(Locale.US);
+        final String q = query.trim();
         if (q.isEmpty()) {
-            rows.add(new LocationView.Row("Current location", place != null ? place.name : "Where the phone is", true, null));
+            rows.clear();
+            rows.add(new LocationView.Row("Current location", here && place != null ? place.name : "Where the phone is", true, null));
             for (Place p : recent) rows.add(new LocationView.Row(p.name, "Recent", false, p));
-        } else {
-            for (Place p : CITIES) {
-                if (p.name.toLowerCase(Locale.US).startsWith(q) || p.detail.toLowerCase(Locale.US).startsWith(q)) {
-                    rows.add(new LocationView.Row(p.name, p.detail, false, p));
-                }
-            }
-            if (rows.isEmpty()) locationView.message = "No places found";
+            locationView.invalidate();
+            return;
         }
+        rows.clear();
+        locationView.message = "Searching";
         locationView.invalidate();
+        // Typing on a keypad is slow: wait for a pause before asking.
+        main.postDelayed(() -> {
+            if (ask != searching) return;
+            worker.execute(() -> {
+                List<Place> found;
+                String failed = null;
+                try {
+                    found = weather.search(q);
+                } catch (IOException | InterruptedException e) {
+                    found = new ArrayList<>();
+                    failed = e.getMessage();
+                }
+                final List<Place> got = found;
+                final String why = failed;
+                main.post(() -> {
+                    if (ask != searching) return;
+                    rows.clear();
+                    for (Place p : got) rows.add(new LocationView.Row(p.name, p.detail, false, p));
+                    locationView.message = why != null ? why : got.isEmpty() ? "No places found" : null;
+                    locationView.invalidate();
+                });
+            });
+        }, 450);
     }
 
     private boolean locationKey(int key, boolean down, KeyEvent event) {
@@ -335,30 +450,129 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
     }
 
     private void choose(LocationView.Row row) {
-        Place p = row.place;
-        if (p == null) p = CITIES.get(0); // Where the phone is: until there's a GPS fix to ask for.
+        if (row.place == null) {
+            locate();
+            return;
+        }
+        use(row.place, false);
+    }
+
+    private void use(Place p, boolean followPhone) {
         place = p;
-        recent = Place.remember(recent, p, 5);
-        prefs.edit().putString("place", Place.toJsonString(p)).putString("recent", Place.write(recent)).apply();
+        here = followPhone;
+        if (!followPhone) recent = Place.remember(recent, p, 5);
+        prefs.edit().putString("place", Place.toJsonString(p)).putBoolean("here", followPhone)
+            .putString("recent", Place.write(recent)).apply();
         sample = null;
+        searching++;
         locationLayer.setVisibility(View.GONE);
         view.requestFocus();
         view.scrollToTop();
         view.offset = 0;
+        view.forecast = null;
+        view.error = null;
         view.forceStatusBar();
-        load(true);
+        fetching = false;
+        load(false);
     }
 
-    /** Somewhere to search until the weather service's own search is wired. */
-    private static final List<Place> CITIES = new ArrayList<>();
-    static {
-        CITIES.add(new Place("Miami, FL", "Florida, United States", 25.77, -80.19));
-        CITIES.add(new Place("Portland, OR", "Oregon, United States", 45.52, -122.68));
-        CITIES.add(new Place("Portland, ME", "Maine, United States", 43.66, -70.26));
-        CITIES.add(new Place("Portland", "Victoria, Australia", -38.34, 141.6));
-        CITIES.add(new Place("Seattle, WA", "Washington, United States", 47.61, -122.33));
-        CITIES.add(new Place("Jackson, WY", "Wyoming, United States", 43.48, -110.76));
-        CITIES.add(new Place("New York, NY", "New York, United States", 40.71, -74.01));
-        CITIES.add(new Place("San Francisco, CA", "California, United States", 37.77, -122.42));
+    // ------------------------------------------------------------------
+    // Where the phone is.
+    // ------------------------------------------------------------------
+
+    private static final int ASK_LOCATION = 1;
+
+    private boolean mayLocate() {
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void locate() {
+        if (!mayLocate()) {
+            requestPermissions(new String[] {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, ASK_LOCATION);
+            return;
+        }
+        locationView.rows.clear();
+        locationView.selected = -1;
+        locationView.message = "Finding where the phone is";
+        locationView.invalidate();
+        final int ask = ++searching;
+        Location fix = lastKnown();
+        if (fix != null && System.currentTimeMillis() - fix.getTime() < 30 * 60 * 1000L) {
+            name(fix, ask);
+            return;
+        }
+        final LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+        final LocationListener listener = new LocationListener() {
+            @Override public void onLocationChanged(Location l) {
+                lm.removeUpdates(this);
+                if (ask == searching) name(l, ask);
+            }
+            @Override public void onStatusChanged(String p, int s, Bundle b) {}
+            @Override public void onProviderEnabled(String p) {}
+            @Override public void onProviderDisabled(String p) {}
+        };
+        try {
+            for (String provider : new String[] {LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER}) {
+                if (lm.isProviderEnabled(provider)) lm.requestSingleUpdate(provider, listener, Looper.getMainLooper());
+            }
+        } catch (SecurityException | IllegalArgumentException e) {
+            // Reported by the timeout below.
+        }
+        final Location stale = fix;
+        main.postDelayed(() -> {
+            if (ask != searching) return;
+            lm.removeUpdates(listener);
+            if (stale != null) {
+                name(stale, ask);
+            } else {
+                locationView.message = "Couldn't find where the phone is";
+                locationView.invalidate();
+            }
+        }, 45000);
+    }
+
+    @SuppressWarnings("MissingPermission")
+    private Location lastKnown() {
+        if (!mayLocate()) return null;
+        LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+        Location best = null;
+        try {
+            for (String provider : lm.getProviders(true)) {
+                Location l = lm.getLastKnownLocation(provider);
+                if (l != null && (best == null || l.getTime() > best.getTime())) best = l;
+            }
+        } catch (SecurityException e) {
+            return null;
+        }
+        return best;
+    }
+
+    /** Names the place at `fix`, then shows its weather. */
+    private void name(final Location fix, final int ask) {
+        worker.execute(() -> {
+            Place p;
+            try {
+                p = weather.named(fix.getLatitude(), fix.getLongitude());
+            } catch (IOException | InterruptedException e) {
+                p = new Place(String.format(java.util.Locale.US, "%.2f, %.2f", fix.getLatitude(), fix.getLongitude()), "", fix.getLatitude(), fix.getLongitude());
+            }
+            final Place got = p;
+            main.post(() -> {
+                if (ask == searching && locationLayer.getVisibility() == View.VISIBLE) use(got, true);
+            });
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        if (code != ASK_LOCATION) return;
+        if (mayLocate()) {
+            locate();
+        } else {
+            locationView.message = "Weather may not use the phone's location";
+            locationView.rows.clear();
+            locationView.invalidate();
+        }
     }
 }
