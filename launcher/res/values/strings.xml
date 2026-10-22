@@ -8,6 +8,7 @@
     <string name="dictionary_name">Dictionary</string>
     <string name="app_unavailable">%1$s is not installed</string>
     <string name="menu_add_program">Add program</string>
+    <string name="menu_move_program">Move program</string>
     <string name="menu_remove_program">Remove program</string>
     <string name="no_programs_to_add">No other programs to add</string>
     <string name="drawer_empty">No programs</string>
