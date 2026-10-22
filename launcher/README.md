@@ -43,6 +43,9 @@ drawer's context menu:
 
 - **Add program** lists every launchable app installed on the device that is
   not already in the drawer. Choosing one appends it to the end of the grid.
+- **Move program** picks up the selected app. The D-pad carries it through the
+  grid, the other apps shifting to make room; the D-pad center key (or Menu) puts
+  it down there, and Back puts it back where it was.
 - **Remove program** removes the currently selected app from the drawer. It does
   not uninstall anything.
 

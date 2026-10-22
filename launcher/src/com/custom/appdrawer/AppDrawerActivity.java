@@ -57,8 +57,8 @@ import java.util.Map;
  * of this process while still allowing Sonim's programmable key UI to launch it.
  *
  * The drawer starts with {@link #DEFAULT_TARGETS}. The Menu key opens a context
- * menu for adding any launchable app or removing the selected one; the resulting
- * list is kept in this app's private preferences.
+ * menu for adding any launchable app, moving the selected one, or removing it;
+ * the resulting list is kept in this app's private preferences.
  */
 public final class AppDrawerActivity extends Activity {
     private static final DefaultTarget[] DEFAULT_TARGETS = {
@@ -77,6 +77,7 @@ public final class AppDrawerActivity extends Activity {
 
     private static final int MENU_ADD = Menu.FIRST;
     private static final int MENU_REMOVE = Menu.FIRST + 1;
+    private static final int MENU_MOVE = Menu.FIRST + 2;
 
     private final List<Target> targets = new ArrayList<>();
 
@@ -104,6 +105,13 @@ public final class AppDrawerActivity extends Activity {
     private GridView grid;
     private AppAdapter adapter;
     private int menuPosition = AdapterView.INVALID_POSITION;
+
+    /**
+     * While an app is being moved, the targets as they were before it was picked
+     * up (restored if the move is cancelled); null otherwise. The moving app is
+     * always the grid's selected item.
+     */
+    private List<Target> targetsBeforeMove;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -136,12 +144,19 @@ public final class AppDrawerActivity extends Activity {
         grid.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                if (isMoving()) {
+                    endMove(true);
+                    return;
+                }
                 launch(adapter.getEntry(position));
             }
         });
         grid.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             @Override
             public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+                if (isMoving()) {
+                    return true;
+                }
                 showProgramMenu(position);
                 return true;
             }
@@ -190,6 +205,10 @@ public final class AppDrawerActivity extends Activity {
     @Override
     protected void onPause() {
         resumed = false;
+        // Leaving mid-move keeps the app where it was carried to.
+        if (isMoving()) {
+            endMove(true);
+        }
         super.onPause();
     }
 
@@ -204,6 +223,45 @@ public final class AppDrawerActivity extends Activity {
         super.onNewIntent(intent);
         setIntent(intent);
         focusFirstApp();
+    }
+
+    /**
+     * While an app is being moved the D-pad carries it instead of moving the
+     * selection; the center key or Menu puts it down and Back puts it back.
+     * Keys are taken here, before the grid sees them.
+     */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (!isMoving()) {
+            return super.dispatchKeyEvent(event);
+        }
+        int keyCode = event.getKeyCode();
+        boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                if (down) moveSelectedBy(-1);
+                return true;
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                if (down) moveSelectedBy(1);
+                return true;
+            case KeyEvent.KEYCODE_DPAD_UP:
+                if (down) moveSelectedBy(-grid.getNumColumns());
+                return true;
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                if (down) moveSelectedBy(grid.getNumColumns());
+                return true;
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_ENTER:
+            case KeyEvent.KEYCODE_MENU:
+                // Drop on release so the key's up event can't also launch or open a menu.
+                if (!down && event.getRepeatCount() == 0) endMove(true);
+                return true;
+            case KeyEvent.KEYCODE_BACK:
+                if (!down) endMove(false);
+                return true;
+            default:
+                return super.dispatchKeyEvent(event);
+        }
     }
 
     @Override
@@ -235,6 +293,9 @@ public final class AppDrawerActivity extends Activity {
             menu.setHeaderTitle(R.string.app_name);
         }
         menu.add(Menu.NONE, MENU_ADD, Menu.NONE, R.string.menu_add_program);
+        if (isValidPosition(menuPosition) && targets.size() > 1) {
+            menu.add(Menu.NONE, MENU_MOVE, Menu.NONE, R.string.menu_move_program);
+        }
         if (isValidPosition(menuPosition)) {
             menu.add(Menu.NONE, MENU_REMOVE, Menu.NONE, R.string.menu_remove_program);
         }
@@ -248,6 +309,9 @@ public final class AppDrawerActivity extends Activity {
                 return true;
             case MENU_REMOVE:
                 removeTarget(menuPosition);
+                return true;
+            case MENU_MOVE:
+                startMove(menuPosition);
                 return true;
             default:
                 return super.onContextItemSelected(item);
@@ -334,6 +398,56 @@ public final class AppDrawerActivity extends Activity {
         selectPosition(Math.min(position, targets.size() - 1));
     }
 
+    private boolean isMoving() {
+        return targetsBeforeMove != null;
+    }
+
+    /** Lifts the app at {@code position} so the D-pad can carry it. */
+    private void startMove(int position) {
+        if (!isValidPosition(position)) {
+            return;
+        }
+        targetsBeforeMove = new ArrayList<>(targets);
+        adapter.setMoving(position);
+        selectPosition(position);
+    }
+
+    /**
+     * Carries the moving app {@code delta} slots along the grid, the apps in
+     * between shifting over to make room. Past either end it stops there.
+     */
+    private void moveSelectedBy(int delta) {
+        int from = adapter.movingPosition;
+        if (!isValidPosition(from)) {
+            return;
+        }
+        int to = Math.max(0, Math.min(targets.size() - 1, from + delta));
+        if (to == from) {
+            return;
+        }
+        targets.add(to, targets.remove(from));
+        adapter.move(from, to);
+        grid.setSelection(to);
+    }
+
+    /** Puts the moving app down, keeping its new place or restoring the old order. */
+    private void endMove(boolean keep) {
+        int position = adapter.movingPosition;
+        if (!keep) {
+            Target moved = isValidPosition(position) ? targets.get(position) : null;
+            targets.clear();
+            targets.addAll(targetsBeforeMove);
+            position = moved == null ? 0 : targets.indexOf(moved);
+        }
+        targetsBeforeMove = null;
+        adapter.setMoving(AdapterView.INVALID_POSITION);
+        if (keep) {
+            saveTargets();
+        }
+        refreshApps();
+        selectPosition(position);
+    }
+
     private int indexOfTarget(String packageName, String className) {
         for (int i = 0; i < targets.size(); i++) {
             Target target = targets.get(i);
@@ -390,6 +504,11 @@ public final class AppDrawerActivity extends Activity {
     }
 
     private void refreshApps() {
+        if (isMoving()) {
+            // A package change mid-move would rebuild the grid under the moving
+            // app; the drop refreshes it anyway.
+            return;
+        }
         PackageManager pm = getPackageManager();
         List<Entry> entries = new ArrayList<>(targets.size());
         for (Target target : targets) {
@@ -526,6 +645,18 @@ public final class AppDrawerActivity extends Activity {
 
     private final class AppAdapter extends BaseAdapter {
         private final List<Entry> entries = new ArrayList<>();
+        int movingPosition = AdapterView.INVALID_POSITION;
+
+        void setMoving(int position) {
+            movingPosition = position;
+            notifyDataSetChanged();
+        }
+
+        void move(int from, int to) {
+            entries.add(to, entries.remove(from));
+            movingPosition = to;
+            notifyDataSetChanged();
+        }
 
         void replace(List<Entry> replacement) {
             entries.clear();
@@ -599,6 +730,11 @@ public final class AppDrawerActivity extends Activity {
             holder.label.setText(entry.label);
             holder.icon.setAlpha(entry.intent == null ? 0.45f : 1.0f);
             holder.label.setAlpha(entry.intent == null ? 0.45f : 1.0f);
+            if (position == movingPosition) {
+                convertView.setBackgroundResource(R.drawable.grid_moving);
+            } else {
+                convertView.setBackgroundColor(Color.TRANSPARENT);
+            }
             return convertView;
         }
     }

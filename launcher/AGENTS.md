@@ -11,8 +11,9 @@ The drawer starts with a default set of applications. Each default entry has an
 explicit package/activity pair and a fallback label in `DEFAULT_TARGETS` in
 `src/com/custom/appdrawer/AppDrawerActivity.java`; user-visible fallback text
 lives in `res/values/strings.xml`. The Menu key opens a native context menu to
-add any launchable app (chosen from a native `AlertDialog` list) or remove the
-selected one; the resulting ordered list, with each entry's last-known label, is
+add any launchable app (chosen from a native `AlertDialog` list), move the
+selected one (the D-pad then carries it; center or Menu drops it, Back cancels),
+or remove it; the resulting ordered list, with each entry's last-known label, is
 persisted as JSON in private `SharedPreferences` and replaces the defaults once
 saved. Missing applications must remain visible as dimmed entries and fail with
 a toast rather than crashing.
@@ -51,7 +52,7 @@ There is no automated test suite. For code or resource changes, run
 `adb install -r AppDrawer.apk` and verify on an XP3800 or equivalent API 27
 device that D-pad focus starts on the first item, navigation and center-key
 launching work, labels/icons render correctly, absent target apps remain
-safe to select, and the Menu key's Add/Remove program actions update and
+safe to select, and the Menu key's Add/Move/Remove program actions update and
 persist the grid.
 
 ## Change conventions
