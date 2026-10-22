@@ -91,22 +91,25 @@ final class WeatherView extends View {
         return SKY + 2 + HOURLY_H + 2 + 21 + days * DAY_H + 6;
     }
 
+    /** Far enough down that the ten days at least start at the top. */
     private float maxScroll() {
-        return Math.max(0, pageHeight() - getHeight() / scale());
+        return Math.max(SKY + 2 + HOURLY_H + 2, pageHeight() - getHeight() / scale());
     }
 
-    /** Down: the sky goes in one step, then three days at a time. */
+    /** Down: the sky goes, then the hours, then three days at a time. */
     boolean scrollDown() {
         float max = maxScroll();
         if (scroll >= max - .5f) return false;
-        float to = scroll < SKY ? SKY : scroll + DAY_H * 3;
+        float days = SKY + 2 + HOURLY_H + 2;
+        float to = scroll < SKY - .5f ? SKY : scroll < days - .5f ? days : scroll + DAY_H * 3;
         animateTo(Math.min(max, to));
         return true;
     }
 
     boolean scrollUp() {
         if (scroll <= 0) return false;
-        float to = scroll <= SKY + .5f ? 0 : Math.max(SKY, scroll - DAY_H * 3);
+        float days = SKY + 2 + HOURLY_H + 2;
+        float to = scroll <= SKY + .5f ? 0 : scroll <= days + .5f ? SKY : Math.max(days, scroll - DAY_H * 3);
         if (to > maxScroll()) to = SKY;
         animateTo(to);
         return true;
@@ -228,7 +231,7 @@ final class WeatherView extends View {
         text.setTypeface(MEDIUM);
         text.setTextSize(9.5f);
         text.setLetterSpacing(0);
-        float lw = text.measureText(m.chip) + 14;
+        float lw = width(m.chip, 9.5f, MEDIUM) + 14;
         Art.rect(c, W - M - lw, 5, lw, 14, 7, Colors.BLUE, 1);
         label(c, W - M - lw / 2, 15.2f, m.chip, 9.5f, MEDIUM, 0xFFFFFFFF, Paint.Align.CENTER);
         // Times and icons.
@@ -396,8 +399,32 @@ final class WeatherView extends View {
         text.setTextSize(size);
         text.setColor(color);
         text.setTextAlign(align);
-        c.drawText(s, x, y, text);
+        if (size < 11 && s.indexOf(' ') >= 0) {
+            // Small text: hinting at mdpi all but closes the gap between
+            // words, so each word is placed by hand.
+            String[] words = s.split(" ");
+            float gap = size * .28f, total = -gap;
+            text.setTextAlign(Paint.Align.LEFT);
+            for (String w : words) total += text.measureText(w) + gap;
+            float at = align == Paint.Align.CENTER ? x - total / 2 : align == Paint.Align.RIGHT ? x - total : x;
+            for (String w : words) {
+                c.drawText(w, at, y, text);
+                at += text.measureText(w) + gap;
+            }
+        } else {
+            c.drawText(s, x, y, text);
+        }
         text.setTextAlign(Paint.Align.LEFT);
+    }
+
+    /** How wide `label` draws `s`. */
+    float width(String s, float size, Typeface face) {
+        text.setTypeface(face);
+        text.setTextSize(size);
+        if (size >= 11 || s.indexOf(' ') < 0) return text.measureText(s);
+        float gap = size * .28f, total = -gap;
+        for (String w : s.split(" ")) total += text.measureText(w) + gap;
+        return total;
     }
 
     /** `s`, shortened with an ellipsis to fit `width`. */
