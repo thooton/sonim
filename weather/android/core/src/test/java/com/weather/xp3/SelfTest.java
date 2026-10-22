@@ -51,6 +51,9 @@ public final class SelfTest {
             check.same("cycles on", Metric.TEMP, Metric.VISIBILITY.next());
             check.same("and back", Metric.VISIBILITY, Metric.TEMP.previous());
             check.same("by name", Metric.UV, Metric.named("UV"));
+            check.same("wind's unit", "Wind · km/h", Metric.WIND.chip(Units.METRIC));
+            check.same("inches say so", "Precip", Metric.PRECIP.chip(Units.US));
+            check.same("plain", "Humidity", Metric.HUMIDITY.chip(Units.US));
             check.same("unknown", Metric.TEMP, Metric.named("nope"));
         });
         check.run("forecast", () -> {

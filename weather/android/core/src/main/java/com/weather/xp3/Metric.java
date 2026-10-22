@@ -29,6 +29,16 @@ public enum Metric {
         this.kind = kind;
     }
 
+    /** The chip's words, with the unit where the values go without one. */
+    public String chip(Units u) {
+        switch (this) {
+            case WIND: return chip + " · " + u.speedUnit();
+            case PRESSURE: return chip + " · " + (u.metric ? "hPa" : "inHg");
+            case PRECIP: return u.metric ? chip + " · mm" : chip;
+            default: return chip;
+        }
+    }
+
     public double value(Forecast.Hour h) {
         switch (this) {
             case TEMP: return h.temp;

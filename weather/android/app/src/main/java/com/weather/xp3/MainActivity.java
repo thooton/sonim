@@ -108,6 +108,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         lp.topMargin = dp(LocationView.FIELD_Y);
         locationLayer.addView(field, lp);
         locationLayer.setVisibility(View.GONE);
+        view.covered = false;
         root.addView(locationLayer, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
 
@@ -358,6 +359,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         field.setText("");
         locationView.selected = -1;
         locationLayer.setVisibility(View.VISIBLE);
+        view.covered = true;
         statusBar(view.theme.bg, !view.theme.dark);
         field.requestFocus();
         search("");
@@ -365,6 +367,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
 
     private void closeLocation() {
         locationLayer.setVisibility(View.GONE);
+        view.covered = false;
         view.requestFocus();
         view.forceStatusBar();
         if (view.forecast == null && place == null) finish();
@@ -466,6 +469,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         sample = null;
         searching++;
         locationLayer.setVisibility(View.GONE);
+        view.covered = false;
         view.requestFocus();
         view.scrollToTop();
         view.offset = 0;

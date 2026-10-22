@@ -325,12 +325,12 @@ const METRICS = {
   feels:  { label: 'Feels like',  short: 'Feels like',    kind: 'line', v: h => h.feels, fmt: v => v + '°', color: v => tempColor(v) },
   pop:    { label: 'Precip chance', short: 'Precip chance', kind: 'bar', v: h => h.pop, max: 100, fmt: v => v + '%', color: () => BLUE },
   precip: { label: 'Precip amount', short: 'Precip',      kind: 'bar', v: h => h.precip, max: .3, fmt: v => v === 0 ? '0"' : v.toFixed(2).replace(/^0/, '') + '"', color: () => BLUE },
-  wind:   { label: 'Wind',        short: 'Wind',          kind: 'wind', v: h => h.wind, fmt: v => v, unit: 'mph' },
+  wind:   { label: 'Wind',        short: 'Wind · mph',          kind: 'wind', v: h => h.wind, fmt: v => v, unit: 'mph' },
   hum:    { label: 'Humidity',    short: 'Humidity',      kind: 'bar', v: h => h.hum, max: 100, fmt: v => v + '%', color: () => '#30d5c8' },
   uv:     { label: 'UV index',    short: 'UV index',      kind: 'bar', v: h => h.uv, max: 11, fmt: v => v, color: v => uvColor(v) },
   cloud:  { label: 'Cloud cover', short: 'Cloud cover',   kind: 'bar', v: h => h.cloud, max: 100, fmt: v => v + '%', color: () => '#8e9aaf' },
   dew:    { label: 'Dew point',   short: 'Dew point',     kind: 'line', v: h => h.dew, fmt: v => v + '°', color: v => tempColor(v) },
-  pres:   { label: 'Pressure',    short: 'Pressure',      kind: 'line', v: h => h.pres, fmt: v => v.toFixed(2), color: () => '#bf5af2' },
+  pres:   { label: 'Pressure',    short: 'Pressure · inHg',      kind: 'line', v: h => h.pres, fmt: v => v.toFixed(2), color: () => '#bf5af2' },
   vis:    { label: 'Visibility',  short: 'Visibility',    kind: 'bar', v: h => h.vis, max: 10, fmt: v => v + 'mi', color: () => '#64d2ff' },
 };
 const METRIC_ORDER = ['temp', 'feels', 'pop', 'precip', 'wind', 'hum', 'uv', 'cloud', 'dew', 'pres', 'vis'];
@@ -346,8 +346,8 @@ function text(x, y, s, o = {}) {
   return `<text ${a.join(' ')}>${s}</text>`;
 }
 
-function statusBar(color, dark) {
-  const c = '#ffffff';
+function statusBar(color, darkIcons) {
+  const c = darkIcons ? '#000000' : '#ffffff';
   return `<rect width="${W}" height="${STATUS}" fill="${color}"/>
     ${text(6, 16, '10:09', { size: 12, fill: c, weight: 500 })}
     <g fill="${c}"><path d="M196,17 l9,-9 v9 z"/><rect x="211" y="8" width="13" height="9" rx="1.5" fill="none" stroke="${c}" stroke-width="1.2"/><rect x="212.6" y="9.6" width="8.4" height="5.8" rx=".6"/><rect x="224.4" y="10.6" width="1.5" height="3.6" rx=".5"/></g>
@@ -426,7 +426,6 @@ function hourly(s, y0, th, metric = 'temp', offset = 0) {
     hs.forEach((h, i) => {
       const cx = M + COLW * i + COLW / 2;
       g += text(cx, 70, h.wind, { size: 12, anchor: 'middle', fill: th.text, weight: 500 });
-      if (i === 0) g += text(cx + 9, 70, 'mph', { size: 8, fill: th.muted });
       g += `<g transform="translate(${cx} 79) rotate(${h.dir + 180})"><path d="M0,-5 L3.6,4 L0,2.2 L-3.6,4 Z" fill="#21d3a0"/></g>`;
     });
   }
@@ -469,7 +468,8 @@ function screen(s, o = {}) {
   g += daily(s, STATUS + SKY + 2 + HOURLY_H + 2, th, 0, 10);
   g += `</g>`;
   // The status bar takes the sky's colour while the sky shows, the page's after.
-  g += statusBar(scroll > SKY - 10 ? (o.theme === 'light' ? '#c7c7cc' : '#000000') : L.card);
+  const paged = scroll > SKY - 10;
+  g += statusBar(paged ? th.bg : L.card, paged && o.theme === 'light');
   if (o.loading) g += loadingBar(L.card);
   if (o.overlay) g += o.overlay(th, s);
   return g + '</svg>';
@@ -500,12 +500,13 @@ function sheet(th, title, rows, sel, opts = {}) {
     if (r.value) g += text(226, y + rowH / 2 + 4.5, esc(r.value), { size: 11.5, anchor: 'end', fill: sub });
     if (r.check) g += `<path d="M${214},${y + rowH / 2} l4,4 l8,-9" fill="none" stroke="${on ? '#fff' : BLUE}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
   });
+  if (opts.more) g += `<rect x="108" y="316" width="24" height="2" rx="1" fill="${th.faint}"/>`;
   return g;
 }
 const GLYPH = {
   pin: c => `<path d="M8,1.5 A5.5,5.5 0 0 0 2.5,7 C2.5,11 8,15 8,15 C8,15 13.5,11 13.5,7 A5.5,5.5 0 0 0 8,1.5 Z" fill="${c}"/><circle cx="8" cy="7" r="2" fill="#fff" opacity=".9"/>`,
   chart: c => `<path d="M1.5,12 L5.5,7 L9,9.5 L14.5,3" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="1" y="13.6" width="14" height="1.6" rx=".8" fill="${c}"/>`,
-  units: c => `<text x="8" y="12.5" text-anchor="middle" font-size="12" font-weight="700" fill="${c}">°</text><circle cx="8" cy="8" r="6.5" fill="none" stroke="${c}" stroke-width="1.6"/>`,
+  units: c => `<circle cx="8" cy="8" r="6.5" fill="none" stroke="${c}" stroke-width="1.6"/><circle cx="6.6" cy="7.2" r="1.6" fill="none" stroke="${c}" stroke-width="1.4"/><path d="M10.2,7.5 V11.2" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`,
   theme: c => `<circle cx="8" cy="8" r="6.5" fill="none" stroke="${c}" stroke-width="1.6"/><path d="M8,1.5 A6.5,6.5 0 0 1 8,14.5 Z" fill="${c}"/>`,
   refresh: c => `<path d="M13,8 A5,5 0 1 1 11.3,4.2" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round"/><path d="M9.6,1.6 L13.6,3.8 L10.4,6.8 Z" fill="${c}"/>`,
 };
@@ -520,13 +521,13 @@ function menuOverlay(sel, theme = 'Dark') {
   ], sel);
 }
 function metricOverlay(sel, current) {
-  return th => sheet(th, 'Hourly data', METRIC_ORDER.slice(0, 8).map(k => ({ label: METRICS[k].label, check: k === current })), sel, { rowH: 24 });
+  return th => sheet(th, 'Hourly data', METRIC_ORDER.slice(0, 9).map(k => ({ label: METRICS[k].label, check: k === current })), sel, { rowH: 24, more: true });
 }
 
 // Location: a field at the top, the places it finds under it.
 function locationOverlay(query, results, sel) {
   return th => {
-    let g = `<rect x="0" y="${STATUS}" width="240" height="${320 - STATUS}" fill="${th.bg}"/>`;
+    let g = `<rect x="0" y="${STATUS}" width="240" height="${320 - STATUS}" fill="${th.bg}"/>` + statusBar(th.bg, th.bg === '#ffffff');
     g += `<rect x="8" y="${STATUS + 8}" width="224" height="30" rx="15" fill="${th.field}" ${sel === -1 ? `stroke="${BLUE}" stroke-width="1.5"` : ''}/>`;
     g += `<g transform="translate(18 ${STATUS + 15}) scale(.95)"><circle cx="6.5" cy="6.5" r="4.8" fill="none" stroke="${th.muted}" stroke-width="1.8"/><path d="M10,10 L14,14" stroke="${th.muted}" stroke-width="1.8" stroke-linecap="round"/></g>`;
     g += query
@@ -579,7 +580,7 @@ const METRIC_FRAMES = [
   ['feels', 'Feels like.'],
   ['pop', 'Precip chance, in CARROT\'s blue.'],
   ['precip', 'Precip amount, inches per hour.'],
-  ['wind', 'Wind: speed and an arrow that points downwind.'],
+  ['wind', 'Wind: speed and an arrow that points downwind; the chip says the unit.'],
   ['hum', 'Humidity.'],
   ['uv', 'UV index, coloured by the UV scale.'],
   ['cloud', 'Cloud cover.'],
@@ -601,7 +602,7 @@ const SECTIONS = [
   { h: 'Menu and location', frames: [
     { svg: screen(MIAMI, { overlay: menuOverlay(0) }), cap: '<b>Menu</b>, on Location. The sheet is headed by where you are.' },
     { svg: screen(MIAMI, { overlay: menuOverlay(1) }), cap: 'On <b>Hourly data</b>, which says what shows now.' },
-    { svg: screen(MIAMI, { overlay: metricOverlay(2, 'temp') }), cap: '<b>Hourly data</b>: Up and Down, OK picks. (It scrolls on to Dew point, Pressure, Visibility.)' },
+    { svg: screen(MIAMI, { overlay: metricOverlay(2, 'temp') }), cap: '<b>Hourly data</b>: Up and Down, OK picks. The mark at the foot says it scrolls on, to Pressure and Visibility.' },
     { svg: screen(MIAMI, { overlay: locationOverlay('', [{ here: true, name: 'Current location', sub: 'Miami, FL' }, { name: 'Seattle, WA', sub: 'Recent' }, { name: 'Jackson, WY', sub: 'Recent' }], -1) }), cap: '<b>Location</b>: type a city or ZIP; the phone\'s own position and recent places under it.' },
     { svg: screen(MIAMI, { overlay: locationOverlay('Portland', [{ name: 'Portland, OR', sub: 'Oregon, United States' }, { name: 'Portland, ME', sub: 'Maine, United States' }, { name: 'Portland', sub: 'Victoria, Australia' }], 0) }), cap: 'Places it found; <b>OK</b> picks one and the forecast follows.' },
   ] },

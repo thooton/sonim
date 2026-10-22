@@ -93,8 +93,7 @@ final class Sheet {
             if (r.value != null) v.label(c, 226, y + rowH / 2 + 4.5f, r.value, 11.5f, WeatherView.regular(), sub, Paint.Align.RIGHT);
             if (r.check) Art.stroke(c, "M214," + (y + rowH / 2) + " l4,4 l8,-9", on ? 0xFFFFFFFF : Colors.BLUE, 2, 1);
         }
-        // More below or above: a fade says so.
-        if (first > 0) Art.rect(c, 108, y0 + 30, 24, 2, 1, th.faint, 1);
+        // More below: a mark at the foot says so.
         if (first + shown < rows.size()) Art.rect(c, 108, height - 4, 24, 2, 1, th.faint, 1);
     }
 
