@@ -1,0 +1,20 @@
+plugins {
+    id "com.android.application"
+}
+
+apply from: rootProject.file("gradle/app.gradle")
+
+android {
+    namespace "com.weather.xp3"
+
+    defaultConfig {
+        applicationId "com.weather.xp3"
+        versionCode 1
+        versionName "0.1.0"
+    }
+}
+
+dependencies {
+    implementation project(":weather:core")
+    implementation project(":common:ui")
+}

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CARROT's day sky in a rounded square: the sun over a cloud, and the
+     hills along the foot. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#0077F8" android:pathData="M10,2 H38 A8,8 0 0 1 46,10 V38 A8,8 0 0 1 38,46 H10 A8,8 0 0 1 2,38 V10 A8,8 0 0 1 10,2 Z" />
+    <path android:fillColor="#3FE0B3" android:pathData="M2,34 C10,31 16,36 24,37 C32,38 38,32 46,30 V38 A8,8 0 0 1 38,46 H10 A8,8 0 0 1 2,38 Z" />
+    <group android:translateX="21" android:translateY="15">
+        <group android:rotation="0">
+            <path android:fillColor="#F79402" android:pathData="M-6.5,-7.4 H6.5 A0.9,0.9 0 0 1 7.4,-6.5 V6.5 A0.9,0.9 0 0 1 6.5,7.4 H-6.5 A0.9,0.9 0 0 1 -7.4,6.5 V-6.5 A0.9,0.9 0 0 1 -6.5,-7.4 Z" />
+        </group>
+        <group android:rotation="45">
+            <path android:fillColor="#F79402" android:pathData="M-6.5,-7.4 H6.5 A0.9,0.9 0 0 1 7.4,-6.5 V6.5 A0.9,0.9 0 0 1 6.5,7.4 H-6.5 A0.9,0.9 0 0 1 -7.4,6.5 V-6.5 A0.9,0.9 0 0 1 -6.5,-7.4 Z" />
+        </group>
+        <path android:fillColor="#FFED00" android:pathData="M-5.8,0 A5.8,5.8 0 1 0 5.8,0 A5.8,5.8 0 1 0 -5.8,0 Z" />
+    </group>
+    <group android:translateX="11" android:translateY="13" android:scaleX="0.9" android:scaleY="0.9">
+        <path android:fillColor="#00CFFF" android:pathData="M8.5,27 L24.5,27 A6.5,6.5 0 0 0 25.6,14.1 A9,9 0 0 0 8.4,15.4 A5.8,5.8 0 0 0 8.5,27 Z" />
+    </group>
+</vector>
