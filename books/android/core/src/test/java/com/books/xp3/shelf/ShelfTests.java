@@ -68,6 +68,14 @@ public final class ShelfTests {
             for (Shelf.Entry e : changed) if (e.path.equals(zed)) entry = e;
             check.ok("changed file is new", entry != null && entry.isNew());
 
+            // A deleted book leaves the shelf and its index.
+            String alpha = new File(books, "alpha.txt").getAbsolutePath();
+            again.progress(alpha, 5, 100, 4000);
+            again.remove(alpha);
+            check.ok("removed", again.get(alpha) == null);
+            check.ok("saved without it", again.save());
+            check.ok("not read back", new Shelf(state).get(alpha) == null);
+
             write(new File(state, "shelf.tsv"), "garbage\n");
             check.same("damaged index is empty", 0, new Shelf(state).books().size());
         } finally {

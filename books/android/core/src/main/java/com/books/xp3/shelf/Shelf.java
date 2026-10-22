@@ -244,6 +244,11 @@ public final class Shelf {
         entry.opened = 0;
     }
 
+    /** Takes a book off the shelf, place and all: its file has been deleted. */
+    public synchronized void remove(String path) {
+        entries.remove(path);
+    }
+
     // ------------------------------------------------------------------
     // The index file
     // ------------------------------------------------------------------

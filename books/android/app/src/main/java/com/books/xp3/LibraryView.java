@@ -47,6 +47,8 @@ final class LibraryView extends View {
     private int scroll;
     private String message;
     private String detail;
+    /** A line in the header, in place of the book count: what the last action did. */
+    private String notice;
 
     final int coverWidth;
     final int coverHeight;
@@ -107,6 +109,16 @@ final class LibraryView extends View {
         invalidate();
     }
 
+    /** Shows `notice` in the header until it is replaced or cleared with null. */
+    void setNotice(String notice) {
+        this.notice = notice;
+        invalidate();
+    }
+
+    String notice() {
+        return notice;
+    }
+
     boolean hasBooks() {
         return !books.isEmpty() && message == null;
     }
@@ -164,7 +176,14 @@ final class LibraryView extends View {
         text.setTextSize(dp(22));
         text.setColor(colorLabel);
         canvas.drawText("Library", pad, dp(30), text);
-        if (hasBooks()) {
+        if (notice != null) {
+            float left = pad + text.measureText("Library") + dp(12);
+            text.setTypeface(regular);
+            text.setTextSize(dp(11));
+            text.setColor(colorAccent);
+            String line = TextUtils.ellipsize(notice, text, width - pad - left, TextUtils.TruncateAt.END).toString();
+            canvas.drawText(line, width - pad - text.measureText(line), dp(29), text);
+        } else if (hasBooks()) {
             text.setTypeface(regular);
             text.setTextSize(dp(11));
             text.setColor(colorSecondary);

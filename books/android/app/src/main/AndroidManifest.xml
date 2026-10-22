@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Storage, to find books where a file manager or a USB cable puts them
-         (Books, Download, Documents, an SD card); asked for on first launch.
+         (the Books folders of the phone and the SD card); asked for on first
+         launch. Writing, to delete a book and to save one converted to MOBI
+         beside it; asked for the first time either is chosen.
          No network: the app has no INTERNET permission. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 

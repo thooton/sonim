@@ -4,7 +4,8 @@ A dependency-free e-book reader for the Sonim XP3, styled after Apple Books in
 dark mode. A sibling of `../list`, `../music` and the rest, under the same
 constraints: 240x320 mdpi, d-pad driven, no AndroidX or third-party libraries,
 `:core` plain Java `--release 8` running on API 27. No network: the manifest
-asks only for READ_EXTERNAL_STORAGE.
+asks only for READ_EXTERNAL_STORAGE, and WRITE_EXTERNAL_STORAGE for deleting
+a book and saving one converted to MOBI.
 
 ## Layout
 
@@ -15,7 +16,12 @@ asks only for READ_EXTERNAL_STORAGE.
     (container, OPF, spine, nav or NCX contents, cover), `PlainText`
     (Gutenberg header/footer, paragraph and heading detection, UTF-8 else
     Windows-1252), and `Book` (chapters cut into `Section`s and the contents
-    resolved to offsets).
+    resolved to offsets). `Mobi` writes an EPUB as a Mobipocket 6 file for a
+    Kindle (spine joined into one HTML, markup cut down, links as `filepos`,
+    a contents page and guide, images as records, EXTH metadata and cover),
+    with its text records packed by `PalmDoc`. `MobiTests` reads the file
+    back as a reader would; check header changes against KindleUnpack too
+    (`pip install mobi`, then `mobi.extract`).
   - `shelf/Shelf`: scans the folders it is given for books, caches title and
     author, and keeps reading positions in `shelf.tsv` in the app's private
     files. The library gives it only `Books` at the top of internal storage
@@ -26,7 +32,9 @@ asks only for READ_EXTERNAL_STORAGE.
   `Covers` (thumbnails cached in the cache dir), `ReaderActivity` (loading,
   layouts, keys, the settings sheet and contents), `Pages` (one section as a
   StaticLayout cut into pages), `PageView` (draws a page and the OK overlay),
-  `ListPanel` (the drawn sheet and contents list), `Fonts`, `Settings`.
+  `ListPanel` (the drawn sheet and contents list), `Fonts`, `Settings`,
+  `KindleImages` (images readied for MOBI: small JPEGs and GIFs kept, the
+  rest redrawn as JPEG under 127 KB).
 
 ## How reading works
 
@@ -56,7 +64,12 @@ asks only for READ_EXTERNAL_STORAGE.
   release never lands on something that has just opened.
 - The library's Menu is an action sheet drawn with `ListPanel`, not the
   platform's context menu as in `../list`: the popup is its own window, which
-  Night Shift's filter would miss.
+  Night Shift's filter would miss. Delete asks first, on a second sheet with
+  Cancel focused. What an action did (Deleted, Converting…, Saved X.mobi) is
+  a notice in the library's header (`LibraryView.setNotice`), not a toast.
+- Converting writes `<name>.mobi` beside the EPUB, through a hidden `.part`
+  file renamed into place, on its own worker, one book at a time. The
+  library does not list MOBIs.
 
 ## Build and validation
 

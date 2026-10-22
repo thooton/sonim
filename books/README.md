@@ -12,6 +12,12 @@ adb push "Some Book.epub" /sdcard/Books/
 
 The library finds them the next time it opens, with their covers, the book you read last at the top.
 
+## Deleting and converting
+
+**Delete Book** in the library's Menu erases the book's file from the phone (it asks first, with Cancel chosen), and its place with it.
+
+**Convert to MOBI** (EPUBs only) saves a MOBI beside the book, under the same name, for a Kindle: `Books/Some Book.epub` becomes `Books/Some Book.mobi`. Converting again replaces it. The header says *Converting…* while it works and *Saved Some Book.mobi* when done. The text keeps its headings, italics, bold, lists, tables and links; the contents become a contents page the Kindle's Go To menu finds; the cover and pictures come along, PNGs and very large pictures redrawn as JPEGs a Kindle accepts. The library itself doesn't list MOBIs.
+
 ## Keys
 
 In the library:
@@ -20,7 +26,7 @@ In the library:
 | --- | --- |
 | Up / Down | Choose a book (Left / Right jump five) |
 | OK | Open it |
-| Menu | Mark as unread or finished, look for new books |
+| Menu | Mark as unread or finished, convert to MOBI, delete the book, look for new books |
 
 Reading:
 

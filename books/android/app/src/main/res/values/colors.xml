@@ -12,6 +12,8 @@
     <color name="label_secondary">#8E8E93</color>
     <color name="label_tertiary">#5A5A5E</color>
     <color name="accent">#FF9F0A</color>
+    <!-- iOS's dark-mode red, for Delete. -->
+    <color name="destructive">#FF453A</color>
     <color name="switch_off">#39393D</color>
 
     <!-- The page. Text is a soft white rather than pure white, which glares

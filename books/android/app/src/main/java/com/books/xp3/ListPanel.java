@@ -44,6 +44,8 @@ final class ListPanel extends View {
         int depth;
         /** Drawn in the accent colour: the contents entry being read. */
         boolean current;
+        /** Drawn in red: an action that cannot be undone. */
+        boolean destructive;
 
         Row(int id, int kind, String title) {
             this.id = id;
@@ -85,6 +87,7 @@ final class ListPanel extends View {
     private final int colorSecondary;
     private final int colorTertiary;
     private final int colorAccent;
+    private final int colorDestructive;
     private final int colorSwitchOff;
 
     ListPanel(Context context) {
@@ -101,6 +104,7 @@ final class ListPanel extends View {
         colorSecondary = color(R.color.label_secondary);
         colorTertiary = color(R.color.label_tertiary);
         colorAccent = color(R.color.accent);
+        colorDestructive = color(R.color.destructive);
         colorSwitchOff = color(R.color.switch_off);
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeCap(Paint.Cap.ROUND);
@@ -317,7 +321,7 @@ final class ListPanel extends View {
         int left = pad + row.depth * dp(10);
         text.setTypeface(row.face != null ? row.face : regular);
         text.setTextSize(dp(row.face != null ? 14 : 13));
-        text.setColor(row.current ? colorAccent : colorLabel);
+        text.setColor(row.current ? colorAccent : row.destructive ? colorDestructive : colorLabel);
         canvas.drawText(ellipsize(row.title, right - left - dp(6)), left, baseline, text);
     }
 
