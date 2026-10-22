@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weather mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #e9e9ee;
+    --ink: #1c1c1e;
+    --muted: #6c6c70;
+    --rule: #d1d1d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --page: #111113; --ink: #f2f2f7; --muted: #98989f; --rule: #2c2c2e; }
+  }
+  :root[data-theme="dark"] { --page: #111113; --ink: #f2f2f7; --muted: #98989f; --rule: #2c2c2e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 Roboto, system-ui, sans-serif; }
+  header.page { max-width: 1180px; margin: 0 auto; padding: 28px 16px 8px; }
+  header.page h1 { font-size: 22px; font-weight: 500; margin: 0 0 6px; }
+  header.page p { margin: 0 0 8px; color: var(--muted); max-width: 760px; }
+  .zoom { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; }
+  .zoom button { font: inherit; border: 1px solid var(--rule); background: none; color: var(--ink); border-radius: 6px; padding: 2px 9px; cursor: pointer; }
+  .zoom button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
+  section { max-width: 1180px; margin: 0 auto; padding: 8px 16px 18px; }
+  section h2 { font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 12px; border-top: 1px solid var(--rule); padding-top: 14px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 22px 18px; }
+  figure { margin: 0; }
+  figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; max-width: calc(240px * var(--z, 1.5)); }
+  figcaption b { color: var(--ink); font-weight: 500; }
+  .screen { width: calc(240px * var(--z, 1.5)); height: calc(320px * var(--z, 1.5)); border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.18); background: #000; }
+  .screen svg { display: block; width: 100%; height: 100%; }
+  .keys { font-size: 12px; color: var(--muted); }
+  .keys table { border-collapse: collapse; }
+  .keys td { padding: 3px 14px 3px 0; vertical-align: top; }
+  .keys td:first-child { color: var(--ink); white-space: nowrap; font-weight: 500; }
+  @media (max-width: 520px) { .screen, figcaption { --z: 1.25; } }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Weather for the Sonim XP3</h1>
+  <p>Mockups at the XP3's 240×320 (mdpi, 1 dp = 1 px), drawn in CARROT's colours: each condition gets CARROT's card colour, sky effect, scenery palette and icon colours. The scene runs edge to edge with no margin; the forecasts below sit straight on the page with a side margin and no cards. Every frame here is drawn by the same layout code, so the numbers in it are the app's.</p>
+  <div class="zoom">Zoom
+    <button data-z="1">1×</button><button data-z="1.5" aria-pressed="true">1.5×</button><button data-z="2">2×</button>
+  </div>
+</header>
+<main id="root"></main>
+<section class="keys">
+  <h2>Keys</h2>
+  <table>
+    <tr><td>Menu (left soft key)</td><td>Opens the menu: Location, Hourly data, Units, Theme, Refresh.</td></tr>
+    <tr><td>Up / Down</td><td>Scroll the page: the scene, then the hourly forecast, then ten days.</td></tr>
+    <tr><td>Left / Right</td><td>Scroll the hourly forecast through the next 48 hours.</td></tr>
+    <tr><td>* and #</td><td>Previous and next hourly data (Temp, Feels like, Precip chance…), as the iOS chips do.</td></tr>
+    <tr><td>OK</td><td>Refresh.</td></tr>
+    <tr><td>Back (right soft key)</td><td>Close the menu or dialog; otherwise leave the app.</td></tr>
+  </table>
+</section>
+
+<script>
+// ---------------------------------------------------------------------------
+// Palette: CARROT's own values, read from the Android app (2.5.2).
+// ---------------------------------------------------------------------------
+const CARD = {
+  day: '#0077f8', dayCloudy: '#0045a3', night: '#001986', rainy: '#001986',
+  snow: '#61a3de', fog: '#44c5ee', wind: '#0045a2',
+};
+// Scenery palettes, one per scene, in CARROT's layer order.
+const SCENERY = {
+  day:   { far: '#00cfff', farA: .3, mid: '#2ca2ff', house: '#fffee3', lamp: '#2ca2ff', low: '#02bbcc', front: '#3fe0b3', crown: '#1ca3a4', trunk: '#3fe0b3', spot: '#3fe0b3', dot: '#ffffff', dot2: '#fffa00', smoke: '#2ca2ff' },
+  night: { far: '#1b54ae', farA: 1,  mid: '#9013fe', house: '#fffee3', lamp: '#9013fe', low: '#03a1bd', front: '#0be0c4', crown: '#9013fe', trunk: '#0b3e84', spot: '#ff00fe', dot: '#ffffff', dot2: '#fffa00', smoke: '#9013fe' },
+  rain:  { far: '#00cfff', farA: .3, mid: '#0090f2', house: '#fffee3', lamp: '#0090f2', low: '#02b1c1', front: '#63fee8', crown: '#1c68a4', trunk: '#63fee8', spot: '#63fee8', dot: '#ffffff', dot2: '#fffa00', smoke: '#0090f2' },
+  snow:  { far: '#b8d7f6', farA: .3, mid: '#326ac7', house: '#fffee3', lamp: '#326ac7', low: '#b8d7f6', front: '#e4eeff', crown: '#00adff', trunk: '#0649b9', spot: '#0649b9', dot: '#b8d7f6', dot2: '#b8d7f6', smoke: '#326ac7' },
+  fog:   { far: '#2a9ecc', farA: .3, mid: '#23a0d2', house: '#308cc7', lamp: '#308cc7', low: '#308cc7', front: '#308cc7', crown: '#308cc7', trunk: '#308cc7', spot: '#308cc7', dot: null, dot2: null, smoke: '#308cc7', bars: '#85dcf2' },
+};
+// CARROT's temperature scale (°F), -60 to 130 in tens.
+const TEMP_SCALE = [
+  [-60,'#8a01c1'],[-50,'#6f027d'],[-40,'#a50099'],[-30,'#ec02dd'],[-20,'#f589ff'],[-10,'#d3a6ff'],
+  [0,'#9348ed'],[10,'#6f5bf0'],[20,'#9bc6ff'],[30,'#18a5fc'],[40,'#0cb1cc'],[50,'#68fc57'],
+  [60,'#f7d505'],[70,'#e06f00'],[80,'#f23400'],[90,'#d64600'],[100,'#c70003'],[110,'#d3064e'],
+  [120,'#ff539b'],[130,'#ffcbb0'],
+];
+const BLUE = '#0b84fe';           // CARROT's BLUE: precipitation, selection
+const THEMES = {
+  dark:  { bg: '#000000', text: '#ffffff', muted: '#8e8e93', faint: '#636366', rule: '#2c2c2e', track: '#2c2c2e', sheet: '#1c1c1e', field: '#2c2c2e' },
+  light: { bg: '#ffffff', text: '#000000', muted: '#8e8e93', faint: '#aeaeb2', rule: '#f0f0f0', track: '#e5e5ea', sheet: '#ffffff', field: '#efeff2' },
+};
+
+function tempColor(f) {
+  if (f <= TEMP_SCALE[0][0]) return TEMP_SCALE[0][1];
+  for (let i = 1; i < TEMP_SCALE.length; i++) {
+    const [t1, c1] = TEMP_SCALE[i];
+    if (f <= t1) {
+      const [t0, c0] = TEMP_SCALE[i - 1];
+      return mix(c0, c1, (f - t0) / (t1 - t0));
+    }
+  }
+  return TEMP_SCALE[TEMP_SCALE.length - 1][1];
+}
+function mix(a, b, t) {
+  const p = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+
+// ---------------------------------------------------------------------------
+// Icons, drawn for this app in CARROT's manner: flat shapes, no outlines.
+// Every icon is in a 32×32 box.
+// ---------------------------------------------------------------------------
+const CLOUD = 'M8.5,27 L24.5,27 A6.5,6.5 0 0 0 25.6,14.1 A9,9 0 0 0 8.4,15.4 A5.8,5.8 0 0 0 8.5,27 Z';
+const MOON = 'M17.5,4.2 A12,12 0 1 0 28.8,20.6 A9.6,9.6 0 0 1 17.5,4.2 Z';
+const DROP = 'M16,3 C16,3 6.5,14.6 6.5,20.3 A9.5,9.5 0 0 0 25.5,20.3 C25.5,14.6 16,3 16,3 Z';
+const BOLT = 'M19.5,2.5 L7.5,18.2 L15,18.2 L12.2,29.5 L24.8,12.8 L17.2,12.8 Z';
+function sunShape(cx, cy, r) {
+  // An eight-point burst (two rounded squares) round a yellow disc.
+  const s = r * 1.42;
+  return `<g transform="translate(${cx} ${cy})">
+    <rect x="${-s / 2}" y="${-s / 2}" width="${s}" height="${s}" rx="${r * .16}" fill="#f79402"/>
+    <rect x="${-s / 2}" y="${-s / 2}" width="${s}" height="${s}" rx="${r * .16}" fill="#f79402" transform="rotate(45)"/>
+    <circle r="${r * .56}" fill="#ffed00"/></g>`;
+}
+function snowflake(color) {
+  let g = `<g stroke="${color}" stroke-width="2.6" stroke-linecap="round" fill="${color}">`;
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3 - Math.PI / 2, x = 16 + Math.cos(a) * 10.5, y = 16 + Math.sin(a) * 10.5;
+    g += `<line x1="16" y1="16" x2="${x.toFixed(2)}" y2="${y.toFixed(2)}"/><circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.6" stroke="none"/>`;
+  }
+  return g + `<circle cx="16" cy="16" r="3.4" stroke="none"/></g>`;
+}
+const ICON = {
+  'clear-day': () => sunShape(16, 16, 12.5),
+  'clear-night': () => `<path d="${MOON}" fill="#d445ff"/><path d="M25,4.5v6M22,7.5h6" stroke="#00ffcc" stroke-width="1.8" stroke-linecap="round"/><path d="M28.5,12.2v3.6M26.7,14h3.6" stroke="#00cfff" stroke-width="1.5" stroke-linecap="round"/>`,
+  'partly-cloudy-day': () => sunShape(20.5, 11.5, 9.2) + `<g transform="translate(-3.2 3) scale(.86)"><path d="${CLOUD}" fill="#00cfff"/></g>`,
+  'partly-cloudy-night': () => `<g transform="translate(9 -1.5) scale(.62)"><path d="${MOON}" fill="#d445ff"/></g><g transform="translate(-3.2 3) scale(.86)"><path d="${CLOUD}" fill="#9013fe"/></g>`,
+  'cloudy-day': () => sunShape(23.5, 9, 6.6) + `<path d="${CLOUD}" fill="#00cfff" transform="translate(-1 0)"/>`,
+  'cloudy-night': () => `<path d="${CLOUD}" fill="#9013fe"/>`,
+  'rain': () => `<path d="${DROP}" fill="#007aff"/>`,
+  'snow': (onSky) => snowflake(onSky ? '#ffffff' : '#007aff'),
+  'sleet': (onSky) => `<g transform="translate(-4 2) scale(.72)"><path d="${DROP}" fill="#007aff"/></g><g transform="translate(13 9) scale(.58)">${snowflake(onSky ? '#ffffff' : '#007aff')}</g>`,
+  'thunderstorm': () => `<path d="${BOLT}" fill="#f7b500"/>`,
+  'fog': () => `<g fill="#d0d0d0"><rect x="3" y="7" width="15" height="4.2" rx="2.1"/><rect x="21" y="7" width="7" height="4.2" rx="2.1"/><rect x="7" y="14" width="22" height="4.2" rx="2.1"/><rect x="3" y="21" width="9" height="4.2" rx="2.1"/><rect x="15" y="21" width="12" height="4.2" rx="2.1"/></g>`,
+  'wind': () => `<g fill="none" stroke="#21d3a0" stroke-width="2.6" stroke-linecap="round"><path d="M3,12.5 H20.5 A4,4 0 1 0 16.5,8.5"/><path d="M3,18.5 H25 A3.6,3.6 0 1 1 21.4,22.1"/><path d="M7,24.5 H14"/></g>`,
+};
+function icon(name, x, y, size, onSky) {
+  return `<g transform="translate(${x} ${y}) scale(${size / 32})">${ICON[name](onSky)}</g>`;
+}
+
+// ---------------------------------------------------------------------------
+// The sky's weather effect, in CARROT's colours, over the card.
+// ---------------------------------------------------------------------------
+function rnd(seed) { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+function effect(kind, w, h) {
+  const r = rnd(7);
+  let g = '';
+  if (kind === 'clouds-day' || kind === 'clouds-night') {
+    // CARROT's partly cloudy: rows of rounded dashes drifting across.
+    const c = kind === 'clouds-day' ? '#0a93ff' : '#5e10cf';
+    const rows = [[8, 7], [22, 5], [38, 6], [54, 4]];
+    for (const [y, n] of rows) {
+      let x = -10 + r() * 30;
+      for (let i = 0; i < n && x < w; i++) {
+        const len = 10 + r() * 28;
+        g += `<rect x="${x.toFixed(1)}" y="${y}" width="${len.toFixed(1)}" height="5" rx="2.5" fill="${c}"/>`;
+        if (r() > .55) g += `<rect x="${(x + len + 4).toFixed(1)}" y="${y}" width="5" height="5" rx="2.5" fill="${c}"/>`;
+        x += len + 18 + r() * 34;
+      }
+    }
+  } else if (kind === 'overcast-day' || kind === 'overcast-night') {
+    // A scalloped cloud deck along the top.
+    const c = kind === 'overcast-day' ? '#0a93ff' : '#5e0fcf';
+    let d = `M0,0 H${w} V12`;
+    for (let x = w; x > 0; x -= 24) d += ` A13,9 0 0 1 ${x - 24},12`;
+    g += `<path d="${d} Z" fill="${c}" opacity=".55"/>`;
+    d = `M0,0 H${w} V5`;
+    for (let x = w + 8; x > -20; x -= 30) d += ` A16,10 0 0 1 ${x - 30},5`;
+    g += `<path d="${d} V0 Z" fill="${c}"/>`;
+  } else if (kind === 'rain') {
+    for (let i = 0; i < 46; i++) {
+      const x = r() * w, y = r() * h - 10, len = 10 + r() * 16, a = .1 + r() * .22;
+      g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="1.2" height="${len.toFixed(1)}" rx=".6" fill="#00aefd" opacity="${a.toFixed(2)}"/>`;
+    }
+  } else if (kind === 'snow') {
+    for (let i = 0; i < 38; i++) {
+      const x = r() * w, y = r() * h, s = .9 + r() * 1.8;
+      g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${s.toFixed(1)}" fill="#d7e4fb" opacity="${(.45 + r() * .55).toFixed(2)}"/>`;
+    }
+  } else if (kind === 'stars') {
+    for (let i = 0; i < 40; i++) {
+      const x = r() * w, y = r() * h * .8, s = .4 + r() * .9;
+      g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${s.toFixed(1)}" fill="#f5f2f8" opacity="${(.4 + r() * .6).toFixed(2)}"/>`;
+    }
+    g += `<path d="M206,18v5M203.5,20.5h5M30,46v4M28,48h4" stroke="#ff00fe" stroke-width="1.2" stroke-linecap="round" opacity=".8"/>`;
+  } else if (kind === 'wind') {
+    for (let i = 0; i < 9; i++) {
+      const x = r() * w - 30, y = 6 + r() * (h - 50), len = 30 + r() * 60;
+      g += `<path d="M${x.toFixed(1)},${y.toFixed(1)} h${len.toFixed(1)} q8,0 8,-6" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" opacity="${(.12 + r() * .2).toFixed(2)}"/>`;
+    }
+  } else if (kind === 'fog') {
+    // Fog lies on the scenery, drawn with it.
+  }
+  return g;
+}
+
+// ---------------------------------------------------------------------------
+// The scenery: hills, a lighthouse, an observatory, a tree and a bush.
+// Drawn for a 240-wide screen, 44 high, along the foot of the sky.
+// ---------------------------------------------------------------------------
+function scenery(name, w, y0) {
+  const p = SCENERY[name];
+  const H = 44;
+  // Drawn 240 wide and scaled up by a quarter about the middle, so the
+  // lighthouse fills more of the screen and the lighthouse reads at arm's length.
+  let g = `<g transform="translate(-30 ${y0}) scale(1.25)">`;
+  // Far hills.
+  g += `<path d="M0,14 C30,6 58,8 84,15 C104,20 122,19 142,13 C168,6 200,4 240,12 L240,${H} L0,${H} Z" fill="${p.far}" opacity="${p.farA}"/>`;
+  // Middle hills, with little pines on them.
+  g += `<path d="M0,24 C22,19 44,19 66,24 C82,28 96,27 110,22 C132,15 152,17 172,23 C196,30 218,26 240,20 L240,${H} L0,${H} Z" fill="${p.mid}" opacity=".7"/>`;
+  for (const [x, y] of [[74, 24], [80, 25.5], [172, 22.5], [178, 24], [167, 25]]) {
+    g += `<path d="M${x},${y - 5} L${x + 2.6},${y} L${x - 2.6},${y} Z" fill="${p.mid}"/>`;
+  }
+  // The observatory and its mast.
+  g += `<rect x="95" y="17" width="2" height="15" fill="${p.house}"/>`;
+  for (const yy of [20, 24, 28]) g += `<rect x="94" y="${yy}" width="4" height="1.3" fill="${p.mid}"/>`;
+  g += `<path d="M101,31 A6.5,6.5 0 0 1 114,31 Z" fill="${p.house}"/><rect x="99.5" y="30.5" width="16" height="2.6" rx="1" fill="${p.house}"/>`;
+  g += `<rect x="107" y="25.4" width="1.4" height="3.2" fill="${p.mid}" transform="rotate(-30 107.7 27)"/>`;
+  g += `<rect x="119" y="30.2" width="5" height="3" rx="1.2" fill="${p.house}"/>`;
+  // The lighthouse.
+  g += `<path d="M128.8,33.5 L131.8,19.6 L138.2,19.6 L141.2,33.5 Z" fill="${p.house}"/>`;
+  g += `<rect x="130.6" y="23.4" width="8.8" height="1.6" fill="${p.mid}" opacity=".9"/>`;
+  g += `<rect x="130.8" y="17.4" width="8.4" height="2.6" rx=".8" fill="${p.house}"/>`;
+  g += `<path d="M131.8,17.6 A3.2,3.2 0 0 1 138.2,17.6 Z" fill="${p.lamp}"/>`;
+  g += `<circle cx="137.4" cy="10.6" r="1.5" fill="${p.smoke}"/><circle cx="140.2" cy="6.2" r="1" fill="${p.smoke}" opacity=".8"/>`;
+  // Lower hill, then the near hills either side.
+  g += `<path d="M0,36 C40,33 80,32 120,33.5 C160,35 200,34 240,31 L240,${H} L0,${H} Z" fill="${p.low}"/>`;
+  g += `<path d="M0,8 C16,9 30,16 44,24 C60,33 78,38 104,40 C120,41 150,41 172,37 C194,33 206,22 222,16 C230,13 236,12 240,12 L240,${H} L0,${H} Z" fill="${p.front}"/>`;
+  // Tree on the left hill.
+  g += `<rect x="38.4" y="17" width="1.6" height="12" rx=".8" fill="${p.trunk}"/>`;
+  g += `<path d="M39,24 L36,21.5" stroke="${p.trunk}" stroke-width="1.3" stroke-linecap="round"/>`;
+  g += `<circle cx="39.2" cy="14.4" r="6.2" fill="${p.crown}"/>`;
+  g += `<circle cx="38" cy="12.6" r="1" fill="${p.spot}"/><circle cx="41.4" cy="15" r=".9" fill="${p.spot}"/>`;
+  // Bush on the right hill.
+  g += `<path d="M188,29 A4.2,4.2 0 0 1 193,23.2 A5.6,5.6 0 0 1 203.4,23.6 A4.4,4.4 0 0 1 208.6,29 Z" fill="${p.crown}"/>`;
+  g += `<circle cx="194.4" cy="26" r=".9" fill="${p.spot}"/><circle cx="199.4" cy="23.6" r=".9" fill="${p.spot}"/><circle cx="202.6" cy="27" r=".9" fill="${p.spot}"/>`;
+  // Flowers in the grass.
+  if (p.dot) {
+    const dots = [[30, 21, 1], [50, 26, 0], [27, 25, 2], [54, 31, 1], [34, 30, 1], [39, 31.6, 1], [44, 33, 2], [176, 38, 1], [181, 37.4, 2], [186, 38.6, 1], [200, 34, 1], [206, 33, 2], [212, 27, 1], [214, 31, 1]];
+    for (const [x, y, k] of dots) g += `<circle cx="${x}" cy="${y}" r=".95" fill="${k === 2 ? p.dot2 : p.dot}"/>`;
+  }
+  // Fog: banks of mist across the scene.
+  if (p.bars) {
+    for (const [x, y, l] of [[6, 22, 52], [72, 22, 22], [104, 22, 74], [196, 22, 40], [0, 29, 18], [40, 29, 46], [126, 29, 58], [214, 29, 26], [16, 36, 40], [70, 36, 66], [168, 36, 50]]) {
+      g += `<rect x="${x}" y="${y}" width="${l}" height="3.4" rx="1.7" fill="${p.bars}" opacity=".45"/>`;
+    }
+  }
+  return g + '</g>';
+}
+
+// ---------------------------------------------------------------------------
+// A condition's look: card colour, effect, scenery and icon, as CARROT maps
+// them.
+// ---------------------------------------------------------------------------
+function look(cond) {
+  switch (cond) {
+    case 'clear-day':           return { card: CARD.day,       fx: null,             scene: 'day',   status: CARD.day };
+    case 'partly-cloudy-day':   return { card: CARD.day,       fx: 'clouds-day',     scene: 'day' };
+    case 'cloudy-day':          return { card: CARD.dayCloudy, fx: 'overcast-day',   scene: 'day' };
+    case 'clear-night':         return { card: CARD.night,     fx: 'stars',          scene: 'night' };
+    case 'partly-cloudy-night': return { card: CARD.night,     fx: 'clouds-night',   scene: 'night' };
+    case 'cloudy-night':        return { card: CARD.night,     fx: 'overcast-night', scene: 'night' };
+    case 'rain': case 'thunderstorm':
+                                return { card: CARD.rainy,     fx: 'rain',           scene: 'rain' };
+    case 'snow': case 'sleet':  return { card: CARD.snow,      fx: 'snow',           scene: 'snow' };
+    case 'fog':                 return { card: CARD.fog,       fx: 'fog',            scene: 'fog' };
+    case 'wind':                return { card: CARD.wind,      fx: 'wind',           scene: 'day' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sample forecasts.
+// ---------------------------------------------------------------------------
+const HOURS = ['10', '11', '12', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const AMPM =  ['AM', 'AM', 'PM', 'PM', 'PM', 'PM', 'PM', 'PM', 'PM', 'PM', 'PM', 'PM'];
+function hours(base, conds, opts = {}) {
+  const t = opts.t || [0, 3, 5, 7, 8, 9, 8, 6, 3, 0, -2, -4];
+  return HOURS.map((h, i) => ({
+    h, ap: AMPM[i], cond: conds[Math.min(i, conds.length - 1)],
+    temp: base + t[i], feels: base + t[i] + (opts.feelsOff ?? 3) - (i > 6 ? 2 : 0),
+    pop: (opts.pop || [0, 0, 5, 10, 10, 20, 30, 20, 10, 5, 0, 0])[i],
+    precip: (opts.precip || [0, 0, 0, 0, 0, .02, .05, .02, 0, 0, 0, 0])[i],
+    wind: (opts.wind || [6, 8, 9, 11, 12, 13, 12, 10, 8, 7, 6, 5])[i], gust: 0,
+    dir: (opts.dir || [80, 90, 100, 110, 120, 130, 140, 150, 160, 160, 170, 180])[i],
+    hum: (opts.hum || [72, 68, 63, 58, 55, 53, 55, 60, 66, 71, 75, 78])[i],
+    uv: (opts.uv || [5, 7, 8, 9, 9, 8, 6, 4, 2, 1, 0, 0])[i],
+    cloud: (opts.cloud || [10, 10, 20, 30, 35, 40, 35, 30, 20, 10, 5, 5])[i],
+    dew: base - 12 + Math.round(t[i] / 3),
+    pres: [30.02, 30.02, 30.01, 30.0, 29.98, 29.97, 29.96, 29.96, 29.97, 29.98, 29.99, 30.0][i],
+    vis: [10, 10, 10, 10, 9, 8, 7, 8, 10, 10, 10, 10][i],
+  }));
+}
+const DAYS = ['FRI', 'SAT', 'SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+function days(spec) {
+  return spec.map(([cond, lo, hi, pop], i) => ({ d: i === 0 ? 'TODAY' : DAYS[i], cond, lo, hi, pop }));
+}
+
+const MIAMI = {
+  city: 'Miami, FL', cond: 'clear-day', temp: 86, feels: 91,
+  hours: hours(83, ['clear-day', 'clear-day', 'partly-cloudy-day', 'partly-cloudy-day', 'clear-day', 'clear-day', 'partly-cloudy-day', 'clear-day', 'clear-day', 'clear-night', 'clear-night', 'clear-night']),
+  days: days([['clear-day', 76, 90, 10], ['partly-cloudy-day', 77, 89, 20], ['rain', 76, 86, 60], ['thunderstorm', 75, 84, 70], ['partly-cloudy-day', 75, 87, 20], ['clear-day', 76, 88, 0], ['clear-day', 77, 89, 0], ['cloudy-day', 76, 87, 10], ['partly-cloudy-day', 75, 86, 10], ['clear-day', 75, 88, 0]]),
+};
+
+// ---------------------------------------------------------------------------
+// Layout. Everything is in px at 240×320; 1 dp = 1 px on the XP3.
+// ---------------------------------------------------------------------------
+const W = 240, STATUS = 24, SKY = 148;
+const M = 8;                       // side margin of the forecasts
+const COLS = 6, COLW = (W - 2 * M) / COLS;
+const HOURLY_H = 88, DAY_H = 19;
+
+const METRICS = {
+  temp:   { label: 'Temperature', short: 'Temp',          kind: 'line', v: h => h.temp,  fmt: v => v + '°', color: v => tempColor(v) },
+  feels:  { label: 'Feels like',  short: 'Feels like',    kind: 'line', v: h => h.feels, fmt: v => v + '°', color: v => tempColor(v) },
+  pop:    { label: 'Precip chance', short: 'Precip chance', kind: 'bar', v: h => h.pop, max: 100, fmt: v => v + '%', color: () => BLUE },
+  precip: { label: 'Precip amount', short: 'Precip',      kind: 'bar', v: h => h.precip, max: .3, fmt: v => v === 0 ? '0"' : v.toFixed(2).replace(/^0/, '') + '"', color: () => BLUE },
+  wind:   { label: 'Wind',        short: 'Wind',          kind: 'wind', v: h => h.wind, fmt: v => v, unit: 'mph' },
+  hum:    { label: 'Humidity',    short: 'Humidity',      kind: 'bar', v: h => h.hum, max: 100, fmt: v => v + '%', color: () => '#30d5c8' },
+  uv:     { label: 'UV index',    short: 'UV index',      kind: 'bar', v: h => h.uv, max: 11, fmt: v => v, color: v => uvColor(v) },
+  cloud:  { label: 'Cloud cover', short: 'Cloud cover',   kind: 'bar', v: h => h.cloud, max: 100, fmt: v => v + '%', color: () => '#8e9aaf' },
+  dew:    { label: 'Dew point',   short: 'Dew point',     kind: 'line', v: h => h.dew, fmt: v => v + '°', color: v => tempColor(v) },
+  pres:   { label: 'Pressure',    short: 'Pressure',      kind: 'line', v: h => h.pres, fmt: v => v.toFixed(2), color: () => '#bf5af2' },
+  vis:    { label: 'Visibility',  short: 'Visibility',    kind: 'bar', v: h => h.vis, max: 10, fmt: v => v + 'mi', color: () => '#64d2ff' },
+};
+const METRIC_ORDER = ['temp', 'feels', 'pop', 'precip', 'wind', 'hum', 'uv', 'cloud', 'dew', 'pres', 'vis'];
+function uvColor(v) { return v < 3 ? '#34c759' : v < 6 ? '#ffcc00' : v < 8 ? '#ff9500' : v < 11 ? '#ff3b30' : '#af52de'; }
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+function text(x, y, s, o = {}) {
+  const a = [`x="${x}"`, `y="${y}"`, `font-size="${o.size || 11}"`, `fill="${o.fill || '#fff'}"`];
+  if (o.weight) a.push(`font-weight="${o.weight}"`);
+  if (o.anchor) a.push(`text-anchor="${o.anchor}"`);
+  if (o.ls) a.push(`letter-spacing="${o.ls}"`);
+  if (o.op) a.push(`opacity="${o.op}"`);
+  return `<text ${a.join(' ')}>${s}</text>`;
+}
+
+function statusBar(color, dark) {
+  const c = '#ffffff';
+  return `<rect width="${W}" height="${STATUS}" fill="${color}"/>
+    ${text(6, 16, '10:09', { size: 12, fill: c, weight: 500 })}
+    <g fill="${c}"><path d="M196,17 l9,-9 v9 z"/><rect x="211" y="8" width="13" height="9" rx="1.5" fill="none" stroke="${c}" stroke-width="1.2"/><rect x="212.6" y="9.6" width="8.4" height="5.8" rx=".6"/><rect x="224.4" y="10.6" width="1.5" height="3.6" rx=".5"/></g>
+    <path d="M182,10.5 a9,9 0 0 1 12,0 M184.3,13 a5.6,5.6 0 0 1 7.4,0" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/><circle cx="188" cy="15.8" r="1.3" fill="${c}"/>`;
+}
+
+// The sky: city, icon, temperature, feels like, scenery.
+function sky(s, y0) {
+  const L = look(s.cond);
+  let g = `<g transform="translate(0 ${y0})"><rect width="${W}" height="${SKY}" fill="${L.card}"/>`;
+  if (L.fx) g += effect(L.fx, W, SKY - 36);
+  // City, centred, CARROT's bold 16sp scaled to the XP3.
+  g += text(W / 2, 19, esc(s.city), { size: 14, weight: 500, anchor: 'middle' });
+  // Icon and temperature side by side, centred as one group.
+  const tw = String(s.temp).length * 25 + 14;            // Roboto Light 46px digits are ~25px
+  const iw = 50, gap = 12, total = iw + gap + tw;
+  const ix = (W - total) / 2;
+  g += icon(s.cond, ix, 30, iw, true);
+  g += text(ix + iw + gap - 2, 70, `${s.temp}°`, { size: 46, weight: 300 });
+  g += text(ix + iw + gap, 86, `Feels ${s.feels}°`, { size: 11, op: .85 });
+  g += scenery(L.scene, W, SKY - 55);
+  return g + '</g>';
+}
+
+function hourly(s, y0, th, metric = 'temp', offset = 0) {
+  const m = METRICS[metric];
+  const hs = s.hours.slice(offset, offset + COLS);
+  let g = `<g transform="translate(0 ${y0})">`;
+  // Header: what this is on the left, which data on the right.
+  g += text(M, 15, 'HOURLY FORECAST', { size: 9.5, weight: 500, fill: th.muted, ls: .3 });
+  const lw = m.short.length * 5.6 + 14;
+  g += `<rect x="${W - M - lw}" y="5" width="${lw}" height="14" rx="7" fill="${BLUE}"/>`;
+  g += text(W - M - lw / 2, 15.2, m.short, { size: 9.5, weight: 500, anchor: 'middle' });
+  // Times, icons.
+  hs.forEach((h, i) => {
+    const cx = M + COLW * i + COLW / 2;
+    g += `<text x="${cx}" y="34" text-anchor="middle" font-size="10.5" fill="${th.text}">${h.h}<tspan font-size="7.5" dx="0.5">${h.ap}</tspan></text>`;
+    g += icon(h.cond, cx - 8, 39, 16, false);
+  });
+  // The data: a line through the values, or bars under them.
+  const top = 62, bottom = 84;
+  const vals = s.hours.map(m.v);
+  if (m.kind === 'line') {
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    const yOf = v => hi === lo ? (top + bottom) / 2 + 4 : bottom - (v - lo) / (hi - lo) * (bottom - top - 4);
+    // Extend the line half a column past each edge, as the iOS chart does.
+    const pts = [];
+    const first = Math.max(0, offset - 1), last = Math.min(s.hours.length - 1, offset + COLS);
+    for (let i = first; i <= last; i++) pts.push([M + COLW * (i - offset) + COLW / 2, yOf(vals[i]), vals[i]]);
+    const gid = `g${Math.random().toString(36).slice(2, 8)}`;
+    g += `<defs><linearGradient id="${gid}" x1="0" x2="1">${pts.map((p, k) => `<stop offset="${(k / (pts.length - 1)).toFixed(3)}" stop-color="${m.color(p[2])}"/>`).join('')}</linearGradient>
+      <clipPath id="c${gid}"><rect x="0" y="0" width="${W}" height="100"/></clipPath></defs>`;
+    let d = '';
+    pts.forEach((p, k) => {
+      if (k === 0) d = `M${p[0]},${p[1].toFixed(1)}`;
+      else {
+        const q = pts[k - 1], mx = (q[0] + p[0]) / 2;
+        d += ` C${mx},${q[1].toFixed(1)} ${mx},${p[1].toFixed(1)} ${p[0]},${p[1].toFixed(1)}`;
+      }
+    });
+    g += `<path d="${d}" fill="none" stroke="url(#${gid})" stroke-width="2.2" stroke-linecap="round" clip-path="url(#c${gid})"/>`;
+    hs.forEach((h, i) => {
+      const cx = M + COLW * i + COLW / 2, v = m.v(h), y = yOf(v);
+      g += `<circle cx="${cx}" cy="${y.toFixed(1)}" r="2.4" fill="${th.bg}" stroke="${m.color(v)}" stroke-width="1.6"/>`;
+      g += text(cx, (y - 5).toFixed(1), m.fmt(v), { size: 10.5, anchor: 'middle', fill: th.text, weight: 500 });
+    });
+  } else if (m.kind === 'bar') {
+    hs.forEach((h, i) => {
+      const cx = M + COLW * i + COLW / 2, v = m.v(h);
+      const bh = Math.max(2, Math.min(1, v / m.max) * 16);
+      g += `<rect x="${cx - 7}" y="${bottom - 16}" width="14" height="16" rx="2" fill="${th.track}"/>`;
+      g += `<rect x="${cx - 7}" y="${(bottom - bh).toFixed(1)}" width="14" height="${bh.toFixed(1)}" rx="2" fill="${m.color(v)}"/>`;
+      g += text(cx, bottom - 20, m.fmt(v), { size: 10.5, anchor: 'middle', fill: th.text, weight: 500 });
+    });
+  } else if (m.kind === 'wind') {
+    hs.forEach((h, i) => {
+      const cx = M + COLW * i + COLW / 2;
+      g += text(cx, 70, h.wind, { size: 12, anchor: 'middle', fill: th.text, weight: 500 });
+      if (i === 0) g += text(cx + 9, 70, 'mph', { size: 8, fill: th.muted });
+      g += `<g transform="translate(${cx} 79) rotate(${h.dir + 180})"><path d="M0,-5 L3.6,4 L0,2.2 L-3.6,4 Z" fill="#21d3a0"/></g>`;
+    });
+  }
+  return g + '</g>';
+}
+
+function daily(s, y0, th, from = 0, count = 10) {
+  const all = s.days;
+  const wlo = Math.min(...all.map(d => d.lo)), whi = Math.max(...all.map(d => d.hi));
+  let g = `<g transform="translate(0 ${y0})">`;
+  g += `<line x1="${M}" x2="${W - M}" y1="0.5" y2="0.5" stroke="${th.rule}"/>`;
+  g += text(M, 15, 'DAILY FORECAST', { size: 9.5, weight: 500, fill: th.muted, ls: .3 });
+  const bx0 = 122, bx1 = 196;
+  all.slice(from, from + count).forEach((d, k) => {
+    const y = 21 + k * DAY_H, mid = y + DAY_H / 2;
+    g += text(M, mid + 4, d.d, { size: 10.5, weight: 500, fill: th.text, ls: .2 });
+    g += icon(d.cond, 52, mid - 8, 16, false);
+    if (d.pop >= 20) g += text(71, mid + 3.5, d.pop + '%', { size: 9, fill: BLUE, weight: 500 });
+    g += text(bx0 - 5, mid + 4, d.lo + '°', { size: 11, anchor: 'end', fill: th.muted });
+    g += `<rect x="${bx0}" y="${mid - 2}" width="${bx1 - bx0}" height="4" rx="2" fill="${th.track}"/>`;
+    const a = bx0 + (d.lo - wlo) / (whi - wlo) * (bx1 - bx0), b = bx0 + (d.hi - wlo) / (whi - wlo) * (bx1 - bx0);
+    const gid = `d${Math.random().toString(36).slice(2, 8)}`;
+    g += `<defs><linearGradient id="${gid}" x1="0" x2="1"><stop offset="0" stop-color="${tempColor(d.lo)}"/><stop offset="1" stop-color="${tempColor(d.hi)}"/></linearGradient></defs>`;
+    g += `<rect x="${a.toFixed(1)}" y="${mid - 2}" width="${Math.max(4, b - a).toFixed(1)}" height="4" rx="2" fill="url(#${gid})"/>`;
+    g += text(W - M, mid + 4, d.hi + '°', { size: 11, anchor: 'end', fill: th.text, weight: 500 });
+  });
+  return g + '</g>';
+}
+
+// A whole screen. scroll moves the page up, as Down does.
+function screen(s, o = {}) {
+  const th = THEMES[o.theme || 'dark'];
+  const L = look(s.cond);
+  const scroll = o.scroll || 0;
+  let g = `<svg viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" font-family="Roboto, sans-serif">`;
+  g += `<rect width="240" height="320" fill="${th.bg}"/>`;
+  g += `<g transform="translate(0 ${-scroll})">`;
+  g += sky(s, STATUS);
+  g += hourly(s, STATUS + SKY + 2, th, o.metric || 'temp', o.offset || 0);
+  g += daily(s, STATUS + SKY + 2 + HOURLY_H + 2, th, 0, 10);
+  g += `</g>`;
+  // The status bar takes the sky's colour while the sky shows, the page's after.
+  g += statusBar(scroll > SKY - 10 ? (o.theme === 'light' ? '#c7c7cc' : '#000000') : L.card);
+  if (o.loading) g += loadingBar(L.card);
+  if (o.overlay) g += o.overlay(th, s);
+  return g + '</svg>';
+}
+
+function loadingBar() {
+  return `<rect x="0" y="${STATUS}" width="240" height="2" fill="#ffffff" opacity=".25"/><rect x="60" y="${STATUS}" width="80" height="2" fill="#ffffff"/>`;
+}
+
+// The menu: a sheet from the foot of the screen, CARROT's blue on the item
+// under the d-pad.
+function sheet(th, title, rows, sel, opts = {}) {
+  const rowH = opts.rowH || 26;
+  const h = 34 + rows.length * rowH + 6;
+  const y0 = 320 - h;
+  let g = `<rect width="240" height="320" fill="#000" opacity=".45"/>`;
+  g += `<path d="M0,${y0 + 12} A12,12 0 0 1 12,${y0} H228 A12,12 0 0 1 240,${y0 + 12} V320 H0 Z" fill="${th.sheet}"/>`;
+  g += `<rect x="108" y="${y0 + 6}" width="24" height="3" rx="1.5" fill="${th.faint}"/>`;
+  g += text(14, y0 + 27, title, { size: 13, weight: 500, fill: th.text });
+  rows.forEach((r, i) => {
+    const y = y0 + 34 + i * rowH;
+    const on = i === sel;
+    if (on) g += `<rect x="6" y="${y}" width="228" height="${rowH}" rx="8" fill="${BLUE}"/>`;
+    const fg = on ? '#ffffff' : th.text, sub = on ? 'rgba(255,255,255,.8)' : th.muted;
+    let x = 14;
+    if (r.icon) { g += `<g transform="translate(14 ${y + rowH / 2 - 8})">${r.icon(on ? '#ffffff' : BLUE)}</g>`; x = 38; }
+    g += text(x, y + rowH / 2 + 4.5, esc(r.label), { size: 12.5, fill: fg });
+    if (r.value) g += text(226, y + rowH / 2 + 4.5, esc(r.value), { size: 11.5, anchor: 'end', fill: sub });
+    if (r.check) g += `<path d="M${214},${y + rowH / 2} l4,4 l8,-9" fill="none" stroke="${on ? '#fff' : BLUE}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  });
+  return g;
+}
+const GLYPH = {
+  pin: c => `<path d="M8,1.5 A5.5,5.5 0 0 0 2.5,7 C2.5,11 8,15 8,15 C8,15 13.5,11 13.5,7 A5.5,5.5 0 0 0 8,1.5 Z" fill="${c}"/><circle cx="8" cy="7" r="2" fill="#fff" opacity=".9"/>`,
+  chart: c => `<path d="M1.5,12 L5.5,7 L9,9.5 L14.5,3" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="1" y="13.6" width="14" height="1.6" rx=".8" fill="${c}"/>`,
+  units: c => `<text x="8" y="12.5" text-anchor="middle" font-size="12" font-weight="700" fill="${c}">°</text><circle cx="8" cy="8" r="6.5" fill="none" stroke="${c}" stroke-width="1.6"/>`,
+  theme: c => `<circle cx="8" cy="8" r="6.5" fill="none" stroke="${c}" stroke-width="1.6"/><path d="M8,1.5 A6.5,6.5 0 0 1 8,14.5 Z" fill="${c}"/>`,
+  refresh: c => `<path d="M13,8 A5,5 0 1 1 11.3,4.2" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round"/><path d="M9.6,1.6 L13.6,3.8 L10.4,6.8 Z" fill="${c}"/>`,
+};
+
+function menuOverlay(sel, theme = 'Dark') {
+  return th => sheet(th, 'Miami, FL', [
+    { icon: GLYPH.pin, label: 'Location' },
+    { icon: GLYPH.chart, label: 'Hourly data', value: 'Temp' },
+    { icon: GLYPH.units, label: 'Units', value: '°F, mph' },
+    { icon: GLYPH.theme, label: 'Theme', value: theme },
+    { icon: GLYPH.refresh, label: 'Refresh' },
+  ], sel);
+}
+function metricOverlay(sel, current) {
+  return th => sheet(th, 'Hourly data', METRIC_ORDER.slice(0, 8).map(k => ({ label: METRICS[k].label, check: k === current })), sel, { rowH: 24 });
+}
+
+// Location: a field at the top, the places it finds under it.
+function locationOverlay(query, results, sel) {
+  return th => {
+    let g = `<rect x="0" y="${STATUS}" width="240" height="${320 - STATUS}" fill="${th.bg}"/>`;
+    g += `<rect x="8" y="${STATUS + 8}" width="224" height="30" rx="15" fill="${th.field}" ${sel === -1 ? `stroke="${BLUE}" stroke-width="1.5"` : ''}/>`;
+    g += `<g transform="translate(18 ${STATUS + 15}) scale(.95)"><circle cx="6.5" cy="6.5" r="4.8" fill="none" stroke="${th.muted}" stroke-width="1.8"/><path d="M10,10 L14,14" stroke="${th.muted}" stroke-width="1.8" stroke-linecap="round"/></g>`;
+    g += query
+      ? text(38, STATUS + 27, esc(query), { size: 13, fill: th.text }) + (sel === -1 ? `<rect x="${38 + query.length * 6.6}" y="${STATUS + 16}" width="1.4" height="14" fill="${BLUE}"/>` : '')
+      : text(38, STATUS + 27, 'City or ZIP code', { size: 13, fill: th.muted });
+    results.forEach((r, i) => {
+      const y = STATUS + 46 + i * 40, on = i === sel;
+      if (on) g += `<rect x="6" y="${y}" width="228" height="38" rx="8" fill="${BLUE}"/>`;
+      g += `<g transform="translate(14 ${y + 11})">${(r.here ? GLYPH.pin : GLYPH.pin)(on ? '#fff' : (r.here ? BLUE : th.faint))}</g>`;
+      g += text(38, y + 16, esc(r.name), { size: 13, fill: on ? '#fff' : th.text, weight: 500 });
+      g += text(38, y + 30, esc(r.sub), { size: 10.5, fill: on ? 'rgba(255,255,255,.8)' : th.muted });
+      if (!on && i < results.length - 1) g += `<line x1="38" x2="232" y1="${y + 39}" y2="${y + 39}" stroke="${th.rule}"/>`;
+    });
+    return g;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The frames.
+// ---------------------------------------------------------------------------
+function variant(base, patch) {
+  const v = Object.assign({}, base, patch);
+  if (!patch.days) {
+    // Ten days round the city's temperature, starting with its own weather.
+    const day = c => c.replace('-night', '-day').replace('clear-day', 'clear-day');
+    const seq = [day(v.cond), day(v.cond), 'partly-cloudy-day', 'cloudy-day', 'rain', 'partly-cloudy-day', 'clear-day', 'clear-day', 'cloudy-day', 'partly-cloudy-day'];
+    const sw = [0, -3, 2, 4, -2, -5, 1, 3, 0, -1];
+    const pop = { rain: 80, thunderstorm: 70, snow: 70, sleet: 60, 'cloudy-day': 10, fog: 10 };
+    v.days = days(seq.map((c, i) => [c, v.temp - 10 + sw[i], v.temp + 4 + sw[i] + (i % 3), pop[c] || 0]));
+  }
+  return v;
+}
+const H = (base, cond, conds, opts) => hours(base, conds || [cond], opts);
+
+const CONDITIONS = [
+  { t: 'Clear, day', s: MIAMI, note: 'Card <b>#0077F8</b>, day scenery, no sky effect.' },
+  { t: 'Partly cloudy, day', s: variant(MIAMI, { city: 'San Diego, CA', cond: 'partly-cloudy-day', temp: 72, feels: 72, hours: H(70, 'partly-cloudy-day', ['partly-cloudy-day', 'partly-cloudy-day', 'clear-day', 'clear-day', 'partly-cloudy-day', 'partly-cloudy-day', 'clear-day', 'clear-night'], { t: [0, 1, 2, 3, 3, 2, 1, -1, -3, -5, -6, -7] }) }), note: 'Card <b>#0077F8</b>, rows of <b>#0A93FF</b> cloud dashes.' },
+  { t: 'Mostly cloudy, day', s: variant(MIAMI, { city: 'Portland, OR', cond: 'cloudy-day', temp: 58, feels: 56, hours: H(56, 'cloudy-day', ['cloudy-day'], { t: [0, 1, 2, 2, 3, 2, 1, 0, -1, -2, -3, -3], feelsOff: -2 }) }), note: 'Card <b>#0045A3</b>, a <b>#0A93FF</b> cloud deck along the top.' },
+  { t: 'Rain', s: variant(MIAMI, { city: 'Seattle, WA', cond: 'rain', temp: 44, feels: 41, hours: H(43, 'rain', ['rain', 'rain', 'rain', 'rain', 'cloudy-day', 'cloudy-day'], { t: [0, 0, 1, 1, 2, 2, 1, 0, 0, -1, -1, -2], feelsOff: -3, pop: [90, 90, 80, 70, 50, 40, 30, 30, 40, 50, 60, 60], precip: [.12, .09, .06, .04, .02, .01, 0, 0, .01, .03, .05, .06] }) }), note: 'Card <b>#001986</b>, <b>#00AEFD</b> rain, rain scenery.' },
+  { t: 'Thunderstorm', s: variant(MIAMI, { city: 'Tampa, FL', cond: 'thunderstorm', temp: 79, feels: 84, hours: H(79, 'thunderstorm', ['thunderstorm', 'thunderstorm', 'rain', 'rain', 'cloudy-day', 'partly-cloudy-day'], { t: [0, -1, -2, -2, -1, 0, 1, 1, 0, -1, -2, -3] }) }), note: 'As rain, with CARROT\'s <b>#F7B500</b> bolt.' },
+  { t: 'Snow', s: variant(MIAMI, { city: 'Jackson, WY', cond: 'snow', temp: 24, feels: 15, hours: H(24, 'snow', ['snow'], { t: [0, 0, -1, -2, -3, -3, -4, -5, -5, -6, -6, -7], feelsOff: -9 }) }), note: 'Card <b>#61A3DE</b>, <b>#D7E4FB</b> snow, snowy scenery, a white flake.' },
+  { t: 'Fog', s: variant(MIAMI, { city: 'San Francisco, CA', cond: 'fog', temp: 57, feels: 57, hours: H(57, 'fog', ['fog', 'fog', 'fog', 'cloudy-day', 'partly-cloudy-day', 'partly-cloudy-day'], { t: [0, 1, 2, 3, 4, 4, 3, 2, 0, -1, -2, -2], feelsOff: 0 }) }), note: 'Card <b>#44C5EE</b>, the scene sunk in <b>#85DCF2</b> mist.' },
+  { t: 'Windy', s: variant(MIAMI, { city: 'Chicago, IL', cond: 'wind', temp: 61, feels: 55, hours: H(61, 'wind', ['wind', 'wind', 'wind', 'partly-cloudy-day'], { t: [0, 1, 1, 2, 2, 1, 0, -1, -2, -3, -4, -5], feelsOff: -6 }) }), note: 'Card <b>#0045A2</b>, white gusts.' },
+  { t: 'Clear, night', s: variant(MIAMI, { city: 'New York, NY', cond: 'clear-night', temp: 37, feels: 33, hours: H(37, 'clear-night', ['clear-night'], { t: [0, -1, -1, -2, -2, -3, -3, -4, -4, -3, -2, 0], feelsOff: -4 }) }), note: 'Card <b>#001986</b>, stars, night scenery in <b>#9013FE</b>.' },
+  { t: 'Partly cloudy, night', s: variant(MIAMI, { city: 'Denver, CO', cond: 'partly-cloudy-night', temp: 48, feels: 46, hours: H(48, 'partly-cloudy-night', ['partly-cloudy-night', 'partly-cloudy-night', 'clear-night'], { t: [0, -1, -2, -3, -4, -5, -6, -6, -7, -6, -4, -1] }) }), note: 'Card <b>#001986</b>, <b>#5E10CF</b> cloud dashes.' },
+];
+
+const METRIC_FRAMES = [
+  ['temp', 'Temperature: the line takes CARROT\'s temperature colours.'],
+  ['feels', 'Feels like.'],
+  ['pop', 'Precip chance, in CARROT\'s blue.'],
+  ['precip', 'Precip amount, inches per hour.'],
+  ['wind', 'Wind: speed and an arrow that points downwind.'],
+  ['hum', 'Humidity.'],
+  ['uv', 'UV index, coloured by the UV scale.'],
+  ['cloud', 'Cloud cover.'],
+  ['dew', 'Dew point.'],
+  ['pres', 'Pressure, inHg.'],
+  ['vis', 'Visibility, miles.'],
+];
+
+const RAINY = CONDITIONS[3].s;
+const SECTIONS = [
+  { h: 'Conditions', frames: CONDITIONS.map(c => ({ svg: screen(c.s), cap: `<b>${c.t}</b>. ${c.note}` })) },
+  { h: 'Hourly data (Menu → Hourly data, or * and #)', frames: METRIC_FRAMES.map(([k, cap]) => ({ svg: screen(RAINY, { metric: k }), cap: `<b>${METRICS[k].label}</b>. ${cap}` })) },
+  { h: 'Moving around', frames: [
+    { svg: screen(MIAMI, { offset: 6 }), cap: '<b>Right</b> scrolls the hours on: 4 PM to 9 PM.' },
+    { svg: screen(MIAMI, { scroll: SKY }), cap: '<b>Down</b> scrolls the page: the sky goes, the hours and ten days stay.' },
+    { svg: screen(MIAMI, { scroll: SKY + HOURLY_H + 2, metric: 'pop' }), cap: '<b>Down</b> again, precip chance showing.' },
+    { svg: screen(MIAMI, { loading: true }), cap: '<b>Refreshing</b>: a thin bar under the status bar; the old forecast stays.' },
+  ] },
+  { h: 'Menu and location', frames: [
+    { svg: screen(MIAMI, { overlay: menuOverlay(0) }), cap: '<b>Menu</b>, on Location. The sheet is headed by where you are.' },
+    { svg: screen(MIAMI, { overlay: menuOverlay(1) }), cap: 'On <b>Hourly data</b>, which says what shows now.' },
+    { svg: screen(MIAMI, { overlay: metricOverlay(2, 'temp') }), cap: '<b>Hourly data</b>: Up and Down, OK picks. (It scrolls on to Dew point, Pressure, Visibility.)' },
+    { svg: screen(MIAMI, { overlay: locationOverlay('', [{ here: true, name: 'Current location', sub: 'Miami, FL' }, { name: 'Seattle, WA', sub: 'Recent' }, { name: 'Jackson, WY', sub: 'Recent' }], -1) }), cap: '<b>Location</b>: type a city or ZIP; the phone\'s own position and recent places under it.' },
+    { svg: screen(MIAMI, { overlay: locationOverlay('Portland', [{ name: 'Portland, OR', sub: 'Oregon, United States' }, { name: 'Portland, ME', sub: 'Maine, United States' }, { name: 'Portland', sub: 'Victoria, Australia' }], 0) }), cap: 'Places it found; <b>OK</b> picks one and the forecast follows.' },
+  ] },
+  { h: 'Light theme', frames: [
+    { svg: screen(MIAMI, { theme: 'light' }), cap: '<b>Light</b>, CARROT\'s light mode: black on white under the sky.' },
+    { svg: screen(CONDITIONS[8].s, { theme: 'light' }), cap: 'Night sky over the light page.' },
+    { svg: screen(MIAMI, { theme: 'light', overlay: menuOverlay(3, 'Light') }), cap: 'The menu in light.' },
+  ] },
+];
+
+const root = document.getElementById('root');
+root.innerHTML = SECTIONS.map(sec => `<section><h2>${sec.h}</h2><div class="grid">${sec.frames.map(f => `<figure><div class="screen">${f.svg}</div><figcaption>${f.cap}</figcaption></figure>`).join('')}</div></section>`).join('');
+
+for (const b of document.querySelectorAll('.zoom button')) {
+  b.onclick = () => {
+    document.documentElement.style.setProperty('--z', b.dataset.z);
+    for (const o of document.querySelectorAll('.zoom button')) o.setAttribute('aria-pressed', o === b);
+  };
+}
+</script>
+</body>
+</html>
