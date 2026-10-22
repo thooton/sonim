@@ -91,7 +91,7 @@ public final class Epub {
     // The package document
     // ------------------------------------------------------------------
 
-    private static final class Item {
+    static final class Item {
         final String id;
         final String path;
         final String type;
@@ -109,9 +109,11 @@ public final class Epub {
         }
     }
 
-    private static final class Package {
+    static final class Package {
         String title;
         String author;
+        /** The book's dc:language, as written; null if it has none. */
+        String language;
         String coverId;
         String ncxId;
         final Map<String, Item> manifest = new HashMap<String, Item>();
@@ -141,7 +143,7 @@ public final class Epub {
         }
     }
 
-    private static Package readPackage(ZipFile zip) throws IOException {
+    static Package readPackage(ZipFile zip) throws IOException {
         String opfPath = null;
         byte[] container = bytes(zip, "META-INF/container.xml");
         if (container != null) {
@@ -170,7 +172,7 @@ public final class Epub {
         while (markup.next()) {
             if (markup.type == Markup.START) {
                 String name = markup.name;
-                if ("title".equals(name) || "creator".equals(name)) {
+                if ("title".equals(name) || "creator".equals(name) || "language".equals(name)) {
                     reading = name;
                     value.setLength(0);
                 } else if ("meta".equals(name)) {
@@ -198,6 +200,7 @@ public final class Epub {
                 if (found.length() > 0) {
                     if ("title".equals(reading) && pkg.title == null) pkg.title = found;
                     if ("creator".equals(reading) && pkg.author == null) pkg.author = found;
+                    if ("language".equals(reading) && pkg.language == null) pkg.language = found;
                 }
                 reading = null;
             }
@@ -217,7 +220,7 @@ public final class Epub {
     // Contents
     // ------------------------------------------------------------------
 
-    private static List<Book.Link> contents(ZipFile zip, Package pkg, Map<String, Integer> byPath)
+    static List<Book.Link> contents(ZipFile zip, Package pkg, Map<String, Integer> byPath)
         throws IOException {
         List<Book.Link> links = new ArrayList<Book.Link>();
         Item nav = pkg.nav();
@@ -336,7 +339,7 @@ public final class Epub {
     // Paths, entries and text
     // ------------------------------------------------------------------
 
-    private static ZipFile open(File file) throws IOException {
+    static ZipFile open(File file) throws IOException {
         try {
             return new ZipFile(file);
         } catch (IOException e) {
@@ -370,7 +373,7 @@ public final class Epub {
         return out.toString();
     }
 
-    private static String decode(String href) {
+    static String decode(String href) {
         if (href.indexOf('%') < 0) return href;
         try {
             return URLDecoder.decode(href.replace("+", "%2B"), "UTF-8");
@@ -400,7 +403,7 @@ public final class Epub {
     }
 
     /** An entry's bytes, or null if it is missing or too large. */
-    private static byte[] bytes(ZipFile zip, String path) throws IOException {
+    static byte[] bytes(ZipFile zip, String path) throws IOException {
         ZipEntry entry = find(zip, path);
         if (entry == null || entry.isDirectory()) return null;
         InputStream in = zip.getInputStream(entry);

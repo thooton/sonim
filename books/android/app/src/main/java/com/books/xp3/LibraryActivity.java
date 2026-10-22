@@ -1,9 +1,11 @@
 package com.books.xp3;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.media.MediaScannerConnection;
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.Gravity;
@@ -12,29 +14,40 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import com.books.xp3.book.Mobi;
 import com.books.xp3.shelf.Shelf;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 
 /**
  * The library: every .epub and .txt in the Books folder of the phone and of
  * its SD card, the book last read first.
  *
- * Keys: Up and Down choose, OK opens, Menu marks a book read or unread or
- * looks for new books.
+ * Keys: Up and Down choose, OK opens, Menu marks a book read or unread,
+ * converts an EPUB to MOBI, deletes a book, or looks for new books.
  */
 public final class LibraryActivity extends BaseActivity implements ListPanel.Listener {
 
     private static final int ASK_STORAGE = 1;
+    private static final int ASK_WRITE = 2;
     private static final String BOOKS = "Books";
     private static final int MENU_UNREAD = 1;
     private static final int MENU_FINISHED = 2;
     private static final int MENU_REFRESH = 3;
+    private static final int MENU_CONVERT = 4;
+    private static final int MENU_DELETE = 5;
+    private static final int MENU_DELETE_NOW = 6;
+    private static final int MENU_KEEP = 7;
+    /** How long a notice stays in the header. */
+    private static final long NOTICE_MS = 5000;
 
     private Shelf shelf;
     private Covers covers;
@@ -45,6 +58,12 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
     private boolean menuOpen;
     private final ExecutorService scans = Ui.worker("books-scan");
     private final ExecutorService coverLoads = Ui.worker("books-covers");
+    private final ExecutorService conversions = Ui.worker("books-convert");
+    /** True while a book is being converted; one at a time. */
+    private boolean converting;
+    /** What was chosen before writing to storage was allowed: done once it is. */
+    private Runnable afterWrite;
+    private final Runnable clearNotice = () -> view.setNotice(converting ? "Converting\u2026" : null);
     private boolean scanning;
     /** Set when a book is opened, so the list comes back with it on top. */
     private boolean returning;
@@ -92,6 +111,16 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
 
     @Override
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        if (code == ASK_WRITE) {
+            Runnable action = afterWrite;
+            afterWrite = null;
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+                if (action != null) action.run();
+            } else {
+                notice("Not allowed to change storage");
+            }
+            return;
+        }
         if (code != ASK_STORAGE) return;
         if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
             view.setMessage("Looking for books\u2026", null);
@@ -263,9 +292,31 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
             if (!menuBook.finished() && menuBook.length > 0) {
                 rows.add(new ListPanel.Row(MENU_FINISHED, ListPanel.PLAIN, "Mark as Finished"));
             }
+            if (isEpub(menuBook)) rows.add(new ListPanel.Row(MENU_CONVERT, ListPanel.PLAIN, "Convert to MOBI"));
         }
         rows.add(new ListPanel.Row(MENU_REFRESH, ListPanel.PLAIN, "Look for New Books"));
-        menu.show(menuBook != null ? menuBook.displayTitle() : "Library", true, rows, 0);
+        if (menuBook != null) {
+            ListPanel.Row delete = new ListPanel.Row(MENU_DELETE, ListPanel.PLAIN, "Delete Book");
+            delete.destructive = true;
+            rows.add(delete);
+        }
+        openSheet(menuBook != null ? menuBook.displayTitle() : "Library", rows, 0);
+    }
+
+    /** Asks before deleting, Cancel first so a stray OK keeps the book. */
+    private void confirmDelete(Shelf.Entry book) {
+        menuBook = book;
+        List<ListPanel.Row> rows = new ArrayList<ListPanel.Row>();
+        rows.add(new ListPanel.Row(0, ListPanel.HEADER, "Erase it from the phone?"));
+        rows.add(new ListPanel.Row(MENU_KEEP, ListPanel.PLAIN, "Cancel"));
+        ListPanel.Row delete = new ListPanel.Row(MENU_DELETE_NOW, ListPanel.PLAIN, "Delete");
+        delete.destructive = true;
+        rows.add(delete);
+        openSheet(book.displayTitle(), rows, 1);
+    }
+
+    private void openSheet(String title, List<ListPanel.Row> rows, int focus) {
+        menu.show(title, true, rows, focus);
         FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) menu.getLayoutParams();
         params.height = menu.sheetHeight(root.getHeight());
         menu.setLayoutParams(params);
@@ -298,11 +349,100 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
             case MENU_REFRESH:
                 scan();
                 return;
+            case MENU_CONVERT:
+                if (book != null) withWrite(() -> convert(book));
+                return;
+            case MENU_DELETE:
+                if (book != null) confirmDelete(book);
+                return;
+            case MENU_DELETE_NOW:
+                if (book != null) withWrite(() -> delete(book));
+                return;
             default:
                 return;
         }
         Shared.save(shelf);
         show(shelf.books());
+    }
+
+    // ------------------------------------------------------------------
+    // Deleting and converting: both write to storage
+    // ------------------------------------------------------------------
+
+    /*
+     * Writing is in the same permission group as reading, which the library
+     * already has, so the system grants it without asking.
+     */
+    private void withWrite(Runnable action) {
+        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            action.run();
+            return;
+        }
+        afterWrite = action;
+        requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, ASK_WRITE);
+    }
+
+    /** Deletes the book's file from the phone, and the book from the shelf. */
+    private void delete(Shelf.Entry book) {
+        File file = book.file();
+        if (!file.delete() && file.exists()) {
+            notice("Couldn\u2019t delete it");
+            return;
+        }
+        shelf.remove(book.path);
+        Shared.save(shelf);
+        MediaScannerConnection.scanFile(getApplicationContext(), new String[] {file.getAbsolutePath()}, null, null);
+        show(shelf.books());
+        notice("Deleted");
+    }
+
+    /**
+     * Writes the book as a MOBI beside it, under the same name (replacing an
+     * earlier conversion), off the main thread. The library doesn't list
+     * MOBIs; the file is there for a Kindle.
+     */
+    private void convert(Shelf.Entry book) {
+        if (converting) {
+            notice("Already converting a book");
+            return;
+        }
+        final File epub = book.file();
+        String name = epub.getName();
+        final File mobi = new File(epub.getParentFile(), name.substring(0, name.length() - ".epub".length()) + ".mobi");
+        converting = true;
+        view.removeCallbacks(clearNotice);
+        view.setNotice("Converting\u2026");
+        final Context app = getApplicationContext();
+        conversions.execute(() -> {
+            String said;
+            try {
+                Mobi.convert(epub, mobi, new KindleImages());
+                MediaScannerConnection.scanFile(app, new String[] {mobi.getAbsolutePath()}, null, null);
+                said = "Saved " + mobi.getName();
+            } catch (FileNotFoundException e) {
+                said = "Couldn\u2019t save it beside the book";
+            } catch (IOException e) {
+                said = e.getMessage() != null ? e.getMessage() : "Couldn\u2019t convert it";
+            } catch (RuntimeException | OutOfMemoryError e) {
+                said = "Couldn\u2019t convert it";
+            }
+            final String done = said;
+            runOnUiThread(() -> {
+                converting = false;
+                if (!isDestroyed()) notice(done);
+            });
+        });
+    }
+
+    private static boolean isEpub(Shelf.Entry book) {
+        return book.path.toLowerCase(Locale.ROOT).endsWith(".epub");
+    }
+
+    /** A line in the header for a few seconds: no toasts, which Night Shift can't reach. */
+    private void notice(String text) {
+        view.removeCallbacks(clearNotice);
+        view.setNotice(text);
+        view.postDelayed(clearNotice, NOTICE_MS);
     }
 
     @Override
@@ -315,5 +455,8 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         super.onDestroy();
         scans.shutdown();
         coverLoads.shutdownNow();
+        // A conversion under way is finished, so no half-written file is left.
+        conversions.shutdown();
+        view.removeCallbacks(clearNotice);
     }
 }

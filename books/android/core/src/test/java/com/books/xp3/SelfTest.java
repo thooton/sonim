@@ -1,6 +1,7 @@
 package com.books.xp3;
 
 import com.books.xp3.book.BookTests;
+import com.books.xp3.book.MobiTests;
 import com.books.xp3.shelf.ShelfTests;
 import com.xp3.common.Check;
 
@@ -16,6 +17,7 @@ public final class SelfTest {
     public static void main(String[] args) throws Exception {
         Check check = new Check();
         BookTests.run(check);
+        MobiTests.run(check);
         ShelfTests.run(check);
         if (!check.report()) System.exit(1);
     }
