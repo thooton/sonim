@@ -173,8 +173,8 @@ public final class SelfTest {
             check.same("the undated post", "T", e.get(6).post.shortcode);
             check.same("opens on the first upcoming", 3, agenda.start);
             check.same("items", Arrays.asList(1, 3, 4, 6), agenda.items());
-            check.same("today", "Today", Dates.heading(at("2026-10-23T00:00:00-07:00"), now, PHOENIX));
-            check.same("tomorrow", "Tomorrow", Dates.heading(at("2026-10-24T00:00:00-07:00"), now, PHOENIX));
+            check.same("today is a date too", "Friday, Oct 23", Dates.heading(at("2026-10-23T00:00:00-07:00"), now, PHOENIX));
+            check.same("and tomorrow", "Saturday, Oct 24", Dates.heading(at("2026-10-24T00:00:00-07:00"), now, PHOENIX));
             check.same("next year", "Friday, Jan 1, 2027", Dates.heading(at("2027-01-01T00:00:00-07:00"), now, PHOENIX));
 
             Agenda over = Agenda.build(Arrays.asList(gbm, thanks), now, PHOENIX);

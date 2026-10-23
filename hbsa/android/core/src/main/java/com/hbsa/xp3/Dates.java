@@ -208,12 +208,8 @@ public final class Dates {
         return letters >= 2 ? text : null;
     }
 
-    /** "Today", "Tomorrow", "Yesterday", or "Saturday, Oct 31" (with the year when it isn't this one). */
+    /** "Saturday, Oct 31", with the year when it isn't this one: always the day and date, never "Today". */
     public static String heading(long day, long now, TimeZone zone) {
-        int days = daysBetween(midnight(now, zone), day);
-        if (days == 0) return "Today";
-        if (days == 1) return "Tomorrow";
-        if (days == -1) return "Yesterday";
         Calendar c = Calendar.getInstance(zone, Locale.US);
         c.setTimeInMillis(now);
         int thisYear = c.get(Calendar.YEAR);
@@ -252,11 +248,6 @@ public final class Dates {
         c.set(Calendar.SECOND, 0);
         c.set(Calendar.MILLISECOND, 0);
         return c.getTimeInMillis();
-    }
-
-    /** Whole days from local `today` to local `day` (both midnights). */
-    public static int daysBetween(long today, long day) {
-        return (int) Math.round((day - today) / (double) DAY_MS);
     }
 
     private static int month(String name) {
