@@ -21,9 +21,10 @@ import java.util.Map;
  * A quiz, one question per screen (E3).
  *
  * A bar of equal steps shows where the student is, never how long they
- * have. The softkeys move between questions and every answer is saved to
- * Canvas as it is chosen, so leaving and coming back loses nothing. A time
- * limit, if the teacher set one, is stated once before starting, as a fact.
+ * have. Buttons under the answers move between questions, and every answer
+ * is saved to Canvas as it is chosen, so leaving and coming back loses
+ * nothing. A time limit, if the teacher set one, is stated once before
+ * starting, as a fact.
  */
 final class QuizScreen extends Screen {
 
@@ -83,9 +84,11 @@ final class QuizScreen extends Screen {
         }));
     }
 
+    // A quiz is taken with the d-pad and OK alone: the softkeys do nothing
+    // here, and Previous, Next and Turn in are buttons on the page.
     @Override
     String left() {
-        return questions == null || index == 0 ? "Back" : "Previous";
+        return null;
     }
 
     @Override
@@ -93,14 +96,7 @@ final class QuizScreen extends Screen {
         return "Select";
     }
 
-    @Override
-    String right() {
-        if (questions == null) return null;
-        return index == questions.size() - 1 ? "Turn in" : "Next";
-    }
-
-    @Override
-    void onRight() {
+    private void next() {
         if (questions == null) return;
         saveTyped();
         if (index == questions.size() - 1) finish();
@@ -110,22 +106,28 @@ final class QuizScreen extends Screen {
         }
     }
 
+    private void previous() {
+        saveTyped();
+        index--;
+        app.redraw();
+    }
+
+    @Override
+    boolean onBack() {
+        // Every answer is already on Canvas, so Back simply leaves.
+        saveTyped();
+        return false;
+    }
+
     @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
-        if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT) {
-            if (event.getAction() == KeyEvent.ACTION_UP) {
-                saveTyped();
-                if (questions == null || index == 0) app.pop();
-                else {
-                    index--;
-                    app.redraw();
-                }
-            }
+        if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT
+            || code == KeyEvent.KEYCODE_SOFT_RIGHT) {
             return true;
         }
         if (typed != null && app.getCurrentFocus() == typed && com.xp3.common.ui.Ui.isOk(code)) {
-            if (event.getAction() == KeyEvent.ACTION_UP) onRight();
+            if (event.getAction() == KeyEvent.ACTION_UP) next();
             return true;
         }
         return false;
@@ -187,11 +189,16 @@ final class QuizScreen extends Screen {
             v.pad(note, 12, 8, 12, 0);
             page.addView(note, Views.wide());
         }
-        // The softkey bar is hidden, so Next and Turn in also sit on the page,
-        // below the answers, where Down then OK reaches them.
+        // Below the answers, where Down then OK reaches them.
         boolean last = index == questions.size() - 1;
-        Item step = Sheet.button(app, v, "step", last ? "Turn in" : "Next", last, this::onRight);
-        page.addView(step, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 10, 10, 10, 8));
+        LinearLayout buttons = v.row();
+        if (index > 0) {
+            Item back = Sheet.button(app, v, "previous", "Previous", false, this::previous);
+            buttons.addView(back, v.margins(new LinearLayout.LayoutParams(0, v.dp(28), 1), 0, 0, 6, 0));
+        }
+        Item step = Sheet.button(app, v, "step", last ? "Turn in" : "Next", last, this::next);
+        buttons.addView(step, new LinearLayout.LayoutParams(0, v.dp(28), 1));
+        page.addView(buttons, v.margins(Views.wide(), 10, 10, 10, 8));
         return root;
     }
 
