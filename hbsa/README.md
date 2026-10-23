@@ -2,7 +2,7 @@
 
 The club's events, read from its Instagram, @hbsaasu, for someone without
 Instagram. One list, top to bottom: a heading for each day an event falls
-on ("TODAY", "SATURDAY, OCT 31"), and under it each event's start time and
+on, always by its weekday and date ("SATURDAY, OCT 31"), and under it each event's start time and
 name, with its post's picture. Past days are greyed above; the list opens on
 the first event that hasn't happened yet. Posts that name no date come last,
 under "Other posts".

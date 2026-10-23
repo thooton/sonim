@@ -53,7 +53,7 @@ several, by its own line with the date taken out ("Diwali Night - Nov 8,
 6pm" is "Diwali Night").
 
 `Agenda.build` is the list: events by day then time (untimed last), a
-heading before each day, then "Other posts" for posts with no date; `start`
+heading before each day (always weekday and date: the user wants no "Today" or "Tomorrow"), then "Other posts" for posts with no date; `start`
 is the first event today or later, where the list opens.
 
 ## Layout
