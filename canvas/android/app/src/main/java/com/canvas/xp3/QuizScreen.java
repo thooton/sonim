@@ -187,6 +187,11 @@ final class QuizScreen extends Screen {
             v.pad(note, 12, 8, 12, 0);
             page.addView(note, Views.wide());
         }
+        // The softkey bar is hidden, so Next and Turn in also sit on the page,
+        // below the answers, where Down then OK reaches them.
+        boolean last = index == questions.size() - 1;
+        Item step = Sheet.button(app, v, "step", last ? "Turn in" : "Next", last, this::onRight);
+        page.addView(step, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 10, 10, 10, 8));
         return root;
     }
 
