@@ -78,9 +78,11 @@ glyph is a ring (`Ring`) that fills clockwise from the top, with the number
 in the middle.
 
 Transform in a file's menu opens the Formats sheet (`Sheet.formats`): a
-box for each of `Formats.ALL`, PDF ticked and fixed, the rest unticked
-every time, and Start under them, picked, so OK, OK makes a PDF. OK on a
-box ticks it. The agent makes exactly what is ticked (the command center
+box for each of `Formats.ALL`, PDF ticked ("To tablet": only a PDF goes
+on the tablet, so a job without one leaves nothing there and has no View),
+the rest unticked every time, and Start under them, picked, so OK, OK
+makes a PDF. OK on a box ticks or unticks it; with nothing ticked, Start
+is greyed and does nothing. The agent makes exactly what is ticked (the command center
 enforces it), and Try again asks for the same formats. With a job already
 running on the file, Transform shows how it is going instead.
 

@@ -740,6 +740,7 @@ public final class MainActivity extends Activity {
                         sheet.toggle();
                         return;
                     }
+                    if (!sheet.ready()) return;
                     if (jobs.runningOn(doc.id) == null) start(doc.id, doc.name, sheet.chosen());
                     break;
                 case Sheet.FILES:

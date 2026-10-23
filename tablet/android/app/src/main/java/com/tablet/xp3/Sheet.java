@@ -164,9 +164,10 @@ final class Sheet extends FrameLayout {
     }
 
     /**
-     * What a transform makes, as boxes OK ticks: the PDF always, the rest
-     * unticked every time. Start is under them, and picked, so OK, OK makes
-     * a PDF.
+     * What a transform makes, as boxes OK ticks: the PDF (the copy that goes
+     * on the tablet) ticked to begin with, the rest unticked every time.
+     * Start is under them, and picked, so OK, OK makes a PDF; with nothing
+     * ticked it is greyed and does nothing.
      */
     static Sheet formats(Context c, Doc doc) {
         Sheet s = new Sheet(c, FORMATS);
@@ -175,7 +176,7 @@ final class Sheet extends FrameLayout {
         s.ticked[0] = true;
         for (int i = 0; i < Formats.ALL.length; i++) {
             Parts.Action a = s.choice(i == 0 ? R.drawable.ic_square_check : R.drawable.ic_square, Formats.LABELS[i]);
-            a.note.setText(i == 0 ? "Always" : "." + Formats.ALL[i]);
+            a.note.setText(i == 0 ? "To tablet" : "." + Formats.ALL[i]);
         }
         s.choice(R.drawable.ic_play, "Start");
         s.pick(Formats.ALL.length);
@@ -187,11 +188,18 @@ final class Sheet extends FrameLayout {
         return picked == Formats.ALL.length;
     }
 
-    /** On the Formats sheet: ticks or unticks the picked format; the PDF stays ticked. */
+    /** On the Formats sheet: ticks or unticks the picked format. */
     void toggle() {
-        if (picked <= 0 || picked >= ticked.length) return;
+        if (picked < 0 || picked >= ticked.length) return;
         ticked[picked] = !ticked[picked];
         choices.get(picked).icon(ticked[picked] ? R.drawable.ic_square_check : R.drawable.ic_square);
+        choices.get(ticked.length).setAlpha(ready() ? 1f : 0.4f);
+    }
+
+    /** On the Formats sheet: whether anything is ticked, so Start can start. */
+    boolean ready() {
+        for (boolean on : ticked) if (on) return true;
+        return false;
     }
 
     /** On the Formats sheet: the formats ticked. */
