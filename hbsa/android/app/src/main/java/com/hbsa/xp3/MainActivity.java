@@ -9,6 +9,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -21,19 +22,20 @@ import android.widget.TextView;
 import com.xp3.common.Http;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Family;
-import com.xp3.common.ui.SelectableAdapter;
 import com.xp3.common.ui.Ui;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 
 /**
- * The club's posts, newest first, under a gold card for the next event any
- * of them mentions. The posts from last time are up at once; fresh ones are
- * fetched behind them on launch and whenever the app comes back after a
- * quarter of an hour.
+ * The club's events, earliest first, under a heading for each day, each
+ * with its start time; then the posts that name no date. The list opens on
+ * the first event that hasn't passed. The posts from last time are up at
+ * once; fresh ones are fetched behind them on launch and whenever the app
+ * comes back after a quarter of an hour, a thin bar along the top showing
+ * it.
  */
 public final class MainActivity extends BaseActivity {
 
@@ -45,40 +47,34 @@ public final class MainActivity extends BaseActivity {
     /** Why the last fetch failed, or null. */
     private String error;
 
-    private TextView status;
     private FrameLayout content;
+    private ProgressBar working;
     private ListView list;
     private Adapter adapter;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        LinearLayout root = vertical();
+        FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(color(R.color.page));
-
-        LinearLayout header = vertical();
-        header.setBackgroundColor(color(R.color.primary));
-        header.setPadding(dp(10), dp(5), dp(10), dp(7));
-        TextView title = text("@" + Instagram.ACCOUNT, 15, color(R.color.on_primary));
-        title.setTypeface(Family.MEDIUM);
-        header.addView(title);
-        status = text("", 11, color(R.color.on_primary_dim));
-        status.setSingleLine(true);
-        status.setEllipsize(TextUtils.TruncateAt.END);
-        status.setPadding(0, dp(3), 0, 0);
-        header.addView(status);
-        root.addView(header);
-
         content = new FrameLayout(this);
-        root.addView(content, Ui.weighted());
+        root.addView(content);
+        working = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        working.setIndeterminate(true);
+        working.setIndeterminateTintList(getColorStateList(R.color.focus_rule));
+        FrameLayout.LayoutParams top = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(6), Gravity.TOP);
+        top.topMargin = -dp(2);
+        root.addView(working, top);
+
         list = new ListView(this);
         Family.list(list);
+        list.setDivider(null);
         list.setItemsCanFocus(false);
         list.setVerticalScrollBarEnabled(false);
         adapter = new Adapter();
         list.setAdapter(adapter);
-        list.setOnItemClickListener((parent, view, position, id) -> open(adapter.post(position)));
-        Ui.onSelect(list, adapter::setSelectedPosition);
+        list.setOnItemClickListener((parent, view, position, id) -> open(position));
+        Ui.onSelect(list, position -> adapter.notifyDataSetChanged());
         setContentView(root);
 
         show();
@@ -88,11 +84,10 @@ public final class MainActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // A post opened is no longer new; and an app left open overnight
-        // shouldn't show yesterday's list.
-        adapter.notifyDataSetChanged();
+        // Left open overnight, "Today" moves on and the list should with it.
+        if (Club.opened >= 0 && list.getParent() != null && Club.opened < adapter.getCount()) select(Club.opened);
+        Club.opened = -1;
         if (!loading && System.currentTimeMillis() - Club.fetched(this) > STALE_MS) load();
-        else showStatus();
     }
 
     private void load() {
@@ -102,9 +97,8 @@ public final class MainActivity extends BaseActivity {
         show();
         worker.execute(() -> {
             String failure = null;
-            List<Post> posts = null;
             try {
-                posts = Instagram.fetch(http);
+                List<Post> posts = Instagram.fetch(http);
                 Club.update(this, posts);
                 Pictures.prune(this, posts);
             } catch (Exception e) {
@@ -120,19 +114,23 @@ public final class MainActivity extends BaseActivity {
         });
     }
 
-    /** The list, or while there is nothing to list, a spinner or why not. */
+    /** The agenda, or while there is nothing to list, a spinner or why not. */
     private void show() {
+        working.setVisibility(loading && list.getParent() != null ? View.VISIBLE : View.GONE);
         List<Post> posts = Club.posts(this);
-        showStatus();
         if (!posts.isEmpty()) {
-            String place = adapter.selectedKey();
-            adapter.set(posts, Dates.next(posts, System.currentTimeMillis(), TimeZone.getDefault()));
-            if (list.getParent() == null) {
+            Agenda.Entry was = adapter.entry(list.getSelectedItemPosition());
+            Agenda agenda = Agenda.build(posts, System.currentTimeMillis(), TimeZone.getDefault());
+            Club.agenda = agenda;
+            adapter.notifyDataSetChanged();
+            boolean first = list.getParent() == null;
+            if (first) {
                 Ui.fill(content, list);
                 list.requestFocus();
             }
-            int at = adapter.positionOf(place);
-            list.setSelection(at >= 0 ? at : 0);
+            int at = first ? -1 : find(agenda, was);
+            select(at >= 0 ? at : agenda.start);
+            working.setVisibility(loading ? View.VISIBLE : View.GONE);
             return;
         }
         if (loading) {
@@ -158,21 +156,27 @@ public final class MainActivity extends BaseActivity {
         retry.requestFocus();
     }
 
-    private void showStatus() {
-        long fetched = Club.fetched(this);
-        if (loading) status.setText("Updating…");
-        else if (fetched == 0) status.setText("");
-        else {
-            String ago = Dates.ago(fetched, System.currentTimeMillis(), TimeZone.getDefault());
-            String updated = ago.equals("just now") ? "Updated just now" : "Updated " + ago;
-            status.setText(error != null ? "Couldn't update · " + updated.toLowerCase(java.util.Locale.US) : updated);
+    /** The same event (or post) in a fresh agenda, or -1. */
+    private static int find(Agenda agenda, Agenda.Entry was) {
+        if (was == null || was.post == null) return -1;
+        for (int i = 0; i < agenda.entries.size(); i++) {
+            Agenda.Entry e = agenda.entries.get(i);
+            if (e.post == null || !e.post.shortcode.equals(was.post.shortcode)) continue;
+            if (was.event == null ? e.event == null : e.event != null && e.event.day == was.event.day) return i;
         }
+        return -1;
     }
 
-    private void open(Post post) {
-        if (post == null) return;
-        List<Post> posts = Club.posts(this);
-        startActivity(new Intent(this, PostActivity.class).putExtra(PostActivity.INDEX, posts.indexOf(post)));
+    /** Puts the d-pad on `position`, its day's heading in view above it. */
+    private void select(int position) {
+        boolean headed = position > 0 && adapter.entry(position - 1) != null && adapter.entry(position - 1).isHeading();
+        list.setSelectionFromTop(position, headed ? dp(Adapter.HEADING_DP) : 0);
+    }
+
+    private void open(int position) {
+        Agenda.Entry entry = adapter.entry(position);
+        if (entry == null || entry.isHeading()) return;
+        startActivity(new Intent(this, PostActivity.class).putExtra(PostActivity.POSITION, position));
     }
 
     @Override
@@ -195,7 +199,7 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void menu() {
-        View anchor = list.getParent() != null && list.getSelectedView() != null ? list.getSelectedView() : status;
+        View anchor = list.getParent() != null && list.getSelectedView() != null ? list.getSelectedView() : content;
         PopupMenu popup = new PopupMenu(this, anchor, Gravity.END);
         popup.getMenu().add(0, 1, 0, "Refresh");
         popup.getMenu().add(0, 2, 0, "Open in browser");
@@ -215,59 +219,41 @@ public final class MainActivity extends BaseActivity {
         }
     }
 
-    /** The next-event card, if there is an event, then a row for each post. */
-    private final class Adapter extends SelectableAdapter {
+    /** Headings, which the d-pad passes over, and the events and posts under them. */
+    private final class Adapter extends BaseAdapter {
 
-        private List<Post> posts = new ArrayList<Post>();
-        private Dates.Event next;
+        static final int HEADING_DP = 26;
 
-        void set(List<Post> posts, Dates.Event next) {
-            this.posts = new ArrayList<Post>(posts);
-            this.next = next;
-            notifyDataSetChanged();
-        }
-
-        private int offset() {
-            return next == null ? 0 : 1;
-        }
-
-        /** The post a position opens: the card opens the post it came from. */
-        Post post(int position) {
-            if (position < 0) return null;
-            if (next != null && position == 0) return next.post;
-            int at = position - offset();
-            return at < posts.size() ? posts.get(at) : null;
-        }
-
-        /** What is under the d-pad, to find it again after a refresh. */
-        String selectedKey() {
-            int at = getSelectedPosition();
-            if (at < 0) return null;
-            if (next != null && at == 0) return "next";
-            Post post = post(at);
-            return post == null ? null : post.shortcode;
-        }
-
-        int positionOf(String key) {
-            if (key == null) return -1;
-            if (key.equals("next")) return next != null ? 0 : -1;
-            for (int i = 0; i < posts.size(); i++) if (posts.get(i).shortcode.equals(key)) return i + offset();
-            return -1;
+        Agenda.Entry entry(int position) {
+            Agenda agenda = Club.agenda;
+            if (agenda == null || position < 0 || position >= agenda.entries.size()) return null;
+            return agenda.entries.get(position);
         }
 
         @Override
         public int getCount() {
-            return posts.size() + offset();
+            return Club.agenda == null ? 0 : Club.agenda.entries.size();
         }
 
         @Override
         public Object getItem(int position) {
-            return post(position);
+            return entry(position);
         }
 
         @Override
         public long getItemId(int position) {
             return position;
+        }
+
+        @Override
+        public boolean areAllItemsEnabled() {
+            return false;
+        }
+
+        @Override
+        public boolean isEnabled(int position) {
+            Agenda.Entry entry = entry(position);
+            return entry != null && !entry.isHeading();
         }
 
         @Override
@@ -277,128 +263,87 @@ public final class MainActivity extends BaseActivity {
 
         @Override
         public int getItemViewType(int position) {
-            return next != null && position == 0 ? 0 : 1;
+            return isEnabled(position) ? 1 : 0;
         }
 
         @Override
         public View getView(int position, View convert, ViewGroup parent) {
-            View view = getItemViewType(position) == 0
-                ? card(convert instanceof Card ? (Card) convert : new Card())
-                : row(convert instanceof Row ? (Row) convert : new Row(), post(position));
-            view.setSelected(isSelected(position));
-            return view;
-        }
-
-        private View card(Card card) {
-            long now = System.currentTimeMillis();
-            TimeZone zone = TimeZone.getDefault();
-            String[] page = Dates.page(next.day, zone);
-            card.month.setText(page[0]);
-            card.day.setText(page[1]);
-            card.name.setText(Dates.title(next.post.caption));
-            card.when.setText(Dates.when(next, now, zone));
-            return card;
-        }
-
-        private View row(Row row, Post post) {
-            boolean fresh = Club.isNew(MainActivity.this, post);
-            row.dot.setVisibility(fresh ? View.VISIBLE : View.GONE);
-            row.time.setText(Dates.ago(post.postedAt, System.currentTimeMillis(), TimeZone.getDefault()));
-            row.time.setTextColor(color(fresh ? R.color.focus_rule : R.color.text_muted));
-            row.time.setTypeface(fresh ? Family.MEDIUM : android.graphics.Typeface.DEFAULT);
-            String caption = post.caption.trim().replaceAll("\\s+", " ");
-            row.caption.setText(caption.isEmpty() ? "No caption" : caption);
-            row.caption.setTextColor(color(caption.isEmpty() ? R.color.text_muted : R.color.text));
-            Pictures.show(MainActivity.this, row.thumb, post, 0, dp(44));
+            Agenda.Entry entry = entry(position);
+            if (entry.isHeading()) {
+                TextView heading = convert instanceof TextView ? (TextView) convert : heading();
+                heading.setText(entry.heading.toUpperCase(Locale.US));
+                heading.setTextColor(color(entry.past ? R.color.past : R.color.focus_rule));
+                return heading;
+            }
+            Row row = convert instanceof Row ? (Row) convert : new Row();
+            row.bind(entry);
+            row.setSelected(position == list.getSelectedItemPosition());
             return row;
         }
-    }
 
-    /** The next event: a calendar page, "NEXT UP", its name and when it is. */
-    private final class Card extends LinearLayout {
-        final TextView month;
-        final TextView day;
-        final TextView name;
-        final TextView when;
-
-        Card() {
-            super(MainActivity.this);
-            setOrientation(HORIZONTAL);
-            setGravity(Gravity.CENTER_VERTICAL);
-            setBackgroundResource(R.drawable.next_card);
-            setPadding(dp(14), dp(12), dp(14), dp(10));
-
-            LinearLayout page = vertical();
-            page.setBackgroundResource(R.drawable.calendar_page);
-            month = text("", 8, color(R.color.on_primary));
-            month.setTypeface(Family.MEDIUM);
-            month.setLetterSpacing(0.08f);
-            month.setGravity(Gravity.CENTER);
-            month.setBackgroundResource(R.drawable.calendar_month);
-            page.addView(month, new LayoutParams(LayoutParams.MATCH_PARENT, dp(12)));
-            day = text("", 15, color(R.color.text));
-            day.setTypeface(Family.MEDIUM);
-            day.setGravity(Gravity.CENTER);
-            page.addView(day, new LayoutParams(LayoutParams.MATCH_PARENT, dp(21)));
-            addView(page, new LayoutParams(dp(34), ViewGroup.LayoutParams.WRAP_CONTENT));
-
-            LinearLayout words = vertical();
-            words.setPadding(dp(9), 0, 0, 0);
-            TextView label = text("NEXT UP", 9, color(R.color.gold_ink));
-            label.setTypeface(Family.MEDIUM);
-            label.setLetterSpacing(0.08f);
-            words.addView(label);
-            name = text("", 13, color(R.color.text));
-            name.setTypeface(Family.MEDIUM);
-            name.setSingleLine(true);
-            name.setEllipsize(TextUtils.TruncateAt.END);
-            name.setPadding(0, dp(2), 0, dp(2));
-            words.addView(name);
-            when = text("", 11, color(R.color.gold_muted));
-            when.setSingleLine(true);
-            words.addView(when);
-            addView(words, new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        private TextView heading() {
+            TextView view = text("", 11, color(R.color.focus_rule));
+            view.setTypeface(Family.MEDIUM);
+            view.setLetterSpacing(0.06f);
+            view.setSingleLine(true);
+            view.setEllipsize(TextUtils.TruncateAt.END);
+            view.setGravity(Gravity.BOTTOM);
+            view.setPadding(dp(10), 0, dp(10), dp(5));
+            view.setLayoutParams(new ListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(HEADING_DP)));
+            return view;
         }
     }
 
-    /** A post: its picture, when it went up, and the start of its caption. */
+    /** An event: its start time, its name and its post's picture. A post with no date has no time. */
     private final class Row extends LinearLayout {
-        final ImageView thumb;
-        final View dot;
         final TextView time;
-        final TextView caption;
+        final TextView title;
+        final ImageView thumb;
 
         Row() {
             super(MainActivity.this);
             setOrientation(HORIZONTAL);
-            setBackgroundResource(com.xp3.common.ui.R.drawable.family_focus);
-            setPadding(dp(10), dp(7), dp(10), dp(7));
+            setGravity(Gravity.CENTER_VERTICAL);
+            setBackgroundResource(R.drawable.row);
+            setPadding(dp(10), dp(6), dp(8), dp(6));
+            setMinimumHeight(dp(48));
+
+            time = text("", 13, color(R.color.text));
+            time.setTextSize(12.5f);
+            time.setTypeface(Family.MEDIUM);
+            time.setSingleLine(true);
+            addView(time, new LayoutParams(dp(60), ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            title = text("", 12, color(R.color.text));
+            title.setMaxLines(2);
+            title.setEllipsize(TextUtils.TruncateAt.END);
+            title.setLineSpacing(dp(1), 1f);
+            addView(title, new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
             thumb = new ImageView(MainActivity.this);
             thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
             thumb.setBackgroundResource(R.drawable.thumb);
             thumb.setClipToOutline(true);
-            addView(thumb, new LayoutParams(dp(44), dp(44)));
+            LayoutParams size = new LayoutParams(dp(36), dp(36));
+            size.leftMargin = dp(8);
+            addView(thumb, size);
+        }
 
-            LinearLayout words = vertical();
-            words.setPadding(dp(8), 0, 0, 0);
-            LinearLayout top = new LinearLayout(MainActivity.this);
-            top.setGravity(Gravity.CENTER_VERTICAL);
-            dot = new View(MainActivity.this);
-            dot.setBackgroundResource(R.drawable.new_dot);
-            LayoutParams dotSize = new LayoutParams(dp(6), dp(6));
-            dotSize.rightMargin = dp(5);
-            top.addView(dot, dotSize);
-            time = text("", 11, color(R.color.text_muted));
-            top.addView(time);
-            words.addView(top);
-            caption = text("", 12, color(R.color.text));
-            caption.setMaxLines(2);
-            caption.setEllipsize(TextUtils.TruncateAt.END);
-            caption.setLineSpacing(dp(1), 1f);
-            caption.setPadding(0, dp(3), 0, 0);
-            words.addView(caption);
-            addView(words, new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        void bind(Agenda.Entry entry) {
+            if (entry.event != null) {
+                time.setVisibility(View.VISIBLE);
+                time.setText(entry.event.minutes >= 0 ? Dates.clock(entry.event.minutes) : "—");
+                title.setText(entry.event.title);
+            } else {
+                time.setVisibility(View.GONE);
+                String caption = entry.post.caption.trim().replaceAll("\\s+", " ");
+                title.setText(caption.isEmpty() ? "No caption" : caption);
+            }
+            int ink = color(entry.past ? R.color.past : R.color.text);
+            time.setTextColor(entry.event != null && entry.event.minutes < 0 ? color(R.color.past) : ink);
+            title.setTextColor(ink);
+            thumb.setAlpha(entry.past ? 0.55f : 1f);
+            Pictures.show(MainActivity.this, thumb, entry.post, 0, dp(36));
         }
     }
 }
