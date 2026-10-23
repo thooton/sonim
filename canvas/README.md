@@ -19,9 +19,8 @@ Open **Options → Settings → Account** and enter the Canvas origin, the cooki
 
 | Key | Action |
 | --- | --- |
-| Left softkey (Menu) | Options for this screen |
-| OK | What the middle of the softkey bar says: Open, Select, Turn in, Send |
-| Right softkey | The screen's one shortcut (also in Options) |
+| Menu | Options for this screen (Zoom, Clear, Gallery, Pause…) |
+| OK | Open, select, or press the button the d-pad is on |
 | Up / Down | Move through the list; Up from the top of the list reaches the strip, then the tabs |
 | Left / Right | Change the day, the tab or the page |
 | 1–7, 0 | Jump to a day of the week, or back to today |

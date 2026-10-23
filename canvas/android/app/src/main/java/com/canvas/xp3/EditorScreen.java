@@ -57,14 +57,8 @@ final class EditorScreen extends Screen {
         return "Done";
     }
 
-    @Override
-    String right() {
-        return "Clear";
-    }
-
-    @Override
-    void onRight() {
-        // Clear takes back the last word: one key per word is what makes a
+    private void deleteWord() {
+        // One word at a time: one key per word is what makes a
         // T9 slip cheap to undo, without the risk of losing the whole answer.
         int end = field.getSelectionStart();
         if (field.getSelectionEnd() != end) {
@@ -197,6 +191,7 @@ final class EditorScreen extends Screen {
     List<Sheet.Choice> options() {
         List<Sheet.Choice> out = new ArrayList<>();
         field.choices(app, out);
+        out.add(new Sheet.Choice("Delete word", R.drawable.ic_undo, null, this::deleteWord));
         out.add(new Sheet.Choice("New line", R.drawable.ic_edit, null, () -> insert("\n")));
         out.add(new Sheet.Choice("Symbol", R.drawable.ic_add, null, this::symbols));
         out.add(new Sheet.Choice("Rename", R.drawable.ic_edit, null, () -> app.push(new FieldScreen(app, "Rename",

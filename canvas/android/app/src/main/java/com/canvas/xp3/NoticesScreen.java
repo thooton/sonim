@@ -35,16 +35,6 @@ final class NoticesScreen extends Screen {
     }
 
     @Override
-    String right() {
-        return "Settings";
-    }
-
-    @Override
-    void onRight() {
-        app.push(new SettingsScreen(app));
-    }
-
-    @Override
     View build() {
         Parts parts = new Parts(app);
         LinearLayout root = v.column();

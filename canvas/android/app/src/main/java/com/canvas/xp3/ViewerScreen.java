@@ -20,12 +20,14 @@ import com.xp3.common.Disk;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
  * Reading a file (C3): a teacher's PDF, picture or text in a reading view
- * sized to the screen. Up and Down scroll, OK turns the page, the left
- * softkey zooms.
+ * sized to the screen. Up and Down scroll, OK turns the page, and Zoom is
+ * in Options.
  *
  * A teacher's file is downloaded once and kept, so an assignment's handouts
  * read again with no signal. Word and PowerPoint files have no reader on the
@@ -81,9 +83,15 @@ final class ViewerScreen extends Screen {
     }
 
     @Override
-    String left() {
-        if (file == null || problem != null) return null;
-        return "pdf".equals(kind()) || "image".equals(kind()) ? (zoomed ? "Fit" : "Zoom") : null;
+    List<Sheet.Choice> options() {
+        List<Sheet.Choice> out = new ArrayList<>();
+        if (file != null && problem == null && ("pdf".equals(kind()) || "image".equals(kind()))) {
+            out.add(new Sheet.Choice(zoomed ? "Fit" : "Zoom", R.drawable.ic_page, null, () -> {
+                zoomed = !zoomed;
+                app.redraw();
+            }));
+        }
+        return out;
     }
 
     @Override
@@ -92,26 +100,9 @@ final class ViewerScreen extends Screen {
     }
 
     @Override
-    String right() {
-        return "Close";
-    }
-
-    @Override
-    void onRight() {
-        app.pop();
-    }
-
-    @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
         boolean up = event.getAction() == KeyEvent.ACTION_UP;
-        if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT) {
-            if (up && left() != null) {
-                zoomed = !zoomed;
-                app.redraw();
-            }
-            return true;
-        }
         if (com.xp3.common.ui.Ui.isOk(code)) {
             if (up && pdf != null && pdf.getPageCount() > 1) turn(1);
             return true;

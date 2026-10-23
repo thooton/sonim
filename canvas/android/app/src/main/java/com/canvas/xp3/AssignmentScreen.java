@@ -67,19 +67,6 @@ final class AssignmentScreen extends Screen {
         return fresh == null ? item : fresh;
     }
 
-    @Override
-    String right() {
-        Assignment work = current();
-        if (canAdd(work)) return "Add work";
-        return "Comment";
-    }
-
-    @Override
-    void onRight() {
-        if (canAdd(current())) addWork();
-        else comments();
-    }
-
     private boolean canAdd(Assignment work) {
         boolean waiting = draft.queued || app.sending(work);
         return work.takesWork() && !work.locked && !waiting && (!work.done || work.attemptsLeft())

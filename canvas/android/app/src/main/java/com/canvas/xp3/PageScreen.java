@@ -38,16 +38,6 @@ final class PageScreen extends Screen {
     }
 
     @Override
-    String right() {
-        return "Close";
-    }
-
-    @Override
-    void onRight() {
-        app.pop();
-    }
-
-    @Override
     boolean onKey(KeyEvent event) {
         return rest != null && read(event, rest);
     }

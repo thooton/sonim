@@ -12,6 +12,8 @@ import android.widget.TextView;
 import com.canvas.xp3.data.Draft;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Check the photo (D4): the page as it was cropped, with the session's
@@ -31,33 +33,27 @@ final class ReviewScreen extends Screen {
     }
 
     @Override
-    String left() {
-        return "Retake";
-    }
-
-    @Override
     String center() {
         return "Keep";
     }
 
     @Override
-    String right() {
-        return "Add page";
+    List<Sheet.Choice> options() {
+        List<Sheet.Choice> out = new ArrayList<>();
+        out.add(new Sheet.Choice("Add page", R.drawable.ic_camera, null, app::pop));
+        out.add(new Sheet.Choice("Retake", R.drawable.ic_undo, null, this::retake));
+        return out;
     }
 
     @Override
-    void onRight() {
-        app.pop();
+    boolean globalOptions() {
+        return false;
     }
 
     @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
         boolean up = event.getAction() == KeyEvent.ACTION_UP;
-        if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT) {
-            if (up) retake();
-            return true;
-        }
         if (com.xp3.common.ui.Ui.isOk(code)) {
             if (up) keep();
             return true;

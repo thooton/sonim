@@ -42,16 +42,6 @@ final class CommentsScreen extends Screen {
     }
 
     @Override
-    String right() {
-        return "Clear";
-    }
-
-    @Override
-    void onRight() {
-        if (field != null) field.setText("");
-    }
-
-    @Override
     boolean globalOptions() {
         return false;
     }
@@ -59,6 +49,7 @@ final class CommentsScreen extends Screen {
     @Override
     List<Sheet.Choice> options() {
         List<Sheet.Choice> out = new ArrayList<>();
+        out.add(new Sheet.Choice("Clear", R.drawable.ic_undo, null, () -> field.setText("")));
         out.add(new Sheet.Choice("Refresh", R.drawable.ic_refresh, null, this::reload));
         return out;
     }

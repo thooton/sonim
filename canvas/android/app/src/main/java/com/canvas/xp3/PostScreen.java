@@ -57,16 +57,6 @@ final class PostScreen extends Screen {
     }
 
     @Override
-    String right() {
-        return post.open ? "Clear" : null;
-    }
-
-    @Override
-    void onRight() {
-        if (field != null) field.setText("");
-    }
-
-    @Override
     View build() {
         Parts parts = new Parts(app);
         if (replies == null && problem == null) return parts.spinner();
@@ -189,6 +179,9 @@ final class PostScreen extends Screen {
     @Override
     java.util.List<Sheet.Choice> options() {
         java.util.List<Sheet.Choice> out = new java.util.ArrayList<>();
+        if (post.open && field != null) {
+            out.add(new Sheet.Choice("Clear", R.drawable.ic_undo, null, () -> field.setText("")));
+        }
         out.add(new Sheet.Choice("Refresh", R.drawable.ic_refresh, null, this::load));
         return out;
     }

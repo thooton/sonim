@@ -64,16 +64,6 @@ final class FieldScreen extends Screen {
     }
 
     @Override
-    String right() {
-        return "Clear";
-    }
-
-    @Override
-    void onRight() {
-        field.setText("");
-    }
-
-    @Override
     boolean globalOptions() {
         return false;
     }
@@ -90,6 +80,7 @@ final class FieldScreen extends Screen {
                 field.setSelection(field.getText().length());
             }));
         }
+        out.add(new Sheet.Choice("Clear", R.drawable.ic_undo, null, () -> field.setText("")));
         out.add(new Sheet.Choice("Cancel", R.drawable.ic_undo, null, app::pop));
         return out;
     }

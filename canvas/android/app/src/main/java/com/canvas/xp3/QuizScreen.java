@@ -84,8 +84,8 @@ final class QuizScreen extends Screen {
         }));
     }
 
-    // A quiz is taken with the d-pad and OK alone: the softkeys do nothing
-    // here, and Previous, Next and Turn in are buttons on the page.
+    // A quiz is taken with the d-pad and OK alone: Menu does nothing here,
+    // and Previous, Next and Turn in are buttons on the page.
     @Override
     String left() {
         return null;
@@ -122,10 +122,6 @@ final class QuizScreen extends Screen {
     @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
-        if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT
-            || code == KeyEvent.KEYCODE_SOFT_RIGHT) {
-            return true;
-        }
         if (typed != null && app.getCurrentFocus() == typed && com.xp3.common.ui.Ui.isOk(code)) {
             if (event.getAction() == KeyEvent.ACTION_UP) next();
             return true;

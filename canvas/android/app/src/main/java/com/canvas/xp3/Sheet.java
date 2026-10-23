@@ -50,17 +50,13 @@ final class Sheet {
         final View view;
         final String left;
         final String center;
-        final String right;
         final List<Choice> numbered;
-        final Runnable onRight;
 
-        Open(View view, String left, String center, String right, List<Choice> numbered, Runnable onRight) {
+        Open(View view, String left, String center, List<Choice> numbered) {
             this.view = view;
             this.left = left;
             this.center = center;
-            this.right = right;
             this.numbered = numbered;
-            this.onRight = onRight;
         }
 
         /** Digits pick a numbered row. */
@@ -102,7 +98,7 @@ final class Sheet {
             row.keyed(badge, name, v);
             sheet.addView(row, Views.wide());
         }
-        app.openOverlay(new Open(wrap(app, sheet, true), "Close", "Select", null, choices, null));
+        app.openOverlay(new Open(wrap(app, sheet, true), "Close", "Select", choices));
     }
 
     /** A choice among values (H3): large rows, the current one filled with an ink dot. */
@@ -127,7 +123,7 @@ final class Sheet {
             sheet.addView(help, Views.wide());
         }
         View wrapped = wrap(app, sheet, true);
-        app.openOverlay(new Open(wrapped, "Cancel", "Select", null, null, null));
+        app.openOverlay(new Open(wrapped, "Cancel", "Select", null));
         Item first = Screen.find(wrapped, "pick:" + start);
         if (first != null) first.requestFocus();
     }
@@ -211,7 +207,7 @@ final class Sheet {
         FrameLayout.LayoutParams at = new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL);
         at.setMargins(v.dp(12), 0, v.dp(12), 0);
         layer.addView(box, at);
-        app.openOverlay(new Open(layer, "Cancel", yes, null, null, null));
+        app.openOverlay(new Open(layer, "Cancel", yes, null));
         primary.requestFocus();
     }
 

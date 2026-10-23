@@ -19,16 +19,6 @@ final class ClassesScreen extends Screen {
     }
 
     @Override
-    String right() {
-        return "To-do";
-    }
-
-    @Override
-    void onRight() {
-        app.pop();
-    }
-
-    @Override
     View build() {
         Parts parts = new Parts(app);
         LinearLayout root = v.column();
