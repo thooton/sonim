@@ -53,6 +53,8 @@ reads and writes its storage, so the app sees what the tablet last synced.
   reaches it (SD card, Documents), so the `.docx` can be handed in straight
   from there: many of the user's teachers take only Word documents. The PDF
   is the one on the tablet, for marking up and transforming again.
+  An email (`.eml`) goes into `Documents` too, where Mail's Open email
+  file finds it.
   Downloading asks for storage the first time.
 - `POST /remarkable/documents?name=&parent=`: Upload, a PDF or ePub from
   the phone, streamed (`Http.upload`), named as the file is without its

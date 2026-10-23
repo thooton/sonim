@@ -74,6 +74,14 @@ The scope is `gmail.modify`: nothing can be deleted for good, only trashed
   that is refused, the file goes to Mail's own folder on the card
   (`Android/data/com.mail.xp3/files/Download`) instead.
 
+- **Email files** (`Eml`): Menu → Open email file lists the `.eml` files
+  in Documents and Download, on the SD card and the phone, newest first
+  (Tablet saves a Transform job's email, a message the user wrote by hand
+  on the tablet, into the card's Documents). The one picked opens as a new
+  message: its To, Cc, Bcc, Subject and text (the plain part, or the HTML
+  as text), and nothing else; it is sent from the user's own address.
+  Reading them asks for storage the first time.
+
 If the CLI's addressing, quoting or forwarding changes, change `Outgoing`
 here and keep the test in step.
 

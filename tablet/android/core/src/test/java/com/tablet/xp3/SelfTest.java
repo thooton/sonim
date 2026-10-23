@@ -143,6 +143,7 @@ public final class SelfTest {
         check.ok("an old job asked for none", essay.formats.isEmpty());
         check.same("a format by extension", "jpg", Formats.of("Scan 3.JPEG"));
         check.same("not a format", "", Formats.of("notes.zip"));
+        check.same("an email by extension", "eml", Formats.of("Note to Ms. Rivera.eml"));
         Job failed = jobs.find("t3");
         check.same("failed says why", "Couldn't start it: no account has room left", failed.summary(NOW, UTC, true));
         check.same("state", "Failed", failed.stateLabel());

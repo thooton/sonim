@@ -1,11 +1,13 @@
 package com.mail.xp3;
 
+import android.Manifest;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.UriPermission;
+import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -46,6 +48,7 @@ import com.mail.xp3.net.Address;
 import com.mail.xp3.net.Attachment;
 import com.mail.xp3.net.Change;
 import com.mail.xp3.net.Conversation;
+import com.mail.xp3.net.Eml;
 import com.mail.xp3.net.Folder;
 import com.mail.xp3.net.Gmail;
 import com.mail.xp3.net.Me;
@@ -62,6 +65,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -95,6 +99,7 @@ public final class MainActivity extends BaseActivity {
     private static final int READ = 1;
     private static final int WRITE = 2;
     private static final int ASK_FOLDER = 1;
+    private static final int READ_STORAGE = 2;
     /** A long message is cut here on screen; its whole text still goes into a reply. */
     private static final int MAX_SHOWN = 20000;
     /** The list is fetched again on coming back to the app after this long. */
@@ -1757,6 +1762,51 @@ public final class MainActivity extends BaseActivity {
         return file;
     }
 
+    // ---- Email files ----
+
+    /**
+     * An .eml from Documents or Download, on the SD card or the phone
+     * (Tablet saves Transform's emails into the card's Documents), opened
+     * as a new message. Reading them asks for storage first, once.
+     */
+    private void chooseEmailFile() {
+        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, READ_STORAGE);
+            return;
+        }
+        List<File> folders = new ArrayList<File>();
+        File card = Card.root(this);
+        File phone = Environment.getExternalStorageDirectory();
+        for (File root : card == null ? new File[] {phone} : new File[] {card, phone}) {
+            folders.add(new File(root, Environment.DIRECTORY_DOCUMENTS));
+            folders.add(new File(root, Environment.DIRECTORY_DOWNLOADS));
+        }
+        final List<File> found = Eml.find(folders);
+        if (found.isEmpty()) {
+            toast("No email files in Documents or Download");
+            return;
+        }
+        List<String> shown = new ArrayList<String>();
+        for (File file : found) shown.add(file.getName().replaceAll("(?i)\\.eml$", ""));
+        listDialog("Open email file", shown, which -> openEmailFile(found.get(which)), null);
+    }
+
+    private void openEmailFile(final File file) {
+        final int from = screen;
+        start("Opening " + file.getName() + "…", () -> {
+            final Outgoing out = Eml.open(Files.readAllBytes(file.toPath()));
+            return () -> write(out, from, "");
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        if (request != READ_STORAGE) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) chooseEmailFile();
+        else toast("Storage not allowed");
+    }
+
     /** The message in view's links: a web one opens in the browser, an address starts a message to it. */
     private void chooseLink() {
         Message target = replyTarget();
@@ -1991,6 +2041,7 @@ public final class MainActivity extends BaseActivity {
             return sheet;
         }
         sheet.add(R.drawable.ic_edit, "Write", '0', () -> compose(""));
+        sheet.add(R.drawable.ic_draft, "Open email file…", this::chooseEmailFile);
         Conversation conversation = current();
         if (conversation != null) conversationActions(sheet, conversation);
         sheet.add(R.drawable.ic_search, "Search…", '*', this::askSearch);

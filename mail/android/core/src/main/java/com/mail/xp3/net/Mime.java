@@ -66,7 +66,7 @@ public final class Mime {
         return out.toString();
     }
 
-    private static byte[] quoted(String text) {
+    static byte[] quoted(String text) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);

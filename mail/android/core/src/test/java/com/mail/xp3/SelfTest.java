@@ -4,6 +4,7 @@ import com.mail.xp3.net.Address;
 import com.mail.xp3.net.Attachment;
 import com.mail.xp3.net.Change;
 import com.mail.xp3.net.Conversation;
+import com.mail.xp3.net.Eml;
 import com.mail.xp3.net.Folder;
 import com.mail.xp3.net.Gmail;
 import com.mail.xp3.net.Html;
@@ -36,6 +37,33 @@ public final class SelfTest {
 
     public static void main(String[] args) throws Exception {
         final Check check = new Check();
+        check.run("email files", () -> {
+            // As Transform writes one, with Python's email package.
+            Outgoing typed = Eml.open(("To: Ms. Rivera <rivera@school.org>, sam@x.org\nSubject: Late homework =?utf-8?b?4oCU?= sorry\n"
+                + "X-Unsent: 1\nContent-Type: text/plain; charset=\"utf-8\"\nContent-Transfer-Encoding: 8bit\nMIME-Version: 1.0\n\n"
+                + "Dear Ms. Rivera,\n\nI’ll hand it in tomorrow.\n\nSam\n").getBytes(Charset.forName("UTF-8")));
+            check.same("a new message", Outgoing.NEW, typed.kind);
+            check.same("to", "Ms. Rivera <rivera@school.org>, sam@x.org", typed.to);
+            check.same("no cc", "", typed.cc);
+            check.same("the subject, decoded", "Late homework — sorry", typed.subject);
+            check.same("the text", "Dear Ms. Rivera,\n\nI’ll hand it in tomorrow.\n\nSam", typed.text);
+            check.same("no from", "", typed.from);
+            Outgoing qp = Eml.open(("Cc: \"Doe, Jane\" <jane@x.com>\r\nSubject: Lunch\r\n on Friday\r\nContent-Type: multipart/alternative; boundary=\"b1\"\r\n\r\n"
+                + "preamble\r\n--b1\r\nContent-Type: text/html\r\n\r\n<p>Hi</p>\r\n--b1\r\nContent-Type: text/plain; charset=utf-8\r\n"
+                + "Content-Transfer-Encoding: quoted-printable\r\n\r\nCaf=C3=A9 at noon, a long line broken by a so=\r\nft break.\r\n--b1--\r\n")
+                .getBytes(Charset.forName("UTF-8")));
+            check.same("cc, quoted", "\"Doe, Jane\" <jane@x.com>", qp.cc);
+            check.same("a folded subject", "Lunch on Friday", qp.subject);
+            check.same("the plain part, quoted-printable", "Café at noon, a long line broken by a soft break.", qp.text);
+            Outgoing bare = Eml.open("Subject: Hi\n\n".getBytes(Charset.forName("UTF-8")));
+            check.same("no one yet", "", bare.to);
+            check.same("an empty body", "", bare.text);
+            Outgoing b64 = Eml.open(("Subject: x\nContent-Type: multipart/mixed; boundary=zz\n\n--zz\n\n"
+                + Base64.getEncoder().encodeToString("ignored".getBytes(Charset.forName("UTF-8"))) + "\n--zz\nContent-Type: text/html; charset=utf-8\n"
+                + "Content-Transfer-Encoding: base64\n\n" + Base64.getMimeEncoder().encodeToString("<p>Only <b>HTML</b></p>".getBytes(Charset.forName("UTF-8")))
+                + "\n--zz--\n").getBytes(Charset.forName("UTF-8")));
+            check.same("a part with no headers is plain text", "aWdub3JlZA==", b64.text);
+        });
         check.run("addresses", () -> {
             List<Address> list = Address.parse("\"Doe, Jane\" <jane@x.com>, bob@y.org, =?UTF-8?Q?Ren=C3=A9?= <rene@z.fr>, undisclosed-recipients:;");
             check.same("count", 3, list.size());
