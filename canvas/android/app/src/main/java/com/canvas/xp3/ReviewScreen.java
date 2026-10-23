@@ -46,11 +46,6 @@ final class ReviewScreen extends Screen {
     }
 
     @Override
-    boolean globalOptions() {
-        return false;
-    }
-
-    @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
         boolean up = event.getAction() == KeyEvent.ACTION_UP;

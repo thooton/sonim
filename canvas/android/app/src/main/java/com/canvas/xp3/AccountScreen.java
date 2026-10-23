@@ -22,11 +22,6 @@ final class AccountScreen extends Screen {
     }
 
     @Override
-    boolean globalOptions() {
-        return false;
-    }
-
-    @Override
     View build() {
         Parts parts = new Parts(app);
         Config config = app.backend.config();
