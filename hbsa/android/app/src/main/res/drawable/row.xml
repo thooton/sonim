@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An event: plain at rest; under the d-pad, shaded edge to edge with a
+     violet-magenta bar down its left side. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <layer-list>
+            <item><color android:color="@color/press_fill" /></item>
+            <item android:gravity="left" android:width="3dp"><color android:color="@color/focus_rule" /></item>
+        </layer-list>
+    </item>
+    <item android:state_selected="true">
+        <layer-list>
+            <item><color android:color="@color/focus_fill" /></item>
+            <item android:gravity="left" android:width="3dp"><color android:color="@color/focus_rule" /></item>
+        </layer-list>
+    </item>
+    <item><color android:color="@color/row" /></item>
+</selector>

@@ -114,35 +114,74 @@ public final class SelfTest {
             check.same("midnight", "12 AM", Dates.clock(0));
         });
 
-        check.run("next event", () -> {
-            Post social = new Post("S", "u", posted1, "Fall Social!\nFriday, Oct 31\n6-9 PM at the MU", Arrays.asList("a"), 0);
-            Post gbm = new Post("G", "u", posted2, "GBM this Thursday at 7pm", Arrays.asList("a"), 0);
-            Post recap = new Post("R", "u", posted2, "Thanks for coming on Oct 3!", Arrays.asList("a"), 0);
-            long now = at("2026-10-23T09:00:00-07:00");
-            Dates.Event next = Dates.next(Arrays.asList(social, gbm, recap), now, PHOENIX);
-            check.same("the social", "S", next.post.shortcode);
-            check.same("on the 31st", at("2026-10-31T00:00:00-07:00"), next.day);
-            check.same("from a time on its own line", 18 * 60, next.minutes);
-            check.same("8 days away", 8, Dates.daysBetween(Dates.midnight(now, PHOENIX), next.day));
-            check.ok("nothing once it has passed", Dates.next(Arrays.asList(social, gbm, recap), at("2026-11-01T09:00:00-07:00"), PHOENIX) == null);
-            Dates.Event today = Dates.next(Arrays.asList(gbm), at("2026-10-15T08:00:00-07:00"), PHOENIX);
-            check.same("today counts", at("2026-10-15T00:00:00-07:00"), today.day);
+        check.run("more dates", () -> {
+            check.same("tonight", at("2026-10-21T00:00:00-07:00"), Dates.find("Movie night tonight!", posted1, PHOENIX).get(0).day);
+            check.same("tomorrow", at("2026-10-22T00:00:00-07:00"), Dates.find("see you tomorrow", posted1, PHOENIX).get(0).day);
+            check.same("24-hour", 18 * 60 + 30, Dates.find("doors 18:30", posted1, PHOENIX).get(0).minutes);
+            check.same("7:30 is evening", 19 * 60 + 30, Dates.find("starts 7:30", posted1, PHOENIX).get(0).minutes);
+            check.same("11:00 stays morning", 11 * 60, Dates.find("brunch 11:00", posted1, PHOENIX).get(0).minutes);
+            check.same("not a price", 0, Dates.find("only $5.00", posted1, PHOENIX).size());
         });
 
-        check.run("words", () -> {
+        check.run("events", () -> {
+            List<Dates.Event> one = Dates.events(new Post("S", "u", posted1, "Fall Social at the MU! Food and games.\n📅 Saturday, Oct 31\n⏰ 6-9 PM", Arrays.asList("a"), 0), PHOENIX);
+            check.same("one event", 1, one.size());
+            check.same("its day", at("2026-10-31T00:00:00-07:00"), one.get(0).day);
+            check.same("time on its own line", 18 * 60, one.get(0).minutes);
+            check.same("named by the caption", "Fall Social at the MU!", one.get(0).title);
+
+            Post many = new Post("M", "u", posted1, "This week at HBSA:\nGBM - Oct 22 at 7pm\nDiwali Night: Nov 8, 6:30pm\nStudy hall 10/24", Arrays.asList("a"), 0);
+            List<Dates.Event> three = Dates.events(many, PHOENIX);
+            check.same("three events", 3, three.size());
+            check.same("first name", "GBM", three.get(0).title);
+            check.same("first time", 19 * 60, three.get(0).minutes);
+            check.same("second name", "Diwali Night", three.get(1).title);
+            check.same("second time", 18 * 60 + 30, three.get(1).minutes);
+            check.same("third name", "Study hall", three.get(2).title);
+            check.same("no time of its own", -1, three.get(2).minutes);
+
+            Post every = new Post("E", "u", posted1, "Meetings every Thursday! Next social is Nov 1 at 5pm", Arrays.asList("a"), 0);
+            List<Dates.Event> e = Dates.events(every, PHOENIX);
+            check.same("weekday dropped beside a date", 1, e.size());
+            check.same("the date", at("2026-11-01T00:00:00-07:00"), e.get(0).day);
+
+            Post again = new Post("A", "u", posted1, "Oct 31! Doors open Oct 31 at 6pm", Arrays.asList("a"), 0);
+            List<Dates.Event> once = Dates.events(again, PHOENIX);
+            check.same("a day named twice is one event", 1, once.size());
+            check.same("with the time", 18 * 60, once.get(0).minutes);
+
+            check.same("a time before its day", 17 * 60, Dates.events(new Post("B", "u", posted1, "Bake sale 5pm on Oct 30", Arrays.asList("a"), 0), PHOENIX).get(0).minutes);
+            check.same("no date, no event", 0, Dates.events(new Post("N", "u", posted1, "Thanks everyone!", Arrays.asList("a"), 0), PHOENIX).size());
+            check.same("too far off", 0, Dates.events(new Post("F", "u", posted1, "Save the date: April 2", Arrays.asList("a"), 0), PHOENIX).size());
+        });
+
+        check.run("agenda", () -> {
             long now = at("2026-10-23T09:00:00-07:00");
-            check.same("minutes", "5 min ago", Dates.ago(now - 5 * 60000, now, PHOENIX));
-            check.same("hours", "3 h ago", Dates.ago(now - 3 * 3600000, now, PHOENIX));
-            check.same("days", "2 days ago", Dates.ago(posted1, now, PHOENIX));
-            check.same("a date", "Oct 14", Dates.ago(posted2, now, PHOENIX));
-            check.same("last year", "Oct 14, 2025", Dates.date(at("2025-10-14T09:00:00-07:00"), now, PHOENIX));
-            Post social = new Post("S", "u", posted1, "Fall Social at the MU! Food and games.\nFriday, Oct 31 6pm", Arrays.asList("a"), 0);
-            Dates.Event next = Dates.next(Arrays.asList(social), now, PHOENIX);
-            check.same("when", "Sat 6 PM · in 8 days", Dates.when(next, now, PHOENIX));
-            check.same("page", Arrays.asList("OCT", "31"), Arrays.asList(Dates.page(next.day, PHOENIX)));
-            check.same("tomorrow", "Tomorrow · 6 PM", Dates.when(next, at("2026-10-30T20:00:00-07:00"), PHOENIX));
-            check.same("title", "Fall Social at the MU!", Dates.title("\n  " + social.caption));
-            check.same("short sentence kept whole", "Hi. We meet weekly", Dates.title("Hi. We meet weekly"));
+            Post social = new Post("S", "u", posted1, "Fall Social!\nSaturday, Oct 31\n6-9 PM at the MU", Arrays.asList("a"), 0);
+            Post gbm = new Post("G", "u", posted2, "GBM this Thursday at 7pm", Arrays.asList("a"), 0);
+            Post halloween = new Post("H", "u", posted1, "Pumpkin carving Oct 31 at 2pm", Arrays.asList("a"), 0);
+            Post thanks = new Post("T", "u", posted1, "Thank you all!", Arrays.asList("a"), 0);
+            Agenda agenda = Agenda.build(Arrays.asList(social, thanks, gbm, halloween), now, PHOENIX);
+            List<Agenda.Entry> e = agenda.entries;
+            check.same("entries", 7, e.size());
+            check.same("past day first", "Thursday, Oct 15", e.get(0).heading);
+            check.ok("and it is past", e.get(1).past);
+            check.same("then the 31st", "Saturday, Oct 31", e.get(2).heading);
+            check.same("earlier time first", "H", e.get(3).post.shortcode);
+            check.same("then the social", "S", e.get(4).post.shortcode);
+            check.same("undated last", "Other posts", e.get(5).heading);
+            check.same("the undated post", "T", e.get(6).post.shortcode);
+            check.same("opens on the first upcoming", 3, agenda.start);
+            check.same("items", Arrays.asList(1, 3, 4, 6), agenda.items());
+            check.same("today", "Today", Dates.heading(at("2026-10-23T00:00:00-07:00"), now, PHOENIX));
+            check.same("tomorrow", "Tomorrow", Dates.heading(at("2026-10-24T00:00:00-07:00"), now, PHOENIX));
+            check.same("next year", "Friday, Jan 1, 2027", Dates.heading(at("2027-01-01T00:00:00-07:00"), now, PHOENIX));
+
+            Agenda over = Agenda.build(Arrays.asList(gbm, thanks), now, PHOENIX);
+            check.same("nothing ahead: opens on the last event", 1, over.start);
+            Agenda none = Agenda.build(Arrays.asList(thanks), now, PHOENIX);
+            check.same("no events: opens on the posts", 1, none.start);
+            check.same("clock", "6:30 PM", Dates.clock(18 * 60 + 30));
         });
 
         if (!check.report()) System.exit(1);

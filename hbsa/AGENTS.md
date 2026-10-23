@@ -35,31 +35,47 @@ Picture addresses are signed and expire, so `Pictures` keeps each picture on
 disk (in the cache dir, at most 480px wide) by shortcode and carousel index,
 and prunes the files of posts that have dropped out of the latest 12.
 
-## Dates
+## Events
 
 `Dates.find` finds the dates and times in a caption ("Friday, Oct 31 at
-6pm", "10/31", "the 2nd of November", "7-9pm", "noon"). A date without a
-year takes the post's year, or the next if that would put it more than 45
-days before the post; a weekday on its own is the first such day on or after
-the post. `Dates.next` picks the soonest one not yet passed across all
-posts (a written-out date beats a lone weekday in the same caption, and
-nothing more than 120 days after its post counts), with the time nearest it.
+6pm", "10/31", "the 2nd of November", "tonight", "tomorrow", "7-9pm",
+"noon", "18:30", and "7:30" with no am or pm, taken as evening for 1:00 to
+9:59). A date without a year takes the post's year, or the next if that
+would put it more than 45 days before the post; a weekday on its own is the
+first such day on or after the post.
+
+`Dates.events` turns those into the post's events, one per day: a written-out
+date beats a lone weekday in the same caption, a date more than 120 days
+after the post or 60 before it is dropped, and each date takes the first
+time after it and before the next date (else one earlier on its line). An
+event is named by the caption's first sentence, or, when the post announces
+several, by its own line with the date taken out ("Diwali Night - Nov 8,
+6pm" is "Diwali Night").
+
+`Agenda.build` is the list: events by day then time (untimed last), a
+heading before each day, then "Other posts" for posts with no date; `start`
+is the first event today or later, where the list opens.
 
 ## Layout
 
-- `android/core`: `Post`, `Instagram`, `Dates`. Tests in `src/test` use
-  pages written for the tests in Instagram's shape; run them with
-  `./gradlew :hbsa:core:selfTest`.
-- `android/app`: `MainActivity` (the list and the gold card), `PostActivity`
-  (a post), `Club` (the posts on disk in `files/posts.json`, when they were
-  fetched, and which have been opened: on the first fetch every post counts
-  as seen, and later ones are new until opened), `Pictures`.
-- `mockups/index.html`: the three designs considered; B (Agenda) is the one
-  built.
+- `android/core`: `Post`, `Instagram`, `Dates`, `Agenda`. Tests in
+  `src/test` use pages written for the tests in Instagram's shape; run them
+  with `./gradlew :hbsa:core:selfTest`.
+- `android/app`: `MainActivity` (the agenda; a thin bar along the top while
+  fetching), `PostActivity` (an event's post; Left and Right walk the
+  agenda), `Club` (the posts on disk in `files/posts.json`, when they were
+  fetched, and the agenda on screen), `Pictures`.
+- `mockups/index.html`: the first three designs considered. The app has
+  moved on from them (see Look).
 
 ## Look
 
-The family look (see `../DESIGN.md`) in ASU maroon and gold: maroon
-`#5A1229` header and status bar, `#8C1D40` for focus and what is new, gold
-`#FFC627` only for dates (the next-event card and the marks in a caption).
-The icon is a tear-off calendar page, gold on maroon, with a day circled.
+No headers on any screen: the list and the post start at the top. Violet
+and magenta: the status bar `#3A0D4A`; `#9C1FA6` for the day headings, the
+event under the d-pad and when an event is; `#F8D8F2` behind the dates
+marked in a caption. Past events are greyed (`#A79DAB`). The event under the
+d-pad is shaded edge to edge (`#F3E2F7`) with a 3dp violet bar down its left
+side (`res/drawable/row.xml`), not the family's rounded outline. Posting
+dates are deliberately not shown anywhere: the user found them confusing
+beside event dates. The icon is a tear-off calendar page on violet with a
+day circled.

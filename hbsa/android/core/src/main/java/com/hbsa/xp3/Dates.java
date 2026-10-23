@@ -9,13 +9,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The dates and times a caption mentions ("Friday, Oct 31 at 6pm",
- * "10/31", "7-9 PM"), for marking them in the caption and for finding the
- * club's next event.
+ * The events a caption announces: the dates and times it mentions
+ * ("Friday, Oct 31 at 6pm", "10/31", "tonight", "7-9 PM", "18:30"), each
+ * date paired with the time that goes with it.
  *
  * A date without a year is taken in the year of the post, or the next one if
  * that would put it well before the post. A weekday on its own ("this
- * Thursday") is the first such day on or after the post.
+ * Thursday") is the first such day on or after the post; "today" and
+ * "tonight" are the day of the post, "tomorrow" the day after.
  */
 public final class Dates {
 
@@ -34,12 +35,18 @@ public final class Dates {
     private static final Pattern NUMERIC = Pattern.compile(
         "(?<![0-9/$.])(1[0-2]|0?[1-9])/(3[01]|[12][0-9]|0?[1-9])(?:/(20[0-9]{2}|[0-9]{2}))?(?![0-9/])");
     private static final Pattern WEEKDAYS = Pattern.compile("\\b" + WEEKDAY + "\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern RELATIVE = Pattern.compile("\\b(today|tonight|tomorrow)\\b", Pattern.CASE_INSENSITIVE);
     /** "6pm", "6:30 PM", "7-9pm", "7pm - 9pm", "noon". */
     private static final Pattern TIME = Pattern.compile(
         "\\b" + CLOCK + "(?:\\s*" + MERIDIEM + ")?\\s*(?:-|–|—|to)\\s*" + CLOCK + "\\s*" + MERIDIEM
         + "|\\b" + CLOCK + "\\s*" + MERIDIEM
         + "|\\bnoon\\b",
         Pattern.CASE_INSENSITIVE);
+    /**
+     * "18:30", or "7:30" with no am or pm: a club's 1:00 to 9:59 is taken to
+     * be in the afternoon or evening.
+     */
+    private static final Pattern BARE_TIME = Pattern.compile("(?<![0-9:$.])([01]?[0-9]|2[0-3]):([0-5][0-9])(?![0-9:])");
 
     private static final String[] MONTHS = {"jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"};
     private static final String[] DAYS = {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"};
@@ -67,16 +74,20 @@ public final class Dates {
         }
     }
 
-    /** An upcoming event, as the gold card on the list shows it. */
+    /** One event a post announces. */
     public static final class Event {
         public final Post post;
+        /** Local midnight of its day. */
         public final long day;
+        /** When it starts, in minutes after midnight, or -1 if the caption doesn't say. */
         public final int minutes;
+        public final String title;
 
-        Event(Post post, long day, int minutes) {
+        Event(Post post, long day, int minutes, String title) {
             this.post = post;
             this.day = day;
             this.minutes = minutes;
+            this.title = title;
         }
     }
 
@@ -100,55 +111,116 @@ public final class Dates {
         while (m.find()) {
             add(found, m.start(), m.end(), weekday(posted, zone, m.group(1).toLowerCase(Locale.US)), false);
         }
-        m = TIME.matcher(caption);
+        m = RELATIVE.matcher(caption);
         while (m.find()) {
-            int minutes = minutes(m);
-            if (minutes >= 0) addTime(found, m.start(), m.end(), minutes);
+            add(found, m.start(), m.end(), m.group(1).equalsIgnoreCase("tomorrow") ? midnight(posted + DAY_MS + DAY_MS / 2, zone) : posted, true);
+        }
+        m = TIME.matcher(caption);
+        while (m.find()) addTime(found, m.start(), m.end(), minutes(m));
+        m = BARE_TIME.matcher(caption);
+        while (m.find()) {
+            int hour = Integer.parseInt(m.group(1));
+            if (hour >= 1 && hour <= 9) hour += 12;
+            addTime(found, m.start(), m.end(), hour * 60 + Integer.parseInt(m.group(2)));
         }
         sort(found);
         return merge(caption, found);
     }
 
     /**
-     * The soonest event, from all the posts, that hasn't passed: a written-out
-     * date is trusted over a weekday on its own, which is used only when a
-     * caption has no other date.
+     * The events a post announces, one per day it names, in the caption's
+     * order. A written-out date is trusted over a weekday on its own, which
+     * counts only when the caption has no other date ("every Thursday" in a
+     * post about Oct 31 isn't an event); and a date more than 120 days after
+     * the post, or 60 before it, is taken for something else.
      */
-    public static Event next(List<Post> posts, long now, TimeZone zone) {
-        long today = midnight(now, zone);
-        Event best = null;
-        for (Post post : posts) {
-            List<Mention> mentions = find(post.caption, post.postedAt, zone);
-            boolean anyExact = false;
-            for (Mention mention : mentions) anyExact |= mention.exact;
-            for (Mention mention : mentions) {
-                if (mention.day < today || anyExact && !mention.exact) continue;
-                // Nothing more than a few weeks after the post: "Oct 3" in a
-                // recap is last year's, not next year's.
-                if (mention.day > midnight(post.postedAt, zone) + 120 * DAY_MS) continue;
-                int minutes = mention.minutes >= 0 ? mention.minutes : timeNear(mentions, mention);
-                if (best == null || mention.day < best.day
-                    || mention.day == best.day && best.minutes < 0 && minutes >= 0) {
-                    best = new Event(post, mention.day, minutes);
-                }
+    public static List<Event> events(Post post, TimeZone zone) {
+        List<Mention> mentions = find(post.caption, post.postedAt, zone);
+        List<Mention> dates = new ArrayList<Mention>();
+        boolean anyExact = false;
+        for (Mention m : mentions) anyExact |= m.day >= 0 && m.exact;
+        long posted = midnight(post.postedAt, zone);
+        for (Mention m : mentions) {
+            if (m.day < 0 || anyExact && !m.exact) continue;
+            if (m.day > posted + 120 * DAY_MS || m.day < posted - 60 * DAY_MS) continue;
+            dates.add(m);
+        }
+        List<Event> events = new ArrayList<Event>();
+        for (int i = 0; i < dates.size(); i++) {
+            Mention date = dates.get(i);
+            int minutes = date.minutes >= 0 ? date.minutes
+                : timeFor(post.caption, mentions, date, i + 1 < dates.size() ? dates.get(i + 1).start : post.caption.length());
+            boolean merged = false;
+            for (int k = 0; k < events.size(); k++) {
+                Event e = events.get(k);
+                if (e.day != date.day) continue;
+                if (e.minutes < 0 && minutes >= 0) events.set(k, new Event(post, e.day, minutes, e.title));
+                merged = true;
             }
+            if (merged) continue;
+            String title = dates.size() > 1 ? lineTitle(post.caption, mentions, date) : null;
+            events.add(new Event(post, date.day, minutes, title != null ? title : title(post.caption)));
+        }
+        return events;
+    }
+
+    /**
+     * The time that goes with a date: the first one after it and before the
+     * next date, else one earlier on the same line ("6pm on Friday").
+     */
+    private static int timeFor(String caption, List<Mention> mentions, Mention date, int until) {
+        for (Mention m : mentions) {
+            if (m.day < 0 && m.minutes >= 0 && m.start >= date.end && m.start < until && m.start - date.end <= 200) return m.minutes;
+        }
+        int lineStart = caption.lastIndexOf('\n', date.start) + 1;
+        int best = -1;
+        for (Mention m : mentions) {
+            if (m.day < 0 && m.minutes >= 0 && m.end <= date.start && m.start >= lineStart) best = m.minutes;
         }
         return best;
     }
 
-    /** The time mentioned closest after a date, or else just before it. */
-    private static int timeNear(List<Mention> mentions, Mention date) {
-        int best = -1;
-        int distance = Integer.MAX_VALUE;
+    /**
+     * For a post announcing several events, each one's name from its own
+     * line ("Diwali Night - Nov 8, 6pm" is "Diwali Night"), or null when the
+     * line is nothing but the date.
+     */
+    private static String lineTitle(String caption, List<Mention> mentions, Mention date) {
+        int start = caption.lastIndexOf('\n', date.start) + 1;
+        int end = caption.indexOf('\n', date.end);
+        if (end < 0) end = caption.length();
+        StringBuilder line = new StringBuilder();
+        int at = start;
         for (Mention m : mentions) {
-            if (m.day >= 0 || m.minutes < 0) continue;
-            int gap = m.start >= date.end ? m.start - date.end : (date.start - m.end) * 3;
-            if (gap >= 0 && gap < distance && gap <= 120) {
-                distance = gap;
-                best = m.minutes;
-            }
+            if (m.end <= start || m.start >= end) continue;
+            line.append(caption, at, Math.max(at, m.start)).append(' ');
+            at = Math.max(at, m.end);
         }
-        return best;
+        line.append(caption, at, end);
+        String text = line.toString()
+            .replaceAll("(?i)\\b(date|when|time|where|on|at|from|by|this|next)\\s*:?\\s*(?=[^\\p{L}]*$)", "")
+            .replaceAll("(?i)^[^\\p{L}\\p{N}]*(date|when|time)\\s*:", "")
+            .replaceAll("\\s+", " ")
+            .replaceAll("^[^\\p{L}\\p{N}]+|[\\s\\-–—|@,:;·•(]+$", "")
+            .trim();
+        int letters = 0;
+        for (int i = 0; i < text.length(); i++) if (Character.isLetter(text.charAt(i))) letters++;
+        return letters >= 2 ? text : null;
+    }
+
+    /** "Today", "Tomorrow", "Yesterday", or "Saturday, Oct 31" (with the year when it isn't this one). */
+    public static String heading(long day, long now, TimeZone zone) {
+        int days = daysBetween(midnight(now, zone), day);
+        if (days == 0) return "Today";
+        if (days == 1) return "Tomorrow";
+        if (days == -1) return "Yesterday";
+        Calendar c = Calendar.getInstance(zone, Locale.US);
+        c.setTimeInMillis(now);
+        int thisYear = c.get(Calendar.YEAR);
+        c.setTimeInMillis(day);
+        String out = c.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.US) + ", "
+            + c.getDisplayName(Calendar.MONTH, Calendar.SHORT, Locale.US) + " " + c.get(Calendar.DAY_OF_MONTH);
+        return c.get(Calendar.YEAR) == thisYear ? out : out + ", " + c.get(Calendar.YEAR);
     }
 
     /** "6 PM", "6:30 PM", "12 PM". */
@@ -157,50 +229,6 @@ public final class Dates {
         int minute = minutes % 60;
         int twelve = hour % 12 == 0 ? 12 : hour % 12;
         return twelve + (minute == 0 ? "" : String.format(Locale.US, ":%02d", minute)) + (hour < 12 ? " AM" : " PM");
-    }
-
-    /** When a post went up: "just now", "5 min ago", "3 h ago", "Yesterday", "4 days ago", "Oct 14". */
-    public static String ago(long posted, long now, TimeZone zone) {
-        long minutes = (now - posted) / 60000;
-        if (minutes < 1) return "just now";
-        if (minutes < 60) return minutes + " min ago";
-        if (minutes < 24 * 60) return (minutes / 60) + " h ago";
-        int days = daysBetween(midnight(posted, zone), midnight(now, zone));
-        if (days <= 1) return "Yesterday";
-        if (days < 7) return days + " days ago";
-        return date(posted, now, zone);
-    }
-
-    /** "Oct 14", with the year when it isn't this one. */
-    public static String date(long time, long now, TimeZone zone) {
-        Calendar c = Calendar.getInstance(zone, Locale.US);
-        c.setTimeInMillis(now);
-        int thisYear = c.get(Calendar.YEAR);
-        c.setTimeInMillis(time);
-        String out = c.getDisplayName(Calendar.MONTH, Calendar.SHORT, Locale.US) + " " + c.get(Calendar.DAY_OF_MONTH);
-        return c.get(Calendar.YEAR) == thisYear ? out : out + ", " + c.get(Calendar.YEAR);
-    }
-
-    /** When an event is, as the card says it: "Today · 6 PM", "Tomorrow", "Fri 6 PM · in 8 days". */
-    public static String when(Event event, long now, TimeZone zone) {
-        int days = daysBetween(midnight(now, zone), event.day);
-        String time = event.minutes >= 0 ? clock(event.minutes) : null;
-        if (days == 0) return time == null ? "Today" : "Today · " + time;
-        if (days == 1) return time == null ? "Tomorrow" : "Tomorrow · " + time;
-        Calendar c = Calendar.getInstance(zone, Locale.US);
-        c.setTimeInMillis(event.day);
-        String day = c.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.US);
-        return (time == null ? day : day + " " + time) + " · in " + days + " days";
-    }
-
-    /** "OCT" and "31", for the tear-off calendar page on the card. */
-    public static String[] page(long day, TimeZone zone) {
-        Calendar c = Calendar.getInstance(zone, Locale.US);
-        c.setTimeInMillis(day);
-        return new String[] {
-            c.getDisplayName(Calendar.MONTH, Calendar.SHORT, Locale.US).toUpperCase(Locale.US),
-            String.valueOf(c.get(Calendar.DAY_OF_MONTH)),
-        };
     }
 
     /** A caption's first line, cut at the end of its first sentence: the event's name. */

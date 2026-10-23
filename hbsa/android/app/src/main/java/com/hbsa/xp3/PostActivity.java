@@ -20,57 +20,53 @@ import android.widget.TextView;
 
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Family;
-import com.xp3.common.ui.Ui;
 
 import java.util.List;
 import java.util.TimeZone;
 
 /**
- * One post: its picture over the whole of its caption, the dates and times
- * in the caption marked in gold. Left and Right go to the newer and older
- * post, OK to the next picture of a carousel, Up and Down scroll.
+ * One event's post: its picture, when the event is, and the whole caption
+ * with its dates and times marked. Left and Right go to the event before
+ * and after it in the list, OK to the next picture of a carousel, Up and
+ * Down scroll.
  */
 public final class PostActivity extends BaseActivity {
 
-    static final String INDEX = "index";
+    static final String POSITION = "position";
 
-    private List<Post> posts;
-    private int index;
+    private Agenda agenda;
+    /** The positions in the agenda that are events or posts. */
+    private List<Integer> items;
+    /** Which of `items` is shown. */
+    private int item;
     private int picture;
 
-    private TextView date;
-    private TextView ago;
     private ScrollView scroll;
     private LinearLayout page;
     private Picture image;
     private TextView counter;
+    private TextView when;
     private TextView caption;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        posts = Club.posts(this);
-        index = getIntent().getIntExtra(INDEX, 0);
-        if (state != null) index = state.getInt(INDEX, index);
-        if (index < 0 || index >= posts.size()) {
+        agenda = Club.agenda;
+        if (agenda == null) {
+            finish();
+            return;
+        }
+        items = agenda.items();
+        int position = getIntent().getIntExtra(POSITION, -1);
+        if (state != null) position = state.getInt(POSITION, position);
+        item = items.indexOf(position);
+        if (item < 0) {
             finish();
             return;
         }
 
-        LinearLayout root = vertical();
-        root.setBackgroundColor(color(R.color.page));
-        LinearLayout bar = new LinearLayout(this);
-        bar.setBackgroundColor(color(R.color.primary));
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(10), 0, dp(10), 0);
-        date = text("", 15, color(R.color.on_primary));
-        date.setTypeface(Family.MEDIUM);
-        bar.addView(date, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        ago = text("", 11, color(R.color.on_primary_dim));
-        bar.addView(ago);
-        root.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(32)));
-
         scroll = new ScrollView(this);
+        scroll.setBackgroundColor(color(R.color.page));
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setFocusable(true);
         scroll.setDefaultFocusHighlightEnabled(false);
@@ -89,13 +85,16 @@ public final class PostActivity extends BaseActivity {
         corner.setMargins(0, dp(6), dp(6), 0);
         frame.addView(counter, corner);
         page.addView(frame);
+        when = text("", 13, color(R.color.focus_rule));
+        when.setTypeface(Family.MEDIUM);
+        when.setPadding(dp(10), dp(10), dp(10), 0);
+        page.addView(when);
         caption = text("", 13, color(R.color.text));
         caption.setLineSpacing(dp(3), 1f);
-        caption.setPadding(dp(10), dp(9), dp(10), dp(16));
+        caption.setPadding(dp(10), dp(8), dp(10), dp(16));
         page.addView(caption);
         scroll.addView(page);
-        root.addView(scroll, Ui.weighted());
-        setContentView(root);
+        setContentView(scroll);
 
         bind();
         scroll.requestFocus();
@@ -104,25 +103,32 @@ public final class PostActivity extends BaseActivity {
     @Override
     protected void onSaveInstanceState(Bundle state) {
         super.onSaveInstanceState(state);
-        state.putInt(INDEX, index);
+        state.putInt(POSITION, items.get(item));
+    }
+
+    private Agenda.Entry entry() {
+        return agenda.entries.get(items.get(item));
     }
 
     private void bind() {
-        Post post = posts.get(index);
-        Club.seen(this, post);
-        long now = System.currentTimeMillis();
-        TimeZone zone = TimeZone.getDefault();
-        date.setText(Dates.date(post.postedAt, now, zone));
-        String when = Dates.ago(post.postedAt, now, zone);
-        ago.setText(when.equals(date.getText().toString()) ? "" : when);
+        Agenda.Entry entry = entry();
+        Club.opened = items.get(item);
+        if (entry.event != null) {
+            String day = Dates.heading(entry.event.day, System.currentTimeMillis(), TimeZone.getDefault());
+            when.setText(entry.event.minutes >= 0 ? day + " · " + Dates.clock(entry.event.minutes) : day);
+            when.setTextColor(color(entry.past ? R.color.text_muted : R.color.focus_rule));
+            when.setVisibility(View.VISIBLE);
+        } else {
+            when.setVisibility(View.GONE);
+        }
         picture = 0;
         showPicture();
-        caption.setText(marked(post));
+        caption.setText(marked(entry.post));
         scroll.scrollTo(0, 0);
     }
 
     private void showPicture() {
-        Post post = posts.get(index);
+        Post post = entry().post;
         int count = post.images.size();
         counter.setVisibility(count > 1 ? View.VISIBLE : View.GONE);
         counter.setText((picture + 1) + "/" + count);
@@ -130,7 +136,7 @@ public final class PostActivity extends BaseActivity {
         Pictures.show(this, image, post, picture, Pictures.WIDTH);
     }
 
-    /** The caption with every date and time in it on a gold highlighter. */
+    /** The caption with every date and time in it marked. */
     private CharSequence marked(Post post) {
         String text = post.caption.trim();
         if (text.isEmpty()) return "";
@@ -142,11 +148,11 @@ public final class PostActivity extends BaseActivity {
         return out;
     }
 
-    /** To the newer (-1) or older (+1) post, sliding in from that side. */
+    /** To the event before (-1) or after (+1) in the list, sliding in from that side. */
     private void turn(int direction) {
-        int to = index + direction;
-        if (to < 0 || to >= posts.size()) return;
-        index = to;
+        int to = item + direction;
+        if (to < 0 || to >= items.size()) return;
+        item = to;
         bind();
         page.setTranslationX(direction * dp(48));
         page.setAlpha(0f);
@@ -169,8 +175,8 @@ public final class PostActivity extends BaseActivity {
             default:
                 break;
         }
-        if (Ui.isOk(key)) {
-            int count = posts.get(index).images.size();
+        if (com.xp3.common.ui.Ui.isOk(key)) {
+            int count = entry().post.images.size();
             if (down && event.getRepeatCount() == 0 && count > 1) {
                 picture = (picture + 1) % count;
                 showPicture();
@@ -186,10 +192,10 @@ public final class PostActivity extends BaseActivity {
     }
 
     private void menu() {
-        PopupMenu popup = new PopupMenu(this, date, Gravity.END);
+        PopupMenu popup = new PopupMenu(this, page, Gravity.END);
         popup.getMenu().add(0, 1, 0, "Open in browser");
         popup.setOnMenuItemClickListener(item -> {
-            MainActivity.browse(this, posts.get(index).url);
+            MainActivity.browse(this, entry().post.url);
             return true;
         });
         popup.show();
