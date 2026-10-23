@@ -1,0 +1,7 @@
+// Reading @hbsaasu's profile page and the dates in its captions: plain Java,
+// checked on a desktop JVM.
+apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    api project(":common:core")
+}

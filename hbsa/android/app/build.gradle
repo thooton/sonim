@@ -1,0 +1,20 @@
+plugins {
+    id "com.android.application"
+}
+
+apply from: rootProject.file("gradle/app.gradle")
+
+android {
+    namespace "com.hbsa.xp3"
+
+    defaultConfig {
+        applicationId "com.hbsa.xp3"
+        versionCode 1
+        versionName "1.0.0"
+    }
+}
+
+dependencies {
+    implementation project(":hbsa:core")
+    implementation project(":common:ui")
+}
