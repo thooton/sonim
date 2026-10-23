@@ -60,11 +60,6 @@ final class PickerScreen extends Screen {
     }
 
     @Override
-    boolean globalOptions() {
-        return false;
-    }
-
-    @Override
     boolean onBack() {
         if (folder == null) return false;
         File parent = folder.getParentFile();

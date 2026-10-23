@@ -49,11 +49,6 @@ final class LinkScreen extends Screen {
     }
 
     @Override
-    boolean globalOptions() {
-        return false;
-    }
-
-    @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
         if (com.xp3.common.ui.Ui.isOk(code) && app.getCurrentFocus() instanceof EditText) {

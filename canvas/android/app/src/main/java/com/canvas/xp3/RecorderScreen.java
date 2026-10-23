@@ -56,11 +56,6 @@ final class RecorderScreen extends Screen {
         return out;
     }
 
-    @Override
-    boolean globalOptions() {
-        return false;
-    }
-
     private void discard() {
         Sheet.ask(app, "Discard this recording?", "It's deleted from this phone.", "Discard", "Keep recording",
             () -> {

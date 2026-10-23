@@ -76,11 +76,6 @@ final class CameraScreen extends Screen {
     }
 
     @Override
-    boolean globalOptions() {
-        return false;
-    }
-
-    @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
         if (com.xp3.common.ui.Ui.isOk(code) || code == KeyEvent.KEYCODE_CAMERA) {
