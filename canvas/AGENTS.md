@@ -56,7 +56,7 @@ rationale comments beside the implementation.
     saved work and how it becomes one submission (`Draft.plan`),
     notifications, settings, quizzes and reminder times.
 - `android/app`: Android UI and orchestration.
-  - `MainActivity.java` owns the screen stack, the softkey bar, overlays,
+  - `MainActivity.java` owns the screen stack, the hidden softkey bar, overlays,
     key routing, sync and turn-in orchestration.
   - Each screen is a `Screen` subclass that rebuilds its whole view from its
     state; `MainActivity` restores focus by `Item.key` afterwards.
@@ -175,8 +175,11 @@ d-pad reachability and visible selection for every action.
 - The home tab indices intentionally equal `Assignment.ASSIGNED`, `MISSING`,
   and `DONE`.
 - Yellow (`Look.mark`) means focus and nothing else. The softkey bar is
-  hidden (its labels are still kept up to date, unshown). Left softkey arrives as MENU or SOFT_LEFT;
-  every right-softkey shortcut is also reachable from Options.
+  hidden (its labels are still kept up to date, unshown).
+- The phone has two softkeys, Menu and Back, used like a right click and a
+  back arrow: Menu (MENU or SOFT_LEFT) opens Options and Back goes back.
+  Never give either another job, and never put an action on a softkey alone:
+  every action is a row or button the d-pad reaches, or an Options entry.
 - Reusable dimensions and colors belong in resources. Check every added label
   at 240px width and every screen at 320px height; one extra row is material.
 - Lists act on OK key release. Sonim firmware may report OK as either

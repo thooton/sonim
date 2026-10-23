@@ -51,14 +51,8 @@ final class ClassScreen extends Screen {
         });
     }
 
-    @Override
-    String right() {
-        return tab == 1 && data != null && data.topics.size() > 1 ? "Topics" : null;
-    }
-
     /** Jumps to the next topic heading in Classwork. */
-    @Override
-    void onRight() {
+    private void nextTopic() {
         if (tab != 1 || scroll == null) return;
         View focus = app.getCurrentFocus();
         List<Item> rows = items(scroll);
@@ -76,6 +70,9 @@ final class ClassScreen extends Screen {
     @Override
     List<Sheet.Choice> options() {
         List<Sheet.Choice> out = new ArrayList<>();
+        if (tab == 1 && data != null && data.topics.size() > 1) {
+            out.add(new Sheet.Choice("Next topic", R.drawable.ic_folder, null, this::nextTopic));
+        }
         final boolean quiet = app.prefs.quiet.contains(course.id);
         out.add(new Sheet.Choice(quiet ? "Turn reminders on" : "Turn reminders off", R.drawable.ic_bell,
             "This class", () -> app.savePrefs(app.prefs.withQuiet(course.id, !quiet))));

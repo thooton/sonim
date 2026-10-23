@@ -50,33 +50,18 @@ final class PickerScreen extends Screen {
     }
 
     @Override
-    String left() {
-        return "Back";
+    List<Sheet.Choice> options() {
+        List<Sheet.Choice> out = new ArrayList<>();
+        out.add(new Sheet.Choice(byName ? "Newest first" : "A to Z", R.drawable.ic_bullets, null, () -> {
+            byName = !byName;
+            app.redraw();
+        }));
+        return out;
     }
 
     @Override
-    String right() {
-        return byName ? "Newest" : "A to Z";
-    }
-
-    @Override
-    void onRight() {
-        byName = !byName;
-        app.redraw();
-    }
-
-    @Override
-    boolean onKey(android.view.KeyEvent event) {
-        int code = event.getKeyCode();
-        if (code == android.view.KeyEvent.KEYCODE_MENU || code == android.view.KeyEvent.KEYCODE_SOFT_LEFT) {
-            if (event.getAction() == android.view.KeyEvent.ACTION_UP) onBackPressedHere();
-            return true;
-        }
+    boolean globalOptions() {
         return false;
-    }
-
-    private void onBackPressedHere() {
-        if (!onBack()) app.pop();
     }
 
     @Override

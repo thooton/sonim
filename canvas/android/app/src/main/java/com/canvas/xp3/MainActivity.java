@@ -43,13 +43,11 @@ import java.util.concurrent.ExecutorService;
  * The one activity: a stack of screens, the softkey bar under them, and
  * whatever is sliding over them.
  *
- * Every screen names its three keys in the bar at the bottom, so nothing has
- * to be guessed. The left softkey opens Options, the right one is the
- * screen's single shortcut, and OK does what the middle of the bar says.
- * Back goes back one screen. The XP3's own softkeys arrive as Menu and Back
- * on some firmware and as the soft-left and soft-right codes on others, so
- * every shortcut on the right is in Options too: nothing depends on a key the
- * phone might not send.
+ * The phone has two softkeys, Menu and Back, and they mean only that: Menu
+ * opens Options, like a right click, and Back goes back one screen. Every
+ * action is a row or button the d-pad reaches, or an entry in Options, and OK
+ * does what the middle of the bar says. Some firmware sends Menu as the
+ * soft-left code, so both open Options.
  *
  * The work list lives here, above the screens, because nearly every screen
  * reads it: the home timeline, a class's grades, the assignment page.
@@ -87,7 +85,6 @@ public final class MainActivity extends BaseActivity {
     private FrameLayout layer;
     private TextView keyLeft;
     private TextView keyCenter;
-    private TextView keyRight;
     private View bar;
     private Sheet.Open overlay;
     private View focusBeforeOverlay;
@@ -191,11 +188,8 @@ public final class MainActivity extends BaseActivity {
         keyLeft = views.text("", 9.5f, look.semibold, look.muted);
         keyCenter = views.text("", 9.5f, look.heavy, look.ink);
         keyCenter.setGravity(Gravity.CENTER);
-        keyRight = views.text("", 9.5f, look.semibold, look.muted);
-        keyRight.setGravity(Gravity.RIGHT);
         row.addView(keyLeft, Views.fill());
         row.addView(keyCenter, Views.fill());
-        row.addView(keyRight, Views.fill());
         LinearLayout holder = views.column();
         holder.addView(views.hairline());
         holder.addView(row, new LinearLayout.LayoutParams(-1, views.dp(18)));
@@ -362,7 +356,6 @@ public final class MainActivity extends BaseActivity {
         View focused = getCurrentFocus();
         if (focused instanceof EditText) center = screen.center();
         keyCenter.setText(center == null ? "" : center);
-        keyRight.setText(screen.right() == null ? "" : screen.right());
     }
 
     void refreshKeys() {
@@ -382,7 +375,6 @@ public final class MainActivity extends BaseActivity {
         layer.addView(open.view, new FrameLayout.LayoutParams(-1, -1));
         keyLeft.setText(open.left == null ? "" : open.left);
         keyCenter.setText(open.center == null ? "" : open.center);
-        keyRight.setText(open.right == null ? "" : open.right);
         List<Item> items = Screen.items(open.view);
         if (!items.isEmpty()) items.get(0).requestFocus();
     }
@@ -447,10 +439,6 @@ public final class MainActivity extends BaseActivity {
                 if (up) closeOverlay();
                 return true;
             }
-            if (code == KeyEvent.KEYCODE_SOFT_RIGHT) {
-                if (up && overlay.onRight != null) overlay.onRight.run();
-                return true;
-            }
             if (overlay.key(this, event)) return true;
             return super.dispatchKeyEvent(event);
         }
@@ -458,10 +446,6 @@ public final class MainActivity extends BaseActivity {
         if (screen != null && screen.onKey(event)) return true;
         if (isLeftSoft(code)) {
             if (up && screen != null && screen.left() != null) showOptions();
-            return true;
-        }
-        if (code == KeyEvent.KEYCODE_SOFT_RIGHT) {
-            if (up && screen != null && screen.right() != null) screen.onRight();
             return true;
         }
         // Clear backs out like Back, except in a text field, where it is how

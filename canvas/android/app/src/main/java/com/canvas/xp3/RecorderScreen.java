@@ -44,22 +44,24 @@ final class RecorderScreen extends Screen {
     }
 
     @Override
-    String left() {
-        return paused ? "Resume" : "Pause";
-    }
-
-    @Override
     String center() {
         return "Stop";
     }
 
     @Override
-    String right() {
-        return "Discard";
+    List<Sheet.Choice> options() {
+        List<Sheet.Choice> out = new ArrayList<>();
+        out.add(new Sheet.Choice(paused ? "Resume" : "Pause", R.drawable.ic_pause, null, this::pause));
+        out.add(new Sheet.Choice("Discard", R.drawable.ic_undo, null, this::discard));
+        return out;
     }
 
     @Override
-    void onRight() {
+    boolean globalOptions() {
+        return false;
+    }
+
+    private void discard() {
         Sheet.ask(app, "Discard this recording?", "It's deleted from this phone.", "Discard", "Keep recording",
             () -> {
                 release();
@@ -71,10 +73,6 @@ final class RecorderScreen extends Screen {
     @Override
     boolean onKey(android.view.KeyEvent event) {
         int code = event.getKeyCode();
-        if (code == android.view.KeyEvent.KEYCODE_MENU || code == android.view.KeyEvent.KEYCODE_SOFT_LEFT) {
-            if (event.getAction() == android.view.KeyEvent.ACTION_UP) pause();
-            return true;
-        }
         if (com.xp3.common.ui.Ui.isOk(code)) {
             if (event.getAction() == android.view.KeyEvent.ACTION_UP) stop();
             return true;

@@ -59,34 +59,30 @@ final class CameraScreen extends Screen {
     }
 
     @Override
-    String left() {
-        return "Gallery";
-    }
-
-    @Override
     String center() {
         return busy ? "" : "Capture";
     }
 
     @Override
-    String right() {
-        return pages.isEmpty() ? null : "Done";
+    List<Sheet.Choice> options() {
+        List<Sheet.Choice> out = new ArrayList<>();
+        out.add(new Sheet.Choice("Gallery", R.drawable.ic_image, null,
+            () -> app.withPermission(MainActivity.STORAGE, () -> app.push(PickerScreen.images(app, work)))));
+        if (!pages.isEmpty()) {
+            out.add(new Sheet.Choice("Done", R.drawable.ic_check, pages.size() + (pages.size() == 1 ? " page" : " pages"),
+                () -> app.push(new ReviewScreen(app, this, pages.size() - 1))));
+        }
+        return out;
     }
 
     @Override
-    void onRight() {
-        if (!pages.isEmpty()) app.push(new ReviewScreen(app, this, pages.size() - 1));
+    boolean globalOptions() {
+        return false;
     }
 
     @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
-        if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT) {
-            if (event.getAction() == KeyEvent.ACTION_UP) {
-                app.withPermission(MainActivity.STORAGE, () -> app.push(PickerScreen.images(app, work)));
-            }
-            return true;
-        }
         if (com.xp3.common.ui.Ui.isOk(code) || code == KeyEvent.KEYCODE_CAMERA) {
             if (event.getAction() == KeyEvent.ACTION_UP) capture();
             return true;

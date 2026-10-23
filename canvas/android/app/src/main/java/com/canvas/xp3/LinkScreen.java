@@ -10,6 +10,9 @@ import android.widget.TextView;
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Draft;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Add a link (D7). Typing a web address on a keypad is slow, so the common
  * pieces (https://, www., .com and /) sit under the field, one press each.
@@ -30,33 +33,29 @@ final class LinkScreen extends Screen {
     }
 
     @Override
-    String left() {
-        return "Cancel";
-    }
-
-    @Override
     String center() {
         return "Add";
     }
 
     @Override
-    String right() {
-        return "Clear";
+    List<Sheet.Choice> options() {
+        List<Sheet.Choice> out = new ArrayList<>();
+        final View focus = app.getCurrentFocus();
+        if (focus instanceof EditText) {
+            out.add(new Sheet.Choice("Clear", R.drawable.ic_undo, null, () -> ((EditText) focus).setText("")));
+        }
+        out.add(new Sheet.Choice("Cancel", R.drawable.ic_undo, null, app::pop));
+        return out;
     }
 
     @Override
-    void onRight() {
-        View focus = app.getCurrentFocus();
-        if (focus instanceof EditText) ((EditText) focus).setText("");
+    boolean globalOptions() {
+        return false;
     }
 
     @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
-        if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT) {
-            if (event.getAction() == KeyEvent.ACTION_UP) app.pop();
-            return true;
-        }
         if (com.xp3.common.ui.Ui.isOk(code) && app.getCurrentFocus() instanceof EditText) {
             if (event.getAction() == KeyEvent.ACTION_UP) add();
             return true;

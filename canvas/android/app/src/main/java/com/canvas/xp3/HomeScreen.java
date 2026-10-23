@@ -52,16 +52,6 @@ final class HomeScreen extends Screen {
     }
 
     @Override
-    String right() {
-        return "Classes";
-    }
-
-    @Override
-    void onRight() {
-        app.push(new ClassesScreen(app));
-    }
-
-    @Override
     boolean globalOptions() {
         return true;
     }

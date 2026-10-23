@@ -38,17 +38,13 @@ abstract class Screen {
 
     abstract View build();
 
-    /** The left softkey. Every screen's is Options unless it says otherwise. */
+    /**
+     * The Menu key, which opens Options; null where Menu does nothing. The
+     * phone has only Menu and Back, so no screen gives either another job.
+     */
     String left() {
         return "Options";
     }
-
-    /** The right softkey: the screen's one shortcut, or null. */
-    String right() {
-        return null;
-    }
-
-    void onRight() {}
 
     /** What OK does when no item names it. */
     String center() {

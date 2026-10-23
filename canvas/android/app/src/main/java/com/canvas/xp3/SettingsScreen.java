@@ -21,21 +21,6 @@ final class SettingsScreen extends Screen {
     }
 
     @Override
-    String left() {
-        return "Back";
-    }
-
-    @Override
-    boolean onKey(android.view.KeyEvent event) {
-        int code = event.getKeyCode();
-        if (code == android.view.KeyEvent.KEYCODE_MENU || code == android.view.KeyEvent.KEYCODE_SOFT_LEFT) {
-            if (event.getAction() == android.view.KeyEvent.ACTION_UP) app.pop();
-            return true;
-        }
-        return false;
-    }
-
-    @Override
     View build() {
         Parts parts = new Parts(app);
         Prefs prefs = app.prefs;

@@ -101,8 +101,8 @@ a calm, planner-style school app built around the week.
   something is, never its status. Nothing is red; grades never change colour.
 - **Dates, not countdowns.** "Due Tuesday, Oct 20 at 10:30", drawn beside a
   tear-off calendar page. Late work "was due" and "can still be turned in".
-- **No softkey bar.** The left softkey opens Options and the right one is
-  the screen's shortcut, but no bar labels them; the rows get the space.
+- **No softkey bar.** Menu opens Options and Back goes back, nothing else,
+  so no bar labels them; the rows get the space.
 - **Light and dark.** In the dark theme ink and paper swap and the
   highlighter stroke drops to about 42%.
 - **Its icon** is the week strip in miniature: on ink, a yellow day with a
