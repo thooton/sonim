@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ASU maroon and gold. Maroon is the frame and the focus; gold means
+         a date: the next-event card and the dates marked in a caption. -->
+    <color name="primary">#5A1229</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_primary_dim">#E8B9C8</color>
+
+    <color name="page">#FFFFFF</color>
+    <color name="row">#FFFFFF</color>
+    <color name="divider">#EEE4E7</color>
+    <color name="focus_fill">#F9E9EE</color>
+    <color name="focus_rule">#8C1D40</color>
+    <color name="press_fill">#F2D3DD</color>
+    <color name="highlight">#248C1D40</color>
+
+    <color name="text">#1D1A1B</color>
+    <color name="text_muted">#74696D</color>
+    <color name="thumb">#EFE6E9</color>
+
+    <color name="gold">#FFC627</color>
+    <color name="gold_fill">#FFF4D6</color>
+    <color name="gold_ink">#8A6200</color>
+    <color name="gold_muted">#6B5A2A</color>
+    <color name="mark">#FFE9A8</color>
+</resources>
