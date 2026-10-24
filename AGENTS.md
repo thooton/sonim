@@ -27,6 +27,50 @@ never reaches the phone. A change touching several apps bumps each of them,
 and so does a change to `common/` or `gradle/`: bump every app that uses what
 changed.
 
+## Writing to the SD card needs Android's grant for the card
+
+Every agent that has saved a file onto the SD card has hit this. On the
+XP3 (Android 8.1), `WRITE_EXTERNAL_STORAGE` is **not enough** for the
+removable card: plain `File.mkdirs()`, `new FileOutputStream(...)`,
+`renameTo` and `delete` anywhere on the card outside the app's own
+`Android/data/<package>` folder fail. The cause is "Permission denied",
+but the user sees whatever the app wraps it in, such as "Couldn't make the
+Documents folder", "can't create documents" or "Couldn't open Download on
+the SD card". Reads can fail the same way for files another app put there,
+even though listing them works. The phone's own storage
+(`Environment.getExternalStorageDirectory()`) is not affected, so a fix
+that works there proves nothing about the card.
+
+Don't use plain file I/O for the card. Do this instead:
+
+1. Use `CardGrant` in `common/ui`. `CardGrant.tree(context, card)` returns
+   the kept grant, or null. If it is null, start `CardGrant.ask(context)`
+   with `startActivityForResult` (Android's "Allow <app> to access SD
+   card?", asked once and kept). In `onActivityResult`, call
+   `CardGrant.answered(...)` and then resume the action that was waiting.
+   Catch `ActivityNotFoundException`, and handle `ask` returning null.
+2. Write through `DocumentsContract`: `createDocument` (folders with
+   `MIME_TYPE_DIR`, files with `application/octet-stream` so the name is
+   kept as given), then `ContentResolver.openOutputStream`. Use
+   `deleteDocument` and `renameDocument` to delete and rename.
+   `CardGrant.document(tree, card, file)` maps a `File` to its document
+   URI. Check the created name with `CardGrant.file(card, doc)`, since the
+   provider may rename a clash.
+3. Something downloaded over the network (`Http`, a `Center`, etc. that
+   writes to a `File`) goes into `getCacheDir()` first and is then copied
+   onto the card. Delete the cache copy afterwards, and delete the
+   document if the copy fails.
+
+Working examples to copy: `source/.../CardStore.java` (downloads),
+`books/.../CardFiles.java` (reading, deleting and renaming another app's
+files), and `tablet/.../CardSaver.java` (fetch into cache, then copy).
+Then call `MediaScannerConnection.scanFile` on the saved paths so other
+apps see them.
+
+Already known to still use plain writes on the card, and so broken in the
+same way: Canvas's link save (`Backend.saveToCard`, into SD card/Download).
+Mail avoids the problem by falling back to its own `Android/data` folder.
+
 ## Building
 
 Every Gradle app, and the shared code, is one Gradle build at the root, run
