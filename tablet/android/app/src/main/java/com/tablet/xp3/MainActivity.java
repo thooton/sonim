@@ -3,6 +3,8 @@ package com.tablet.xp3;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
@@ -39,6 +41,7 @@ import com.tablet.xp3.net.Center;
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
 import com.xp3.common.ui.Card;
+import com.xp3.common.ui.CardGrant;
 import com.xp3.common.ui.Ui;
 
 import java.io.File;
@@ -79,6 +82,8 @@ public final class MainActivity extends Activity {
     private static final int STORAGE = 1;
     /** Asking for storage, to read it for Upload. */
     private static final int STORAGE_UPLOAD = 2;
+    /** Asking for the SD card, which Android wants before an app writes there. */
+    private static final int ASK_CARD = 3;
     /** The folder on the SD card that documents are downloaded into. */
     private static final String DOWNLOADS = "Documents";
     /** And page images, where the camera's photos are. */
@@ -135,7 +140,7 @@ public final class MainActivity extends Activity {
     private Drawer drawer;
     private TextView toast;
 
-    /** The result waiting on the storage permission, or "". */
+    /** The download waiting on the storage permission or the card's grant, or null. */
     private Runnable pendingDownload;
 
     private final Runnable hideToast = () -> toast.setVisibility(View.GONE);
@@ -886,7 +891,9 @@ public final class MainActivity extends Activity {
      * Saves files onto the SD card, never the phone's own storage, each
      * into its folder there; Canvas's file picker finds Documents (SD card,
      * Documents) for handing in. `said` is what the toast calls them while
-     * they come. Asks for storage first, once.
+     * they come. Asks for storage first, then for the card, once each.
+     * Each file is fetched into the cache and copied onto the card through
+     * the card's grant, since Android refuses plain writes there.
      */
     private void download(String said, List<Item> items) {
         if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -904,6 +911,23 @@ public final class MainActivity extends Activity {
             say("", "No SD card");
             return;
         }
+        final CardSaver onCard = CardSaver.open(this, card);
+        if (onCard == null) {
+            Intent ask = CardGrant.ask(this);
+            if (ask == null) {
+                say("", "Can't open the SD card");
+                return;
+            }
+            try {
+                pendingDownload = () -> download(said, items);
+                startActivityForResult(ask, ASK_CARD);
+            } catch (ActivityNotFoundException e) {
+                pendingDownload = null;
+                say("", "Can't open the SD card");
+            }
+            return;
+        }
+        final File cache = new File(getCacheDir(), "download");
         say("", "Downloading " + said + "…");
         worker.execute(() -> {
             String error = null;
@@ -911,9 +935,16 @@ public final class MainActivity extends Activity {
             try {
                 for (Item item : items) {
                     File folder = new File(card, item.into);
-                    if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't make the " + item.into + " folder");
+                    onCard.mkdirs(folder);
                     File dest = Downloads.free(folder, item.name);
-                    item.fetch.run(with, dest);
+                    if (!cache.isDirectory() && !cache.mkdirs()) throw new IOException("Couldn't save " + dest.getName());
+                    File fetched = new File(cache, "file");
+                    try {
+                        item.fetch.run(with, fetched);
+                        onCard.copy(fetched, dest);
+                    } finally {
+                        fetched.delete();
+                    }
                     saved.add(dest.getPath());
                 }
             } catch (IOException e) {
@@ -1077,6 +1108,17 @@ public final class MainActivity extends Activity {
         if (pending == null) return;
         if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) pending.run();
         else say("", "Storage permission denied");
+    }
+
+    @Override
+    protected void onActivityResult(int request, int result, Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request != ASK_CARD) return;
+        Runnable pending = pendingDownload;
+        pendingDownload = null;
+        if (pending == null) return;
+        if (CardGrant.answered(this, result, data)) pending.run();
+        else say("", "SD card access denied");
     }
 
     /** Takes a job off the list, which for a running one also ends it. */

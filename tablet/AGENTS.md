@@ -55,7 +55,10 @@ reads and writes its storage, so the app sees what the tablet last synced.
   is the one on the tablet, for marking up and transforming again.
   An email (`.eml`) goes into `Documents` too, where Mail's Open email
   file finds it.
-  Downloading asks for storage the first time.
+  Downloading asks for storage the first time, then for the whole SD card
+  (`CardGrant` in common): Android 8.1 refuses plain writes on the card
+  ("Couldn't make the Documents folder"), so each file is fetched into the
+  cache and copied onto the card through the grant (`CardSaver`).
 - `POST /remarkable/documents?name=&parent=`: Upload, a PDF or ePub from
   the phone, streamed (`Http.upload`), named as the file is without its
   extension, into the folder picked on the Upload to sheet. Upload is a
