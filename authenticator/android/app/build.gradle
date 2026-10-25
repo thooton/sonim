@@ -1,0 +1,29 @@
+plugins {
+    id "com.android.application"
+}
+
+apply from: rootProject.file("gradle/app.gradle")
+
+apply from: rootProject.file("gradle/bundled.gradle")
+
+// The same command center as Places and Source, with the same token: it keeps
+// the two-factor accounts.
+bundled("com.authenticator.xp3") {
+    def center = deltaCenter(true)
+    [SERVER: center.server, TOKEN: center.token, REVISION: center.revision]
+}
+
+android {
+    namespace "com.authenticator.xp3"
+
+    defaultConfig {
+        applicationId "com.authenticator.xp3"
+        versionCode 1
+        versionName "1.0.0"
+    }
+}
+
+dependencies {
+    implementation project(":authenticator:core")
+    implementation project(":common:ui")
+}

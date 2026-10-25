@@ -1,0 +1,7 @@
+// Codes, two-factor links, the QR reader and the command center's list:
+// plain Java, checked on a desktop JVM.
+apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    api project(":common:core")
+}

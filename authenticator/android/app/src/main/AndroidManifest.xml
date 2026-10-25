@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The command center, which keeps the accounts. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- The camera is the phone's own camera app, asked for a photo; no
+         camera permission is needed for that, and declaring one would make
+         Android refuse the request until it was granted. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme">
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+            android:screenOrientation="portrait"
+            android:launchMode="singleTop"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".EntryActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize|stateAlwaysVisible"
+            android:exported="false" />
+        <!-- Where the camera app writes its photo: one file in the cache,
+             lent to it for that one request. -->
+        <provider
+            android:name=".PhotoProvider"
+            android:authorities="com.authenticator.xp3.photos"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+    </application>
+</manifest>

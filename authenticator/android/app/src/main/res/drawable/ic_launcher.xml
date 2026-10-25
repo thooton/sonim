@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A code's countdown: on Authy's navy, a white ring two thirds run down
+     around a keyhole. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#121C2D" android:pathData="M10,2 H38 A8,8 0 0 1 46,10 V38 A8,8 0 0 1 38,46 H10 A8,8 0 0 1 2,38 V10 A8,8 0 0 1 10,2 Z" />
+    <path android:strokeColor="#3A4560" android:strokeWidth="3.6" android:fillColor="#00000000"
+        android:pathData="M24,24 m-14,0 a14,14 0 1 0 28,0 a14,14 0 1 0 -28,0" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="3.6" android:strokeLineCap="round" android:fillColor="#00000000"
+        android:pathData="M24,10 A14,14 0 1 1 11.88,31" />
+    <path android:fillColor="#FFFFFF" android:pathData="M24,17.5 a4.2,4.2 0 0 1 2.3,7.7 l1.4,7.3 h-7.4 l1.4,-7.3 A4.2,4.2 0 0 1 24,17.5 Z" />
+</vector>

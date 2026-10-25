@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Authenticator mockup</title>
+<style>
+@font-face{font-family:Inter;font-weight:400;src:url(../android/app/src/main/res/font/inter_regular.ttf)}
+@font-face{font-family:Inter;font-weight:500;src:url(../android/app/src/main/res/font/inter_medium.ttf)}
+@font-face{font-family:Inter;font-weight:600;src:url(../android/app/src/main/res/font/inter_semi_bold.ttf)}
+body{margin:0;background:#ddd;font-family:Inter;display:flex;gap:16px;padding:16px}
+.phone{width:240px;height:320px;background:#F4F4F6;position:relative;overflow:hidden}
+.status{height:24px;color:#121C2D;font-size:12px;display:flex;justify-content:space-between;align-items:center;padding:0 6px;box-sizing:border-box;font-weight:500}
+.list{padding-top:4px}
+.row{padding:3px 7px}
+.card{height:52px;background:#fff;border-radius:26px;display:flex;align-items:center;padding:0 14px 0 6px;box-shadow:0 1px 0 #14121C2D;box-sizing:border-box}
+.card.focus{outline:1.5px solid #121C2D;outline-offset:-1.5px}
+.logo{width:38px;height:38px;flex:none}
+.words{margin-left:9px;min-width:0}
+.name{font-size:12px;font-weight:500;color:#121C2D;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15}
+.name span{font-size:10px;font-weight:400;color:#606B85}
+.code{font-size:21px;font-weight:500;color:#121C2D;font-feature-settings:"tnum";padding-top:3px;line-height:1.1}
+.empty{position:absolute;inset:24px 0 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.fab{width:44px;height:44px;border-radius:50%;background:#121C2D;color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;margin-top:16px;box-shadow:0 0 0 3px #8891AA inset}
+</style></head><body>
+<div class="phone" id="list"><div class="status"><span>9:41</span><span>▮▮▮ ■</span></div><div class="list"></div></div>
+<div class="phone"><div class="status"><span>9:41</span><span>▮▮▮ ■</span></div><div class="empty"><div style="font-size:14px;font-weight:500;color:#121C2D">No accounts</div><div class="fab">+</div></div></div>
+<script>
+const accounts=[["Facebook","jacobc@gmail.com","#1877F2","482 963",.8],["Discord","jacobc@gmail.com","#5865F2","576 821",.8],["Twilio","","#F22F46","349 705",.8],["X","jacobc@gmail.com","#000000","987 654",.8],["AWS","root","#FF9900","4201 3577",.4],["GitHub","jacobc@gmail.com","#181717","063 119",.8]];
+const list=document.querySelector('.list');
+accounts.forEach(([t,d,c,code,left],i)=>{
+  const r=19,ring=2.5,inset=ring/2,R=r-inset,circ=2*Math.PI*R,badge=r-ring-2;
+  const light=(()=>{const n=parseInt(c.slice(1),16);return .299*(n>>16)+.587*((n>>8)&255)+.114*(n&255)>186})();
+  list.insertAdjacentHTML('beforeend',`<div class="row"><div class="card ${i==1?'focus':''}">
+  <svg class="logo" viewBox="0 0 38 38"><circle cx="19" cy="19" r="${R}" fill="none" stroke="#E1E3EA" stroke-width="${ring}"/>
+  <circle cx="19" cy="19" r="${R}" fill="none" stroke="${c}" stroke-width="${ring}" stroke-linecap="round" stroke-dasharray="${circ*left} ${circ}" transform="rotate(${-90+360*(1-left)} 19 19)"/>
+  <circle cx="19" cy="19" r="${badge}" fill="${c}"/><text x="19" y="19" text-anchor="middle" dominant-baseline="central" font-family="Inter" font-weight="600" font-size="${badge*1.05}" fill="${light?'#121C2D':'#fff'}">${t[0]}</text></svg>
+  <div class="words"><div class="name">${t}${d?' <span>('+d+')</span>':''}</div><div class="code">${code}</div></div></div></div>`);
+});
+</script></body></html>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:colorPrimary">@color/page</item>
+        <item name="android:colorPrimaryDark">@color/page</item>
+        <item name="android:colorAccent">@color/ink</item>
+        <item name="android:colorControlHighlight">@color/highlight</item>
+        <item name="android:statusBarColor">@color/page</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/page</item>
+        <item name="android:windowBackground">@color/page</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:textColorPrimary">@color/ink</item>
+        <item name="android:alertDialogTheme">@style/FamilyDialog</item>
+        <item name="android:popupMenuStyle">@style/FamilyPopupMenu</item>
+        <item name="android:contextPopupMenuStyle">@style/FamilyPopupMenu</item>
+    </style>
+</resources>

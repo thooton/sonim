@@ -390,3 +390,23 @@ What changes from CARROT, for the screen:
 
 `weather/mockups/index.html` is the design and is drawn by the same layout
 code as the app; see `weather/AGENTS.md`.
+
+## Authenticator: Authy's list view
+
+Authenticator takes its look from Authy's list view (Authy 27.7.1, its APK
+and Play Store screenshots), since Authy is the authenticator people know.
+It sets the family rules aside where Authy differs:
+
+- **Pale grey page, white pills.** The page and status bar are `#F4F4F6`
+  with dark icons; each account is a white card as round at its ends as it
+  is tall, over a faint shadow, 7dp from the sides.
+- **Twilio's navy and Inter.** Names and codes in navy `#121C2D`, the
+  account after the name in `#606B85` and smaller; Inter Medium for the
+  name and the 21sp code (even figures, "482 963"), as Authy bundles Inter.
+- **The logo and its ring.** The service's initial on its brand colour,
+  inside a ring of that colour over a grey track, running down with the
+  code's time, as Authy's ring does around its logos.
+- **Focus, which Authy doesn't have.** The card under the d-pad is outlined
+  in the navy; nothing grows or moves.
+- **One step at a time.** Up and Down move one account, at once, and the
+  list moves only as far as it must to show it.
