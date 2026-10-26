@@ -74,7 +74,7 @@ final class Look {
         {"aws", "#FF9900"}, {"amazon", "#FF9900"},
         {"discord", "#5865F2"}, {"facebook", "#1877F2"}, {"meta", "#0467DF"},
         {"instagram", "#E4405F"}, {"whatsapp", "#25D366"},
-        {"twitter", "#000000"}, {"x.com", "#000000"},
+        {"twitter", "#1DA1F2"}, {"x.com", "#1DA1F2"},
         {"twitch", "#9146FF"}, {"twilio", "#F22F46"}, {"authy", "#EC1C24"},
         {"dropbox", "#0061FF"}, {"slack", "#4A154B"}, {"apple", "#000000"},
         {"reddit", "#FF4500"}, {"paypal", "#003087"}, {"venmo", "#008CFF"},
@@ -109,7 +109,7 @@ final class Look {
     /** The colour from BRANDS, or null for a name none of them is in. */
     static Integer named(Account account) {
         String issuer = account.issuer.toLowerCase(Locale.US).trim();
-        if (issuer.equals("x")) return 0xFF000000;
+        if (issuer.equals("x")) return 0xFF1DA1F2;
         // Whole words of the service's name (or the account's, when there is
         // no service), so "ASU" doesn't colour "Treasury" and "Bank
         // (sam@gmail.com)" isn't Gmail's; a long brand name may lead a word

@@ -51,25 +51,33 @@ public final class Services {
     private final Map<String, Service> names = new HashMap<>();
     /** By every domain, whole. */
     private final Map<String, Service> domains = new HashMap<>();
-    /** By a domain's first label ("aws" for aws.amazon.com, "github"). */
+    /** By a domain's first label ("aws" for aws.amazon.com, "github", "tutanota"). */
     private final Map<String, Service> labels = new HashMap<>();
 
     private Services(List<String[]> rows) {
         size = rows.size();
         List<Service> all = new ArrayList<>();
+        List<String[]> theirs = new ArrayList<>();
         for (String[] row : rows) {
             String[] its = row[1].split(",");
             Service service = new Service(row[0], its[0], row.length > 2 ? row[2] : "");
             all.add(service);
+            theirs.add(its);
             putName(row[0], service);
             for (String domain : its) domains.putIfAbsent(domain.toLowerCase(Locale.US), service);
         }
         // Labels come second, so a service named "Amazon" wins "amazon"
-        // over one that only has a domain there.
-        for (Service service : all) {
-            String label = service.domain.toLowerCase(Locale.US).replaceFirst("^www\\.", "");
-            label = label.substring(0, label.indexOf('.') < 0 ? label.length() : label.indexOf('.'));
-            if (!names.containsKey(label)) labels.putIfAbsent(label, service);
+        // over one that only has a domain there; and main domains before the
+        // rest, so "Tuta" is "tuta" and, by its old domain, "tutanota".
+        for (int pass = 0; pass < 2; pass++) {
+            for (int i = 0; i < all.size(); i++) {
+                String[] its = theirs.get(i);
+                for (int d = pass == 0 ? 0 : 1; d < (pass == 0 ? 1 : its.length); d++) {
+                    String label = its[d].toLowerCase(Locale.US).replaceFirst("^www\\.", "");
+                    label = label.substring(0, label.indexOf('.') < 0 ? label.length() : label.indexOf('.'));
+                    if (!names.containsKey(label)) labels.putIfAbsent(label, all.get(i));
+                }
+            }
         }
     }
 

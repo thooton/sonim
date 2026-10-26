@@ -109,6 +109,7 @@ public final class SelfTest {
                 {"GitHub", "github.com"}, {"Google", "google.com"}, {"Microsoft", "microsoft.com"}, {"Discord", "discord.com"},
                 {"AWS", "aws.amazon.com"}, {"Dropbox", "dropbox.com"}, {"Twitter", "x.com"}, {"Coinbase", "coinbase.com"},
                 {"PayPal", "paypal.com"}, {"Proton", "proton.me"}, {"Anthropic", "anthropic.com"},
+                {"Tutanota", "tuta.com"}, {"Tuta", "tuta.com"}, {"SpigotMC", "spigotmc.org"}, {"Spigot", "spigotmc.org"},
             };
             for (String[] pair : known) {
                 Services.Service found = all.find(Account.of(pair[0], "sam", "JBSWY3DPEHPK3PXP"));

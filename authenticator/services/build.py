@@ -19,9 +19,12 @@ EXTRA = [
     ("Anthropic", ["anthropic.com"], "https://www.anthropic.com/images/icons/apple-touch-icon.png"),
     ("Claude", ["claude.ai"], "https://claude.ai/apple-touch-icon.png"),
     ("Tailscale", ["tailscale.com"], "https://tailscale.com/favicon.png"),
+    ("SpigotMC (Spigot)", ["spigotmc.org"], "https://static.spigotmc.org/img/spigot-og.png"),
 ]
-# Logos the crawl couldn't reach from where it ran.
+# Logos the crawl couldn't reach from where it ran, or the user prefers.
 OVERRIDE = {
+    # The bird, not X's logo.
+    "x.com": "https://abs.twimg.com/responsive-web/client-web/icon-ios.b1fc727a.png",
     "github.com": "https://github.githubassets.com/apple-touch-icon-180x180.png",
 }
 
