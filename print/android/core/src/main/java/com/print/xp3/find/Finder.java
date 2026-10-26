@@ -29,6 +29,9 @@ public final class Finder {
     public static final int IPP_PORT = 631;
     public static final int RAW_PORT = 9100;
     public static final int LPD_PORT = 515;
+    /** Where some printers (Brother's among them) also take IPP: over TLS, and on the web port. */
+    public static final int IPPS_PORT = 443;
+    public static final int HTTP_PORT = 80;
 
     private final Listener listener;
     private final Map<String, Printer> printers = new LinkedHashMap<String, Printer>();
@@ -71,22 +74,44 @@ public final class Finder {
         }
     }
 
-    /** A printer at an address typed in: whatever answers on the printer ports there. */
+    /**
+     * A printer at an address typed in: whatever answers on the printer ports
+     * there. IPP is looked for on 631, then over TLS on 443 and on 80, where
+     * printers that have 631 turned off still take it.
+     */
     public List<Printer> at(String address) throws IOException {
         List<Printer> found = new ArrayList<Printer>();
-        if (Sweep.open(address, IPP_PORT, 3000)) {
-            for (Printer printer : Probe.ippAt(address, IPP_PORT)) found.add(merge(printer));
+        List<Integer> open = new ArrayList<Integer>();
+        int[][] ipp = {{IPP_PORT, 0}, {IPPS_PORT, 1}, {HTTP_PORT, 0}};
+        for (int[] each : ipp) {
+            if (!found.isEmpty() || stopped) break;
+            if (!Sweep.open(address, each[0], 4000)) continue;
+            open.add(each[0]);
+            for (Printer printer : Probe.ippAt(address, each[0], each[1] == 1)) found.add(merge(printer));
         }
-        if (Sweep.open(address, RAW_PORT, 3000)) {
+        if (Sweep.open(address, RAW_PORT, 4000)) {
             Printer printer = merge(raw(address, RAW_PORT));
             Probe.pjl(printer);
             if (!found.contains(printer)) found.add(printer);
-        } else if (found.isEmpty() && Sweep.open(address, LPD_PORT, 3000)) {
+        } else if (found.isEmpty() && Sweep.open(address, LPD_PORT, 4000)) {
             found.add(merge(lpd(address, "lp")));
         }
-        if (found.isEmpty()) throw new IOException("No printer answers at " + address);
+        if (found.isEmpty()) {
+            if (open.isEmpty()) {
+                throw new IOException("Nothing answers at " + address + ". Check the address on the printer's"
+                    + " network page, and that it is on the same Wi-Fi as this phone (not a guest network).");
+            }
+            throw new IOException(address + " answers on port " + join(open)
+                + ", but not as a printer. Is IPP turned on in the printer's settings?");
+        }
         for (Printer printer : found) listener.changed(printer);
         return found;
+    }
+
+    private static String join(List<Integer> ports) {
+        StringBuilder out = new StringBuilder();
+        for (int port : ports) out.append(out.length() == 0 ? "" : ", ").append(port);
+        return out.toString();
     }
 
     // What mDNS found.

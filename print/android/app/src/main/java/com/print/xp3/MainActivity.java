@@ -44,6 +44,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        Wifi.bind(this);
         Look.load(this);
         root = new FrameLayout(this);
         root.setBackgroundColor(Look.WHITE);

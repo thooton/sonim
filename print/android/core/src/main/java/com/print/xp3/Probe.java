@@ -15,7 +15,7 @@ public final class Probe {
     private Probe() {}
 
     /** Where IPP printers usually listen, most usual first. */
-    static final String[] PATHS = {"/ipp/print", "/ipp", "/ipp/printer", "/printer", "/"};
+    static final String[] PATHS = {"/ipp/print", "/ipp", "/ipp/port1", "/ipp/printer", "/printer", "/"};
 
     /** Get-Printer-Attributes: everything the printer says about itself. */
     public static Capabilities attributes(IppClient client, boolean ipp2) throws IOException {
@@ -28,7 +28,10 @@ public final class Probe {
             .add("requesting-user-name", Ipp.NAME, Job.USER)
             .add("requested-attributes", Ipp.KEYWORD, "all");
         Ipp.Message answer = client.send(request);
-        if (answer.code == Ipp.VERSION_NOT_SUPPORTED && ipp2) return attributes(client, false);
+        // Some printers turn down a 2.0 request as bad rather than as the wrong version.
+        if ((answer.code == Ipp.VERSION_NOT_SUPPORTED || answer.code == Ipp.BAD_REQUEST) && ipp2) {
+            return attributes(client, false);
+        }
         if (!answer.ok() || answer.group(Ipp.PRINTER) == null) {
             throw new IOException("The printer said " + String.format("0x%04x", answer.code));
         }
@@ -70,10 +73,15 @@ public final class Probe {
      * announced: the usual paths in turn, then a print server's queues.
      */
     public static List<Printer> ippAt(String address, int port) {
+        return ippAt(address, port, false);
+    }
+
+    /** As {@link #ippAt(String, int)}, over TLS from the start when `tls` (443, ipps). */
+    public static List<Printer> ippAt(String address, int port, boolean tls) {
         List<Printer> out = new ArrayList<Printer>();
         for (String path : PATHS) {
             try {
-                IppClient client = new IppClient(address, port, path, false).readTimeout(5000);
+                IppClient client = new IppClient(address, port, path, tls).readTimeout(5000);
                 Capabilities caps = attributes(client, true);
                 Printer printer = new Printer(address);
                 printer.ippPort = port;
@@ -87,6 +95,7 @@ public final class Probe {
             }
         }
         // A print server (CUPS on a computer sharing its printers) lists its queues.
+        if (port != 631) return out;
         try {
             IppClient client = new IppClient(address, port, "/", false).readTimeout(5000);
             Ipp.Message request = Ipp.request(Ipp.CUPS_GET_PRINTERS, client.id(), null);

@@ -41,6 +41,7 @@ public final class PrintService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         startForeground(NOTIFICATION, notification(null));
+        Wifi.bind(this);
         if (worker == null) {
             hold();
             worker = new Thread(this::work, "print");

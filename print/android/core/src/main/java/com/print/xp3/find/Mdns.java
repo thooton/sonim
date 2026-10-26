@@ -98,6 +98,9 @@ public final class Mdns {
                 if (elapsed >= millis) break;
                 if (next < sends.length && elapsed >= sends[next]) {
                     ask(sockets.get(0), types);
+                    // And as an ordinary query from 5353, for responders that
+                    // ignore the legacy kind and answer only by multicast.
+                    if (sockets.size() > 1) ask(sockets.get(1), types);
                     next++;
                 }
                 Thread.sleep(250);

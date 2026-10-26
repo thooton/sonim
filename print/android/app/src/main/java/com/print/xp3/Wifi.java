@@ -1,6 +1,10 @@
 package com.print.xp3;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 
@@ -8,6 +12,46 @@ import android.net.wifi.WifiManager;
 final class Wifi {
 
     private Wifi() {}
+
+    private static boolean bound;
+
+    /**
+     * Sends all of this app's traffic over the Wi-Fi, for as long as there is
+     * one. Android otherwise sends it over mobile data when the Wi-Fi has no
+     * internet (a printer's own network, a router offline), and then no
+     * printer on the Wi-Fi can be reached, found or typed in.
+     */
+    static synchronized void bind(Context context) {
+        if (bound) return;
+        final ConnectivityManager connectivity =
+            (ConnectivityManager) context.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivity == null) return;
+        bound = true;
+        NetworkRequest request = new NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build();
+        try {
+            connectivity.registerNetworkCallback(request, new ConnectivityManager.NetworkCallback() {
+                private Network current;
+
+                @Override
+                public void onAvailable(Network network) {
+                    current = network;
+                    connectivity.bindProcessToNetwork(network);
+                }
+
+                @Override
+                public void onLost(Network network) {
+                    if (!network.equals(current)) return;
+                    current = null;
+                    connectivity.bindProcessToNetwork(null);
+                }
+            });
+        } catch (RuntimeException e) {
+            // Left to Android's own choice of network.
+        }
+    }
 
     static boolean on(Context context) {
         WifiManager wifi = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);

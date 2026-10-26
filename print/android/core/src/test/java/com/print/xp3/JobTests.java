@@ -34,6 +34,10 @@ final class JobTests {
         final List<byte[]> documents = new ArrayList<byte[]>();
         int finalState = 9;
         String finalReason = "job-completed-successfully";
+        /** The one path it answers at (404 elsewhere), or null for any. */
+        String onlyPath;
+        /** Turns down IPP 2.0 as a bad request, as some Brothers do. */
+        boolean only11;
         private final Thread thread;
 
         FakePrinter(String... formats) throws IOException {
@@ -59,6 +63,7 @@ final class JobTests {
         private void serve(Socket socket) throws IOException {
             InputStream in = socket.getInputStream();
             long length = 0;
+            String requestLine = line(in);
             String line;
             while (!(line = line(in)).isEmpty()) {
                 if (line.toLowerCase(Locale.ROOT).startsWith("content-length:")) length = Long.parseLong(line.substring(15).trim());
@@ -70,7 +75,21 @@ final class JobTests {
                 if (read < 0) break;
                 at += read;
             }
+            String[] asked = requestLine.split(" ");
+            if (onlyPath != null && (asked.length < 2 || !asked[1].equals(onlyPath))) {
+                socket.getOutputStream().write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n".getBytes("US-ASCII"));
+                return;
+            }
             Ipp.Message request = Ipp.decode(body);
+            if (only11 && request.major == 2) {
+                Ipp.Message refused = new Ipp.Message(Ipp.BAD_REQUEST, request.id);
+                byte[] out = Ipp.encode(refused);
+                OutputStream write = socket.getOutputStream();
+                write.write(("HTTP/1.1 200 OK\r\nContent-Type: application/ipp\r\nContent-Length: " + out.length
+                    + "\r\n\r\n").getBytes("US-ASCII"));
+                write.write(out);
+                return;
+            }
             int head = Ipp.encode(request).length;
             Ipp.Message answer = new Ipp.Message(Ipp.OK, request.id);
             answer.add(Ipp.OPERATION).add("attributes-charset", Ipp.CHARSET, "utf-8")
@@ -155,6 +174,16 @@ final class JobTests {
     }
 
     static void run(final Check check) {
+        check.run("probe: a Brother at /ipp/port1 that takes only IPP 1.1", () -> {
+            try (FakePrinter fake = new FakePrinter("image/urf", "application/octet-stream")) {
+                fake.onlyPath = "/ipp/port1";
+                fake.only11 = true;
+                List<Printer> found = Probe.ippAt("127.0.0.1", fake.port());
+                check.same("found", 1, found.size());
+                check.same("path", "/ipp/port1", found.get(0).ippPath);
+                check.same("ipp 1.1", false, found.get(0).ipp.ipp2);
+            }
+        });
         check.run("job: pdf refused, pwg taken", () -> {
             File pdf = File.createTempFile("doc", ".pdf");
             pdf.deleteOnExit();
