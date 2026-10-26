@@ -65,17 +65,25 @@ file, with the few services 2fa.directory lacks (Google, Microsoft,
 Anthropic...) and fixed logos in its EXTRA and OVERRIDE. Rerun both to
 refresh it.
 
+Three logos come with the app instead, in `app/src/main/assets/logos/`,
+the list naming them `asset:<file>`: Twitter's bird (x.com links the X, and
+Google's copy of it is the X too), Tuta's icon (an account called Tutanota
+is Tuta, by its old domain) and SpigotMC's (its server gives the picture
+only to its own pages). A bundled logo is the only source the app tries:
+there is nothing to fetch and no favicon to fall back on.
+
 `Services.find` (in `:core`, tested) says which service an account is:
 the service's name whole or squashed, a domain, a domain's first label
 ("AWS"), a name in or before brackets, before a colon, or its first word;
 a name that is a domain is that domain. An account with only an email is
 none. `Logos` fetches the logo on three workers, the site's address first
 and then Google's favicon service (`t1.gstatic.com/faviconV2`, which
-answers 404 when it has none), following https redirects by hand, scales
-it to at most 96 pixels, and keeps it in `files/logos/<hash>.png`. Every
-time the list changes from the command center (sync, add, edit, delete)
-`keep` deletes the logos no account is any more. Until a logo is there,
-or when there is none, the monogram shows as before.
+answers 404 when it has none), or reads a bundled one out of the app's
+assets where the list says so, following https redirects by hand, scaling
+it to at most 96 pixels, and keeping it in `files/logos/<hash>.png`.
+Every time the list changes from the command center (sync, add, edit,
+delete) `keep` deletes the logos no account is any more. Until a logo is
+there, or when there is none, the monogram shows as before.
 
 `OtpLink` reads `otpauth://totp/...` (Google's Key Uri Format) and
 `otpauth-migration://offline?data=...` (Google Authenticator's export, a

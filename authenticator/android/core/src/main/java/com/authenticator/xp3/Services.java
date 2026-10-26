@@ -15,11 +15,17 @@ import java.util.regex.Pattern;
  */
 public final class Services {
 
+    /** Marks a logo the app carries itself, in its assets under logos/, not by an address. */
+    public static final String BUNDLED = "asset:";
+
     /** One service: its name, main domain, and where its logo is fetched from. */
     public static final class Service {
         public final String name;
         public final String domain;
-        /** The logo the service's own site links, or "" when none was found. */
+        /**
+         * The logo the service's own site links, or "" when none was found, or
+         * `asset:<file>` for one bundled in the app's assets, under logos/.
+         */
         public final String logo;
 
         Service(String name, String domain, String logo) {
@@ -28,12 +34,26 @@ public final class Services {
             this.logo = logo;
         }
 
-        /** Where to fetch the logo, in order: the site's own, then Google's copy of its icon. */
+        /**
+         * Where to fetch the logo, in order: the site's own, then Google's copy
+         * of its icon. A bundled logo is alone: there is nothing to fetch, and
+         * nothing to fall back on, Google's copy of x.com being the X.
+         */
         public List<String> logos() {
             List<String> urls = new ArrayList<>();
             if (logo.length() > 0) urls.add(logo);
-            urls.add(favicon(domain));
+            if (!bundled()) urls.add(favicon(domain));
             return urls;
+        }
+
+        /** Whether the logo comes with the app, in its assets under logos/. */
+        public boolean bundled() {
+            return logo.startsWith(BUNDLED);
+        }
+
+        /** The bundled logo's file name, under logos/. Empty when it isn't bundled. */
+        public String asset() {
+            return bundled() ? logo.substring(BUNDLED.length()) : "";
         }
     }
 
@@ -97,7 +117,8 @@ public final class Services {
     /** The list in services.tsv's form: name, domains (comma separated), logo; a tab between. */
     public static Services parse(String text) {
         List<String[]> rows = new ArrayList<>();
-        for (String line : text.split("\n")) {
+        // A Windows checkout ends its lines with \r\n, and a logo's address must not keep the \r.
+        for (String line : text.split("\r?\n")) {
             String[] row = line.split("\t", -1);
             if (row.length >= 2 && row[0].length() > 0 && row[1].length() > 0) rows.add(row);
         }

@@ -4,6 +4,10 @@ domains (comma separated, the main one first) and its logo's address, or
 nothing when none was found (the app then asks Google's favicon service for
 the main domain's).
 
+A logo given as `asset:<file>` is one the app carries itself, in
+android/app/src/main/assets/logos/: services whose own site gives no usable
+picture, or gives the wrong one.
+
     python3 crawl.py <twofactorauth checkout> crawl.jsonl
     python3 build.py crawl.jsonl
 
@@ -19,12 +23,15 @@ EXTRA = [
     ("Anthropic", ["anthropic.com"], "https://www.anthropic.com/images/icons/apple-touch-icon.png"),
     ("Claude", ["claude.ai"], "https://claude.ai/apple-touch-icon.png"),
     ("Tailscale", ["tailscale.com"], "https://tailscale.com/favicon.png"),
-    ("SpigotMC (Spigot)", ["spigotmc.org"], "https://static.spigotmc.org/img/spigot-og.png"),
+    # Spigot's own picture, which its server gives only to its own pages.
+    ("SpigotMC (Spigot)", ["spigotmc.org"], "asset:spigotmc.png"),
 ]
 # Logos the crawl couldn't reach from where it ran, or the user prefers.
 OVERRIDE = {
-    # The bird, not X's logo.
-    "x.com": "https://abs.twimg.com/responsive-web/client-web/icon-ios.b1fc727a.png",
+    # The bird, not X's logo: x.com links the X, and so does Google's copy of it.
+    "x.com": "asset:twitter.png",
+    # Tuta's icon, which is also Tutanota's, its old name being one of its domains.
+    "tuta.com": "asset:tutanota.png",
     "github.com": "https://github.githubassets.com/apple-touch-icon-180x180.png",
 }
 

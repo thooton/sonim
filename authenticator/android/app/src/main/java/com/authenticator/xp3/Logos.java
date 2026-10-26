@@ -29,9 +29,11 @@ import java.util.concurrent.ExecutorService;
 /**
  * The services' logos: which service an account is (`Services`, from the
  * bundled services.tsv), its logo fetched from where the list says, the
- * service's own site first and then Google's copy of its icon, and kept in
- * files/logos until no account is that service any more (`keep`). Until a
- * logo is here, and for a service with none, the monogram shows.
+ * service's own site first and then Google's copy of its icon, or read from
+ * the app's own assets for the few the list names as `asset:` (Twitter's
+ * bird, Tuta's and SpigotMC's), and kept in files/logos until no account is
+ * that service any more (`keep`). Until a logo is here, and for a service
+ * with none, the monogram shows.
  */
 final class Logos {
 
@@ -155,28 +157,44 @@ final class Logos {
         });
     }
 
-    /** From the phone if it was fetched before, else fetched and kept. */
+    /** From the phone if it was had before, else fetched or, bundled, read from the app, and kept. */
     private Bitmap load(String key, Services.Service service) {
         File file = new File(dir, key + ".png");
         if (file.length() > 0) {
             Bitmap kept = BitmapFactory.decodeFile(file.getPath());
             if (kept != null) return kept;
         }
+        Bitmap logo = service.bundled() ? bundled(service.asset()) : fetched(service);
+        if (logo == null) return null;
+        dir.mkdirs();
+        File part = new File(dir, key + ".part");
+        try (FileOutputStream out = new FileOutputStream(part)) {
+            logo.compress(Bitmap.CompressFormat.PNG, 100, out);
+        } catch (IOException e) {
+            part.delete();
+            return logo;
+        }
+        if (!part.renameTo(file)) part.delete();
+        return logo;
+    }
+
+    /** The first of the service's addresses that answers with a picture. */
+    private Bitmap fetched(Services.Service service) {
         for (String url : service.logos()) {
-            Bitmap fetched = fetch(url);
-            if (fetched == null) continue;
-            dir.mkdirs();
-            File part = new File(dir, key + ".part");
-            try (FileOutputStream out = new FileOutputStream(part)) {
-                fetched.compress(Bitmap.CompressFormat.PNG, 100, out);
-            } catch (IOException e) {
-                part.delete();
-                return fetched;
-            }
-            if (!part.renameTo(file)) part.delete();
-            return fetched;
+            Bitmap got = fetch(url);
+            if (got != null) return got;
         }
         return null;
+    }
+
+    /** A logo the app carries itself, from its assets under logos/. */
+    private Bitmap bundled(String name) {
+        try (InputStream in = context.getAssets().open("logos/" + name)) {
+            byte[] bytes = read(in);
+            return bytes == null ? null : decode(bytes);
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
     }
 
     /**

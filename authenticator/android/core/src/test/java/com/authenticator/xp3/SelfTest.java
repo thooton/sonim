@@ -83,7 +83,7 @@ public final class SelfTest {
         check.run("services", () -> {
             Services few = Services.parse("Amazon\tamazon.com\thttps://amazon.com/icon.png\n"
                 + "Amazon Web Services\taws.amazon.com\t\n"
-                + "X (Twitter)\tx.com,twitter.com\thttps://x.com/a.png\n"
+                + "X (Twitter)\tx.com,twitter.com\tasset:twitter.png\n"
                 + "Epic Games\tepicgames.com\thttps://epicgames.com/i.png\n"
                 + "bad line\n");
             check.same("rows", 4, few.size());
@@ -101,6 +101,8 @@ public final class SelfTest {
             check.same("the site's logo, then Google's", "https://amazon.com/icon.png|" + Services.favicon("amazon.com"),
                 String.join("|", few.find(Account.of("Amazon", "", "JBSWY3DPEHPK3PXP")).logos()));
             check.same("no logo of its own", 1, few.find(Account.of("AWS", "", "JBSWY3DPEHPK3PXP")).logos().size());
+            check.same("a bundled logo alone, with no fallback", "asset:twitter.png",
+                String.join("|", few.find(Account.of("Twitter", "", "JBSWY3DPEHPK3PXP")).logos()));
 
             Services all = Services.parse(new String(java.nio.file.Files.readAllBytes(
                 java.nio.file.Paths.get("../app/src/main/assets/services.tsv")), StandardCharsets.UTF_8));
@@ -114,6 +116,13 @@ public final class SelfTest {
             for (String[] pair : known) {
                 Services.Service found = all.find(Account.of(pair[0], "sam", "JBSWY3DPEHPK3PXP"));
                 check.same(pair[0], pair[1], found == null ? null : found.domain);
+            }
+            String[][] bundled = { {"Twitter", "twitter.png"}, {"Tutanota", "tutanota.png"}, {"SpigotMC", "spigotmc.png"} };
+            for (String[] pair : bundled) {
+                Services.Service found = all.find(Account.of(pair[0], "sam", "JBSWY3DPEHPK3PXP"));
+                check.same(pair[0] + " carries its own logo", "asset:" + pair[1], found == null ? null : found.logo);
+                check.ok(pair[0] + "'s logo is in the app",
+                    new java.io.File("../app/src/main/assets/logos/" + pair[1]).length() > 0);
             }
         });
 
