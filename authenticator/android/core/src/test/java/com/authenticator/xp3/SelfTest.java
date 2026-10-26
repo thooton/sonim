@@ -80,6 +80,42 @@ public final class SelfTest {
             check.fails("not two-factor", "isn't for two-factor", () -> OtpLink.parse("https://example.com"));
         });
 
+        check.run("services", () -> {
+            Services few = Services.parse("Amazon\tamazon.com\thttps://amazon.com/icon.png\n"
+                + "Amazon Web Services\taws.amazon.com\t\n"
+                + "X (Twitter)\tx.com,twitter.com\thttps://x.com/a.png\n"
+                + "Epic Games\tepicgames.com\thttps://epicgames.com/i.png\n"
+                + "bad line\n");
+            check.same("rows", 4, few.size());
+            check.same("by name", "Amazon", few.find(Account.of("amazon", "sam", "JBSWY3DPEHPK3PXP")).name);
+            check.same("by label", "Amazon Web Services", few.find(Account.of("AWS", "root", "JBSWY3DPEHPK3PXP")).name);
+            check.same("by a name in brackets", "X (Twitter)", few.find(Account.of("Twitter", "", "JBSWY3DPEHPK3PXP")).name);
+            check.same("by the name before brackets", "X (Twitter)", few.find(Account.of("X", "", "JBSWY3DPEHPK3PXP")).name);
+            check.same("by another domain", "X (Twitter)", few.find(Account.of("www.twitter.com", "", "JBSWY3DPEHPK3PXP")).name);
+            check.same("squashed", "Epic Games", few.find(Account.of("EpicGames", "", "JBSWY3DPEHPK3PXP")).name);
+            check.same("what follows a colon", "Epic Games", few.find(Account.of("Epic Games: Fortnite", "", "JBSWY3DPEHPK3PXP")).name);
+            check.same("the first word", "Amazon", few.find(Account.of("Amazon Seller", "", "JBSWY3DPEHPK3PXP")).name);
+            check.same("a domain the list lacks", "example.org", few.find(Account.of("Example.org", "", "JBSWY3DPEHPK3PXP")).domain);
+            check.same("nothing fits", null, few.find(Account.of("My Bank", "", "JBSWY3DPEHPK3PXP")));
+            check.same("an email alone isn't its provider", null, few.find(Account.of("", "sam@amazon.com", "JBSWY3DPEHPK3PXP")));
+            check.same("the site's logo, then Google's", "https://amazon.com/icon.png|" + Services.favicon("amazon.com"),
+                String.join("|", few.find(Account.of("Amazon", "", "JBSWY3DPEHPK3PXP")).logos()));
+            check.same("no logo of its own", 1, few.find(Account.of("AWS", "", "JBSWY3DPEHPK3PXP")).logos().size());
+
+            Services all = Services.parse(new String(java.nio.file.Files.readAllBytes(
+                java.nio.file.Paths.get("../app/src/main/assets/services.tsv")), StandardCharsets.UTF_8));
+            check.ok("the app's list is large (" + all.size() + ")", all.size() > 2000);
+            String[][] known = {
+                {"GitHub", "github.com"}, {"Google", "google.com"}, {"Microsoft", "microsoft.com"}, {"Discord", "discord.com"},
+                {"AWS", "aws.amazon.com"}, {"Dropbox", "dropbox.com"}, {"Twitter", "x.com"}, {"Coinbase", "coinbase.com"},
+                {"PayPal", "paypal.com"}, {"Proton", "proton.me"}, {"Anthropic", "anthropic.com"},
+            };
+            for (String[] pair : known) {
+                Services.Service found = all.find(Account.of(pair[0], "sam", "JBSWY3DPEHPK3PXP"));
+                check.same(pair[0], pair[1], found == null ? null : found.domain);
+            }
+        });
+
         List<String[]> fixtures = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
             SelfTest.class.getResourceAsStream("/qr/expected.txt"), StandardCharsets.UTF_8))) {
@@ -137,6 +173,10 @@ public final class SelfTest {
                     stored.add("{\"id\":\"b2\",\"issuer\":\"AWS\",\"account\":\"root\",\"secret\":\"GEZDGNBVGY3TQOJQ\",\"algorithm\":\"SHA1\",\"digits\":6,\"period\":30}");
                     return TestServer.Reply.of(201, "application/json", "[" + String.join(",", stored) + "]");
                 }
+                if (request.method.equals("PUT") && request.path.equals("/otp/a1")) {
+                    stored.set(0, request.body);
+                    return TestServer.Reply.json("[" + String.join(",", stored) + "]");
+                }
                 if (request.method.equals("DELETE") && request.path.equals("/otp/b2")) {
                     stored.remove(1);
                     return TestServer.Reply.json("[" + String.join(",", stored) + "]");
@@ -154,6 +194,10 @@ public final class SelfTest {
                 check.ok("sent as a list with the settings", sent.startsWith("[{") && sent.contains("\"secret\":\"GEZDGNBVGY3TQOJQ\"") && sent.contains("\"digits\":6"));
                 check.fails("the command center's reason shown", "The secret key isn't valid Base32",
                     () -> vault.add(Collections.singletonList(Account.of("X", "", "BADBAD"))));
+                Account changed = new Account("a1", "GitHub Enterprise", "sammy", "JBSWY3DPEHPK3PXP", "SHA256", 8, 60);
+                List<Account> updated = vault.update(changed);
+                check.same("updated", "a1 GitHub Enterprise sammy SHA256 8 60", updated.get(0).id + " " + updated.get(0).issuer + " "
+                    + updated.get(0).account + " " + updated.get(0).algorithm + " " + updated.get(0).digits + " " + updated.get(0).period);
                 check.same("removed", 1, vault.remove("b2").size());
                 check.same("removing one already gone lists again", 1, vault.remove("zz").size());
                 check.fails("wrong token", "HTTP 401", () -> new Vault(base, "nope").list());

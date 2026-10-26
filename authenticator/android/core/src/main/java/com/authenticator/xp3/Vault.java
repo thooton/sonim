@@ -11,8 +11,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The accounts on the command center (GET /otp, POST /otp, DELETE /otp/{id},
- * with the delta token). Every call answers with the whole list as it now
+ * The accounts on the command center (GET /otp, POST /otp, PUT /otp/{id},
+ * DELETE /otp/{id}, with the delta token). Every call answers with the whole list as it now
  * stands there, which the app keeps as its copy for when it is offline, in the
  * same JSON (`write`, `read`).
  */
@@ -43,6 +43,12 @@ public final class Vault {
         return send(request("/otp").post(Json.write(body)).header("Content-Type", "application/json"));
     }
 
+    /** Changes the account with `changed`'s id to what `changed` says. */
+    public List<Account> update(Account changed) throws IOException, InterruptedException {
+        return send(request("/otp/" + changed.id).method("PUT").post(Json.write(changed.toJson()))
+            .header("Content-Type", "application/json"));
+    }
+
     public List<Account> remove(String id) throws IOException, InterruptedException {
         return send(request("/otp/" + id).method("DELETE"));
     }
@@ -70,7 +76,7 @@ public final class Vault {
         }
         // Removed already, from another phone or an earlier try that timed out.
         if (response.status() == 404 && response.body().contains("no such account")) return list();
-        if (response.status() == 404) throw new IOException("The command center needs updating for two-factor accounts");
+        if (response.status() == 404 || response.status() == 405) throw new IOException("The command center needs updating for two-factor accounts");
         Http.requireSuccess(response.status(), "Command center");
         try {
             return read(response.body());

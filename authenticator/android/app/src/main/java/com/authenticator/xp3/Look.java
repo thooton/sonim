@@ -102,6 +102,12 @@ final class Look {
     };
 
     static int brand(Account account) {
+        Integer named = named(account);
+        return named != null ? named : TONES[Math.abs(account.title().toLowerCase(Locale.US).hashCode() % TONES.length)];
+    }
+
+    /** The colour from BRANDS, or null for a name none of them is in. */
+    static Integer named(Account account) {
         String issuer = account.issuer.toLowerCase(Locale.US).trim();
         if (issuer.equals("x")) return 0xFF000000;
         // Whole words of the service's name (or the account's, when there is
@@ -117,7 +123,7 @@ final class Look {
                 }
             }
         }
-        return TONES[Math.abs(account.title().toLowerCase(Locale.US).hashCode() % TONES.length)];
+        return null;
     }
 
     /** The monogram on a logo: the name's first letter or digit. */

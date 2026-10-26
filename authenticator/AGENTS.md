@@ -7,14 +7,16 @@ third-party libraries, `:core` plain Java `--release 8` running on API 27.
 
 The user asked for it to be extremely simple: the list of accounts and
 their codes, and Menu's Add by camera, Add by image and Add manually (plus
-Delete). Keep it that way; no search, sorting, grid view, PIN or backups.
+Edit and Delete). Keep it that way; no search, sorting, grid view, PIN or
+backups. The services' logos, and Edit, were asked for later.
 
 ## Where the accounts live
 
 On the Delta command center (thooton/delta, `cmd/delta-cc/otp.go`), behind
 the delta token: `GET /otp` lists them, `POST /otp` adds one or a list (an
 account whose secret is already there is skipped), `DELETE /otp/{id}`
-removes one; each answers with the whole list. `Vault` is the client. The
+removes one, `PUT /otp/{id}` changes one (the secret another account has
+is refused); each answers with the whole list. `Vault` is the client. The
 app keeps the last list it got in `files/accounts.json` (owner-only), shows
 it at once, and syncs on launch and when it comes back after ten minutes.
 Adding and deleting need the command center; the codes don't. Codes are
@@ -46,7 +48,34 @@ scan, the symbol as printed then mirrored, and last the picture inverted.
 - **Add by image** is `ACTION_GET_CONTENT` for `image/*`, then
   `ACTION_PICK` from the gallery if nothing handles that.
 - **Add manually** is `EntryActivity`: service, account, secret key (or a
-  whole `otpauth://` link).
+  whole `otpauth://` link), and digits, seconds and algorithm (6, 30, SHA1).
+- **Edit** is `EntryActivity` given the account's id and fields, but never
+  its secret: the key field is empty with dots for a hint, and kept unless
+  a new key (or link) is typed. `Vault.update` sends it all.
+
+## Logos
+
+`app/src/main/assets/services.tsv` is about 2,600 services: name, domains
+and the address of the logo the service's own site links (its
+apple-touch-icon or icon, checked to be a PNG, JPEG, GIF, WebP or ICO,
+which Android 8.1 decodes; never SVG), or nothing where none was found.
+`services/crawl.py` finds them from 2fa.directory's list (MIT,
+`services/2fa-directory-LICENSE.md`) and `services/build.py` writes the
+file, with the few services 2fa.directory lacks (Google, Microsoft,
+Anthropic...) and fixed logos in its EXTRA and OVERRIDE. Rerun both to
+refresh it.
+
+`Services.find` (in `:core`, tested) says which service an account is:
+the service's name whole or squashed, a domain, a domain's first label
+("AWS"), a name in or before brackets, before a colon, or its first word;
+a name that is a domain is that domain. An account with only an email is
+none. `Logos` fetches the logo on three workers, the site's address first
+and then Google's favicon service (`t1.gstatic.com/faviconV2`, which
+answers 404 when it has none), following https redirects by hand, scales
+it to at most 96 pixels, and keeps it in `files/logos/<hash>.png`. Every
+time the list changes from the command center (sync, add, edit, delete)
+`keep` deletes the logos no account is any more. Until a logo is there,
+or when there is none, the monogram shows as before.
 
 `OtpLink` reads `otpauth://totp/...` (Google's Key Uri Format) and
 `otpauth-migration://offline?data=...` (Google Authenticator's export, a
@@ -55,16 +84,18 @@ protocol buffer); HOTP is refused.
 ## Layout
 
 - `android/core`: `Account` (one account, its codes and the command
-  center's JSON), `Base32`, `OtpLink`, `Vault`, and `qr/`. Tests in
+  center's JSON), `Base32`, `OtpLink`, `Services`, `Vault`, and `qr/`. Tests in
   `src/test` (`./gradlew :authenticator:core:selfTest`): RFC 6238's test
-  vectors, the links, the export, the command center against a loopback
+  vectors, the links, the export, the services list and matching, the command
+  center against a loopback
   server, Reed-Solomon, and every picture in `src/test/resources/qr`, which
   `src/test/fixtures.py` makes (clean codes of versions 1 to 40 at every
   level, and photo-like ones: at an angle, rotated, blurred, unevenly lit,
   noisy, JPEG, inverted, mirrored, small, in a screenshot, and none at all).
 - `android/app`: `MainActivity` (the list, its keys, the menu, adding,
-  deleting, syncing, the login dialog), `EntryActivity`, `Logo` (the badge
-  and its countdown ring), `Look` (Inter, the cards, the services' colours),
+  deleting, syncing, the login dialog), `EntryActivity` (adding and
+  editing), `Logo` (the badge and its countdown ring), `Logos` (fetching
+  and keeping the services' logos), `Look` (Inter, the cards, the services' colours),
   `Pictures`, `PhotoProvider`.
 - `mockups/index.html`: the list drawn at 240x320 with the app's sizes.
 
@@ -74,10 +105,13 @@ Taken from Authy 27.7.1 (its APK and its Play Store screenshots): the page
 `#F4F4F6`, white cards as round at the ends as they are tall over a faint
 shadow, Twilio's navy `#121C2D` for names, codes and the round add button,
 `#606B85` for the account after the name, Inter (bundled from Authy's own
-APK, subset to Latin, OFL; licence in `assets/Inter-OFL.txt`). Each logo is
-the service's initial on its brand colour (`Look.BRANDS`, matched on whole
+APK, subset to Latin, OFL; licence in `assets/Inter-OFL.txt`). Each logo is the service's own
+(`Logos`): cut round when it fills its square, otherwise on a white disc
+in the square inside it. Without one, it is the service's initial on its
+brand colour (`Look.BRANDS`, matched on whole
 words of the service's name; otherwise one of eight tones chosen by the
-name), inside a ring of the same colour over a `#E1E3EA` track that runs
+name), inside a ring of that colour (for a logo whose service isn't in
+`BRANDS`, the average of the logo's coloured pixels) over a `#E1E3EA` track that runs
 down with the code's time. Codes are grouped in halves ("482 963") with even
 figures. Authy has no d-pad focus, so the card under the d-pad is outlined
 in the navy. No header: the list starts at the top. With no accounts, "No

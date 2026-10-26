@@ -58,8 +58,9 @@ import java.util.concurrent.ExecutorService;
  * The accounts live on the command center. The last list it sent is kept in
  * the app's files so codes show at once and offline, and is synced on
  * launch and whenever the app comes back after a while. Menu adds an account
- * by camera, by picture or by hand, and deletes the one under the d-pad; OK
- * copies its code.
+ * by camera, by picture or by hand, and edits or deletes the one under the
+ * d-pad; OK copies its code. Each service's logo is fetched once and kept
+ * (`Logos`) for as long as an account is that service.
  */
 public final class MainActivity extends BaseActivity {
 
@@ -77,10 +78,14 @@ public final class MainActivity extends BaseActivity {
     private static final int ADD_MANUAL = 3;
     private static final int DELETE = 4;
     private static final int CENTER = 5;
+    private static final int EDIT = 6;
 
     private final ExecutorService worker = Ui.worker("authenticator");
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable tick = this::tick;
+    private final Logos logos = new Logos(this, () -> {
+        if (this.adapter != null) this.adapter.notifyDataSetChanged();
+    });
 
     private Login login = Login.blank();
     private List<Account> accounts = new ArrayList<>();
@@ -281,7 +286,7 @@ public final class MainActivity extends BaseActivity {
         void bind(Account next, boolean focus) {
             account = next;
             shown = "";
-            logo.show(next);
+            logo.show(next, logos.get(next), logos.tint(next));
             SpannableStringBuilder line = new SpannableStringBuilder(next.title());
             String detail = next.detail();
             if (detail.length() > 0) {
@@ -398,14 +403,17 @@ public final class MainActivity extends BaseActivity {
         int top = list.getPaddingTop();
         int bottom = list.getHeight() - list.getPaddingBottom();
         View view = list.getChildAt(target - list.getFirstVisiblePosition());
+        // setSelectionFromTop measures from inside the list's top padding,
+        // so each place is given less that padding; given as it is, the list
+        // would creep by the padding at every press.
         if (view != null && view.getTop() >= top && view.getBottom() <= bottom) {
-            list.setSelectionFromTop(target, view.getTop());
+            list.setSelectionFromTop(target, view.getTop() - top);
         } else if (direction > 0) {
             View any = view != null ? view : list.getChildAt(0);
             int height = any == null ? 0 : any.getHeight();
-            list.setSelectionFromTop(target, bottom - height);
+            list.setSelectionFromTop(target, bottom - height - top);
         } else {
-            list.setSelectionFromTop(target, top);
+            list.setSelectionFromTop(target, 0);
         }
         paintFocus();
     }
@@ -421,19 +429,32 @@ public final class MainActivity extends BaseActivity {
         menu.add(0, ADD_IMAGE, 1, "Add by image");
         menu.add(0, ADD_MANUAL, 2, "Add manually");
         final Account account = selected();
-        if (account != null) menu.add(0, DELETE, 3, "Delete");
-        if (!login.ready() || account == null || error != null) menu.add(0, CENTER, 4, "Command center");
+        if (account != null) menu.add(0, EDIT, 3, "Edit");
+        if (account != null) menu.add(0, DELETE, 4, "Delete");
+        if (!login.ready() || account == null || error != null) menu.add(0, CENTER, 5, "Command center");
         popup.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
                 case ADD_CAMERA: camera(); return true;
                 case ADD_IMAGE: image(); return true;
                 case ADD_MANUAL: startActivityForResult(new Intent(this, EntryActivity.class), ENTRY); return true;
+                case EDIT: startActivityForResult(editing(account), ENTRY); return true;
                 case DELETE: confirmDelete(account); return true;
                 case CENTER: askLogin(); return true;
                 default: return false;
             }
         });
         popup.show();
+    }
+
+    /** The entry screen with the account's fields, but not its secret. */
+    private Intent editing(Account account) {
+        return new Intent(this, EntryActivity.class)
+            .putExtra(EntryActivity.ID, account.id)
+            .putExtra(EntryActivity.ISSUER, account.issuer)
+            .putExtra(EntryActivity.ACCOUNT, account.account)
+            .putExtra(EntryActivity.ALGORITHM, account.algorithm)
+            .putExtra(EntryActivity.DIGITS, account.digits)
+            .putExtra(EntryActivity.PERIOD, account.period);
     }
 
     private void camera() {
@@ -493,11 +514,24 @@ public final class MainActivity extends BaseActivity {
             scan(() -> Pictures.read(this, uri));
         } else if (request == ENTRY && data != null) {
             String link = data.getStringExtra(EntryActivity.LINK);
+            String id = data.getStringExtra(EntryActivity.ID);
             try {
-                List<Account> found = link != null ? OtpLink.parse(link)
-                    : Collections.singletonList(Account.of(data.getStringExtra(EntryActivity.ISSUER),
-                        data.getStringExtra(EntryActivity.ACCOUNT), data.getStringExtra(EntryActivity.SECRET)));
-                add(found);
+                if (link != null) {
+                    add(OtpLink.parse(link));
+                    return;
+                }
+                String secret = data.getStringExtra(EntryActivity.SECRET);
+                if (id != null) {
+                    Account old = null;
+                    for (Account account : accounts) if (id.equals(account.id)) old = account;
+                    if (old == null) return;
+                    if (secret == null || secret.length() == 0) secret = old.secret;
+                }
+                Account typed = new Account(id, data.getStringExtra(EntryActivity.ISSUER), data.getStringExtra(EntryActivity.ACCOUNT),
+                    secret, data.getStringExtra(EntryActivity.ALGORITHM),
+                    data.getIntExtra(EntryActivity.DIGITS, 6), data.getIntExtra(EntryActivity.PERIOD, 30));
+                if (id != null) edit(typed);
+                else add(Collections.singletonList(typed));
             } catch (IllegalArgumentException e) {
                 toast(e.getMessage());
             }
@@ -567,6 +601,7 @@ public final class MainActivity extends BaseActivity {
                     accounts = got;
                     synced = System.currentTimeMillis();
                     show();
+                    logos.keep(accounts);
                     if (keep != null) select(keep);
                 } else {
                     show();
@@ -617,6 +652,43 @@ public final class MainActivity extends BaseActivity {
         });
     }
 
+    private void edit(final Account changed) {
+        if (!login.ready()) {
+            askLogin();
+            return;
+        }
+        busy++;
+        show();
+        final Login using = login;
+        worker.execute(() -> {
+            List<Account> fresh = null;
+            String failure = null;
+            try {
+                fresh = new Vault(using).update(changed);
+                writeCache(fresh);
+            } catch (Exception e) {
+                failure = message(e);
+            }
+            final List<Account> got = fresh;
+            final String failed = failure;
+            runOnUiThread(() -> {
+                busy--;
+                if (got == null) {
+                    show();
+                    toast(failed);
+                    return;
+                }
+                accounts = got;
+                error = null;
+                synced = System.currentTimeMillis();
+                show();
+                logos.keep(accounts);
+                toast("Saved " + changed.title());
+                select(changed.secret);
+            });
+        });
+    }
+
     private void confirmDelete(final Account account) {
         String detail = account.detail();
         new AlertDialog.Builder(this)
@@ -653,6 +725,7 @@ public final class MainActivity extends BaseActivity {
                 }
                 accounts = got;
                 show();
+                logos.keep(accounts);
                 if (!accounts.isEmpty()) list.setSelection(Math.max(0, Math.min(at, accounts.size() - 1)));
                 toast("Deleted " + account.title());
             });
