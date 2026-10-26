@@ -83,9 +83,8 @@ public final class MainActivity extends BaseActivity {
     private final ExecutorService worker = Ui.worker("authenticator");
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable tick = this::tick;
-    private final Logos logos = new Logos(this, () -> {
-        if (this.adapter != null) this.adapter.notifyDataSetChanged();
-    });
+    /** Made in onCreate: before it the activity has no context to read files or assets with. */
+    private Logos logos;
 
     private Login login = Login.blank();
     private List<Account> accounts = new ArrayList<>();
@@ -103,6 +102,9 @@ public final class MainActivity extends BaseActivity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        logos = new Logos(this, () -> {
+            if (adapter != null) adapter.notifyDataSetChanged();
+        });
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(color(R.color.page));
         content = new FrameLayout(this);
