@@ -9,6 +9,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import java.util.List;
 
 /**
  * Printing (screens 09, 10 and 11) for one job: how sending is going, then
@@ -371,6 +372,20 @@ final class PrintingScreen extends Screen implements Queue.Listener {
                 }
             }
             return "Ink";
+        }
+    }
+
+    @Override
+    void options(List<Option> out) {
+        if (showing == PROGRESS) {
+            out.add(new Option("Hide", () -> app.home()));
+            out.add(new Option("Cancel print", this::askCancel));
+        } else if (showing == DONE || showing == CANCELED) {
+            out.add(new Option("Done", () -> app.home()));
+            out.add(new Option("Print another PDF", () -> {
+                app.home();
+                app.allowed(() -> app.open(new LocationsScreen()));
+            }));
         }
     }
 }

@@ -179,4 +179,12 @@ final class PrintSettingsScreen extends Screen {
         }
         return true;
     }
+
+    @Override
+    void options(List<Option> out) {
+        out.add(new Option("Print", () -> {
+            app.close();
+            print.run();
+        }));
+    }
 }

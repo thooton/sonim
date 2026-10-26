@@ -59,8 +59,9 @@ problem), `PrintersScreen` (Nearby, By IP address, nothing found),
 `MainActivity.choose` is the proposal's choice dialog, `ask` a question
 with a button.
 
-- Back, and the left soft key (Menu on the XP3), go back; nothing has a
-  menu. Number keys on Home act wherever the focus is. Every action is a
+- Back goes back. Menu opens Options, as in the sibling apps (DESIGN.md):
+  a list of the screen's actions from `Screen.options`, repeating its
+  buttons; Menu again closes it. Number keys on Home act wherever the focus is. Every action is a
   button on screen, and exactly one thing is focused.
 - `PdfDocument` draws a page for the printer through `PdfRenderer` in strips
   of 128 rows, fitted to the paper, turned a quarter when the shapes differ.

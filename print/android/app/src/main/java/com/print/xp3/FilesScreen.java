@@ -341,4 +341,15 @@ final class FilesScreen extends Screen {
         // A file opened and looked at may now have a known page count.
         for (Line line : lines) if (line.pdf != null) line.row.sub.setText(about(line.pdf));
     }
+
+    @Override
+    void options(List<Option> out) {
+        if (pdfs == null) return;
+        out.add(new Option("Sort: " + Library.SORTS[(sort + 1) % Library.SORTS.length].toLowerCase(java.util.Locale.ROOT), () -> {
+            sort = (sort + 1) % Library.SORTS.length;
+            Store.get(app).setSort(sort);
+            rows();
+            focusFirst();
+        }));
+    }
 }

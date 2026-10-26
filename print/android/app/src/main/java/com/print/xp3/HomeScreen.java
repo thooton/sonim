@@ -9,6 +9,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import java.util.List;
 
 /**
  * Home (screen 01): the printer banner, six tiles that match keys 1 to 6,
@@ -269,5 +270,16 @@ final class HomeScreen extends Screen implements Queue.Listener {
         if (digit < 0 || digit > 6) return false;
         if (event.getAction() == KeyEvent.ACTION_UP) act(digit);
         return true;
+    }
+
+    @Override
+    void options(List<Option> out) {
+        out.add(new Option("Print PDF", () -> act(1)));
+        if (last != null) out.add(new Option("Print again", () -> act(0)));
+        out.add(new Option("Recent", () -> act(2)));
+        out.add(new Option("Printers", () -> act(3)));
+        out.add(new Option("Print Queue", () -> act(4)));
+        out.add(new Option("Ink Levels", () -> act(5)));
+        out.add(new Option("Settings", () -> act(6)));
     }
 }

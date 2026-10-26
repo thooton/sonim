@@ -2,6 +2,7 @@ package com.print.xp3;
 
 import android.view.KeyEvent;
 import android.view.View;
+import java.util.List;
 
 /**
  * One screen on {@link MainActivity}'s stack. Its view is built once, when
@@ -35,6 +36,20 @@ abstract class Screen {
     boolean key(KeyEvent event) {
         return false;
     }
+
+    /** One thing Menu offers: what it says, and what it does. */
+    static final class Option {
+        final String title;
+        final Runnable action;
+
+        Option(String title, Runnable action) {
+            this.title = title;
+            this.action = action;
+        }
+    }
+
+    /** What Menu offers here, as it stands now: the screen's own actions, best first. */
+    void options(List<Option> out) {}
 
     /** Back: true when the screen dealt with it itself (cleared a search, say). */
     boolean back() {

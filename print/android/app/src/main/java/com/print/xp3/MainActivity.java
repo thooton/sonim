@@ -25,8 +25,7 @@ import java.util.List;
 /**
  * The one activity: a stack of {@link Screen}s, Home at the bottom, and a
  * dialog drawn over the top one when a setting's choices are open. Back
- * (or the left soft key, which has no label) goes back a screen; on Home it
- * leaves.
+ * goes back a screen (on Home it leaves); Menu opens the screen's Options.
  */
 public final class MainActivity extends Activity {
 
@@ -191,15 +190,41 @@ public final class MainActivity extends Activity {
     public boolean dispatchKeyEvent(KeyEvent event) {
         int code = event.getKeyCode();
         boolean up = event.getAction() == KeyEvent.ACTION_UP;
-        // The left soft key (Menu on the XP3) is Back too, unlabelled, as the proposal recommends: there is no menu.
-        if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_SOFT_LEFT || code == KeyEvent.KEYCODE_MENU) {
+        if (code == KeyEvent.KEYCODE_BACK) {
             if (up && !event.isCanceled()) back();
+            return true;
+        }
+        // Menu opens Options, as in the other apps; pressed again it closes them.
+        if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT) {
+            if (up && !event.isCanceled() && event.getRepeatCount() == 0) menu();
             return true;
         }
         if (overlay != null) return super.dispatchKeyEvent(event);
         Screen top = top();
         if (top != null && top.key(event)) return true;
         return super.dispatchKeyEvent(event);
+    }
+
+    private boolean menuOpen;
+
+    private void menu() {
+        if (overlay != null) {
+            // Over Options, Menu closes them; over any other dialog it does nothing.
+            if (menuOpen) closeOverlay();
+            return;
+        }
+        Screen top = top();
+        if (top == null) return;
+        final List<Screen.Option> options = new ArrayList<Screen.Option>();
+        top.options(options);
+        if (options.isEmpty()) {
+            toast("No options here");
+            return;
+        }
+        List<Choice> choices = new ArrayList<Choice>();
+        for (Screen.Option option : options) choices.add(new Choice(option.title, null));
+        choose("Options", choices, -1, null, which -> options.get(which).action.run());
+        menuOpen = true;
     }
 
     private void back() {
@@ -326,6 +351,7 @@ public final class MainActivity extends Activity {
         if (overlay == null) return;
         root.removeView(overlay);
         overlay = null;
+        menuOpen = false;
         Screen top = top();
         if (top != null) {
             if (top.view instanceof ViewGroup) {
