@@ -1,7 +1,6 @@
 package com.flashcards.xp3;
 
 import com.flashcards.xp3.algo.Fsrs;
-import com.flashcards.xp3.algo.GroupBuilder;
 import com.flashcards.xp3.algo.ReviewSession;
 import com.flashcards.xp3.data.CardDef;
 import com.flashcards.xp3.data.Deck;
@@ -15,6 +14,7 @@ import io.github.openspacedrepetition.State;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,7 +26,7 @@ import java.util.Random;
  * engine under test is the Java-8 FSRS-6 adaptation in package
  * io.github.openspacedrepetition. Legacy java-fsrs vectors are retained with
  * their original parameter set, alongside the app-level behaviors built on
- * top — the 85%-targeted group builder and the review session.
+ * top — the Anki-style review queue.
  */
 public final class AlgoTests {
 
@@ -38,16 +38,12 @@ public final class AlgoTests {
         correctedFsrsEdges(c);
         fuzz(c);
         stabilityFloor(c);
-        groupSizeAndDistinct(c);
-        hardDeckDoesNotIntroduceNewCards(c);
-        newCardsEnterAutomatically(c);
-        learningCardBlocksNewIntroductions(c);
-        cardsAboveNinetyAreNeverSelected(c);
-        cardAtNinetyRemainsEligible(c);
-        groupTargetsEightyFive(c);
-        groupPreferUrgent(c);
-        scheduleEndToEnd(c);
-        equalCardsDoNotStarve(c);
+        newCardsWhileRecallIsHigh(c);
+        noNewCardsWhileRecallIsLow(c);
+        reviewsBeforeNewCards(c);
+        dueReviewsOnly(c);
+        learningComesBackWhenDue(c);
+        previewMatchesRating(c);
     }
 
     /* --- the engine's own entry points --- */
@@ -312,7 +308,7 @@ public final class AlgoTests {
         });
     }
 
-    /* --- group builder: shape --- */
+    /* --- the Anki queue --- */
 
     private static Deck deckOf(int n) {
         List<DeckCard> cards = new ArrayList<>();
@@ -340,244 +336,141 @@ public final class AlgoTests {
             .build();
     }
 
-    private static void groupSizeAndDistinct(Check c) {
-        c.run("group size & distinct", () -> {
-            // a deck with many reviewed cards yields a full group of ten
-            Deck big = deckOf(30);
-            long now = T0;
-            for (DeckCard card : big.cards()) {
-                card.fsrs = reviewed(5.0, 5.0, now - 6L * 86400L);
-            }
-            List<DeckCard> group =
-                new GroupBuilder(big.cards(), now, new Random(1L)).build();
-            c.same("full group is ten", 10, group.size());
-            // and every card in it is distinct
-            boolean distinct = true;
-            for (int i = 0; i < group.size(); i++) {
-                for (int j = i + 1; j < group.size(); j++) {
-                    if (group.get(i) == group.get(j)) distinct = false;
-                }
-            }
-            c.ok("no card twice", distinct);
-        });
+    // noon UTC, so the 4am rollover is eight hours behind and sixteen ahead
+    private static final long NOON = 1_700_049_600L;
+
+    private static ReviewSession session(Deck deck) {
+        return new ReviewSession(deck, ZoneOffset.UTC);
     }
 
-    private static void hardDeckDoesNotIntroduceNewCards(Check c) {
-        c.run("hard deck does not introduce new cards", () -> {
-            Deck deck = deckOf(12);
-            long now = T0;
-            for (int i = 0; i < 10; i++) {
-                deck.cards().get(i).fsrs = reviewed(1.0, 5.0, now - 2L * 86400L);
-            }
-
-            List<DeckCard> group =
-                new GroupBuilder(deck.cards(), now, new Random(8L)).build();
-
-            c.ok("fixture is below target", deck.cards().get(0).probability(now) < GroupBuilder.TARGET);
-            c.same("review group stays full", GroupBuilder.GROUP_SIZE, group.size());
-            for (DeckCard card : group) {
-                c.ok("new cards are outside accuracy math", !card.isNew());
-            }
-        });
-    }
-
-    private static void newCardsEnterAutomatically(Check c) {
-        c.run("new cards enter automatically", () -> {
-            Deck deck = deckOf(12);
-            long now = T0;
-            for (int i = 0; i < 10; i++) {
-                deck.cards().get(i).fsrs = reviewed(5.0, 3.0, now - 6L * 86400L);
-            }
-            DeckCard firstNew = deck.cards().get(10);
-            DeckCard secondNew = deck.cards().get(11);
-
-            ReviewSession scheduler = new ReviewSession(deck, now, new Random(9L));
-            scheduler.next();
-
-            int introduced = 0;
-            if (scheduler.group().contains(firstNew)) introduced++;
-            if (scheduler.group().contains(secondNew)) introduced++;
-            c.ok("fixture is above target", deck.cards().get(0).probability(now) > GroupBuilder.TARGET);
-            c.same("only one new card is auto-added", 1, introduced);
-            c.same("new card occupies one group slot", GroupBuilder.GROUP_SIZE, scheduler.group().size());
-        });
-    }
-
-    private static void learningCardBlocksNewIntroductions(Check c) {
-        c.run("learning card blocks new introductions", () -> {
-            Deck deck = deckOf(3);
-            long now = T0;
-            deck.cards().get(0).fsrs = reviewed(10.0, 3.0, now);
-            deck.cards().get(1).fsrs =
-                Card.builder()
-                    .state(State.LEARNING)
-                    .step(0)
-                    .stability(1.0)
-                    .difficulty(5.0)
-                    .due(Instant.ofEpochSecond(now))
-                    .lastReview(Instant.ofEpochSecond(now - 2L * 86400L))
-                    .build();
-
-            List<DeckCard> group =
-                new GroupBuilder(deck.cards(), now, new Random(11L)).build();
-
-            c.ok("existing learning card is selected", group.contains(deck.cards().get(1)));
-            c.ok("new card waits for learning to finish", !group.contains(deck.cards().get(2)));
-        });
-    }
-
-    private static void cardsAboveNinetyAreNeverSelected(Check c) {
-        c.run("cards above 90% are never selected", () -> {
-            Deck deck = deckOf(3);
-            long now = T0;
-            DeckCard tooFresh = deck.cards().get(0);
-            DeckCard ready = deck.cards().get(1);
-            DeckCard unseen = deck.cards().get(2);
-            tooFresh.fsrs = reviewed(10.0, 3.0, now);
-            ready.fsrs = reviewed(1.0, 5.0, now - 2L * 86400L);
-
-            List<DeckCard> group =
-                new GroupBuilder(deck.cards(), now, new Random(10L)).build();
-
-            c.ok("fixture starts above 90%", tooFresh.probability(now) > 0.90);
-            c.ok("above-90% card is excluded", !group.contains(tooFresh));
-            c.ok("eligible reviewed card remains", group.contains(ready));
-            c.ok("new card remains eligible", group.contains(unseen));
-        });
-    }
-
-    private static void cardAtNinetyRemainsEligible(Check c) {
-        c.run("card at 90% remains eligible", () -> {
-            Deck deck = deckOf(1);
-            long now = T0;
-            DeckCard boundary = deck.cards().get(0);
-            boundary.fsrs = reviewed(1.0, 5.0, now - 86400L);
-
-            List<DeckCard> group =
-                new GroupBuilder(deck.cards(), now, new Random(12L)).build();
-
-            c.close("fixture is exactly 90%", 0.90, boundary.probability(now), 1e-9);
-            c.ok("90% card is selected", group.contains(boundary));
-        });
-    }
-
-    /* --- group builder: the 85% target --- */
-
-    // Builds a realistic deck: most cards reviewed recently enough to carry a
-    // high retrievability, a graduating tail of cards that have aged. With the
-    // pool rich enough above the 85% target, the builder must genuinely mix
-    // to land the group mean near it — the behavior this test exists to pin.
-    private static void groupTargetsEightyFive(Check c) {
-        c.run("group targets 85%", () -> {
+    private static void newCardsWhileRecallIsHigh(Check c) {
+        c.run("new cards while recall is above 85%", () -> {
             Deck deck = deckOf(30);
-            long now = T0;
-            for (int i = 0; i < 30; i++) {
-                double s = 3.0 + (i % 6) * 0.7;          // 3.0..6.5
-                long elapsed = (long) ((i % 8) * 8) + 1; // 1..57 days
-                deck.cards().get(i).fsrs = reviewed(s, 5.0, now - elapsed * 86400L);
-            }
-            long sum = 0;
-            int trials = 200;
-            for (int t = 0; t < trials; t++) {
-                List<DeckCard> group =
-                    new GroupBuilder(deck.cards(), now, new Random(t)).build();
-                for (DeckCard card : group) {
-                    sum += Math.round(card.probability(now) * 1000.0);
-                }
-            }
-            double mean = (sum / 1000.0) / (trials * GroupBuilder.GROUP_SIZE);
-            c.close("mean predicted accuracy near 85%", GroupBuilder.TARGET, mean, 0.08);
-        });
-    }
-
-    /* --- group builder: phase 1 prefers urgent cards --- */
-
-    // When the deck is small and spotty, the builder must still serve the most
-    // urgent cards rather than lazily taking the easiest, up to MIN_URGENT.
-    private static void groupPreferUrgent(Check c) {
-        c.run("group takes urgent", () -> {
-            Deck deck = deckOf(20);
-            long now = T0;
-            // Nineteen moderately fresh cards plus one gone stale. The stale card
-            // must survive selection into a ten-card group.
-            for (int i = 0; i < 19; i++) {
-                deck.cards().get(i).fsrs = reviewed(5.0, 3.0, now - 6L * 86400L);
-            }
-            deck.cards().get(19).fsrs = reviewed(1.0, 5.0, now - 30L * 86400L);
-            List<DeckCard> group =
-                new GroupBuilder(deck.cards(), now, new Random(7L)).build();
-            c.same("large deck still builds ten", 10, group.size());
-            c.ok("stale card is served", group.contains(deck.cards().get(19)));
-        });
-    }
-
-    /* --- scheduler: end to end --- */
-
-    private static void scheduleEndToEnd(Check c) {
-        c.run("scheduler end to end", () -> {
-            long now = T0;
-            long later = now + 30L * 86400L;
-            long originalReview = now - 5L * 86400L;
-            Deck deck = deckOf(12);
-            for (DeckCard card : deck.cards()) {
-                card.fsrs = reviewed(4.0, 5.0, originalReview);
-            }
-            ReviewSession s = new ReviewSession(deck, now, new Random(3L));
-
-            // A deck of 12 yields a first group of exactly GROUP_SIZE.
-            DeckCard first = s.next();
-            c.ok("group starts on first next", first != null);
-            c.same("first group is ten", GroupBuilder.GROUP_SIZE, s.group().size());
-
-            // Serve the whole first group, rating each card (1..4, cycling); every one
-            // is distinct within the group.
-            int served = 0;
+            ReviewSession s = session(deck);
+            c.same("all new cards on offer", 30, s.counts(NOON)[0]);
+            long now = NOON;
             DeckCard card;
-            while (s.hasCurrent()) {
-                card = s.current();
-                served++;
-                s.rate(1 + (served % 4), later);
+            int introduced = 0;
+            // Easy graduates a new card at once and keeps recall high, so no
+            // daily limit ever stops them.
+            while ((card = s.next(now)) != null) {
+                c.ok("only new cards", card.isNew());
+                s.rate(4, now);
+                introduced++;
+                now += 10;
             }
-            c.same("served the full group", GroupBuilder.GROUP_SIZE, served);
-
-            // After the group is spent, the next request rebuilds a fresh
-            // group from the updated FSRS state. The ten just reviewed cards
-            // are above 90%, so only the two untouched cards are eligible.
-            DeckCard again = s.next();
-            c.ok("resumes after group exhausted", again != null);
-            c.same("fresh cards are left out of rebuild", 2, s.group().size());
-
-            // The two cards omitted from the first group continued to decay
-            // while the first ten were refreshed. Both must now be urgent.
-            int untouchedInSecond = 0;
-            for (DeckCard d : s.group()) {
-                if (d.fsrs.getLastReview().getEpochSecond() == originalReview) {
-                    untouchedInSecond++;
-                }
-            }
-            c.same("second group includes both still-urgent cards", 2, untouchedInSecond);
+            c.same("the whole deck comes in", 30, introduced);
         });
     }
 
-    private static void equalCardsDoNotStarve(Check c) {
-        c.run("equal-probability fairness", () -> {
-            long now = T0;
-            Deck deck = deckOf(30);
-            for (DeckCard card : deck.cards()) {
-                card.fsrs = reviewed(5.0, 5.0, now - 6L * 86400L);
+    private static void noNewCardsWhileRecallIsLow(Check c) {
+        c.run("no new cards while recall is below 85%", () -> {
+            Deck deck = deckOf(3);
+            // studied a while ago, not due until tomorrow, but mostly forgotten
+            for (int i = 0; i < 2; i++) {
+                deck.cards().get(i).fsrs = Card.builder()
+                    .state(State.REVIEW).stability(1.0).difficulty(5.0)
+                    .due(Instant.ofEpochSecond(NOON + 86400L))
+                    .lastReview(Instant.ofEpochSecond(NOON - 5L * 86400L))
+                    .build();
             }
-            boolean[] seen = new boolean[30];
-            for (int pass = 0; pass < 30; pass++) {
-                List<DeckCard> group =
-                    new GroupBuilder(deck.cards(), now, new Random(pass)).build();
-                for (DeckCard card : group) {
-                    int id = Integer.parseInt(card.def.key.substring(3));
-                    seen[id] = true;
-                }
-            }
-            boolean allSeen = true;
-            for (boolean value : seen) allSeen &= value;
-            c.ok("random tie-breaking reaches whole deck", allSeen);
+            ReviewSession s = session(deck);
+            c.ok("recall is low", s.recall(NOON) < ReviewSession.TARGET);
+            c.same("no new count", 0, s.counts(NOON)[0]);
+            c.ok("nothing new is served", s.next(NOON) == null);
         });
+    }
+
+    private static void reviewsBeforeNewCards(Check c) {
+        c.run("reviews before new cards", () -> {
+            Deck deck = deckOf(4);
+            for (int i = 0; i < 2; i++) deck.cards().get(i).fsrs = dueAt(NOON - 3600L);
+            ReviewSession s = session(deck);
+            c.ok("recall is high", s.wantsNew(NOON));
+            for (int i = 0; i < 2; i++) {
+                DeckCard card = s.next(NOON);
+                c.ok("a review first", !card.isNew());
+                s.rate(3, NOON);
+            }
+            c.ok("then a new card", s.next(NOON).isNew());
+        });
+    }
+
+    private static void dueReviewsOnly(Check c) {
+        c.run("only reviews due today", () -> {
+            Deck deck = deckOf(2);
+            ReviewSession s = session(deck);
+            DeckCard dueTonight = deck.cards().get(0);
+            DeckCard dueTomorrow = deck.cards().get(1);
+            dueTonight.fsrs = dueAt(NOON + 10L * 3600L);
+            dueTomorrow.fsrs = dueAt(NOON + 20L * 3600L);
+            c.same("review count", 1, s.counts(NOON)[2]);
+            c.ok("due before 4am is shown", s.next(NOON) == dueTonight);
+            s.rate(3, NOON);
+            c.ok("due after 4am waits", s.next(NOON + 60) == null);
+            c.ok("comes up after rollover", s.next(NOON + 17L * 3600L) == dueTomorrow);
+        });
+    }
+
+    private static void learningComesBackWhenDue(Check c) {
+        c.run("learning steps", () -> {
+            Deck deck = deckOf(1);
+            ReviewSession s = session(deck);
+            DeckCard card = s.next(NOON);
+            s.rate(1, NOON);
+            c.same("again keeps it learning", State.LEARNING, card.fsrs.getState());
+            c.same("learning count", 1, s.counts(NOON)[1]);
+            c.ok("learn ahead serves it when nothing else is left", s.next(NOON + 1) == card);
+            s.rate(3, NOON + 60);
+            long due = card.fsrs.getDue().getEpochSecond();
+            c.same("good goes to the 10m step", NOON + 60 + 600, due);
+            c.same("next learning due", due, s.nextLearningDue(NOON + 60));
+            c.ok("served again once due", s.next(due) == card);
+            s.rate(3, due);
+            c.same("second good graduates", State.REVIEW, card.fsrs.getState());
+        });
+    }
+
+    private static void newCardsMixIntoReviews(Check c) {
+        c.run("new mixed with reviews", () -> {
+            Deck deck = deckOf(40);
+            for (int i = 0; i < 20; i++) deck.cards().get(i).fsrs = dueAt(NOON - 86400L);
+            ReviewSession s = session(deck);
+            int newInFirstHalf = 0;
+            long now = NOON;
+            for (int i = 0; i < 20; i++) {
+                DeckCard card = s.next(now);
+                if (card.isNew()) newInFirstHalf++;
+                s.rate(4, now);
+                now += 10;
+            }
+            c.ok("about half the first twenty are new", newInFirstHalf >= 8 && newInFirstHalf <= 12);
+        });
+    }
+
+    private static void previewMatchesRating(Check c) {
+        c.run("preview matches rating", () -> {
+            Deck deck = deckOf(1);
+            DeckCard card = deck.cards().get(0);
+            card.fsrs = reviewed(30.0, 5.0, NOON - 30L * 86400L);
+            ReviewSession s = session(deck);
+            s.next(NOON);
+            Card shown = ReviewSession.preview(card.fsrs, 3, NOON);
+            s.rate(3, NOON);
+            c.same("same due as previewed", shown.getDue(), card.fsrs.getDue());
+            Card hard = ReviewSession.preview(shown, 2, NOON + 40L * 86400L);
+            Card easy = ReviewSession.preview(shown, 4, NOON + 40L * 86400L);
+            c.ok("easy waits longer than hard", easy.getDue().isAfter(hard.getDue()));
+        });
+    }
+
+    private static Card dueAt(long due) {
+        return Card.builder()
+            .state(State.REVIEW)
+            .stability(10.0)
+            .difficulty(5.0)
+            .due(Instant.ofEpochSecond(due))
+            .lastReview(Instant.ofEpochSecond(due - 10L * 86400L))
+            .build();
     }
 }

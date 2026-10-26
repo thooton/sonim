@@ -3,130 +3,178 @@ package com.flashcards.xp3.algo;
 import com.flashcards.xp3.data.Deck;
 import com.flashcards.xp3.data.DeckCard;
 
+import io.github.openspacedrepetition.Card;
 import io.github.openspacedrepetition.Rating;
 import io.github.openspacedrepetition.Scheduler;
+import io.github.openspacedrepetition.State;
 
-import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 
 /**
- * The review session for one deck.
+ * One deck's study session, queued the way Anki's v3 scheduler does with FSRS
+ * on and its default deck options, except for how new cards come in:
  *
- * Owns the current 10-card group and the deck it draws on. Serves the group
- * one card at a time, applies a 1..4 rating to the current card, and when the
- * group is spent builds the next one from the deck's updated state — which is
- * what makes the targeting "live": every group is sized and mixed at 85% from
- * the probabilities as they are right after the previous group changed them.
- * New cards are auto-added by the same arithmetic (see {@link GroupBuilder}),
- * never by a fixed daily quota and never by user choice.
+ * - learning and relearning cards come first once due (steps 1m 10m, 10m),
+ * - then the day's reviews, due before the next 4am rollover, oldest first,
+ * - then new cards, in deck order, while the mean predicted recall of every
+ *   card already studied is above 85% — no fixed daily limit; when recall
+ *   sinks below the target, only the old cards come up until it recovers,
+ * - then learning cards due within the 20-minute learn-ahead limit,
+ * - then nothing: the deck is done for now.
+ *
+ * Every card, new or not, is shown front first and answered 1..4. FSRS-6
+ * (desired retention 0.9) sets each next due date; the fuzz is seeded by the
+ * card and its last review, as Anki's is, so {@link #preview} shows exactly
+ * the interval a rating will give.
  */
 public final class ReviewSession {
 
+    /** New cards come in while the studied cards' mean recall is above this. */
+    public static final double TARGET = 0.85;
+    public static final long LEARN_AHEAD = 20L * 60L;
+    public static final int ROLLOVER_HOUR = 4;
+
     private final Deck deck;
-    private final Random rng;
-    private long selectionTime;
-    private final boolean liveClock;
-    private final List<DeckCard> group;
-    private final Scheduler fsrs;
-    private int index;
-    private int groupNumber;
+    private final ZoneId zone;
+    private DeckCard current;
 
-    private ReviewSession(Deck deck, long baseTime, Random rng, boolean liveClock) {
+    public ReviewSession(Deck deck, ZoneId zone) {
         this.deck = deck;
-        this.rng = rng;
-        this.selectionTime = baseTime;
-        this.liveClock = liveClock;
-        this.group = new ArrayList<>();
-        this.index = 0;
-        this.fsrs = Fsrs.defaults();
-    }
-
-    /** Deterministic-time constructor for tests and offline simulations. */
-    public ReviewSession(Deck deck, long baseTime, Random rng) {
-        this(deck, baseTime, rng, false);
-    }
-
-    public ReviewSession(Deck deck) {
-        this(deck, System.currentTimeMillis() / 1000L, new SecureRandom(), true);
+        this.zone = zone;
     }
 
     public boolean hasCards() {
         return deck.size() > 0;
     }
 
-    /**
-     * Whether the current group still has a card to show. A freshly built
-     * session has an empty group, so this is false until {@link #next()} is
-     * first called.
-     */
-    public boolean hasCurrent() {
-        return index < group.size();
-    }
-
-    /** The current card, or null when the group is exhausted. */
+    /** The card being shown, or null when the deck is done for now. */
     public DeckCard current() {
-        return hasCurrent() ? group.get(index) : null;
+        return current;
+    }
+
+    /** Picks the next card to show at `now`, or null when there is none. */
+    public DeckCard next(long now) {
+        long dayEnd = dayEnd(now);
+        DeckCard learning = null;
+        DeckCard review = null;
+        DeckCard fresh = null;
+        for (DeckCard card : deck.cards()) {
+            if (card.isNew()) {
+                if (fresh == null) fresh = card;
+                continue;
+            }
+            long due = dueOf(card);
+            if (isLearning(card)) {
+                if (due < dayEnd && (learning == null || due < dueOf(learning))) learning = card;
+            } else if (due < dayEnd && (review == null || due < dueOf(review))) {
+                review = card;
+            }
+        }
+        if (fresh != null && !wantsNew(now)) fresh = null;
+
+        if (learning != null && dueOf(learning) <= now) current = learning;
+        else if (review != null) current = review;
+        else if (fresh != null) current = fresh;
+        else if (learning != null && dueOf(learning) <= now + LEARN_AHEAD) current = learning;
+        else current = null;
+        return current;
+    }
+
+    /** Answers the current card (1 Again, 2 Hard, 3 Good, 4 Easy). */
+    public void rate(int rating, long now) {
+        DeckCard card = current;
+        if (card == null) return;
+        card.fsrs = answer(card.fsrs, rating, now);
+        current = null;
+    }
+
+    /** What a rating would make of the card: its new state and due date. */
+    public static Card preview(Card card, int rating, long now) {
+        return answer(card, rating, now);
+    }
+
+    /** The mean predicted recall of every card studied so far (1 when none). */
+    public double recall(long now) {
+        double total = 0.0;
+        int studied = 0;
+        for (DeckCard card : deck.cards()) {
+            if (card.isNew()) continue;
+            total += card.probability(now);
+            studied++;
+        }
+        return studied == 0 ? 1.0 : total / studied;
+    }
+
+    /** Whether recall is high enough to take on a new card. */
+    public boolean wantsNew(long now) {
+        return recall(now) > TARGET;
     }
 
     /**
-     * Advances to the next card, building a fresh group if the current one is
-     * spent. Returns the next card to show, or null when the deck is empty or
-     * every reviewed card is currently above the 90% eligibility ceiling.
+     * Anki's counts for the deck right now: new cards (while recall lets them
+     * in), learning cards due within learn-ahead, and reviews due today.
      */
-    public DeckCard next() {
-        if (index < group.size()) {
-            return group.get(index);
+    public int[] counts(long now) {
+        long dayEnd = dayEnd(now);
+        int unseen = 0;
+        int learning = 0;
+        int reviews = 0;
+        for (DeckCard card : deck.cards()) {
+            if (card.isNew()) {
+                unseen++;
+                continue;
+            }
+            long due = dueOf(card);
+            if (isLearning(card)) {
+                if (due <= now + LEARN_AHEAD) learning++;
+            } else if (due < dayEnd) {
+                reviews++;
+            }
         }
-        rebuild();
-        return hasCurrent() ? group.get(index) : null;
+        return new int[]{wantsNew(now) ? unseen : 0, learning, reviews};
     }
 
-    /** Rating of the current card (1..4) on the card shown before `next()`. */
-    public void rate(int rating, long now) {
-        DeckCard card = current();
-        if (card == null) return;
+    /** When the next learning card due later today comes up, or -1. */
+    public long nextLearningDue(long now) {
+        long dayEnd = dayEnd(now);
+        long next = -1;
+        for (DeckCard card : deck.cards()) {
+            if (card.isNew() || !isLearning(card)) continue;
+            long due = dueOf(card);
+            if (due < dayEnd && (next < 0 || due < next)) next = due;
+        }
+        return next;
+    }
+
+    private static Card answer(Card card, int rating, long now) {
         if (rating < 1 || rating > 4) {
             throw new IllegalArgumentException("rating must be between 1 and 4");
         }
-        long effectiveNow = Math.max(now, selectionTime);
-        if (card.fsrs.getLastReview() != null) {
-            effectiveNow = Math.max(effectiveNow, card.fsrs.getLastReview().getEpochSecond());
-        }
-        card.fsrs =
-            fsrs.reviewCard(
-                    card.fsrs, Rating.values()[rating - 1], Instant.ofEpochSecond(effectiveNow))
-                .getCard();
-        selectionTime = Math.max(selectionTime, effectiveNow);
-        index++;
+        long last = card.getLastReview() == null ? 0L : card.getLastReview().getEpochSecond();
+        Scheduler fsrs = Scheduler.builder()
+            .randomSeedNumber(card.getCardId() * 31 + Long.hashCode(last))
+            .build();
+        return fsrs.reviewCard(
+                card, Rating.values()[rating - 1], Instant.ofEpochSecond(Math.max(now, last)))
+            .getCard();
     }
 
-    /** The group built for the current pass, in serve order. */
-    public List<DeckCard> group() {
-        return group;
+    /** The end of the Anki day `now` falls in: days run from 4am to 4am. */
+    private long dayEnd(long now) {
+        LocalDate day = Instant.ofEpochSecond(now).atZone(zone).minusHours(ROLLOVER_HOUR)
+            .toLocalDate();
+        return ZonedDateTime.of(day.plusDays(1).atTime(ROLLOVER_HOUR, 0), zone).toEpochSecond();
     }
 
-    /** How many cards remain in the current group (unserved). */
-    public int remaining() {
-        return group.size() - index;
+    private static long dueOf(DeckCard card) {
+        return card.fsrs.getDue().getEpochSecond();
     }
 
-    /** The ordinal of the group currently served (1 for the first). */
-    public int groupNumber() {
-        return groupNumber;
-    }
-
-    private void rebuild() {
-        group.clear();
-        index = 0;
-        long observedNow = liveClock ? System.currentTimeMillis() / 1000L : selectionTime;
-        long now = Math.max(selectionTime, observedNow);
-        selectionTime = now;
-
-        List<DeckCard> fresh = new GroupBuilder(deck.cards(), now, rng).build();
-        group.addAll(fresh);
-        groupNumber++;
+    private static boolean isLearning(DeckCard card) {
+        State state = card.fsrs.getState();
+        return state == State.LEARNING || state == State.RELEARNING;
     }
 }

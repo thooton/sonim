@@ -22,8 +22,6 @@ import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Tabs;
 import com.xp3.common.ui.Ui;
 
-import io.github.openspacedrepetition.State;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -37,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -77,12 +76,14 @@ public final class MainActivity extends BaseActivity {
         final String asset;
         final String initialStateAsset;
         final Deck deck;
+        final ReviewSession session;
 
         LoadedDeck(String name, String asset, String initialStateAsset, Deck deck) {
             this.name = name;
             this.asset = asset;
             this.initialStateAsset = initialStateAsset;
             this.deck = deck;
+            this.session = new ReviewSession(deck, ZoneId.systemDefault());
         }
 
         File stateFile(File dir) {
@@ -213,10 +214,11 @@ public final class MainActivity extends BaseActivity {
     private void renderReview() {
         if (reviewPane == null) {
             if (activeDeck >= 0 && activeDeck < decks.size()) {
-                session = new ReviewSession(decks.get(activeDeck).deck);
+                session = decks.get(activeDeck).session;
                 reviewPane = new ReviewPane(this, session, () -> persist());
             } else {
-                reviewPane = new ReviewPane(this, new ReviewSession(emptyDeck()), () -> persist());
+                reviewPane = new ReviewPane(
+                    this, new ReviewSession(emptyDeck(), ZoneId.systemDefault()), () -> persist());
             }
         }
         Ui.fill(content, reviewPane);
@@ -278,7 +280,7 @@ public final class MainActivity extends BaseActivity {
             row.addView(name, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-            int[] counts = deckCounts(loaded.deck);
+            int[] counts = loaded.session.counts(System.currentTimeMillis() / 1000L);
             LinearLayout stats = new LinearLayout(MainActivity.this);
             stats.setOrientation(LinearLayout.HORIZONTAL);
             stats.setPadding(dp(10), dp(2), 0, 0);
@@ -291,24 +293,6 @@ public final class MainActivity extends BaseActivity {
             row.setMinimumHeight(dp(54));
             return row;
         }
-    }
-
-    private int[] deckCounts(Deck deck) {
-        int fresh = 0;
-        int learning = 0;
-        int due = 0;
-        long now = System.currentTimeMillis() / 1000L;
-        for (DeckCard card : deck.cards()) {
-            if (card.isNew()) {
-                fresh++;
-            } else if (card.fsrs.getState() == State.LEARNING
-                || card.fsrs.getState() == State.RELEARNING) {
-                learning++;
-            } else if (card.fsrs.getDue().getEpochSecond() <= now) {
-                due++;
-            }
-        }
-        return new int[]{fresh, learning, due};
     }
 
     private void addCount(LinearLayout row, String label, int colorRes) {

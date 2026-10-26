@@ -2,7 +2,11 @@ package com.flashcards.xp3;
 
 import android.content.Context;
 import android.graphics.Typeface;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.UnderlineSpan;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -13,15 +17,17 @@ import android.widget.TextView;
 import com.flashcards.xp3.algo.ReviewSession;
 import com.flashcards.xp3.data.DeckCard;
 
+import io.github.openspacedrepetition.Card;
+import io.github.openspacedrepetition.State;
+
 /**
  * The study screen for one deck.
  *
- * A card is served front-first: the key fills the middle of the screen, the
- * answer hidden. Pressing OK (DPAD_CENTER/ENTER) reveals it — the value and
- * any auxiliary line together with the four neutral answer keys at the
- * bottom. New cards are introductions instead: prompt and answer are visible
- * together, and 5 advances after recording the introduction as Again in
- * FSRS. Ordinary reviews use 1 Again, 2 Hard, 3 Good, 4 Easy.
+ * As in Anki: the new, learning and review counts along the top, the card
+ * served front-first with the answer hidden, and OK (DPAD_CENTER/ENTER)
+ * revealing it — the value and any auxiliary line — together with the four
+ * answer keys at the bottom, each with the interval it gives: 1 Again,
+ * 2 Hard, 3 Good, 4 Easy. New cards are answered the same way.
  */
 public final class ReviewPane extends LinearLayout {
 
@@ -53,11 +59,9 @@ public final class ReviewPane extends LinearLayout {
         setFocusableInTouchMode(true);
 
         statusView = new TextView(context);
-        statusView.setTextColor(color(R.color.warning));
-        statusView.setTextSize(11);
+        statusView.setTextSize(13);
         statusView.setTypeface(Typeface.DEFAULT_BOLD);
         statusView.setGravity(Gravity.CENTER);
-        statusView.setVisibility(View.GONE);
         addView(
             statusView,
             new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -110,9 +114,12 @@ public final class ReviewPane extends LinearLayout {
         showFirst();
     }
 
-    /** Serves the first card (building the first group), or says the deck is empty. */
+    private final Runnable recheck = this::showFirst;
+
+    /** Serves the next card due, or says the deck is done for now. */
     private void showFirst() {
-        DeckCard card = session.next();
+        removeCallbacks(recheck);
+        DeckCard card = session.next(now());
         if (card == null) showIdle();
         else showCard(card);
     }
@@ -122,36 +129,79 @@ public final class ReviewPane extends LinearLayout {
         cardScroll.scrollTo(0, 0);
         keyView.setTextSize(22);
         keyView.setMaxLines(3);
-        if (card.isNew()) {
-            statusView.setText("New card");
-            statusView.setVisibility(View.VISIBLE);
-        } else {
-            statusView.setVisibility(View.GONE);
-        }
+        showCounts(card);
         keyView.setText(card.def.key);
-        keyView.setVisibility(View.VISIBLE);
-        if (card.isNew()) {
-            revealed = true;
-            showAnswer(card);
-            showNextChip();
-        } else {
-            valueView.setVisibility(View.GONE);
-            auxView.setVisibility(View.GONE);
-            hideChips();
-        }
-    }
-
-    private void showIdle() {
-        revealed = false;
-        statusView.setVisibility(View.GONE);
-        cardScroll.scrollTo(0, 0);
-        keyView.setTextSize(16);
-        keyView.setMaxLines(5);
-        keyView.setText(session.hasCards() ? "Nothing to review yet." : "This deck is empty.");
         keyView.setVisibility(View.VISIBLE);
         valueView.setVisibility(View.GONE);
         auxView.setVisibility(View.GONE);
         hideChips();
+    }
+
+    /** Anki's "new + learning + review" counts, the current card's underlined. */
+    private void showCounts(DeckCard card) {
+        int[] counts = session.counts(now());
+        int queue = -1;
+        if (card != null) {
+            State state = card.fsrs.getState();
+            if (card.isNew()) queue = 0;
+            else if (state == State.LEARNING || state == State.RELEARNING) queue = 1;
+            else queue = 2;
+        }
+        int[] colors = {R.color.count_new, R.color.count_learn, R.color.count_due};
+        SpannableStringBuilder text = new SpannableStringBuilder();
+        for (int i = 0; i < 3; i++) {
+            if (i > 0) text.append(" + ");
+            int start = text.length();
+            text.append(Integer.toString(counts[i]));
+            text.setSpan(
+                new ForegroundColorSpan(color(colors[i])),
+                start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            if (i == queue) {
+                text.setSpan(new UnderlineSpan(), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+        statusView.setTextColor(color(R.color.text_muted));
+        statusView.setText(text);
+    }
+
+    private void showIdle() {
+        revealed = false;
+        showCounts(null);
+        cardScroll.scrollTo(0, 0);
+        keyView.setTextSize(16);
+        keyView.setMaxLines(5);
+        String text = "This deck is empty.";
+        if (session.hasCards()) {
+            text = "Congratulations! You have finished this deck for now.";
+            long now = now();
+            long next = session.nextLearningDue(now);
+            if (next > 0) {
+                long minutes = Math.max(1, (next - now + 59) / 60);
+                text += "\n\nThe next learning card is ready in "
+                    + minutes + (minutes == 1 ? " minute." : " minutes.");
+                // Learn-ahead serves it 20 minutes early, as Anki does.
+                long wait = Math.max(1, next - ReviewSession.LEARN_AHEAD - now);
+                postDelayed(recheck, wait * 1000L);
+            }
+        }
+        keyView.setText(text);
+        keyView.setVisibility(View.VISIBLE);
+        valueView.setVisibility(View.GONE);
+        auxView.setVisibility(View.GONE);
+        hideChips();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        removeCallbacks(recheck);
+        super.onDetachedFromWindow();
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        // Coming back to the tab finds whatever has fallen due meanwhile.
+        if (session.current() == null) showFirst();
     }
 
     private void reveal() {
@@ -174,21 +224,28 @@ public final class ReviewPane extends LinearLayout {
         }
     }
 
-    /** The four answer keys in one neutral row along the bottom edge. */
+    /** The four answer keys along the bottom edge, each over its interval. */
     private void showRatingChips() {
         chipsRow.removeAllViews();
         String[] labels = {"1 Again", "2 Hard", "3 Good", "4 Easy"};
-        for (String label : labels) {
-            chipsRow.addView(chip(label), new LayoutParams(0, chipHeight(), 1f));
+        DeckCard card = session.current();
+        long now = now();
+        for (int i = 0; i < labels.length; i++) {
+            Card after = ReviewSession.preview(card.fsrs, i + 1, now);
+            String interval = interval(after.getDue().getEpochSecond() - now);
+            chipsRow.addView(chip(interval + "\n" + labels[i]), new LayoutParams(0, chipHeight(), 1f));
         }
     }
 
-    /** A new card is presented, not quizzed: there is only one way forward. */
-    private void showNextChip() {
-        chipsRow.removeAllViews();
-        chipsRow.addView(
-            chip("5 Next"),
-            new LayoutParams(LayoutParams.MATCH_PARENT, chipHeight()));
+    /** An interval the way Anki's buttons put it: <1m, 10m, 3h, 4d, 1.5mo, 2.1y. */
+    static String interval(long seconds) {
+        if (seconds < 60) return "<1m";
+        if (seconds < 3600) return (seconds / 60) + "m";
+        if (seconds < 86400) return (seconds / 3600) + "h";
+        double days = seconds / 86400.0;
+        if (days < 30) return Math.round(days) + "d";
+        if (days < 365) return String.format(java.util.Locale.US, "%.1fmo", days / 30.0);
+        return String.format(java.util.Locale.US, "%.1fy", days / 365.0);
     }
 
     private void hideChips() {
@@ -196,16 +253,16 @@ public final class ReviewPane extends LinearLayout {
     }
 
     private int chipHeight() {
-        return dp(34);
+        return dp(38);
     }
 
     private TextView chip(final String label) {
         TextView chip = new TextView(getContext());
         chip.setText(label);
-        chip.setTextSize(12);
+        chip.setTextSize(11);
         chip.setTextColor(color(R.color.chip_text));
         chip.setGravity(Gravity.CENTER);
-        chip.setSingleLine(true);
+        chip.setMaxLines(2);
         chip.setEllipsize(TextUtils.TruncateAt.END);
         chip.setPadding(dp(2), 0, dp(2), 0);
         chip.setBackgroundColor(color(R.color.chip));
@@ -218,13 +275,6 @@ public final class ReviewPane extends LinearLayout {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (event.getRepeatCount() == 0
-            && nextKey(keyCode)
-            && session.current() != null
-            && session.current().isNew()) {
-            rateAndAdvance(1);
-            return true;
-        }
         // Examples are not truncated. On cards whose examples are taller than
         // the display, the phone's up/down keys reveal the remaining text.
         if (revealed && keyCode == KeyEvent.KEYCODE_DPAD_UP) {
@@ -239,7 +289,6 @@ public final class ReviewPane extends LinearLayout {
             return keyCode == KeyEvent.KEYCODE_DPAD_CENTER
                 || keyCode == KeyEvent.KEYCODE_ENTER
                 || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
-                || nextKey(keyCode)
                 || gradeKey(keyCode);
         }
         // OK reveals the answer.
@@ -257,7 +306,6 @@ public final class ReviewPane extends LinearLayout {
         // either the top-row codes or the numpad variants.
         if (gradeKey(keyCode)) {
             if (!revealed) return true; // keys do nothing before the answer is shown
-            if (session.current() != null && session.current().isNew()) return true;
             rateAndAdvance(gradeOf(keyCode));
             return true;
         }
@@ -275,10 +323,6 @@ public final class ReviewPane extends LinearLayout {
             || keyCode == KeyEvent.KEYCODE_NUMPAD_4;
     }
 
-    private static boolean nextKey(int keyCode) {
-        return keyCode == KeyEvent.KEYCODE_5 || keyCode == KeyEvent.KEYCODE_NUMPAD_5;
-    }
-
     private static int gradeOf(int keyCode) {
         if (keyCode == KeyEvent.KEYCODE_1 || keyCode == KeyEvent.KEYCODE_NUMPAD_1) return 1;
         if (keyCode == KeyEvent.KEYCODE_2 || keyCode == KeyEvent.KEYCODE_NUMPAD_2) return 2;
@@ -287,12 +331,13 @@ public final class ReviewPane extends LinearLayout {
     }
 
     private void rateAndAdvance(int rating) {
-        long now = System.currentTimeMillis() / 1000L;
-        session.rate(rating, now);
+        session.rate(rating, now());
         listener.onRated();
-        DeckCard next = session.next();
-        if (next == null) showIdle();
-        else showCard(next);
+        showFirst();
+    }
+
+    private static long now() {
+        return System.currentTimeMillis() / 1000L;
     }
 
     private int color(int res) {
