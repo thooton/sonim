@@ -551,6 +551,7 @@ public final class MainActivity extends BaseActivity {
         screen = Screen.OVERVIEW;
         showToolbar();
         ReviewSession session = session(open);
+        session.setAhead(false);
         long now = System.currentTimeMillis() / 1000L;
         int[] counts = session.counts(now);
         boolean any = counts[0] + counts[1] + counts[2] > 0;
@@ -579,7 +580,7 @@ public final class MainActivity extends BaseActivity {
                 page.addView(line, new LinearLayout.LayoutParams(dp(160), ViewGroup.LayoutParams.WRAP_CONTENT));
             }
             study = Anki.button(this, "Study Now");
-            study.setOnClickListener(v -> startReview());
+            study.setOnClickListener(v -> startReview(false));
             LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(dp(120), dp(30));
             at.topMargin = dp(16);
             page.addView(study, at);
@@ -598,6 +599,14 @@ public final class MainActivity extends BaseActivity {
                 page.addView(when, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
                 // Learn-ahead serves it 20 minutes early, as Anki does.
                 later(refresh, Math.max(1, next - ReviewSession.LEARN_AHEAD - now) * 1000L);
+            }
+            // Anki's "Review ahead": the cards not yet due, likeliest forgotten first.
+            if (studied(open)) {
+                study = Anki.button(this, "Review Ahead");
+                study.setOnClickListener(v -> startReview(true));
+                LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(dp(130), dp(30));
+                at.topMargin = dp(16);
+                page.addView(study, at);
             }
         }
 
@@ -622,9 +631,17 @@ public final class MainActivity extends BaseActivity {
         }
     }
 
-    private void startReview() {
+    private static boolean studied(Deck deck) {
+        for (DeckCard card : deck.cards()) {
+            if (!card.isNew()) return true;
+        }
+        return false;
+    }
+
+    private void startReview(boolean ahead) {
         screen = Screen.REVIEW;
         showToolbar();
+        session(open).setAhead(ahead);
         review = new ReviewPane(this, session(open), new ReviewPane.Listener() {
             @Override public void onRated() {
                 later(saveSoon, SAVE_AFTER_MS);

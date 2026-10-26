@@ -12,6 +12,13 @@ with no daily number (how this app always worked); or a number, as in
 Anki, counting every card first answered since the rollover on either
 device (`intro`). The Spanish deck starts on Auto.
 
+**Review Ahead.** When a deck is finished for now, its congratulations
+offer Review Ahead (Anki's custom study option of that name): studied
+cards not yet due, the likeliest forgotten first (lowest predicted recall,
+then earliest due), never the card just answered twice running, until the
+user leaves. FSRS schedules an early answer from the days actually elapsed.
+The tablet's `session.earliest` is the same rule.
+
 - `android/core` (plain Java, tested by `:flashcards:core:selfTest`):
   - `io/github/openspacedrepetition/`: an Android/Java 8 adaptation of
     java-fsrs 1.0.0 (FSRS-6 defaults). Keep it close to upstream; `AlgoTests`

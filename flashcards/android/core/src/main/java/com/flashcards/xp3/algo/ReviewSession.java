@@ -27,7 +27,10 @@ import java.time.ZonedDateTime;
  *   as Anki does, counting every card first answered since the rollover on
  *   any device,
  * - then learning cards due within the 20-minute learn-ahead limit,
- * - then nothing: the deck is done for now.
+ * - then nothing: the deck is done for now; unless reviewing ahead (Anki's
+ *   "Review ahead"), which goes on to studied cards not yet due, the ones
+ *   most likely forgotten first (lowest predicted recall, then earliest due,
+ *   then deck order), never the card just answered twice running.
  *
  * Every card, new or not, is shown front first and answered 1..4. FSRS-6
  * (desired retention 0.9) sets each next due date; the fuzz is seeded by the
@@ -44,6 +47,8 @@ public final class ReviewSession {
     private final Deck deck;
     private final ZoneId zone;
     private DeckCard current;
+    private boolean ahead;
+    private DeckCard last;
 
     public ReviewSession(Deck deck, ZoneId zone) {
         this.deck = deck;
@@ -83,8 +88,34 @@ public final class ReviewSession {
         else if (review != null) current = review;
         else if (fresh != null) current = fresh;
         else if (learning != null && dueOf(learning) <= now + LEARN_AHEAD) current = learning;
-        else current = null;
+        else current = ahead ? earliest(now) : null;
         return current;
+    }
+
+    /** Whether, once nothing is due, cards not yet due come up (Review Ahead). */
+    public void setAhead(boolean ahead) {
+        this.ahead = ahead;
+        if (!ahead) last = null;
+    }
+
+    public boolean ahead() {
+        return ahead;
+    }
+
+    /** The studied card most likely forgotten, other than the one just answered. */
+    private DeckCard earliest(long now) {
+        DeckCard best = null;
+        double bestRecall = 0;
+        for (DeckCard card : deck.cards()) {
+            if (card.isNew() || card == last) continue;
+            double recall = card.probability(now);
+            if (best == null || recall < bestRecall
+                || recall == bestRecall && dueOf(card) < dueOf(best)) {
+                best = card;
+                bestRecall = recall;
+            }
+        }
+        return best;
     }
 
     /** Answers the current card (1 Again, 2 Hard, 3 Good, 4 Easy). */
@@ -94,6 +125,7 @@ public final class ReviewSession {
         if (card.isNew()) card.intro = now;
         card.fsrs = answer(card.fsrs, rating, now);
         Collection.touch(card, now * 1000L);
+        last = card;
         current = null;
     }
 

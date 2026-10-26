@@ -30,6 +30,41 @@ public final class SyncTests {
         newCardsArrive(c);
         dailyLimit(c);
         autoHasNoLimit(c);
+        reviewAhead(c);
+    }
+
+    private static void reviewAhead(Check c) {
+        c.run("Review Ahead goes on once nothing is due", () -> {
+            Deck deck = bundled(3).decks().get(0);
+            deck.newPerDay = 0;
+            ReviewSession s = new ReviewSession(deck, ZoneOffset.UTC);
+            // Two studied cards, due in 10 and 40 days; the second was studied
+            // longer ago and is likelier forgotten.
+            DeckCard soon = deck.cards().get(0);
+            DeckCard later = deck.cards().get(1);
+            soon.fsrs = reviewed(soon, 30.0, NOON - 20L * 86400L, NOON + 10L * 86400L);
+            later.fsrs = reviewed(later, 5.0, NOON - 2L * 86400L, NOON + 40L * 86400L);
+            c.ok("nothing due", s.next(NOON) == null);
+            s.setAhead(true);
+            DeckCard first = s.next(NOON);
+            c.ok("the likelier forgotten first", first == soon || first == later);
+            c.ok("lowest recall first", first.probability(NOON) <= (first == soon ? later : soon).probability(NOON));
+            s.rate(3, NOON);
+            DeckCard second = s.next(NOON + 10);
+            c.ok("not the same card twice running", second != first && second != null);
+            c.ok("never a new card", !second.isNew());
+            s.setAhead(false);
+            c.ok("off again: nothing", s.next(NOON + 20) == null);
+        });
+    }
+
+    private static io.github.openspacedrepetition.Card reviewed(DeckCard card, double stability, long last, long due) {
+        return io.github.openspacedrepetition.Card.builder()
+            .cardId(DeckCard.idFor(card.def.identity))
+            .state(State.REVIEW).step(null).stability(stability).difficulty(5.0)
+            .due(java.time.Instant.ofEpochSecond(due))
+            .lastReview(java.time.Instant.ofEpochSecond(last))
+            .build();
     }
 
     private static Collection bundled(int n) {

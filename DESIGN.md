@@ -435,7 +435,8 @@ theme (`res/values/colors.xml`):
   congratulations); the reviewer (the card in Arial-like sans at 20sp, the
   answer under a rule, the bottom bar with "20 + 3 + 41", the current
   card's queue underlined, over Show Answer and then the four answers
-  under their intervals); the deck options (a white Daily Limits card,
+  under their intervals); Review Ahead under the congratulations, as Anki
+  offers it in Custom Study; the deck options (a white Daily Limits card,
   New cards/day in a spin box, Auto below 0).
 - **No key labels.** Anki's buttons don't show their keys, so neither do
   these: OK, 1 to 4, Menu and Back do what they do in Anki's keyboard
