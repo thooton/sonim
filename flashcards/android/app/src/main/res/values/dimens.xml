@@ -1,34 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Measured against the XP3's 240x320 mdpi panel: 24dp status bar, 36dp
-         tab bar, leaving 260dp of content. A flashcard fills the whole page,
-         and the answer strip sits at the bottom. -->
-    <dimen name="tab_bar_height">36dp</dimen>
-    <dimen name="tab_underline">3dp</dimen>
-    <dimen name="tab_text">12sp</dimen>
-
-    <dimen name="row_height">54dp</dimen>
-    <dimen name="row_pad_h">10dp</dimen>
-    <dimen name="divider_height">1dp</dimen>
-    <dimen name="focus_rule">2dp</dimen>
-
-    <dimen name="text_title">15sp</dimen>
-    <dimen name="text_body">13sp</dimen>
-    <dimen name="text_sub">11sp</dimen>
-    <dimen name="text_section">11sp</dimen>
-    <dimen name="text_value">12sp</dimen>
-    <dimen name="text_detail_title">16sp</dimen>
-
-    <!-- The card's front is the big line that has to be read across the room;
-         the answer strip at the bottom labels four numpad keys. -->
-    <dimen name="text_card_front">26sp</dimen>
-    <dimen name="text_card_back">20sp</dimen>
-    <dimen name="text_aux">13sp</dimen>
-
-    <!-- Answer chips are 44dp tall so they are pressable blind, one full row
-         each. -->
-    <dimen name="chip_height">44dp</dimen>
-    <dimen name="chip_text">14sp</dimen>
-
-    <dimen name="text_remaining">11sp</dimen>
+    <!-- The XP3's 240x320 mdpi panel: 24dp status bar, 296dp of window. -->
+    <dimen name="toolbar_height">26dp</dimen>
 </resources>

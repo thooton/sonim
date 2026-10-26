@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- No permissions. Everything here is local: the decks are bundled in
-         the APK and the review state lives in the app's private directory. -->
+    <!-- The decks sync with the command center; studying needs no network. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 

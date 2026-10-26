@@ -1,2 +1,7 @@
-// The FSRS state machine, the deck model and the 85%-targeted group builder.
+// The FSRS state machine, the deck model, the review queue and the sync
+// with the command center.
 apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    api project(":common:core")
+}

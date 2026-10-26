@@ -1,35 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Warm paper and brown ink, following Mimi's parchment-like shell. -->
-    <color name="primary">#6B5945</color>
-    <color name="primary_dark">#4B3D2F</color>
-    <color name="on_primary">#FBFAF7</color>
-    <color name="on_primary_dim">#DED5C8</color>
+    <!-- Anki's light theme (its sass variables), so the app reads as Anki's
+         desktop window on a small screen. -->
+    <color name="canvas">#F5F5F5</color>
+    <color name="elevated">#FFFFFF</color>
+    <color name="border">#C4C4C4</color>
+    <color name="border_subtle">#E4E4E4</color>
+    <color name="text">#020202</color>
+    <color name="text_subtle">#737373</color>
+    <color name="text_faint">#A3A3A3</color>
 
-    <color name="page">#EFEAE3</color>
-    <color name="row">#FBFAF7</color>
-    <color name="divider">#DFD9CD</color>
-    <color name="outline">#CBC2B1</color>
+    <!-- The three queues, as Anki colours them everywhere. -->
+    <color name="state_new">#3B82F6</color>
+    <color name="state_learn">#DC2626</color>
+    <color name="state_review">#16A34A</color>
 
-    <!-- Focus is the one place colour is allowed to be assertive: a pale wash
-         and a 2dp rule rather than a filled block. -->
-    <color name="focus_fill">#E7DED1</color>
-    <color name="focus_rule">#6B5945</color>
-    <color name="press_fill">#D9CEBE</color>
+    <!-- Anki's focus ring and the wash of a row under the pointer, here
+         under the d-pad. -->
+    <color name="focus">#3B82F6</color>
+    <color name="hover">#E5E5E5</color>
+    <color name="button_top">#FFFFFF</color>
+    <color name="button_bottom">#F2F2F2</color>
+    <color name="pressed">#DADADA</color>
 
-    <color name="text">#1D1B16</color>
-    <color name="text_muted">#7D766A</color>
-    <color name="warning">#B23C2B</color>
-    <color name="success">#2F8557</color>
-    <color name="disabled">#E4DFD5</color>
-    <color name="disabled_text">#A49C8D</color>
-
-    <!-- Deck counts keep Anki's familiar semantic colours. -->
-    <color name="count_new">#2F6FD0</color>
-    <color name="count_learn">#B23C2B</color>
-    <color name="count_due">#2F8557</color>
-
-    <!-- Ratings are controls, not status indicators, so all four are neutral. -->
-    <color name="chip">#DDD4C7</color>
-    <color name="chip_text">#4B463C</color>
+    <!-- The names common/ui's dialogs and lists look for. -->
+    <color name="primary">#F5F5F5</color>
+    <color name="focus_rule">#3B82F6</color>
+    <color name="focus_fill">#E5E5E5</color>
+    <color name="divider">#E4E4E4</color>
+    <color name="text_muted">#737373</color>
 </resources>

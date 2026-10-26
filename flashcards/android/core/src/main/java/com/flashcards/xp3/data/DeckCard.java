@@ -5,19 +5,27 @@ import com.flashcards.xp3.algo.Fsrs;
 import io.github.openspacedrepetition.Card;
 
 /**
- * One card as the app knows it: the definition from the bundled deck plus the
- * FSRS memory state, which lives split across the definitions (never changing)
- * and the per-user review log (always changing). The FSRS state is the
- * {@link Card} class of the vendored java-fsrs library; the app only ever
- * routes it through {@link Fsrs} or stores it verbatim.
+ * One card as the app knows it: its definition, its place in the deck, and
+ * the FSRS memory state (the {@link Card} class of the vendored java-fsrs
+ * library, which the app only routes through {@link Fsrs} or stores
+ * verbatim), with what sync needs to know about it.
  */
 public final class DeckCard {
 
-    /** The immutable definition from the bundled deck. */
+    /** The definition: front, back, aux and identity. */
     public final CardDef def;
 
     /** The mutable FSRS state, owned by the scheduler (java-fsrs Card). */
     public Card fsrs;
+
+    /** Its place in the deck: new cards come in this order. */
+    public int ord;
+    /** When it was first answered, Unix seconds, or 0 (never, or unknown). */
+    public long intro;
+    /** When it last changed, device milliseconds, for sync. */
+    public long mod;
+    /** Changed here since the last sync. */
+    public boolean dirty;
 
     public DeckCard(CardDef def) {
         this.def = def;

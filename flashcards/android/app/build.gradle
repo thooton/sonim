@@ -4,13 +4,22 @@ plugins {
 
 apply from: rootProject.file("gradle/app.gradle")
 
+apply from: rootProject.file("gradle/bundled.gradle")
+
+// The same command center as Authenticator, with the same token: it keeps
+// the decks and syncs them with the tablet.
+bundled("com.flashcards.xp3") {
+    def center = deltaCenter(false)
+    [SERVER: center.server, TOKEN: center.token, REVISION: center.revision]
+}
+
 android {
     namespace "com.flashcards.xp3"
 
     defaultConfig {
         applicationId "com.flashcards.xp3"
-        versionCode 5
-        versionName "1.1.0"
+        versionCode 6
+        versionName "1.2.0"
     }
 }
 

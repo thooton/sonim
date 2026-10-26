@@ -410,3 +410,33 @@ It sets the family rules aside where Authy differs:
   in the navy; nothing grows or moves.
 - **One step at a time.** Up and Down move one account, at once, and the
   list moves only as far as it must to show it.
+
+## Flashcards: Anki's desktop window
+
+Flashcards takes its look from Anki's desktop app rather than the family,
+since Anki is what the user studies with, and Flashcards on the tablet
+draws the same window in black and white. Its colours are Anki's light
+theme (`res/values/colors.xml`):
+
+- **Anki's canvas and chrome.** The page and status bar are Anki's
+  `#F5F5F5` with dark icons; the card is white (`#FFFFFF`); borders
+  `#C4C4C4`; text `#020202`, muted `#737373`, a zero count faint `#A3A3A3`.
+- **The queue colours.** New `#3B82F6`, Learning `#DC2626`, To Review
+  `#16A34A`, wherever a count appears, as Anki colours them.
+- **Anki's buttons.** A white to pale grey face, a 1dp grey border, 5dp
+  corners; the button Enter would press in Anki (Study Now, Show Answer,
+  Good) wears Anki's blue focus ring (`#3B82F6`, 2dp), and so does the
+  button under the d-pad.
+- **Anki's screens.** The toolbar (Decks, Sync; Sync blue with changes to
+  send, red when the last sync failed), hidden while studying; the deck
+  table (Deck, New, Learn, Due) on rows washed `#E5E5E5` under the d-pad,
+  with "Studied N cards today." under it; the overview (the name, New,
+  Learning and To Review, Study Now, Options in the bottom bar, or the
+  congratulations); the reviewer (the card in Arial-like sans at 20sp, the
+  answer under a rule, the bottom bar with "20 + 3 + 41", the current
+  card's queue underlined, over Show Answer and then the four answers
+  under their intervals); the deck options (a white Daily Limits card,
+  New cards/day in a spin box, Auto below 0).
+- **No key labels.** Anki's buttons don't show their keys, so neither do
+  these: OK, 1 to 4, Menu and Back do what they do in Anki's keyboard
+  shortcuts and in every other app here.

@@ -1,5 +1,6 @@
 package com.flashcards.xp3.algo;
 
+import com.flashcards.xp3.data.Collection;
 import com.flashcards.xp3.data.Deck;
 import com.flashcards.xp3.data.DeckCard;
 
@@ -19,9 +20,12 @@ import java.time.ZonedDateTime;
  *
  * - learning and relearning cards come first once due (steps 1m 10m, 10m),
  * - then the day's reviews, due before the next 4am rollover, oldest first,
- * - then new cards, in deck order, while the mean predicted recall of every
- *   card already studied is above 85% — no fixed daily limit; when recall
- *   sinks below the target, only the old cards come up until it recovers,
+ * - then new cards, in deck order: on a deck set to AUTO, while the mean
+ *   predicted recall of every card already studied is above 85%, with no
+ *   daily limit (when recall sinks below the target, only the old cards
+ *   come up until it recovers); on a deck with a number, that many a day,
+ *   as Anki does, counting every card first answered since the rollover on
+ *   any device,
  * - then learning cards due within the 20-minute learn-ahead limit,
  * - then nothing: the deck is done for now.
  *
@@ -87,8 +91,14 @@ public final class ReviewSession {
     public void rate(int rating, long now) {
         DeckCard card = current;
         if (card == null) return;
+        if (card.isNew()) card.intro = now;
         card.fsrs = answer(card.fsrs, rating, now);
+        Collection.touch(card, now * 1000L);
         current = null;
+    }
+
+    public Deck deck() {
+        return deck;
     }
 
     /** What a rating would make of the card: its new state and due date. */
@@ -108,9 +118,24 @@ public final class ReviewSession {
         return studied == 0 ? 1.0 : total / studied;
     }
 
-    /** Whether recall is high enough to take on a new card. */
+    /**
+     * Whether a new card may come in: on AUTO, whether recall is high
+     * enough; otherwise whether today's limit has room.
+     */
     public boolean wantsNew(long now) {
-        return recall(now) > TARGET;
+        if (deck.isAuto()) return recall(now) > TARGET;
+        return newLeft(now) > 0;
+    }
+
+    /** How many more new cards today's limit allows (AUTO: no limit). */
+    public int newLeft(long now) {
+        if (deck.isAuto()) return Integer.MAX_VALUE;
+        long dayStart = dayEnd(now) - 86400L;
+        int today = 0;
+        for (DeckCard card : deck.cards()) {
+            if (!card.isNew() && card.intro >= dayStart) today++;
+        }
+        return Math.max(0, deck.newPerDay - today);
     }
 
     /**
@@ -134,7 +159,8 @@ public final class ReviewSession {
                 reviews++;
             }
         }
-        return new int[]{wantsNew(now) ? unseen : 0, learning, reviews};
+        int fresh = wantsNew(now) ? Math.min(unseen, newLeft(now)) : 0;
+        return new int[]{fresh, learning, reviews};
     }
 
     /** When the next learning card due later today comes up, or -1. */
