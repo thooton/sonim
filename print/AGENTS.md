@@ -59,8 +59,11 @@ problem), `PrintersScreen` (Nearby, By IP address, nothing found),
 `MainActivity.choose` is the proposal's choice dialog, `ask` a question
 with a button.
 
-- Back goes back. Menu does nothing: every action is a button on its
-  screen, and nothing is offered twice. Number keys on Home act wherever the focus is. Every action is a
+- Back goes back. Menu opens Options (`Screen.options`) only for what no
+  button does, so nothing is offered twice: sort in Files, forget a kept
+  printer or search again in Printers, take a file off or clear Recent,
+  cancel or reprint a job in Print Queue (where OK shows its progress).
+  Elsewhere Menu does nothing. Number keys on Home act wherever the focus is. Every action is a
   button on screen, and exactly one thing is focused.
 - `PdfDocument` draws a page for the printer through `PdfRenderer` in strips
   of 128 rows, fitted to the paper, turned a quarter when the shapes differ.

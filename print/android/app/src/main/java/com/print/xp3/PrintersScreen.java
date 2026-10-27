@@ -588,4 +588,27 @@ final class PrintersScreen extends Screen {
         }
         typed();
     }
+
+    /** Forget the focused printer, if it is one kept; search again, when a search has found some. */
+    @Override
+    void options(List<Option> out) {
+        if (tab != 0) return;
+        View focused = list.findFocus();
+        Object tag = focused == null ? null : focused.getTag();
+        if (tag instanceof Object[]) {
+            final Printer printer = (Printer) ((Object[]) tag)[0];
+            if (Store.get(app).kept(printer)) out.add(new Option("Forget printer", () -> forget(printer)));
+        }
+        if (searchOver && !rows.isEmpty() && Wifi.on(app)) out.add(new Option("Search again", this::search));
+    }
+
+    private void forget(Printer printer) {
+        Store.get(app).forget(printer);
+        Parts.Row row = rows.remove(printer.key());
+        states.remove(printer.key());
+        if (row != null) list.removeView(row);
+        refreshRows();
+        View focus = focusRow();
+        if (focus != null) focus.requestFocus();
+    }
 }

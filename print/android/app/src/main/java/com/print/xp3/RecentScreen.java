@@ -15,7 +15,8 @@ import java.util.Locale;
 /**
  * Recent (screen 15): what was printed, newest first, grouped by day. OK
  * opens the preview with the settings used last time. A file that has been
- * moved or deleted says so and can't be opened.
+ * moved or deleted says so and can't be opened. Menu takes a file off the
+ * list, or clears it.
  */
 final class RecentScreen extends Screen {
 
@@ -60,6 +61,7 @@ final class RecentScreen extends Screen {
             }
             boolean there = print.exists();
             Parts.Row row = new Parts.Row(c, 42);
+            row.setTag(print.path);
             final ImageView thumb = new ImageView(c);
             thumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
             thumb.setBackgroundColor(0xFFDCDEE3);
@@ -74,11 +76,11 @@ final class RecentScreen extends Screen {
                     if (bitmap != null) thumb.setImageBitmap(bitmap);
                 });
             } else {
+                // Still focusable, so it can be taken off the list.
                 row.title.setTextColor(Look.MUTE);
-                row.setFocusable(false);
             }
             list.addView(row, Parts.line(Parts.FILL, Parts.WRAP));
-            if (firstRow == null && there) firstRow = row;
+            if (firstRow == null) firstRow = row;
             last = row;
         }
         if (last != null) last.noDivider();
@@ -102,5 +104,30 @@ final class RecentScreen extends Screen {
         if (words[0].equalsIgnoreCase("HP") || words[0].equalsIgnoreCase("Canon") || words[0].equalsIgnoreCase("Epson")
             || words[0].equalsIgnoreCase("Brother")) return words[0] + " " + words[1];
         return words[0];
+    }
+
+    @Override
+    void options(List<Option> out) {
+        if (Store.get(app).history().isEmpty()) return;
+        View focused = list.findFocus();
+        final Object path = focused == null ? null : focused.getTag();
+        if (path instanceof String) {
+            out.add(new Option("Remove from Recent", () -> {
+                Store.get(app).unlist((String) path);
+                refill();
+            }));
+        }
+        out.add(new Option("Clear Recent", () -> app.ask("Clear Recent?", "Your PDFs stay where they are.",
+            "Clear", Parts.DANGER, () -> {
+                Store.get(app).clearHistory();
+                refill();
+            }, "Keep")));
+    }
+
+    private void refill() {
+        list.removeAllViews();
+        firstRow = null;
+        fill(app);
+        if (firstRow != null) firstRow.requestFocus();
     }
 }

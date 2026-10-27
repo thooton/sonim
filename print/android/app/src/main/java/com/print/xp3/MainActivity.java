@@ -25,7 +25,8 @@ import java.util.List;
 /**
  * The one activity: a stack of {@link Screen}s, Home at the bottom, and a
  * dialog drawn over the top one when a setting's choices are open. Back
- * goes back a screen; on Home it leaves. Menu does nothing.
+ * goes back a screen; on Home it leaves. Menu opens what the screen offers
+ * that no button does (forget a printer, sort files), when it offers any.
  */
 public final class MainActivity extends Activity {
 
@@ -194,12 +195,33 @@ public final class MainActivity extends Activity {
             if (up && !event.isCanceled()) back();
             return true;
         }
-        // Every action is a button on its screen, so Menu has nothing to add: it does nothing.
-        if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT) return true;
+        if (code == KeyEvent.KEYCODE_MENU || code == KeyEvent.KEYCODE_SOFT_LEFT) {
+            if (up && !event.isCanceled() && event.getRepeatCount() == 0) menu();
+            return true;
+        }
         if (overlay != null) return super.dispatchKeyEvent(event);
         Screen top = top();
         if (top != null && top.key(event)) return true;
         return super.dispatchKeyEvent(event);
+    }
+
+    private boolean menuOpen;
+
+    /** Menu: the top screen's options in a list, or nothing when it has none; Menu again closes it. */
+    private void menu() {
+        if (overlay != null) {
+            if (menuOpen) closeOverlay();
+            return;
+        }
+        Screen top = top();
+        if (top == null) return;
+        final List<Screen.Option> options = new ArrayList<Screen.Option>();
+        top.options(options);
+        if (options.isEmpty()) return;
+        List<Choice> choices = new ArrayList<Choice>();
+        for (Screen.Option option : options) choices.add(new Choice(option.title, null));
+        choose("Options", choices, -1, null, which -> options.get(which).action.run());
+        menuOpen = true;
     }
 
     private void back() {
@@ -326,6 +348,7 @@ public final class MainActivity extends Activity {
         if (overlay == null) return;
         root.removeView(overlay);
         overlay = null;
+        menuOpen = false;
         Screen top = top();
         if (top != null) {
             if (top.view instanceof ViewGroup) {

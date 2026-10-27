@@ -23,7 +23,7 @@ import java.util.Locale;
  * The PDFs in one place (screen 03), newest first, or one folder of the
  * phone's storage. Number keys search at once (screen 04): each key stands
  * for its letters, as in a phone's contact search, and the matching letters
- * are highlighted. # changes the order.
+ * are highlighted. Menu changes the order.
  */
 final class FilesScreen extends Screen {
 
@@ -41,7 +41,6 @@ final class FilesScreen extends Screen {
     private TextView fieldText;
     private TextView mode;
     private TextView meta;
-    private TextView sortHint;
     private final StringBuilder query = new StringBuilder();
     private final List<Line> lines = new ArrayList<Line>();
     private int sort;
@@ -113,11 +112,7 @@ final class FilesScreen extends Screen {
 
         View right = null;
         if (pdfs != null) {
-            LinearLayout sortView = Parts.row(c);
-            sortView.addView(Parts.image(c, R.drawable.ic_sort, Look.BLUE, 13));
-            sortHint = Look.text(c, "#", 10, Look.SEMIBOLD, Look.BLUE);
-            sortView.addView(sortHint);
-            right = sortView;
+            right = Parts.image(c, R.drawable.ic_sort, Look.BLUE, 13);
         } else {
             entries = Library.folder(folder);
         }
@@ -290,15 +285,6 @@ final class FilesScreen extends Screen {
             }
             return query.length() > 0 || !down;
         }
-        if (code == KeyEvent.KEYCODE_POUND && pdfs != null) {
-            if (down) {
-                sort = (sort + 1) % Library.SORTS.length;
-                Store.get(app).setSort(sort);
-                rows();
-                focusFirst();
-            }
-            return true;
-        }
         if (field.isFocused() && code == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (down && !lines.isEmpty()) {
                 fieldLook(false);
@@ -340,5 +326,20 @@ final class FilesScreen extends Screen {
     void shown() {
         // A file opened and looked at may now have a known page count.
         for (Line line : lines) if (line.pdf != null) line.row.sub.setText(about(line.pdf));
+    }
+
+    @Override
+    void options(List<Option> out) {
+        if (pdfs == null) return;
+        out.add(new Option("Sort", () -> {
+            List<MainActivity.Choice> choices = new ArrayList<MainActivity.Choice>();
+            for (String each : Library.SORTS) choices.add(new MainActivity.Choice(each, null));
+            app.choose("Sort", choices, sort, null, which -> {
+                sort = which;
+                Store.get(app).setSort(sort);
+                rows();
+                focusFirst();
+            });
+        }));
     }
 }

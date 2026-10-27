@@ -145,7 +145,7 @@ final class SettingsScreen extends Screen {
                 {"1 to 6", "Open a tile on Home"},
                 {"0", "Print the last PDF again"},
                 {"Number keys", "Search a list of files: each key stands for its letters"},
-                {"#", "Change a file list's order"},
+                {"Menu", "Sort files; forget a printer; take a file off Recent; cancel or reprint a job"},
                 {"◀ ▶", "Turn pages in the preview; change copies; switch tabs"},
                 {"*", "Next box, when typing an address"},
                 {"Back", "Go back a screen. On Printing, printing carries on"},

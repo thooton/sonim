@@ -97,7 +97,7 @@ final class QueueScreen extends Screen implements Queue.Listener {
                 if (Integer.valueOf(entry.id).equals(focusedId)) refocus = row;
             }
         }
-        list.addView(Parts.foot(c, "OK on a job to cancel it or print it again."));
+        list.addView(Parts.foot(c, "Menu on a job to cancel it or print it again."));
         View target = refocus != null ? refocus : firstRow;
         if (target != null && app.top() == this) target.requestFocus();
     }
@@ -132,7 +132,7 @@ final class QueueScreen extends Screen implements Queue.Listener {
         } else {
             row.trailing(Parts.image(c, R.drawable.ic_cross, entry.state == Queue.FAILED ? Look.ERR : Look.MUTE, 12));
         }
-        row.setOnClickListener(v -> act(entry));
+        row.setOnClickListener(v -> app.open(new PrintingScreen(entry)));
         list.addView(row, Parts.line(Parts.FILL, Parts.WRAP));
         return row;
     }
@@ -157,19 +157,18 @@ final class QueueScreen extends Screen implements Queue.Listener {
         }
     }
 
-    private void act(final Queue.Entry entry) {
-        List<MainActivity.Choice> choices = new ArrayList<MainActivity.Choice>();
-        final List<Runnable> actions = new ArrayList<Runnable>();
-        choices.add(new MainActivity.Choice("Show progress", null));
-        actions.add(() -> app.open(new PrintingScreen(entry)));
+    /** Cancel the focused job, or print it again. */
+    @Override
+    void options(List<Option> out) {
+        View focused = list.findFocus();
+        Object id = focused == null ? null : focused.getTag();
+        final Queue.Entry entry = id instanceof Integer ? Queue.get((Integer) id) : null;
+        if (entry == null) return;
         if (entry.active()) {
-            choices.add(new MainActivity.Choice("Cancel print", null));
-            actions.add(() -> app.ask("Cancel this print job?", null, "Cancel print", Parts.DANGER,
-                () -> Queue.cancel(entry), "Keep printing"));
+            out.add(new Option("Cancel print", () -> app.ask("Cancel this print job?", null, "Cancel print", Parts.DANGER,
+                () -> Queue.cancel(entry), "Keep printing")));
         } else {
-            choices.add(new MainActivity.Choice("Print again", "To " + entry.printer.shown()));
-            actions.add(() -> app.open(new PrintingScreen(Queue.again(app, entry, null, entry.options.color))));
+            out.add(new Option("Print again", () -> app.open(new PrintingScreen(Queue.again(app, entry, null, entry.options.color)))));
         }
-        app.choose(entry.title, choices, -1, null, which -> actions.get(which).run());
     }
 }

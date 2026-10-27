@@ -137,6 +137,19 @@ final class Store {
         return known;
     }
 
+    boolean kept(Printer printer) {
+        return kept.contains(printer.key());
+    }
+
+    /** No longer remembers a printer (nor uses it, if it was the one in use). */
+    void forget(Printer printer) {
+        String key = printer.key();
+        kept.remove(key);
+        printers.remove(key);
+        if (key.equals(prefs.getString("current", null))) prefs.edit().remove("current").apply();
+        savePrinters();
+    }
+
     /**
      * Keeps a printer, merging what was found into the one already known
      * there (the same object is kept, so screens holding it see the news).
@@ -262,6 +275,21 @@ final class Store {
         for (int i = history.size() - 1; i >= 0; i--) if (history.get(i).path.equals(path)) history.remove(i);
         history.add(0, new Print(path, title, printer.key(), printer.shown(), System.currentTimeMillis(), pages, copy(options)));
         while (history.size() > HISTORY) history.remove(history.size() - 1);
+        saveHistory();
+    }
+
+    /** Takes a file off Recent. */
+    void unlist(String path) {
+        for (int i = history.size() - 1; i >= 0; i--) if (history.get(i).path.equals(path)) history.remove(i);
+        saveHistory();
+    }
+
+    void clearHistory() {
+        history.clear();
+        saveHistory();
+    }
+
+    private void saveHistory() {
         List<Object> out = new ArrayList<Object>();
         for (Print each : history) {
             out.add(Json.map("path", each.path, "title", each.title, "printer", each.printer,
