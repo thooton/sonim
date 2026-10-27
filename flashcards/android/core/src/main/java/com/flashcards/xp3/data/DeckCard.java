@@ -12,8 +12,11 @@ import io.github.openspacedrepetition.Card;
  */
 public final class DeckCard {
 
-    /** The definition: front, back, aux and identity. */
-    public final CardDef def;
+    /**
+     * The definition: front, back, aux and identity. The identity never
+     * changes; the text does when it is corrected on the command center.
+     */
+    public CardDef def;
 
     /** The mutable FSRS state, owned by the scheduler (java-fsrs Card). */
     public Card fsrs;

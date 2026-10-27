@@ -31,6 +31,20 @@ public final class SyncTests {
         dailyLimit(c);
         autoHasNoLimit(c);
         reviewAhead(c);
+        correctedText(c);
+    }
+
+    private static void correctedText(Check c) {
+        c.run("a card's corrected text arrives", () -> {
+            Collection one = bundled(2);
+            one.apply(Json.write(Json.map("usn", 1L)), one.outgoing());
+            Map<String, Object> fixed = Json.object(Json.parse(cardJson("id0", 1, 0L)));
+            fixed.put("deck", "spanish");
+            fixed.put("front", "el perro");
+            one.apply(Json.write(Json.map("usn", 2L, "decks", Json.list(), "cards", Json.list(fixed))), one.outgoing());
+            c.same("new text", "el perro", one.decks().get(0).cards().get(0).def.key);
+            c.same("same identity", "id0", one.decks().get(0).cards().get(0).def.identity);
+        });
     }
 
     private static void reviewAhead(Check c) {

@@ -199,6 +199,11 @@ public final class Collection {
                 continue;
             } else {
                 card.fsrs = fsrs;
+                // Text corrected on the command center.
+                CardDef def = new CardDef(text(c, "front"), text(c, "back"), text(c, "aux"), id);
+                if (!local && !(def.key.equals(card.def.key) && def.value.equals(card.def.value) && def.aux.equals(card.def.aux))) {
+                    card.def = def;
+                }
             }
             card.intro = longOf(c, "intro", 0);
             card.mod = mod;

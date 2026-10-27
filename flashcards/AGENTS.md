@@ -50,7 +50,7 @@ The tablet's `session.earliest` is the same rule.
 from Menu > Sync. Each record carries `mod`, the phone's clock in
 milliseconds when it last changed, and a dirty flag until the command
 center has it; where the phone and the tablet both changed a card, the
-later change wins. The phone sends its time zone (`zone`) too, so the
+later change wins, except for a card's text, which only the command center changes (`PATCH /flashcards/cards/{id}`): a sync takes corrected text into the card's `def`. The phone sends its time zone (`zone`) too, so the
 tablet, which keeps UTC, rolls the day over at 4am here.
 
 **Signing in.** As the tablet does, the app pairs: with no login, the deck
