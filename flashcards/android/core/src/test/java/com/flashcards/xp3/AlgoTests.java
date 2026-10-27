@@ -38,8 +38,9 @@ public final class AlgoTests {
         correctedFsrsEdges(c);
         fuzz(c);
         stabilityFloor(c);
-        newCardsWhileRecallIsHigh(c);
-        noNewCardsWhileRecallIsLow(c);
+        autoTakesNewCardsAsTheyAreLearned(c);
+        autoWaitsForTheWindow(c);
+        autoWaitsForReviews(c);
         reviewsBeforeNewCards(c);
         dueReviewsOnly(c);
         learningComesBackWhenDue(c);
@@ -343,16 +344,16 @@ public final class AlgoTests {
         return new ReviewSession(deck, ZoneOffset.UTC);
     }
 
-    private static void newCardsWhileRecallIsHigh(Check c) {
-        c.run("new cards while recall is above 85%", () -> {
+    private static void autoTakesNewCardsAsTheyAreLearned(Check c) {
+        c.run("AUTO: new cards as fast as they are learned", () -> {
             Deck deck = deckOf(30);
             ReviewSession s = session(deck);
-            c.same("all new cards on offer", 30, s.counts(NOON)[0]);
+            c.same("a window's worth on offer", ReviewSession.AUTO_WINDOW, s.counts(NOON)[0]);
             long now = NOON;
             DeckCard card;
             int introduced = 0;
-            // Easy graduates a new card at once and keeps recall high, so no
-            // daily limit ever stops them.
+            // Easy graduates a new card at once, so the window never fills
+            // and the whole deck comes in, with no daily number to stop it.
             while ((card = s.next(now)) != null) {
                 c.ok("only new cards", card.isNew());
                 s.rate(4, now);
@@ -363,21 +364,40 @@ public final class AlgoTests {
         });
     }
 
-    private static void noNewCardsWhileRecallIsLow(Check c) {
-        c.run("no new cards while recall is below 85%", () -> {
-            Deck deck = deckOf(3);
-            // studied a while ago, not due until tomorrow, but mostly forgotten
-            for (int i = 0; i < 2; i++) {
-                deck.cards().get(i).fsrs = Card.builder()
-                    .state(State.REVIEW).stability(1.0).difficulty(5.0)
-                    .due(Instant.ofEpochSecond(NOON + 86400L))
-                    .lastReview(Instant.ofEpochSecond(NOON - 5L * 86400L))
-                    .build();
-            }
+    private static void autoWaitsForTheWindow(Check c) {
+        c.run("AUTO: no new card while the window is full", () -> {
+            Deck deck = deckOf(30);
             ReviewSession s = session(deck);
-            c.ok("recall is low", s.recall(NOON) < ReviewSession.TARGET);
-            c.same("no new count", 0, s.counts(NOON)[0]);
-            c.ok("nothing new is served", s.next(NOON) == null);
+            long now = NOON;
+            // Again keeps each new card in learning, so the window fills.
+            for (int i = 0; i < ReviewSession.AUTO_WINDOW; i++) {
+                DeckCard card = s.next(now);
+                c.ok("new while there is room", card.isNew());
+                s.rate(1, now);
+            }
+            c.same("window full", ReviewSession.AUTO_WINDOW, s.inLearning());
+            c.same("no new count", 0, s.counts(now)[0]);
+            DeckCard next = s.next(now);
+            c.ok("learning ahead, not a new card", next != null && !next.isNew());
+            // Graduating one opens one slot.
+            long later = now + 3600;
+            DeckCard first = s.next(later);
+            s.rate(4, later);
+            c.ok("it graduated", first.fsrs.getState() == State.REVIEW);
+            c.same("one slot", 1, s.counts(later)[0]);
+        });
+    }
+
+    private static void autoWaitsForReviews(Check c) {
+        c.run("AUTO: reviews before any new card", () -> {
+            Deck deck = deckOf(5);
+            for (int i = 0; i < 2; i++) deck.cards().get(i).fsrs = dueAt(NOON - 3600L);
+            ReviewSession s = session(deck);
+            c.ok("old first", !s.next(NOON).isNew());
+            s.rate(3, NOON);
+            c.ok("old first again", !s.next(NOON).isNew());
+            s.rate(3, NOON);
+            c.ok("then new", s.next(NOON).isNew());
         });
     }
 
@@ -386,7 +406,7 @@ public final class AlgoTests {
             Deck deck = deckOf(4);
             for (int i = 0; i < 2; i++) deck.cards().get(i).fsrs = dueAt(NOON - 3600L);
             ReviewSession s = session(deck);
-            c.ok("recall is high", s.wantsNew(NOON));
+            c.ok("room for new cards", s.wantsNew(NOON));
             for (int i = 0; i < 2; i++) {
                 DeckCard card = s.next(NOON);
                 c.ok("a review first", !card.isNew());

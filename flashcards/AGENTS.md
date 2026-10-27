@@ -6,11 +6,19 @@ Anki's desktop window, and synced through the Delta command center with
 Flashcards on the tablet (`flashcards/` in thooton/tablet), as AnkiWeb
 syncs Anki. Read `../AGENTS.md` first.
 
-New cards per day is a deck option: **Auto**, where new cards come in
-while the mean predicted recall of the deck's studied cards is above 85%,
-with no daily number (how this app always worked); or a number, as in
-Anki, counting every card first answered since the rollover on either
-device (`intro`). The Spanish deck starts on Auto.
+New cards per day is a deck option: a number, as in Anki, counting every
+card first answered since the rollover on either device (`intro`); or
+**Auto**, with no daily number, where a new card comes in whenever fewer
+than `ReviewSession.AUTO_WINDOW` (10) cards are in learning or relearning,
+as Quizlet brings in new material once the old is in hand. New cards come
+after the day's reviews either way, so old material always goes first.
+Auto only decides when a new card is introduced; everything else
+(learning steps, relearning, reviews, order, intervals) is stock Anki,
+and must stay so. The New count on Auto is the room left in the window,
+never the whole unseen pile. (Auto used to let new cards in while the
+studied cards' mean predicted recall was above 85%, which showed the
+whole pile at once when it crossed, and kept itself open, since a card
+learned today counts as recalled.) The Spanish deck is on Auto.
 
 **Review Ahead.** When a deck is finished for now, its congratulations
 offer Review Ahead (Anki's custom study option of that name): studied

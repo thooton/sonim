@@ -13,7 +13,7 @@ import com.xp3.common.ui.Ui;
 /**
  * Anki's deck options, cut to what the app has: the Daily Limits card with
  * New cards/day in a spin box. Left and Right step it, digits type it, and
- * one step below 0 is Auto, where new cards come in while recall allows
+ * one step below 0 is Auto, where new cards come in as earlier ones are learned
  * rather than a number a day. Back keeps it.
  */
 final class OptionsPane extends LinearLayout {

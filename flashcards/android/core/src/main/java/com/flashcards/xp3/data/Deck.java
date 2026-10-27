@@ -16,7 +16,7 @@ import java.util.Map;
  */
 public final class Deck {
 
-    /** {@link #newPerDay} for AUTO: new cards come in while recall allows. */
+    /** {@link #newPerDay} for AUTO: new cards come in as earlier ones are learned (ReviewSession). */
     public static final int AUTO = -1;
     /** What a deck made from scratch starts with, as in Anki. */
     public static final int DEFAULT_NEW_PER_DAY = 20;

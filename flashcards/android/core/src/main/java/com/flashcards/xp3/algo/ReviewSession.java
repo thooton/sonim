@@ -20,12 +20,15 @@ import java.time.ZonedDateTime;
  *
  * - learning and relearning cards come first once due (steps 1m 10m, 10m),
  * - then the day's reviews, due before the next 4am rollover, oldest first,
- * - then new cards, in deck order: on a deck set to AUTO, while the mean
- *   predicted recall of every card already studied is above 85%, with no
- *   daily limit (when recall sinks below the target, only the old cards
- *   come up until it recovers); on a deck with a number, that many a day,
- *   as Anki does, counting every card first answered since the rollover on
- *   any device,
+ * - then new cards, in deck order: on a deck with a number, that many a
+ *   day, as Anki does, counting every card first answered since the
+ *   rollover on any device; on a deck set to AUTO, with no daily number,
+ *   one at a time while fewer than {@link #AUTO_WINDOW} cards are in
+ *   learning or relearning. That is the only change from Anki, and it only
+ *   decides when a new card is introduced: once in, a card learns, relearns
+ *   and is reviewed exactly as Anki's would. Since new cards come only
+ *   after today's reviews, old material always goes first, and new
+ *   material comes in at the pace the user learns it,
  * - then learning cards due within the 20-minute learn-ahead limit,
  * - then nothing: the deck is done for now; unless reviewing ahead (Anki's
  *   "Review ahead"), which goes on to studied cards not yet due, the ones
@@ -39,8 +42,8 @@ import java.time.ZonedDateTime;
  */
 public final class ReviewSession {
 
-    /** New cards come in while the studied cards' mean recall is above this. */
-    public static final double TARGET = 0.85;
+    /** On AUTO, a new card comes in while fewer cards than this are in (re)learning. */
+    public static final int AUTO_WINDOW = 10;
     public static final long LEARN_AHEAD = 20L * 60L;
     public static final int ROLLOVER_HOUR = 4;
 
@@ -138,30 +141,26 @@ public final class ReviewSession {
         return answer(card, rating, now);
     }
 
-    /** The mean predicted recall of every card studied so far (1 when none). */
-    public double recall(long now) {
-        double total = 0.0;
-        int studied = 0;
+    /** How many cards are in learning or relearning, due or not. */
+    public int inLearning() {
+        int n = 0;
         for (DeckCard card : deck.cards()) {
-            if (card.isNew()) continue;
-            total += card.probability(now);
-            studied++;
+            if (!card.isNew() && isLearning(card)) n++;
         }
-        return studied == 0 ? 1.0 : total / studied;
+        return n;
     }
 
-    /**
-     * Whether a new card may come in: on AUTO, whether recall is high
-     * enough; otherwise whether today's limit has room.
-     */
+    /** Whether a new card may come in, once nothing older is due. */
     public boolean wantsNew(long now) {
-        if (deck.isAuto()) return recall(now) > TARGET;
         return newLeft(now) > 0;
     }
 
-    /** How many more new cards today's limit allows (AUTO: no limit). */
+    /**
+     * How many more new cards may come in: today's limit, less those already
+     * introduced; on AUTO, the room left in the window.
+     */
     public int newLeft(long now) {
-        if (deck.isAuto()) return Integer.MAX_VALUE;
+        if (deck.isAuto()) return Math.max(0, AUTO_WINDOW - inLearning());
         long dayStart = dayEnd(now) - 86400L;
         int today = 0;
         for (DeckCard card : deck.cards()) {
@@ -171,7 +170,7 @@ public final class ReviewSession {
     }
 
     /**
-     * Anki's counts for the deck right now: new cards (while recall lets them
+     * Anki's counts for the deck right now: new cards (as many as may come
      * in), learning cards due within learn-ahead, and reviews due today.
      */
     public int[] counts(long now) {
