@@ -231,7 +231,7 @@ public final class SyncTests {
             Deck deck = bundled(25).decks().get(0);
             c.ok("bundled deck is AUTO", deck.isAuto());
             ReviewSession s = new ReviewSession(deck, ZoneOffset.UTC);
-            c.same("a window's worth on offer", ReviewSession.AUTO_WINDOW, s.counts(NOON)[0]);
+            c.same("the target's worth on offer", ReviewSession.AUTO_TARGET, s.counts(NOON)[0]);
         });
     }
 }

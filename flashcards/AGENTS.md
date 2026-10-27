@@ -8,17 +8,18 @@ syncs Anki. Read `../AGENTS.md` first.
 
 New cards per day is a deck option: a number, as in Anki, counting every
 card first answered since the rollover on either device (`intro`); or
-**Auto**, with no daily number, where a new card comes in whenever fewer
-than `ReviewSession.AUTO_WINDOW` (20) cards are in learning or relearning,
-as Quizlet brings in new material once the old is in hand. New cards come
-after the day's reviews either way, so old material always goes first.
-Auto only decides when a new card is introduced; everything else
-(learning steps, relearning, reviews, order, intervals) is stock Anki,
-and must stay so. The New count on Auto is the room left in the window,
-never the whole unseen pile. (Auto used to let new cards in while the
-studied cards' mean predicted recall was above 85%, which showed the
-whole pile at once when it crossed, and kept itself open, since a card
-learned today counts as recalled.) The Spanish deck is on Auto.
+**Auto**, with no daily number, where New is whatever brings New +
+Learning + Due up to `ReviewSession.AUTO_TARGET` (20): none while Learning
++ Due is at it or over, and more as reviews are answered. Either way new
+cards are mixed in among the day's reviews, spread evenly, as Anki's
+default "Mix with reviews" does (`newTurn`; the tablet's Go port gives the
+same order, pinned by its `TestNewCardsMixIntoReviews`). Auto only decides
+when a new card is introduced; everything else (learning steps,
+relearning, reviews, intervals) is stock Anki, and must stay so. (Auto has
+been a mean-recall gate at 85%, which showed the whole unseen pile once
+it crossed, and then a cap on cards in learning; the user wanted new
+material to arrive steadily, mixed with the old.) The Spanish deck is on
+Auto.
 
 **Review Ahead.** When a deck is finished for now, its congratulations
 offer Review Ahead (Anki's custom study option of that name): studied

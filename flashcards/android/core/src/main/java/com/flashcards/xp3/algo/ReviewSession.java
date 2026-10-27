@@ -20,15 +20,15 @@ import java.time.ZonedDateTime;
  *
  * - learning and relearning cards come first once due (steps 1m 10m, 10m),
  * - then the day's reviews, due before the next 4am rollover, oldest first,
- * - then new cards, in deck order: on a deck with a number, that many a
- *   day, as Anki does, counting every card first answered since the
- *   rollover on any device; on a deck set to AUTO, with no daily number,
- *   one at a time while fewer than {@link #AUTO_WINDOW} cards are in
- *   learning or relearning. That is the only change from Anki, and it only
- *   decides when a new card is introduced: once in, a card learns, relearns
- *   and is reviewed exactly as Anki's would. Since new cards come only
- *   after today's reviews, old material always goes first, and new
- *   material comes in at the pace the user learns it,
+ *   with new cards mixed in among them, spread evenly, as Anki's default
+ *   "Mix with reviews" does; new cards come in deck order, and how many:
+ *   on a deck with a number, that many a day, as Anki does, counting every
+ *   card first answered since the rollover on any device; on AUTO, enough
+ *   to bring New + Learning + Due up to {@link #AUTO_TARGET}, so none while
+ *   Learning + Due is at it or over. That is the only change from Anki, and
+ *   it only decides when a new card is introduced: once in, a card learns,
+ *   relearns and is reviewed exactly as Anki's would. As reviews are
+ *   answered, new cards come in to take their place,
  * - then learning cards due within the 20-minute learn-ahead limit,
  * - then nothing: the deck is done for now; unless reviewing ahead (Anki's
  *   "Review ahead"), which goes on to studied cards not yet due, the ones
@@ -42,8 +42,8 @@ import java.time.ZonedDateTime;
  */
 public final class ReviewSession {
 
-    /** On AUTO, a new card comes in while fewer cards than this are in (re)learning. */
-    public static final int AUTO_WINDOW = 20;
+    /** On AUTO, New + Learning + Due is kept up to this (New fills the gap). */
+    public static final int AUTO_TARGET = 20;
     public static final long LEARN_AHEAD = 20L * 60L;
     public static final int ROLLOVER_HOUR = 4;
 
@@ -52,6 +52,9 @@ public final class ReviewSession {
     private DeckCard current;
     private boolean ahead;
     private DeckCard last;
+    /** New cards and reviews shown this session, to spread one among the other. */
+    private int newShown;
+    private int reviewsShown;
 
     public ReviewSession(Deck deck, ZoneId zone) {
         this.deck = deck;
@@ -85,14 +88,25 @@ public final class ReviewSession {
                 review = card;
             }
         }
-        if (fresh != null && !wantsNew(now)) fresh = null;
+        int[] counts = counts(now);
+        if (counts[0] == 0) fresh = null;
 
         if (learning != null && dueOf(learning) <= now) current = learning;
+        else if (review != null && fresh != null) current = newTurn(counts[0], counts[2]) ? fresh : review;
         else if (review != null) current = review;
         else if (fresh != null) current = fresh;
         else if (learning != null && dueOf(learning) <= now + LEARN_AHEAD) current = learning;
         else current = ahead ? earliest(now) : null;
         return current;
+    }
+
+    /**
+     * Whether a new card's turn has come among the reviews: so far this
+     * session, new cards have had less than their share of what is left, as
+     * Anki's intersperser spreads them. A review goes first.
+     */
+    private boolean newTurn(int fresh, int reviews) {
+        return (long) newShown * reviews < (long) reviewsShown * fresh;
     }
 
     /** Whether, once nothing is due, cards not yet due come up (Review Ahead). */
@@ -125,7 +139,12 @@ public final class ReviewSession {
     public void rate(int rating, long now) {
         DeckCard card = current;
         if (card == null) return;
-        if (card.isNew()) card.intro = now;
+        if (card.isNew()) {
+            card.intro = now;
+            newShown++;
+        } else if (!isLearning(card)) {
+            reviewsShown++;
+        }
         card.fsrs = answer(card.fsrs, rating, now);
         Collection.touch(card, now * 1000L);
         last = card;
@@ -141,26 +160,20 @@ public final class ReviewSession {
         return answer(card, rating, now);
     }
 
-    /** How many cards are in learning or relearning, due or not. */
-    public int inLearning() {
-        int n = 0;
-        for (DeckCard card : deck.cards()) {
-            if (!card.isNew() && isLearning(card)) n++;
-        }
-        return n;
-    }
-
-    /** Whether a new card may come in, once nothing older is due. */
+    /** Whether a new card may come in. */
     public boolean wantsNew(long now) {
         return newLeft(now) > 0;
     }
 
     /**
      * How many more new cards may come in: today's limit, less those already
-     * introduced; on AUTO, the room left in the window.
+     * introduced; on AUTO, what brings New + Learning + Due up to the target.
      */
     public int newLeft(long now) {
-        if (deck.isAuto()) return Math.max(0, AUTO_WINDOW - inLearning());
+        if (deck.isAuto()) {
+            int[] old = oldCounts(now);
+            return Math.max(0, AUTO_TARGET - old[0] - old[1]);
+        }
         long dayStart = dayEnd(now) - 86400L;
         int today = 0;
         for (DeckCard card : deck.cards()) {
@@ -174,15 +187,21 @@ public final class ReviewSession {
      * in), learning cards due within learn-ahead, and reviews due today.
      */
     public int[] counts(long now) {
-        long dayEnd = dayEnd(now);
         int unseen = 0;
+        for (DeckCard card : deck.cards()) {
+            if (card.isNew()) unseen++;
+        }
+        int[] old = oldCounts(now);
+        return new int[]{Math.min(unseen, newLeft(now)), old[0], old[1]};
+    }
+
+    /** Learning cards due within learn-ahead, and reviews due today. */
+    private int[] oldCounts(long now) {
+        long dayEnd = dayEnd(now);
         int learning = 0;
         int reviews = 0;
         for (DeckCard card : deck.cards()) {
-            if (card.isNew()) {
-                unseen++;
-                continue;
-            }
+            if (card.isNew()) continue;
             long due = dueOf(card);
             if (isLearning(card)) {
                 if (due <= now + LEARN_AHEAD) learning++;
@@ -190,8 +209,7 @@ public final class ReviewSession {
                 reviews++;
             }
         }
-        int fresh = wantsNew(now) ? Math.min(unseen, newLeft(now)) : 0;
-        return new int[]{fresh, learning, reviews};
+        return new int[]{learning, reviews};
     }
 
     /** When the next learning card due later today comes up, or -1. */
