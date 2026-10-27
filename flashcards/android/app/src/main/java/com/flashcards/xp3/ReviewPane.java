@@ -20,8 +20,8 @@ import io.github.openspacedrepetition.State;
  * Anki's reviewer: the card on white, the front alone and then the front,
  * a rule and the back; and under it Anki's bottom bar, the queue counts
  * over Show Answer, then the four answer buttons, each under the interval
- * it gives. OK shows the answer and then answers Good, as Space does in
- * Anki; 1 to 4 answer Again, Hard, Good and Easy.
+ * it gives and labelled with its key. OK shows the answer; only 1 to 4
+ * answer, Again, Hard, Good and Easy.
  */
 final class ReviewPane extends LinearLayout {
 
@@ -159,17 +159,17 @@ final class ReviewPane extends LinearLayout {
             aux.setVisibility(VISIBLE);
         }
         answers.removeAllViews();
-        String[] labels = {"Again", "Hard", "Good", "Easy"};
+        String[] labels = {"1 Again", "2 Hard", "3 Good", "4 Easy"};
         long now = now();
         for (int i = 0; i < 4; i++) {
             Card after = ReviewSession.preview(card.fsrs, i + 1, now);
-            answers.addView(answer(Anki.interval(after.getDue().getEpochSecond() - now), labels[i], i == 2),
+            answers.addView(answer(Anki.interval(after.getDue().getEpochSecond() - now), labels[i]),
                 new LayoutParams(0, LayoutParams.MATCH_PARENT, 1f));
         }
     }
 
-    /** One answer button under its interval; Good, the default, wears the ring. */
-    private View answer(String interval, String label, boolean preferred) {
+    /** One answer button under its interval; none wears the ring, since only its key answers. */
+    private View answer(String interval, String label) {
         LinearLayout box = new LinearLayout(getContext());
         box.setOrientation(VERTICAL);
         box.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -187,7 +187,6 @@ final class ReviewPane extends LinearLayout {
         button.setTextSize(12);
         button.setPadding(0, 0, 0, 0);
         button.setFocusable(false);
-        if (preferred) Anki.ring(button);
         box.addView(button, new LayoutParams(LayoutParams.MATCH_PARENT, dp(28)));
         return box;
     }
@@ -212,7 +211,7 @@ final class ReviewPane extends LinearLayout {
             if (ok) reveal();
             return true;
         }
-        rate(ok ? 3 : grade);
+        if (grade != 0) rate(grade);
         return true;
     }
 

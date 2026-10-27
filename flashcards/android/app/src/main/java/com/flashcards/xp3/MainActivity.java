@@ -64,7 +64,7 @@ import java.util.concurrent.ExecutorService;
 /**
  * Anki's desktop window on a flip phone: the deck list, a deck's overview
  * with Study Now, the reviewer ({@link ReviewPane}) and the deck's options
- * ({@link OptionsPane}), under Anki's toolbar.
+ * ({@link OptionsPane}).
  *
  * The decks are the command center's (see {@link Collection}): the app
  * studies its own copy, saved in the app's private directory, and syncs it
@@ -100,7 +100,6 @@ public final class MainActivity extends BaseActivity {
     private File importing;
     private final ZoneId zone = ZoneId.systemDefault();
     private FrameLayout content;
-    private LinearLayout toolbar;
 
     private Collection collection;
     private final Map<String, ReviewSession> sessions = new LinkedHashMap<>();
@@ -131,7 +130,6 @@ public final class MainActivity extends BaseActivity {
         super.onCreate(onIce);
         setContentView(R.layout.activity_main);
         content = findViewById(R.id.content);
-        toolbar = findViewById(R.id.toolbar);
         login = loadLogin(prefs());
         collection = load();
         collection.zone = zone.getId();
@@ -220,7 +218,6 @@ public final class MainActivity extends BaseActivity {
         }
         syncing = true;
         syncAgain = false;
-        showToolbar();
         final Collection.Outgoing out = collection.outgoing();
         final Login using = login;
         net.execute(() -> {
@@ -267,7 +264,6 @@ public final class MainActivity extends BaseActivity {
         }
         syncError = error;
         if (isFinishing() || isDestroyed()) return;
-        showToolbar();
         // What came in shows at once, except under a card being studied,
         // which picks it up with the next card.
         if (reply != null && error == null) {
@@ -391,36 +387,12 @@ public final class MainActivity extends BaseActivity {
     }
 
     // ---------------------------------------------------------------------
-    // The toolbar
-
-    /** Anki's toolbar, Decks and Sync; Sync turns blue with changes to send, red when it failed. */
-    private void showToolbar() {
-        toolbar.removeAllViews();
-        toolbar.setVisibility(screen == Screen.REVIEW ? View.GONE : View.VISIBLE);
-        toolbar.addView(link("Decks", R.color.text, screen == Screen.DECKS));
-        int tone = R.color.text;
-        if (!login.ready()) tone = R.color.text_faint;
-        else if (syncError != null) tone = R.color.state_learn;
-        else if (collection.dirty()) tone = R.color.state_new;
-        toolbar.addView(link(syncing ? "Syncing" : "Sync", tone, false));
-    }
-
-    private TextView link(String label, int tone, boolean here) {
-        TextView link = text(label, 13, color(tone));
-        if (here) link.setTypeface(Anki.MEDIUM);
-        link.setPadding(dp(12), 0, dp(12), 0);
-        link.setGravity(Gravity.CENTER);
-        return link;
-    }
-
-    // ---------------------------------------------------------------------
     // Decks
 
     private void showDecks() {
         screen = Screen.DECKS;
         open = null;
         review = null;
-        showToolbar();
         LinearLayout page = vertical();
         page.setPadding(dp(4), dp(2), dp(4), 0);
         List<Deck> decks = collection.decks();
@@ -706,7 +678,6 @@ public final class MainActivity extends BaseActivity {
     private void showOverview() {
         getWindow().getDecorView().removeCallbacks(refresh);
         screen = Screen.OVERVIEW;
-        showToolbar();
         ReviewSession session = session(open);
         session.setAhead(false);
         long now = System.currentTimeMillis() / 1000L;
@@ -797,7 +768,6 @@ public final class MainActivity extends BaseActivity {
 
     private void startReview(boolean ahead) {
         screen = Screen.REVIEW;
-        showToolbar();
         session(open).setAhead(ahead);
         review = new ReviewPane(this, session(open), new ReviewPane.Listener() {
             @Override public void onRated() {
@@ -822,7 +792,6 @@ public final class MainActivity extends BaseActivity {
     private void showOptions(final Deck deck) {
         open = deck;
         screen = Screen.OPTIONS;
-        showToolbar();
         OptionsPane pane = new OptionsPane(this, deck);
         Ui.fill(content, pane);
         pane.requestFocus();

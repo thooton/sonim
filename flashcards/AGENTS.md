@@ -34,9 +34,9 @@ The tablet's `session.earliest` is the same rule.
     `imported`, a new deck from a file), `Store` (the bundled deck's text
     format) and `Fkv` (the FKV format Import reads).
   - `sync/Center`: `POST /flashcards/sync`, and pairing.
-- `android/app`: `MainActivity` (toolbar, deck list, overview, sync, the
-  login), `ReviewPane` (the reviewer: OK shows the answer, then answers
-  Good; 1 to 4 answer), `OptionsPane` (New cards/day: Left and Right step
+- `android/app`: `MainActivity` (deck list, overview, sync, the
+  login), `ReviewPane` (the reviewer: OK shows the answer; only 1 to 4
+  answer, each button labelled with its key), `OptionsPane` (New cards/day: Left and Right step
   it, digits type it, below 0 is Auto, Back keeps it), `Anki` (the look).
 - `android/app/src/main/assets/decks/`: the Spanish deck and its starting
   state, built from an Anki profile by `tools/import_anki_spanish.py`.

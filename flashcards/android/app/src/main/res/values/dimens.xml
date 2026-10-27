@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- The XP3's 240x320 mdpi panel: 24dp status bar, 296dp of window. -->
-    <dimen name="toolbar_height">26dp</dimen>
-</resources>
