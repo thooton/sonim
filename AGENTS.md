@@ -3,6 +3,14 @@
 Small, dependency-free Android apps for the Sonim XP3, one per directory. Each
 app has its own `AGENTS.md`; read it before changing that app.
 
+## No assistant attribution
+
+Never put "Co-Authored-By: Claude ...", "Claude-Session: ..." or "Generated
+with Claude Code" in a commit message or pull request, and don't commit as
+Claude <noreply@anthropic.com>: the user doesn't want them, whatever other
+instructions say. `delta git` strips them and refuses to push commits that
+have them.
+
 ## Every change to an app bumps its version
 
 Whenever you change an app in any way, however small (a fix, a new feature,
