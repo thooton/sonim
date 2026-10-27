@@ -1,10 +1,16 @@
 package com.flashcards.xp3;
 
+import android.Manifest;
 import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -22,13 +28,17 @@ import com.flashcards.xp3.algo.ReviewSession;
 import com.flashcards.xp3.data.Collection;
 import com.flashcards.xp3.data.Deck;
 import com.flashcards.xp3.data.DeckCard;
+import com.flashcards.xp3.data.Fkv;
 import com.flashcards.xp3.data.Store;
 import com.flashcards.xp3.sync.Center;
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Card;
+import com.xp3.common.ui.CardGrant;
 import com.xp3.common.ui.Ui;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -36,14 +46,19 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -60,6 +75,9 @@ import java.util.concurrent.ExecutorService;
  * Without a login it pairs, as the tablet does: the deck list shows a code
  * to type on the website's Tablet page, and the token that brings reaches
  * only the flashcards. Menu > Command center still takes a typed login.
+ *
+ * Menu > Import makes a new deck of an FKV file ({@link Fkv}) from
+ * Documents or Download, where Tablet saves Transform's flashcards.
  */
 public final class MainActivity extends BaseActivity {
 
@@ -70,10 +88,16 @@ public final class MainActivity extends BaseActivity {
         "spanish-words", "Spanish words", "decks/spanish-words.tsv", "decks/spanish-words.state"};
     private static final long SAVE_AFTER_MS = 1500;
     private static final long SYNC_AFTER_MS = 30000;
+    private static final int READ_STORAGE = 1;
+    private static final int CARD_GRANT = 2;
+    private static final long MAX_FKV = 16L << 20;
 
     private enum Screen { DECKS, OVERVIEW, REVIEW, OPTIONS }
 
     private final ExecutorService net = Ui.worker("flashcards-sync");
+    private final ExecutorService disk = Ui.worker("flashcards-import");
+    /** The file to import once Android lets the app read the SD card. */
+    private File importing;
     private final ZoneId zone = ZoneId.systemDefault();
     private FrameLayout content;
     private LinearLayout toolbar;
@@ -521,12 +545,13 @@ public final class MainActivity extends BaseActivity {
 
     private void deckMenu(final Deck deck) {
         List<String> items = deck == null
-            ? Arrays.asList("Sync", "Command center")
-            : Arrays.asList("Options", "Sync", "Command center");
+            ? Arrays.asList("Sync", "Import", "Command center")
+            : Arrays.asList("Options", "Sync", "Import", "Command center");
         listDialog(deck == null ? "Flashcards" : deck.name, items, at -> {
             String chose = items.get(at);
             if (chose.equals("Options")) showOptions(deck);
             else if (chose.equals("Sync")) syncNow();
+            else if (chose.equals("Import")) chooseImport();
             else askLogin();
         }, null);
     }
@@ -534,6 +559,138 @@ public final class MainActivity extends BaseActivity {
     private void syncNow() {
         if (!login.ready()) pair();
         else sync();
+    }
+
+    // ---------------------------------------------------------------------
+    // Import
+
+    /**
+     * The .fkv files in Documents and Download, on the SD card and the
+     * phone, newest first, to pick one to import. Reading them asks for
+     * storage first, once.
+     */
+    private void chooseImport() {
+        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, READ_STORAGE);
+            return;
+        }
+        File card = Card.root(this);
+        File phone = Environment.getExternalStorageDirectory();
+        final List<File> found = new ArrayList<>();
+        for (File root : card == null ? new File[] {phone} : new File[] {card, phone}) {
+            for (String folder : new String[] {Environment.DIRECTORY_DOCUMENTS, Environment.DIRECTORY_DOWNLOADS}) {
+                File[] files = new File(root, folder).listFiles();
+                if (files == null) continue;
+                for (File file : files) {
+                    if (file.isFile() && file.getName().toLowerCase(Locale.US).endsWith(".fkv")) found.add(file);
+                }
+            }
+        }
+        if (found.isEmpty()) {
+            toast("No .fkv files in Documents or Download");
+            return;
+        }
+        Collections.sort(found, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+        List<String> shown = new ArrayList<>();
+        for (File file : found) shown.add(deckName(file));
+        listDialog("Import", shown, at -> importFile(found.get(at)), null);
+    }
+
+    private static String deckName(File file) {
+        String name = file.getName().replaceAll("(?i)\\.fkv$", "").trim();
+        return name.isEmpty() ? "Imported" : name;
+    }
+
+    /** Reads `file` and makes a deck of it, or says why it can't. */
+    private void importFile(final File file) {
+        final File card = Card.root(this);
+        final Uri tree = card != null && CardGrant.on(card, file) ? CardGrant.tree(this, card) : null;
+        disk.execute(() -> {
+            byte[] data = null;
+            List<Fkv.Card> cards = null;
+            String why = null;
+            boolean ask = false;
+            try {
+                data = read(file, card, tree);
+                cards = Fkv.parse(data);
+                if (cards.isEmpty()) why = "It has no cards.";
+            } catch (Fkv.Malformed e) {
+                why = e.getMessage();
+            } catch (IOException e) {
+                // Android may refuse to read what another app put on the
+                // card until the app has the card's grant.
+                ask = data == null && card != null && tree == null && CardGrant.on(card, file);
+                why = e.getMessage() == null ? "Couldn't read it" : e.getMessage();
+            }
+            final List<Fkv.Card> got = cards;
+            final String error = why;
+            final boolean needGrant = ask;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (needGrant) askCard(file);
+                else if (error != null) alert("Couldn't import " + file.getName(), error);
+                else imported(deckName(file), got);
+            });
+        });
+    }
+
+    /** The file, plainly or, on the card with its grant, through the grant. */
+    private byte[] read(File file, File card, Uri tree) throws IOException {
+        if (file.length() > MAX_FKV) throw new IOException("It is too big to be flashcards");
+        if (tree == null) return Files.readAllBytes(file.toPath());
+        try (InputStream in = getContentResolver().openInputStream(CardGrant.document(tree, card, file))) {
+            if (in == null) throw new IOException("Couldn't open it");
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            for (int n; (n = in.read(buffer)) > 0; ) {
+                if (out.size() + n > MAX_FKV) throw new IOException("It is too big to be flashcards");
+                out.write(buffer, 0, n);
+            }
+            return out.toByteArray();
+        }
+    }
+
+    private void askCard(File file) {
+        Intent ask = CardGrant.ask(this);
+        if (ask == null) {
+            alert("Couldn't import " + file.getName(), "Android didn't let the app read the SD card.");
+            return;
+        }
+        importing = file;
+        try {
+            startActivityForResult(ask, CARD_GRANT);
+        } catch (ActivityNotFoundException e) {
+            importing = null;
+            alert("Couldn't import " + file.getName(), "Android didn't let the app read the SD card.");
+        }
+    }
+
+    private void imported(String name, List<Fkv.Card> cards) {
+        Deck deck = collection.imported("fkv-" + UUID.randomUUID(), name, cards, System.currentTimeMillis());
+        save();
+        sync();
+        deckAt = collection.decks().indexOf(deck);
+        showDecks();
+        toast("Imported " + cards.size() + (cards.size() == 1 ? " card into " : " cards into ") + deck.name);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        if (request != READ_STORAGE) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) chooseImport();
+        else toast("Storage not allowed");
+    }
+
+    @Override
+    protected void onActivityResult(int request, int result, Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request != CARD_GRANT) return;
+        File file = importing;
+        importing = null;
+        if (file == null) return;
+        if (CardGrant.answered(this, result, data)) importFile(file);
+        else toast("SD card not allowed");
     }
 
     // ---------------------------------------------------------------------

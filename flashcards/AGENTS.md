@@ -30,8 +30,9 @@ The tablet's `session.earliest` is the same rule.
     new/learning/review counts, the daily limit or Auto, and the interval
     each rating would give.
   - `data/`: `Deck` (name, new cards/day), `DeckCard`, `CardDef`,
-    `Collection` (every deck and card, its JSON file, and the sync merge)
-    and `Store` (the bundled deck's text format).
+    `Collection` (every deck and card, its JSON file, the sync merge, and
+    `imported`, a new deck from a file), `Store` (the bundled deck's text
+    format) and `Fkv` (the FKV format Import reads).
   - `sync/Center`: `POST /flashcards/sync`, and pairing.
 - `android/app`: `MainActivity` (toolbar, deck list, overview, sync, the
   login), `ReviewPane` (the reviewer: OK shows the answer, then answers
@@ -52,6 +53,24 @@ milliseconds when it last changed, and a dirty flag until the command
 center has it; where the phone and the tablet both changed a card, the
 later change wins, except for a card's text, which only the command center changes (`PATCH /flashcards/cards/{id}`): a sync takes corrected text into the card's `def`. The phone sends its time zone (`zone`) too, so the
 tablet, which keeps UTC, rolls the day over at 4am here.
+
+**Import.** Menu > Import (on the deck list or a deck's overview) lists
+the `.fkv` files in Documents and Download, on the SD card and the phone,
+newest first, and makes a new deck of the one picked, named after the file
+("Cell biology.fkv" is Cell biology; a name taken gets " (2)"), on 20 new
+cards a day. Tablet saves Transform's flashcards into Documents on the
+card. FKV (Flashcards Key-Value) is UTF-8 text, one card per line,
+`key||value`, each side written as the inside of a string literal (`\n`,
+`\t`, `\\`, `\|` and the rest; quotes are themselves; the first bare `||`
+splits the line, so a literal one is `\|\|`), blank lines skipped; a file
+that doesn't parse is refused, naming the line. The deck's id is `fkv-` and
+a random UUID, and each card's is the deck's plus `:` and its place, since
+the command center keeps cards by id across decks. The deck and its cards
+are dirty as of the import, so the next sync takes them to the command
+center and from there to the tablet. Reading asks for storage first, and
+for the SD card's grant (`CardGrant`) only if a plain read there is
+refused. The command center checks what Transform submits with the same
+rules (`internal/fkv` in thooton/delta); change them together.
 
 **Signing in.** As the tablet does, the app pairs: with no login, the deck
 list ends in a code (from `POST /flashcards/pair` at

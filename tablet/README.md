@@ -1,6 +1,6 @@
 # Tablet, for the Sonim XP3
 
-A reMarkable 2 companion: browse the files on the tablet, read a page up close, and send a file to **Transform**. Tick the formats you want (PDF always; Word, Markdown, Text and Images if you like), and an agent reads the instruction written at the top of page 1 ("Transcribe this + format in MLA"), makes what it asks for in those formats, and puts the finished PDF back on the tablet beside the original. With nothing written as an instruction, it types up what is handwritten.
+A reMarkable 2 companion: browse the files on the tablet, read a page up close, and send a file to **Transform**. Tick the formats you want (PDF to begin with; Word, Markdown, Text, Email, Flashcards and Images if you like), and an agent reads the instruction written at the top of page 1 ("Transcribe this + format in MLA"), makes what it asks for in those formats, and puts the finished PDF back on the tablet beside the original. With nothing written as an instruction, it types up what is handwritten.
 
 Tablet reaches the tablet through the Delta command center, which the tablet syncs with (through rmfakecloud) and which runs the transform jobs. It signs in with the same address and token as Delta: baked in at build time, or entered from Menu → Settings.
 

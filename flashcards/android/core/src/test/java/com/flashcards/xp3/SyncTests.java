@@ -32,6 +32,30 @@ public final class SyncTests {
         autoHasNoLimit(c);
         reviewAhead(c);
         correctedText(c);
+        importedDeck(c);
+    }
+
+    private static void importedDeck(Check c) {
+        c.run("an imported deck goes out at the next sync", () -> {
+            Collection one = bundled(2);
+            one.apply(Json.write(Json.map("usn", 1L)), one.outgoing());
+            List<com.flashcards.xp3.data.Fkv.Card> cards = com.flashcards.xp3.data.Fkv.parse(
+                "uno||one\ndos||two\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            Deck deck = one.imported("fkv-1", "Numbers", cards, 5000L);
+            Deck again = one.imported("fkv-2", "Numbers", cards, 6000L);
+            c.same("a name taken is numbered", "Numbers (2)", again.name);
+            c.same("new cards a day", Deck.DEFAULT_NEW_PER_DAY, deck.newPerDay);
+            c.same("in order", "dos", deck.cards().get(1).def.key);
+            c.same("ids are the deck's", "fkv-1:1", deck.cards().get(1).def.identity);
+            c.ok("new", deck.cards().get(0).isNew());
+            Map<String, Object> out = Json.object(Json.parse(one.outgoing().body));
+            c.same("both decks sent", 2, Json.children(out, "decks").size());
+            c.same("every card sent", 4, Json.children(out, "cards").size());
+            Collection back = Collection.read(one.write());
+            c.same("kept in the file", 3, back.decks().size());
+            c.same("its cards too", 2, back.deck("fkv-1").size());
+            c.ok("still to send", back.dirty());
+        });
     }
 
     private static void correctedText(Check c) {

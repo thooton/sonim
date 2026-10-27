@@ -55,6 +55,8 @@ reads and writes its storage, so the app sees what the tablet last synced.
   is the one on the tablet, for marking up and transforming again.
   An email (`.eml`) goes into `Documents` too, where Mail's Open email
   file finds it.
+  Flashcards (`.fkv`) go there as well, where Flashcards' Menu > Import
+  finds them.
   Downloading asks for storage the first time, then for the whole SD card
   (`CardGrant` in common): Android 8.1 refuses plain writes on the card
   ("Couldn't make the Documents folder"), so each file is fetched into the

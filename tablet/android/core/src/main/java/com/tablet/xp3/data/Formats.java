@@ -9,9 +9,9 @@ public final class Formats {
 
     public static final String PDF = "pdf";
     public static final String JPG = "jpg";
-    public static final String[] ALL = {PDF, "docx", "md", "txt", "eml", JPG};
+    public static final String[] ALL = {PDF, "docx", "md", "txt", "eml", "fkv", JPG};
     /** What the Formats and Download sheets call them. */
-    public static final String[] LABELS = {"PDF", "Word", "Markdown", "Text", "Email", "Images"};
+    public static final String[] LABELS = {"PDF", "Word", "Markdown", "Text", "Email", "Flashcards", "Images"};
 
     private Formats() {}
 

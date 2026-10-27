@@ -88,6 +88,41 @@ public final class Collection {
         return deck;
     }
 
+    /**
+     * A new deck of imported cards (Menu > Import), added to this copy: new
+     * cards, in the file's order, on Anki's default new cards per day,
+     * under `name` or, when a deck has it, "name (2)" and so on. It and its
+     * cards are changed as of now, so the next sync takes them to the
+     * command center, which keeps cards by id across decks: each card's id
+     * is the deck's, which is `deckId`, plus its place.
+     */
+    public Deck imported(String deckId, String name, List<Fkv.Card> from, long nowMillis) {
+        String unique = name;
+        for (int n = 2; named(unique); n++) unique = name + " (" + n + ")";
+        List<DeckCard> cards = new ArrayList<>();
+        for (Fkv.Card card : from) {
+            cards.add(new DeckCard(new CardDef(card.key, card.value, "", deckId + ":" + cards.size())));
+        }
+        Deck deck = new Deck(deckId, unique, Deck.DEFAULT_NEW_PER_DAY, cards);
+        int ord = 0;
+        for (DeckCard card : deck.cards()) {
+            card.ord = ord++;
+            card.mod = nowMillis;
+            card.dirty = true;
+        }
+        deck.mod = nowMillis;
+        deck.dirty = true;
+        add(deck);
+        return deck;
+    }
+
+    private boolean named(String name) {
+        for (Deck deck : decks) {
+            if (deck.name.equals(name)) return true;
+        }
+        return false;
+    }
+
     /** Marks a deck's setting changed, to be sent at the next sync. */
     public static void touch(Deck deck, long nowMillis) {
         deck.mod = Math.max(nowMillis, deck.mod + 1);

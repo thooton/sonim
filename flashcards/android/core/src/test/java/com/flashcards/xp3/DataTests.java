@@ -2,6 +2,7 @@ package com.flashcards.xp3;
 
 import com.flashcards.xp3.data.CardDef;
 import com.flashcards.xp3.data.DeckCard;
+import com.flashcards.xp3.data.Fkv;
 import com.flashcards.xp3.data.Store;
 
 import com.xp3.common.Check;
@@ -26,6 +27,35 @@ public final class DataTests {
         stateRoundTrip(c);
         duplicateTextStateRoundTrip(c);
         corruptState(c);
+        fkv(c);
+    }
+
+    private static void fkv(Check c) {
+        c.run("FKV", () -> {
+            String file = "\uFEFFhola||hello\r\n\n  \nline\\none||a \\\\ b\n"
+                + "quote \"it's\"||\\|\\| and \\||\na|||b\n\\x41\\u00e9\\U0001F600||tab\\there\n";
+            List<Fkv.Card> cards = Fkv.parse(file.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            c.same("five cards", 5, cards.size());
+            c.same("plain", "hola=hello", cards.get(0).key + "=" + cards.get(0).value);
+            c.same("newline and backslash", "line\none=a \\ b", cards.get(1).key + "=" + cards.get(1).value);
+            c.same("quotes and pipes", "quote \"it's\"=|| and ||", cards.get(2).key + "=" + cards.get(2).value);
+            c.same("the first || splits", "a=|b", cards.get(3).key + "=" + cards.get(3).value);
+            c.same("code points", "A\u00e9\uD83D\uDE00=tab\there", cards.get(4).key + "=" + cards.get(4).value);
+            String[][] bad = {
+                {"ok||ok\nno separator", "Line 2: no ||"},
+                {"a||b||c", "a second ||"},
+                {"||b", "the key is empty"},
+                {"a||", "the value is empty"},
+                {"a\\q||b", "\\q isn't an escape"},
+                {"a||b\\", "a lone \\"},
+                {"\\x4||b", "isn't a character"},
+                {"\\uD800||b", "isn't a character"},
+            };
+            for (String[] one : bad) {
+                c.fails(one[0], one[1], () -> Fkv.parse(one[0].getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            }
+            c.fails("not UTF-8", "UTF-8", () -> Fkv.parse(new byte[] {'a', '|', '|', (byte) 0xff}));
+        });
     }
 
     private static void duplicateTextStateRoundTrip(Check c) {

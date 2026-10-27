@@ -144,6 +144,7 @@ public final class SelfTest {
         check.same("a format by extension", "jpg", Formats.of("Scan 3.JPEG"));
         check.same("not a format", "", Formats.of("notes.zip"));
         check.same("an email by extension", "eml", Formats.of("Note to Ms. Rivera.eml"));
+        check.same("flashcards by extension", "fkv", Formats.of("Cell biology.fkv"));
         Job failed = jobs.find("t3");
         check.same("failed says why", "Couldn't start it: no account has room left", failed.summary(NOW, UTC, true));
         check.same("state", "Failed", failed.stateLabel());

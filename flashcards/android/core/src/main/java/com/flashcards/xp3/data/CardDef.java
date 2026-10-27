@@ -5,8 +5,9 @@ package com.flashcards.xp3.data;
  * auxiliary text such as an example sentence.
  *
  * This is the whole data model. A deck is an ordered list of these. There is
- * no import, no editor, no two-sided template language: a card is three
- * strings, and that is all a flashcard needs to be on a flip phone.
+ * no editor and no two-sided template language (Menu > Import reads FKV,
+ * key and value, see {@link Fkv}): a card is three strings, and that is all
+ * a flashcard needs to be on a flip phone.
  */
 public final class CardDef {
 
