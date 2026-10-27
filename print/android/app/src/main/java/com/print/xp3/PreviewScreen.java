@@ -9,7 +9,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.io.File;
-import java.util.List;
 
 /**
  * Preview (screen 05): the page as it will print, its paper size and a page
@@ -247,16 +246,5 @@ final class PreviewScreen extends Screen {
             return true;
         }
         return false;
-    }
-
-    @Override
-    void options(List<Option> out) {
-        if (draft == null) return;
-        out.add(new Option("Print", this::print));
-        out.add(new Option("Print settings", () -> app.open(new PrintSettingsScreen(draft, this::print))));
-        out.add(new Option("Choose printer", () -> app.open(new PrintersScreen(chosen -> {
-            draft.use(chosen);
-            refresh();
-        }))));
     }
 }

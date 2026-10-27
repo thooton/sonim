@@ -172,10 +172,4 @@ final class QueueScreen extends Screen implements Queue.Listener {
         }
         app.choose(entry.title, choices, -1, null, which -> actions.get(which).run());
     }
-
-    @Override
-    void options(List<Option> out) {
-        final View focused = view == null ? null : view.findFocus();
-        if (focused != null && focused.getTag() != null) out.add(new Option("This print job", focused::performClick));
-    }
 }

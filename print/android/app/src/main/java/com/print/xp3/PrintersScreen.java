@@ -588,18 +588,4 @@ final class PrintersScreen extends Screen {
         }
         typed();
     }
-
-    @Override
-    void options(List<Option> out) {
-        if (tab != 0) out.add(new Option("Nearby printers", () -> select(0)));
-        if (tab != 1) out.add(new Option("Add by IP address", () -> select(1)));
-        if (searchOver && Wifi.on(app)) {
-            out.add(new Option("Search again", () -> {
-                View empty = nearby.findViewWithTag("empty");
-                if (empty != null) nearby.removeView(empty);
-                select(0);
-                search();
-            }));
-        }
-    }
 }
