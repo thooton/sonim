@@ -9,15 +9,18 @@ import java.util.List;
 
 /**
  * FKV (Flashcards Key-Value), the flashcards Transform makes and Menu >
- * Import reads: UTF-8 text, one card per line, key||value.
+ * Import reads: UTF-8 text, one card per line, key||value, or
+ * key||value||metadata, where the metadata is optional extra text shown under
+ * the answer (an example sentence, say; it becomes the card's aux).
  *
- * The key and the value are written as the body of a string literal: a
+ * Each part is written as the body of a string literal: a
  * backslash starts an escape (\n, \r, \t, \\, \|, \0, \a, \b, \f, \v, \',
  * \", and a code point: \x and 2 hex digits, or a backslash, u or U, and 4 or
- * 8), and anything else stands for itself, quotes included. The first unescaped "||" splits the line; another one in the
- * line is an error, so a literal || is written \|\|. Blank lines are
+ * 8), and anything else stands for itself, quotes included. Each
+ * unescaped "||" ends a part; a third one in the line is an error, so a
+ * literal || is written \|\|. Blank lines are
  * skipped, a \r before a line's end is dropped, and so is a leading BOM. A
- * card needs a key and a value.
+ * card needs a key and a value; the metadata may be empty.
  *
  * The command center checks what Transform submits with the same rules
  * (internal/fkv in thooton/delta); change them together.
@@ -33,14 +36,16 @@ public final class Fkv {
         }
     }
 
-    /** One card: its front and its back. */
+    /** One card: its front, its back, and its metadata ("" for none). */
     public static final class Card {
         public final String key;
         public final String value;
+        public final String meta;
 
-        Card(String key, String value) {
+        Card(String key, String value, String meta) {
             this.key = key;
             this.value = value;
+            this.meta = meta;
         }
     }
 
@@ -71,9 +76,9 @@ public final class Fkv {
         return cards;
     }
 
-    /** One line, key||value. */
+    /** One line, key||value or key||value||metadata. */
     static Card line(String line) throws Malformed {
-        StringBuilder[] parts = {new StringBuilder(), new StringBuilder()};
+        StringBuilder[] parts = {new StringBuilder(), new StringBuilder(), new StringBuilder()};
         int part = 0;
         int i = 0;
         while (i < line.length()) {
@@ -81,8 +86,8 @@ public final class Fkv {
             if (c == '\\') {
                 i = unescape(line, i, parts[part]);
             } else if (c == '|' && i + 1 < line.length() && line.charAt(i + 1) == '|') {
-                if (part == 1) throw new Malformed("a second || (write a literal one as \\|\\|)");
-                part = 1;
+                if (part == 2) throw new Malformed("a third || (write a literal one as \\|\\|)");
+                part++;
                 i += 2;
             } else {
                 parts[part].append(c);
@@ -92,7 +97,7 @@ public final class Fkv {
         if (part == 0) throw new Malformed("no || between the key and the value");
         if (parts[0].length() == 0) throw new Malformed("the key is empty");
         if (parts[1].length() == 0) throw new Malformed("the value is empty");
-        return new Card(parts[0].toString(), parts[1].toString());
+        return new Card(parts[0].toString(), parts[1].toString(), parts[2].toString());
     }
 
     /** Appends the escape at `at` to `out`; returns where it ends. */

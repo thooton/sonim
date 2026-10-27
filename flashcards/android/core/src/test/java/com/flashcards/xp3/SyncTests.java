@@ -40,12 +40,14 @@ public final class SyncTests {
             Collection one = bundled(2);
             one.apply(Json.write(Json.map("usn", 1L)), one.outgoing());
             List<com.flashcards.xp3.data.Fkv.Card> cards = com.flashcards.xp3.data.Fkv.parse(
-                "uno||one\ndos||two\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                "uno||one\ndos||two||Dos gatos.\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
             Deck deck = one.imported("fkv-1", "Numbers", cards, 5000L);
             Deck again = one.imported("fkv-2", "Numbers", cards, 6000L);
             c.same("a name taken is numbered", "Numbers (2)", again.name);
             c.same("new cards a day", Deck.DEFAULT_NEW_PER_DAY, deck.newPerDay);
             c.same("in order", "dos", deck.cards().get(1).def.key);
+            c.same("metadata is aux", "Dos gatos.", deck.cards().get(1).def.aux);
+            c.same("none is empty", "", deck.cards().get(0).def.aux);
             c.same("ids are the deck's", "fkv-1:1", deck.cards().get(1).def.identity);
             c.ok("new", deck.cards().get(0).isNew());
             Map<String, Object> out = Json.object(Json.parse(one.outgoing().body));

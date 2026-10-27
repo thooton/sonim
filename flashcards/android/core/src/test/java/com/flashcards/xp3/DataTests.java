@@ -33,9 +33,13 @@ public final class DataTests {
     private static void fkv(Check c) {
         c.run("FKV", () -> {
             String file = "\uFEFFhola||hello\r\n\n  \nline\\none||a \\\\ b\n"
-                + "quote \"it's\"||\\|\\| and \\||\na|||b\n\\x41\\u00e9\\U0001F600||tab\\there\n";
+                + "quote \"it's\"||\\|\\| and \\||\na|||b\n\\x41\\u00e9\\U0001F600||tab\\there\n"
+                + "estar||to be||Yo estoy fr\u00edo.\\n\\nI am cold.\nx||y||\n";
             List<Fkv.Card> cards = Fkv.parse(file.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            c.same("five cards", 5, cards.size());
+            c.same("seven cards", 7, cards.size());
+            c.same("no metadata", "", cards.get(0).meta);
+            c.same("metadata", "Yo estoy fr\u00edo.\n\nI am cold.", cards.get(5).meta);
+            c.same("empty metadata", "", cards.get(6).meta);
             c.same("plain", "hola=hello", cards.get(0).key + "=" + cards.get(0).value);
             c.same("newline and backslash", "line\none=a \\ b", cards.get(1).key + "=" + cards.get(1).value);
             c.same("quotes and pipes", "quote \"it's\"=|| and ||", cards.get(2).key + "=" + cards.get(2).value);
@@ -43,7 +47,7 @@ public final class DataTests {
             c.same("code points", "A\u00e9\uD83D\uDE00=tab\there", cards.get(4).key + "=" + cards.get(4).value);
             String[][] bad = {
                 {"ok||ok\nno separator", "Line 2: no ||"},
-                {"a||b||c", "a second ||"},
+                {"a||b||c||d", "a third ||"},
                 {"||b", "the key is empty"},
                 {"a||", "the value is empty"},
                 {"a\\q||b", "\\q isn't an escape"},

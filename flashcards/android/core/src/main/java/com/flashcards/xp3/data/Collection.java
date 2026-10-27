@@ -90,7 +90,7 @@ public final class Collection {
 
     /**
      * A new deck of imported cards (Menu > Import), added to this copy: new
-     * cards, in the file's order, on Anki's default new cards per day,
+     * cards, in the file's order, each card's metadata its aux, on Anki's default new cards per day,
      * under `name` or, when a deck has it, "name (2)" and so on. It and its
      * cards are changed as of now, so the next sync takes them to the
      * command center, which keeps cards by id across decks: each card's id
@@ -101,7 +101,7 @@ public final class Collection {
         for (int n = 2; named(unique); n++) unique = name + " (" + n + ")";
         List<DeckCard> cards = new ArrayList<>();
         for (Fkv.Card card : from) {
-            cards.add(new DeckCard(new CardDef(card.key, card.value, "", deckId + ":" + cards.size())));
+            cards.add(new DeckCard(new CardDef(card.key, card.value, card.meta, deckId + ":" + cards.size())));
         }
         Deck deck = new Deck(deckId, unique, Deck.DEFAULT_NEW_PER_DAY, cards);
         int ord = 0;

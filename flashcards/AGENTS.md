@@ -60,9 +60,11 @@ newest first, and makes a new deck of the one picked, named after the file
 ("Cell biology.fkv" is Cell biology; a name taken gets " (2)"), on 20 new
 cards a day. Tablet saves Transform's flashcards into Documents on the
 card. FKV (Flashcards Key-Value) is UTF-8 text, one card per line,
-`key||value`, each side written as the inside of a string literal (`\n`,
-`\t`, `\\`, `\|` and the rest; quotes are themselves; the first bare `||`
-splits the line, so a literal one is `\|\|`), blank lines skipped; a file
+`key||value` or `key||value||metadata` (the metadata, such as an example
+sentence, becomes the card's `aux`, shown under the answer), each part
+written as the inside of a string literal (`\n`, `\t`, `\\`, `\|` and the
+rest; quotes are themselves; each bare `||` ends a part, so a literal one is
+`\|\|`), blank lines skipped; a file
 that doesn't parse is refused, naming the line. The deck's id is `fkv-` and
 a random UUID, and each card's is the deck's plus `:` and its place, since
 the command center keeps cards by id across decks. The deck and its cards
