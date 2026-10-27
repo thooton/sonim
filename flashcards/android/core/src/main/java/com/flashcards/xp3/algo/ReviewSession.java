@@ -43,7 +43,7 @@ import java.time.ZonedDateTime;
 public final class ReviewSession {
 
     /** On AUTO, a new card comes in while fewer cards than this are in (re)learning. */
-    public static final int AUTO_WINDOW = 10;
+    public static final int AUTO_WINDOW = 20;
     public static final long LEARN_AHEAD = 20L * 60L;
     public static final int ROLLOVER_HOUR = 4;
 

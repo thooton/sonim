@@ -9,7 +9,7 @@ syncs Anki. Read `../AGENTS.md` first.
 New cards per day is a deck option: a number, as in Anki, counting every
 card first answered since the rollover on either device (`intro`); or
 **Auto**, with no daily number, where a new card comes in whenever fewer
-than `ReviewSession.AUTO_WINDOW` (10) cards are in learning or relearning,
+than `ReviewSession.AUTO_WINDOW` (20) cards are in learning or relearning,
 as Quizlet brings in new material once the old is in hand. New cards come
 after the day's reviews either way, so old material always goes first.
 Auto only decides when a new card is introduced; everything else
