@@ -79,7 +79,7 @@ public final class MainActivity extends Activity {
     }
 
     private void confirmRelease() {
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle("Stop being device owner?")
             .setPositiveButton("Stop", (dialog, which) -> {
                 dpm.clearDeviceOwnerApp(getPackageName());
@@ -87,5 +87,8 @@ public final class MainActivity extends Activity {
             })
             .setNegativeButton("Cancel", null)
             .show();
+        // The dialog's button style ignores the theme's; say them as written.
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setAllCaps(false);
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setAllCaps(false);
     }
 }
