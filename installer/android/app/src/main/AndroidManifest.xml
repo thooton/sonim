@@ -11,6 +11,9 @@
     <permission
         android:name="com.installer.xp3.permission.INSTALL"
         android:protectionLevel="signature" />
+    <!-- Held too, so the install outcome, sent as this app, passes the same
+         check when it comes back (InstallActivity's receiver requires it). -->
+    <uses-permission android:name="com.installer.xp3.permission.INSTALL" />
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 

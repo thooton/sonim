@@ -58,6 +58,9 @@ public final class MainActivity extends Activity {
         column.addView(release);
 
         ScrollView root = new ScrollView(this);
+        // Otherwise, with no button showing, the page itself takes focus and
+        // Android 8 greys all of it with the default focus highlight.
+        root.setFocusable(false);
         root.addView(column);
         setContentView(root);
         show();

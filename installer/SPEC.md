@@ -125,10 +125,11 @@ refused with a permission error (the shell lacks the signature permission).
 - **Network**: none.
 - **Permissions**: `REQUEST_INSTALL_PACKAGES`; defines
   `com.installer.xp3.permission.INSTALL` (signature) and requires it of
-  callers; `Admin` is a device-admin receiver with no policies.
+  callers (and holds it itself); `Admin` is a device-admin receiver with no policies.
 - **Threads**: the APK is streamed into a `PackageInstaller` session off the
   main thread (64 KB buffer); the outcome comes back as a broadcast to
-  Installer only.
+  Installer only, taken only from a sender with the signature permission
+  and only for the session it committed.
 - **Timing**: no timeouts. An install takes as long as Android does.
 - **Screen state**: the status page reads the role when it is created, not
   each time it is shown (see Open questions).

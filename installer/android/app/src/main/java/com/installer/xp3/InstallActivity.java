@@ -42,10 +42,14 @@ public final class InstallActivity extends Activity {
     public static final String EXTRA_PACKAGE = "package";
 
     private static final String ACTION_STATUS = "com.installer.xp3.STATUS";
+    /** Held only by apps with the shared key, this one included. */
+    private static final String PERMISSION = "com.installer.xp3.permission.INSTALL";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private BroadcastReceiver receiver;
     private boolean done;
+    /** The session committed, once it is; its outcome is the only one taken. */
+    private volatile int committed = -1;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -74,7 +78,9 @@ public final class InstallActivity extends Activity {
                 onStatus(intent);
             }
         };
-        registerReceiver(receiver, new IntentFilter(ACTION_STATUS));
+        // Only a sender holding the signature permission (the session's own
+        // PendingIntent, which sends as this app) can deliver the outcome.
+        registerReceiver(receiver, new IntentFilter(ACTION_STATUS), PERMISSION, null);
 
         new Thread(() -> commit(uri, expected), "installer-commit").start();
     }
@@ -102,6 +108,7 @@ public final class InstallActivity extends Activity {
                 Intent status = new Intent(ACTION_STATUS).setPackage(getPackageName());
                 PendingIntent sender = PendingIntent.getBroadcast(
                     this, id, status, PendingIntent.FLAG_UPDATE_CURRENT);
+                committed = id;
                 session.commit(sender.getIntentSender());
             } finally {
                 session.close();
@@ -119,14 +126,15 @@ public final class InstallActivity extends Activity {
 
     /** The session's answer: done, or (unexpected here) a confirmation to show. */
     private void onStatus(Intent intent) {
+        int id = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1);
+        if (id == -1 || id != committed) return;
         int status = intent.getIntExtra(
             PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             // Not expected for a device owner. The confirmation screen would
             // be the XP3's own, which always refuses, so give up instead.
             try {
-                getPackageManager().getPackageInstaller().abandonSession(
-                    intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1));
+                getPackageManager().getPackageInstaller().abandonSession(id);
             } catch (RuntimeException ignored) {
             }
             fail("Android asked for confirmation even though Installer is the device owner.");
