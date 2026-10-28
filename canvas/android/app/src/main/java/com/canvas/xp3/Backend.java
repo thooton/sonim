@@ -259,10 +259,6 @@ final class Backend {
     // Files
     // ------------------------------------------------------------------
 
-    Map<String, Object> fileInfo(String fileId) throws IOException, InterruptedException {
-        return client().file(fileId);
-    }
-
     /** Where a teacher's file is or will be kept on the phone. */
     File fileOnPhone(String fileId, String name) {
         return store.download(fileId, name);
