@@ -39,7 +39,7 @@ and prunes the files of posts that have dropped out of the latest 12.
 
 `Dates.find` finds the dates and times in a caption ("Friday, Oct 31 at
 6pm", "10/31", "the 2nd of November", "tonight", "tomorrow", "7-9pm",
-"noon", "18:30", and "7:30" with no am or pm, taken as evening for 1:00 to
+"noon", "6.30pm", "18:30", and "7:30" with no am or pm, taken as evening for 1:00 to
 9:59). A date without a year takes the post's year, or the next if that
 would put it more than 45 days before the post; a weekday on its own is the
 first such day on or after the post.
@@ -48,7 +48,9 @@ first such day on or after the post.
 date beats a lone weekday in the same caption, a date more than 120 days
 after the post or 60 before it is dropped, and each date takes the first
 time after it and before the next date (else one earlier on its line). An
-event is named by the caption's first sentence, or, when the post announces
+event is named by the caption's first sentence (with "today", "tonight" and
+"tomorrow" taken out, and not ended by an abbreviation's dot such as "Nov."
+or a mid-sentence "p.m."), or, when the post announces
 several, by its own line with the date taken out ("Diwali Night - Nov 8,
 6pm" is "Diwali Night").
 

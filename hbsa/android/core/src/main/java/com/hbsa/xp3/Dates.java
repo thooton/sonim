@@ -25,7 +25,7 @@ public final class Dates {
         + "|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?";
     private static final String DAY = "(3[01]|[12][0-9]|0?[1-9])(?:st|nd|rd|th)?";
     private static final String WEEKDAY = "(monday|tuesday|wednesday|thursday|friday|saturday|sunday)";
-    private static final String CLOCK = "(1[0-2]|0?[1-9])(?::([0-5][0-9]))?";
+    private static final String CLOCK = "(1[0-2]|0?[1-9])(?:[:.]([0-5][0-9]))?";
     private static final String MERIDIEM = "([ap])\\.?\\s?m\\b\\.?";
 
     private static final Pattern MONTH_DAY = Pattern.compile(
@@ -36,7 +36,7 @@ public final class Dates {
         "(?<![0-9/$.])(1[0-2]|0?[1-9])/(3[01]|[12][0-9]|0?[1-9])(?:/(20[0-9]{2}|[0-9]{2}))?(?![0-9/])");
     private static final Pattern WEEKDAYS = Pattern.compile("\\b" + WEEKDAY + "\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern RELATIVE = Pattern.compile("\\b(today|tonight|tomorrow)\\b", Pattern.CASE_INSENSITIVE);
-    /** "6pm", "6:30 PM", "7-9pm", "7pm - 9pm", "noon". */
+    /** "6pm", "6:30 PM", "6.30pm", "7-9pm", "7pm - 9pm", "noon". */
     private static final Pattern TIME = Pattern.compile(
         "\\b" + CLOCK + "(?:\\s*" + MERIDIEM + ")?\\s*(?:-|–|—|to)\\s*" + CLOCK + "\\s*" + MERIDIEM
         + "|\\b" + CLOCK + "\\s*" + MERIDIEM
@@ -227,13 +227,38 @@ public final class Dates {
         return twelve + (minute == 0 ? "" : String.format(Locale.US, ":%02d", minute)) + (hour < 12 ? " AM" : " PM");
     }
 
-    /** A caption's first line, cut at the end of its first sentence: the event's name. */
+    /** A full stop that doesn't end a sentence: "Nov.", "St.", "Rm.", and "a.m." unless a capital follows. */
+    private static final Pattern ABBREVIATION = Pattern.compile(
+        "(?i)(?:\\b(?:jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec|mon|tues?|wed|thur?s?|fri|sat|sun"
+        + "|st|rm|rd|ave|bldg|dr|mr|mrs|ms|prof|vs)\\.$)");
+    private static final Pattern MERIDIEM_DOT = Pattern.compile("(?i)\\b[ap]\\.m\\.$");
+    /** "today", "tonight", "tomorrow night" and the like, which go stale in a name. */
+    private static final Pattern RELATIVE_WORDS = Pattern.compile(
+        "(?i)\\b(?:today|tonight|tomorrow)(?:['’]s)?(?:\\s+(?:morning|afternoon|evening|night))?\\b[!:,]*");
+
+    /**
+     * A caption's first line, cut at the end of its first sentence, with
+     * "today", "tonight" and "tomorrow" taken out (they would soon say the
+     * wrong day): the event's name.
+     */
     public static String title(String caption) {
         for (String line : caption.split("\n")) {
             String text = line.trim();
             if (text.isEmpty()) continue;
+            String bare = RELATIVE_WORDS.matcher(text).replaceAll("")
+                .replaceAll("\\s+([.!?,])", "$1").replaceAll("\\s+", " ")
+                .replaceAll("^[^\\p{L}\\p{N}]+", "").trim();
+            int letters = 0;
+            for (int i = 0; i < bare.length(); i++) if (Character.isLetter(bare.charAt(i))) letters++;
+            if (letters >= 2 && !bare.equals(text)) text = Character.toUpperCase(bare.charAt(0)) + bare.substring(1);
             Matcher end = Pattern.compile("[.!?](\\s|$)").matcher(text);
-            if (end.find() && end.start() >= 8) text = text.substring(0, end.start() + 1);
+            while (end.find()) {
+                if (end.start() < 8) continue;
+                String before = text.substring(0, end.start() + 1);
+                if (end.end() < text.length() && (ABBREVIATION.matcher(before).find()
+                    || MERIDIEM_DOT.matcher(before).find() && !Character.isUpperCase(text.charAt(end.end())))) continue;
+                return before;
+            }
             return text;
         }
         return "";

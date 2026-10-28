@@ -44,6 +44,8 @@ public final class MainActivity extends BaseActivity {
     private final ExecutorService worker = Ui.worker("instagram");
     private final Http http = new Http();
     private boolean loading;
+    /** When the last fetch began, so a failing one isn't retried on every return to the list. */
+    private long tried;
     /** Why the last fetch failed, or null. */
     private String error;
 
@@ -74,7 +76,10 @@ public final class MainActivity extends BaseActivity {
         adapter = new Adapter();
         list.setAdapter(adapter);
         list.setOnItemClickListener((parent, view, position, id) -> open(position));
-        Ui.onSelect(list, position -> adapter.notifyDataSetChanged());
+        Ui.onSelect(list, position -> {
+            adapter.notifyDataSetChanged();
+            showHeading(position);
+        });
         setContentView(root);
 
         show();
@@ -87,12 +92,13 @@ public final class MainActivity extends BaseActivity {
         // Left open overnight, "Today" moves on and the list should with it.
         if (Club.opened >= 0 && list.getParent() != null && Club.opened < adapter.getCount()) select(Club.opened);
         Club.opened = -1;
-        if (!loading && System.currentTimeMillis() - Club.fetched(this) > STALE_MS) load();
+        if (!loading && System.currentTimeMillis() - Math.max(Club.fetched(this), tried) > STALE_MS) load();
     }
 
     private void load() {
         if (loading) return;
         loading = true;
+        tried = System.currentTimeMillis();
         error = null;
         show();
         worker.execute(() -> {
@@ -171,6 +177,19 @@ public final class MainActivity extends BaseActivity {
     private void select(int position) {
         boolean headed = position > 0 && adapter.entry(position - 1) != null && adapter.entry(position - 1).isHeading();
         list.setSelectionFromTop(position, headed ? dp(Adapter.HEADING_DP) : 0);
+    }
+
+    /**
+     * Brings the heading above `position` into view when the d-pad has
+     * moved up onto the first row of a day and left its heading above the
+     * top, which the list's own scrolling does.
+     */
+    private void showHeading(int position) {
+        Agenda.Entry above = adapter.entry(position - 1);
+        if (above == null || !above.isHeading()) return;
+        int first = list.getFirstVisiblePosition();
+        View top = list.getChildAt(0);
+        if (first >= position || first == position - 1 && top != null && top.getTop() < 0) select(position);
     }
 
     private void open(int position) {

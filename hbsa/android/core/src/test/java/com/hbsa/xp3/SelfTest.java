@@ -121,6 +121,19 @@ public final class SelfTest {
             check.same("7:30 is evening", 19 * 60 + 30, Dates.find("starts 7:30", posted1, PHOENIX).get(0).minutes);
             check.same("11:00 stays morning", 11 * 60, Dates.find("brunch 11:00", posted1, PHOENIX).get(0).minutes);
             check.same("not a price", 0, Dates.find("only $5.00", posted1, PHOENIX).size());
+            check.same("6.30pm", 18 * 60 + 30, Dates.find("Doors open 6.30pm on Nov 6", posted1, PHOENIX).get(0).minutes);
+            check.same("6.30 isn't a time alone", 0, Dates.find("rated 6.30 out of 10", posted1, PHOENIX).size());
+        });
+
+        check.run("names", () -> {
+            check.same("month's dot", "Yoga Nov. 11, 7 AM.", Dates.title("Yoga Nov. 11, 7 AM. Bring a mat."));
+            check.same("p.m. mid-sentence", "Puja Nov 10 at 8 p.m. sharp.", Dates.title("Puja Nov 10 at 8 p.m. sharp. All welcome."));
+            check.same("p.m. ending one", "Puja at 8 p.m.", Dates.title("Puja at 8 p.m. All welcome."));
+            check.same("tomorrow taken out", "Halloween costume party at 9 PM in the ballroom.",
+                Dates.title("Halloween costume party tomorrow night at 9 PM in the ballroom. Costumes encouraged!"));
+            check.same("Today! taken out", "Chai and study session 3pm in the library.", Dates.title("Today! Chai and study session 3pm in the library."));
+            check.same("nothing but the day", "Tonight!", Dates.title("Tonight!"));
+            check.same("short first sentence", "Fall Social at the MU!", Dates.title("Fall Social at the MU! Food and games."));
         });
 
         check.run("events", () -> {

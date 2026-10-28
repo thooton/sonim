@@ -54,7 +54,8 @@ past event. If there are no events at all, on the first of Other posts.
 
 Keys:
 
-- Up / Down: move between rows. Headings are skipped. Up on the first row
+- Up / Down: move between rows. Headings are skipped, but moving Up onto a
+  day's first row keeps that day's heading in view above it. Up on the first row
   and Down on the last row stay put. The row under the d-pad is shaded.
 - OK: opens that row's Post screen.
 - Menu or left soft key: a popup with "Refresh" and "Open in browser".
@@ -131,7 +132,9 @@ Data and where it lives:
 When it fetches:
 
 - On launch, and when the app comes back to the foreground more than 15
-  minutes after the last successful fetch. Never two fetches at once.
+  minutes after the last successful fetch. After a failed fetch, not again
+  for 15 minutes (so going back and forth between the list and a post
+  doesn't retry and repeat the toast). Never two fetches at once.
 - From Menu > Refresh and "Try again", at any time.
 
 Errors (the toast, or the line under "Couldn't reach Instagram"):
@@ -151,14 +154,17 @@ Events (from captions; full rules in AGENTS.md "Events"):
 
 - Recognised: "Friday, Oct 31 at 6pm", "Oct 31", "31 October", "10/31",
   "the 2nd of November", "today", "tonight", "tomorrow", a weekday, "7-9pm",
-  "noon", "18:30", and "7:30" with no am/pm (read as evening for 1:00-9:59).
+  "noon", "6:30pm", "6.30pm", "18:30", and "7:30" with no am/pm (read as evening for 1:00-9:59).
 - A date without a year takes the post's year, or the next if that would put
   it more than 45 days before the post. A lone weekday is the first such day
   on or after the post, and counts only when the caption has no full date.
 - Dates more than 120 days after the post or 60 before it are ignored.
 - One event per day per post. Each takes the first time after its date and
   before the next date, else one earlier on its line.
-- Name: the caption's first sentence; when a post names several days, each
+- Name: the caption's first sentence, with "today", "tonight" and "tomorrow"
+  (and "Today!", "tomorrow night" and the like) taken out, since they soon say
+  the wrong day; a dot after an abbreviation ("Nov.", "St.", "p.m." mid
+  sentence) doesn't end the sentence. When a post names several days, each
   event's own line with the date and time taken out ("Diwali Night - Nov 8,
   6pm" is "Diwali Night").
 - Days and "past" use the phone's time zone; an event is past once its day
