@@ -81,7 +81,7 @@ public final class MainActivity extends Activity {
     private void confirmRelease() {
         AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle("Stop being device owner?")
-            .setPositiveButton("Stop", (dialog, which) -> {
+            .setPositiveButton("Stop", (shown, which) -> {
                 dpm.clearDeviceOwnerApp(getPackageName());
                 show();
             })
