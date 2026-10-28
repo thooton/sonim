@@ -1,7 +1,6 @@
 package com.source.xp3;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -15,6 +14,7 @@ import android.view.View;
 import android.widget.ListView;
 import com.source.xp3.net.Music;
 import com.xp3.common.Login;
+import com.xp3.common.ui.LoginDialog;
 import com.xp3.common.ui.BaseActivity;
 
 /**
@@ -67,7 +67,7 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
         lightStatusBar(!dark(this));
         loadFonts();
         Download.init(this);
-        login = loadLogin(prefs());
+        login = LoginDialog.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
     }
 
     @Override
@@ -124,26 +124,6 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
         recreate();
     }
 
-    /**
-     * The bundled login is adopted once per build that carries a new one;
-     * otherwise whatever was saved (perhaps typed in from Options) is kept.
-     */
-    private static Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     /**
      * Runs `then`, a download, once Source may save onto the SD card: storage
