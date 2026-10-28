@@ -92,7 +92,10 @@ public final class Stats {
             long at = due < dayEnd ? 0 : 1 + (due - dayEnd) / 86400L;
             if (at < DUE_DAYS) s.due[(int) at]++;
 
-            double r = Math.max(0, Math.min(1, card.probability(now)));
+            long lastDay = Instant.ofEpochSecond(last).atZone(zone)
+                .minusHours(ReviewSession.ROLLOVER_HOUR).toLocalDate().toEpochDay();
+            int elapsed = (int) Math.max(0, day.toEpochDay() - lastDay);
+            double r = Math.max(0, Math.min(1, Fsrs.retrievability(card.fsrs, elapsed)));
             s.recall[Math.min(RECALL_BINS - 1, (int) Math.floor(r * RECALL_BINS))]++;
             s.knowledge += r;
         }

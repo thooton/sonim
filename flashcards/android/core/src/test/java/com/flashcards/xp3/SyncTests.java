@@ -88,7 +88,7 @@ public final class SyncTests {
             s.setAhead(true);
             DeckCard first = s.next(NOON);
             c.ok("the likelier forgotten first", first == soon || first == later);
-            c.ok("lowest recall first", first.probability(NOON) <= (first == soon ? later : soon).probability(NOON));
+            c.ok("lowest recall first", s.recall(first.fsrs, NOON) <= s.recall((first == soon ? later : soon).fsrs, NOON));
             s.rate(3, NOON);
             DeckCard second = s.next(NOON + 10);
             c.ok("not the same card twice running", second != first && second != null);

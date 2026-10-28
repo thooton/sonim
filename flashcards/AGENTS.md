@@ -1,10 +1,11 @@
 # AGENTS.md
 
-Spaced-repetition flashcards on FSRS-6, queued like Anki (learning steps,
-reviews due before the 4am rollover, every card answered 1 to 4), drawn as
-Anki's desktop window, and synced through the Delta command center with
-Flashcards on the tablet (`flashcards/` in thooton/tablet), as AnkiWeb
-syncs Anki. Read `../AGENTS.md` first.
+Spaced-repetition flashcards scheduled as Anki desktop schedules them with
+the FSRS4Anki scheduler on (fsrs4anki_scheduler.js v6.1.1, FSRS-6 defaults),
+queued like Anki (learning steps, reviews due before the 4am rollover, every
+card answered 1 to 4), drawn as Anki's desktop window, and synced through
+the Delta command center with Flashcards on the tablet (`flashcards/` in
+thooton/tablet), as AnkiWeb syncs Anki. Read `../AGENTS.md` first.
 
 New cards per day is a deck option: a number, as in Anki, counting every
 card first answered since the rollover on either device (`intro`); or
@@ -15,7 +16,8 @@ cards are mixed in among the day's reviews, spread evenly, as Anki's
 default "Mix with reviews" does (`newTurn`; the tablet's Go port gives the
 same order, pinned by its `TestNewCardsMixIntoReviews`). Auto only decides
 when a new card is introduced; everything else (learning steps,
-relearning, reviews, intervals) is stock Anki, and must stay so. (Auto has
+relearning, reviews, intervals) is Anki with the FSRS4Anki scheduler, and
+must stay so. (Auto has
 been a mean-recall gate at 85%, which showed the whole unseen pile once
 it crossed, and then a cap on cards in learning; the user wanted new
 material to arrive steadily, mixed with the old.) The Spanish deck is on
@@ -25,24 +27,45 @@ Auto.
 offer Review Ahead (Anki's custom study option of that name): studied
 cards not yet due, the likeliest forgotten first (lowest predicted recall,
 then earliest due), never the card just answered twice running, until the
-user leaves. FSRS schedules an early answer from the days actually elapsed.
+user leaves. An early answer is scheduled from the Anki days actually
+elapsed, by the script's review formulas, as if the deck were a normal one:
+in Anki the script leaves a filtered deck's intervals to the SM-2 ones, which
+these cards don't have. The queue keeps its own rules where they differ
+from Anki: no review limit, reviews in order of exact due time, new cards
+mixed in card by card, Review Ahead by lowest recall.
 The tablet's `session.earliest` is the same rule.
 
 - `android/core` (plain Java, tested by `:flashcards:core:selfTest`):
-  - `io/github/openspacedrepetition/`: an Android/Java 8 adaptation of
-    java-fsrs 1.0.0 (FSRS-6 defaults). Keep it close to upstream; `AlgoTests`
-    pins its numbers. The tablet's backend is a Go port of it and of
-    `ReviewSession`, checked against answers this code made; change the
+  - `algo/Fsrs`: the scheduler, a line-for-line port of
+    `fsrs4anki_scheduler.js` v6.1.1 (open-spaced-repetition/fsrs4anki) as
+    Anki 26.09 runs it, with Anki's own learning side around it (steps 1m
+    10m, relearning 10m, up to 25%/5 minutes added to a step, a step past
+    the rollover becoming a day's wait). Its comment lists what the script
+    does differently from java-fsrs and from Anki's built-in FSRS: Anki
+    days, not 24 hours, for recall; every (re)learning answer short-term,
+    Hard included; two-decimal rounding; ±(5% + 1 day) fuzz with Hard <=
+    Good < Easy. Its one departure from the script is the fuzz draw, seeded
+    by the card and its last review so the phone, the tablet and the button
+    labels agree. `AlgoTests.scriptVectors` pins numbers the script gave in
+    Node; check a change against the script itself the same way (feed it
+    `states`/`customData` for a card, with `set_fuzz_factor()` replaced by
+    the fuzz this class drew, and compare). The tablet's backend is a Go
+    port of it and of `ReviewSession`, checked against answers this code
+    made (`TabletVectors` writes its `testdata/java-fsrs.json`: run it with
+    the core's test classes and redirect the output there); change the
     scheduling here only together with the tablet's (see its AGENTS.md).
-  - `algo/Fsrs`: the app's seam to that library.
+  - `io/github/openspacedrepetition/`: `Card`, `State` and `Rating`, the
+    memory state kept from java-fsrs 1.0.0 (its scheduler is gone).
   - `algo/ReviewSession`: one deck's queue: which card is next, the
     new/learning/review counts, the daily limit or Auto, and the interval
-    each rating would give.
+    each rating would give (`preview`, which counts Anki days in the
+    phone's zone for `Fsrs`).
   - `algo/Stats`: the statistics, from the cards' state alone (no review
     log is kept): Today, Future Due, Card Counts, Review Intervals and
-    Card Retrievability. The tablet's `stats.go` is the same arithmetic,
-    and its `TestStatsMatchThePhone` wants `StatsTests`' numbers; change
-    them together.
+    Card Retrievability (recall after the Anki days since the last
+    answer, as `Fsrs` counts them). The tablet's `stats.go` is the same
+    arithmetic, and its `TestStatsMatchThePhone` wants `StatsTests`'
+    numbers; change them together.
   - `data/`: `Deck` (name, new cards/day), `DeckCard`, `CardDef`,
     `Collection` (every deck and card, its JSON file, the sync merge, and
     `imported`, a new deck from a file), `Store` (the bundled deck's text

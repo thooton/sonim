@@ -7,8 +7,8 @@ import java.time.Instant;
 /**
  * The FSRS memory state of a single card: its state (learning / review /
  * relearning), the learning-step it is on, its stability and difficulty, and
- * when it is due and was last reviewed. Instances are produced by {@link
- * Scheduler#reviewCard}, which returns a fresh card for each review.
+ * when it is due and was last reviewed. The app's scheduler,
+ * com.flashcards.xp3.algo.Fsrs, returns a fresh card for each review.
  */
 public class Card {
 

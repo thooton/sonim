@@ -162,7 +162,7 @@ final class ReviewPane extends LinearLayout {
         String[] labels = {"1 Again", "2 Hard", "3 Good", "4 Easy"};
         long now = now();
         for (int i = 0; i < 4; i++) {
-            Card after = ReviewSession.preview(card.fsrs, i + 1, now);
+            Card after = session.preview(card.fsrs, i + 1, now);
             answers.addView(answer(Anki.interval(after.getDue().getEpochSecond() - now), labels[i]),
                 new LayoutParams(0, LayoutParams.MATCH_PARENT, 1f));
         }

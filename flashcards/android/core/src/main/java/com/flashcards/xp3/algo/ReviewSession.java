@@ -5,8 +5,6 @@ import com.flashcards.xp3.data.Deck;
 import com.flashcards.xp3.data.DeckCard;
 
 import io.github.openspacedrepetition.Card;
-import io.github.openspacedrepetition.Rating;
-import io.github.openspacedrepetition.Scheduler;
 import io.github.openspacedrepetition.State;
 
 import java.time.Instant;
@@ -35,10 +33,11 @@ import java.time.ZonedDateTime;
  *   most likely forgotten first (lowest predicted recall, then earliest due,
  *   then deck order), never the card just answered twice running.
  *
- * Every card, new or not, is shown front first and answered 1..4. FSRS-6
- * (desired retention 0.9) sets each next due date; the fuzz is seeded by the
- * card and its last review, as Anki's is, so {@link #preview} shows exactly
- * the interval a rating will give.
+ * Every card, new or not, is shown front first and answered 1..4. {@link
+ * Fsrs} (Anki with the FSRS4Anki scheduler) sets each next due date, counting
+ * days as Anki does, from 4am to 4am; its fuzz is seeded by the card and its
+ * last review, so {@link #preview} shows exactly the interval a rating will
+ * give.
  */
 public final class ReviewSession {
 
@@ -125,7 +124,7 @@ public final class ReviewSession {
         double bestRecall = 0;
         for (DeckCard card : deck.cards()) {
             if (card.isNew() || card == last) continue;
-            double recall = card.probability(now);
+            double recall = recall(card.fsrs, now);
             if (best == null || recall < bestRecall
                 || recall == bestRecall && dueOf(card) < dueOf(best)) {
                 best = card;
@@ -145,7 +144,7 @@ public final class ReviewSession {
         } else if (!isLearning(card)) {
             reviewsShown++;
         }
-        card.fsrs = answer(card.fsrs, rating, now);
+        card.fsrs = preview(card.fsrs, rating, now);
         Collection.touch(card, now * 1000L);
         last = card;
         current = null;
@@ -156,8 +155,16 @@ public final class ReviewSession {
     }
 
     /** What a rating would make of the card: its new state and due date. */
-    public static Card preview(Card card, int rating, long now) {
-        return answer(card, rating, now);
+    public Card preview(Card card, int rating, long now) {
+        long last = card.getLastReview() == null ? now : card.getLastReview().getEpochSecond();
+        now = Math.max(now, last);
+        return Fsrs.review(card, rating, now, daysSince(last, now), dayEnd(now) - now);
+    }
+
+    /** The probability the card is recalled at `now`, per FSRS (0 when unseen). */
+    public double recall(Card card, long now) {
+        if (card.getLastReview() == null) return 0;
+        return Fsrs.retrievability(card, daysSince(card.getLastReview().getEpochSecond(), now));
     }
 
     /** Whether a new card may come in. */
@@ -224,17 +231,15 @@ public final class ReviewSession {
         return next;
     }
 
-    private static Card answer(Card card, int rating, long now) {
-        if (rating < 1 || rating > 4) {
-            throw new IllegalArgumentException("rating must be between 1 and 4");
-        }
-        long last = card.getLastReview() == null ? 0L : card.getLastReview().getEpochSecond();
-        Scheduler fsrs = Scheduler.builder()
-            .randomSeedNumber(card.getCardId() * 31 + Long.hashCode(last))
-            .build();
-        return fsrs.reviewCard(
-                card, Rating.values()[rating - 1], Instant.ofEpochSecond(Math.max(now, last)))
-            .getCard();
+    /** Anki days from `then` to `now`: how many 4am rollovers lie between. */
+    private int daysSince(long then, long now) {
+        return (int) Math.max(0, day(now) - day(then));
+    }
+
+    /** The Anki day `t` falls in, as an epoch day. */
+    private long day(long t) {
+        return Instant.ofEpochSecond(t).atZone(zone).minusHours(ROLLOVER_HOUR).toLocalDate()
+            .toEpochDay();
     }
 
     /** The end of the Anki day `now` falls in: days run from 4am to 4am. */

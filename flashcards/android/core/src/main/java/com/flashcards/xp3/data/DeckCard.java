@@ -1,14 +1,12 @@
 package com.flashcards.xp3.data;
 
-import com.flashcards.xp3.algo.Fsrs;
-
 import io.github.openspacedrepetition.Card;
 
 /**
  * One card as the app knows it: its definition, its place in the deck, and
- * the FSRS memory state (the {@link Card} class of the vendored java-fsrs
- * library, which the app only routes through {@link Fsrs} or stores
- * verbatim), with what sync needs to know about it.
+ * the FSRS memory state (the {@link Card} class kept from the java-fsrs
+ * library, which only the scheduler, {@code algo.Fsrs}, changes), with what
+ * sync needs to know about it.
  */
 public final class DeckCard {
 
@@ -38,11 +36,6 @@ public final class DeckCard {
     public DeckCard(CardDef def, Card fsrs) {
         this.def = def;
         this.fsrs = fsrs;
-    }
-
-    /** Estimated probability of recall right now, per FSRS. */
-    public double probability(long now) {
-        return Fsrs.retrievability(fsrs, now);
     }
 
     /** Whether the user has never reviewed this card. */

@@ -8,36 +8,35 @@ import com.flashcards.xp3.data.DeckCard;
 
 import com.xp3.common.Check;
 import io.github.openspacedrepetition.Card;
-import io.github.openspacedrepetition.Rating;
-import io.github.openspacedrepetition.Scheduler;
 import io.github.openspacedrepetition.State;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
 /**
- * The algorithm half of the app, checked on a desktop JVM. The scheduling
- * engine under test is the Java-8 FSRS-6 adaptation in package
- * io.github.openspacedrepetition. Legacy java-fsrs vectors are retained with
- * their original parameter set, alongside the app-level behaviors built on
- * top — the Anki-style review queue.
+ * The algorithm half of the app, checked on a desktop JVM: the scheduler
+ * ({@link Fsrs}, Anki with the FSRS4Anki v6.1.1 scheduler), pinned to numbers
+ * the script itself gives, and the Anki-style review queue built on top.
  */
 public final class AlgoTests {
 
     public static void run(Check c) {
-        fsrs(c);
-        review(c);
-        libraryVectors(c);
+        newCards(c);
         learningSteps(c);
-        correctedFsrsEdges(c);
+        hardInLearning(c);
+        learningIsShortTermOvernight(c);
+        stepPastTheRollover(c);
+        reviewsCountAnkiDays(c);
+        sameDayReview(c);
+        buttonsInOrder(c);
         fuzz(c);
-        stabilityFloor(c);
+        scriptVectors(c);
+        lapses(c);
+        rounding(c);
         autoTakesNewCardsAsTheyAreLearned(c);
         autoTopsUpToTheTarget(c);
         newCardsMixIntoReviews(c);
@@ -47,266 +46,267 @@ public final class AlgoTests {
         previewMatchesRating(c);
     }
 
-    /* --- the engine's own entry points --- */
+    /* --- the scheduler --- */
 
-    private static void fsrs(Check c) {
-        c.run("fsrs", () -> {
-            Scheduler sch = Fsrs.defaults();
-            // R(S, S) == 0.9 by construction of FACTOR: stability 1, one day ago.
-            Card s1 = reviewed(1.0, 5.0, T0);
-            c.close(
-                "curve at own stability is 0.9",
-                0.9,
-                sch.getCardRetrievability(s1, Instant.ofEpochSecond(T0 + 86400L)),
-                1e-9);
-            // R is 1 the instant a card is reviewed (t == 0).
-            c.close(
-                "curve at t=0 is 1",
-                1.0,
-                sch.getCardRetrievability(s1, Instant.ofEpochSecond(T0)),
-                1e-9);
-            // R falls as the card ages.
-            double fresh =
-                sch.getCardRetrievability(s1, Instant.ofEpochSecond(T0 + 86400L));
-            double aged =
-                sch.getCardRetrievability(s1, Instant.ofEpochSecond(T0 + 30L * 86400L));
-            c.ok("decays with time", fresh > aged);
-            // R of a never-seen card is 0.
-            c.close(
-                "new card retrievability 0",
-                0.0,
-                sch.getCardRetrievability(
-                    Card.builder().cardId(1).build(), Instant.ofEpochSecond(T0)),
-                1e-9);
-            // A Good first answer lands on the library weights' W[2] (3.2602).
-            double[] w = Fsrs.defaults().getParameters();
-            Card good = Fsrs.review(Card.builder().cardId(2).build(), 3, T0);
-            c.close("init stability good", w[2], good.getStability(), 1e-9);
-            c.ok(
-                "init difficulty within band",
-                good.getDifficulty() >= 1.0 && good.getDifficulty() <= 10.0);
-            // harder rating -> higher difficulty
-            Card again = Fsrs.review(Card.builder().cardId(3).build(), 1, T0);
-            c.ok("harder rating -> higher difficulty", again.getDifficulty() > good.getDifficulty());
-        });
-    }
+    private static final long DAY = 86400L;
 
-    private static void review(Check c) {
-        c.run("review", () -> {
-            long now = 1_000_000L;
-            Card card = Card.builder().cardId(10).build();
-            c.ok("starts new", card.getLastReview() == null);
-            c.close("retrievability of a new card is 0", 0.0, Fsrs.retrievability(card, 12345L), 1e-9);
-
-            Card good = Fsrs.review(card, 3, now);
-            c.ok("no longer new", good.getLastReview() != null);
-            c.same("reviewed at now", now, good.getLastReview().getEpochSecond());
-            double[] w = Fsrs.defaults().getParameters();
-            c.close("stability set", w[2], good.getStability(), 1e-9);
-            c.close("difficulty set", w[4] - Math.exp(w[5] * 2.0) + 1.0, good.getDifficulty(), 1e-9);
-
-            // A Good first answer stays in learning (1-min / 10-min steps), due
-            // not further than one step away.
-            c.same("first good stays learning", State.LEARNING, good.getState());
-            c.same("step is 1", 1, good.getStep());
-
-            // A repeated Good two days later graduates the card and grows stability.
-            long later = now + 2L * 86400L;
-            Card good2 = Fsrs.review(good, 3, later);
-            c.same("second good graduates", State.REVIEW, good2.getState());
-            c.ok("graduated step cleared", good2.getStep() == null);
-            c.ok("stability grows on success", good2.getStability() > good.getStability());
-            c.ok(
-                "graduation waits at least a day",
-                Duration.between(good2.getLastReview(), good2.getDue()).toDays() >= 1);
-
-            // An Again on a reviewed card, outside the same-day window, is a
-            // lapse: it lowers stability and sends the card back to relearn.
-            Card lapsed = Fsrs.review(good2, 1, later + 3L * 86400L);
-            c.ok("again lowers stability", lapsed.getStability() < good2.getStability());
-            c.same("again sends to relearn", State.RELEARNING, lapsed.getState());
-        });
-    }
-
-    /* --- the java-fsrs library's own canonical vectors, reproduced --- */
-
-    private static void libraryVectors(Check c) {
-        c.run("java-fsrs vectors", () -> {
-            // testReviewCard: the interval history for the chain
-            // G G G G G G A A G G G G G (fuzz off).
-            Scheduler sch =
-                Scheduler.builder()
-                    .parameters(JAVA_FSRS_1_PARAMETERS)
-                    .enableFuzzing(false)
-                    .build();
-            Rating[] ratings = {
-                Rating.GOOD, Rating.GOOD, Rating.GOOD, Rating.GOOD, Rating.GOOD, Rating.GOOD,
-                Rating.AGAIN, Rating.AGAIN, Rating.GOOD, Rating.GOOD, Rating.GOOD, Rating.GOOD,
-                Rating.GOOD,
-            };
-            Card card = Card.builder().cardId(100).build();
-            Instant rev = Instant.parse("2022-11-29T12:30:00Z");
-            List<Integer> ivlHistory = new ArrayList<>();
-            for (Rating rating : ratings) {
-                card = sch.reviewCard(card, rating, rev).getCard();
-                ivlHistory.add((int) ChronoUnit.DAYS.between(card.getLastReview(), card.getDue()));
-                rev = card.getDue();
-            }
-            List<Integer> expected =
-                Arrays.asList(0, 4, 14, 45, 135, 372, 0, 0, 2, 5, 10, 20, 40);
-            c.ok("interval history matches java-fsrs", expected.equals(ivlHistory));
-
-            // testMemoState: AGAIN G G G G G then G (fuzz on, stability/difficulty unaffected).
-            Scheduler sch2 =
-                Scheduler.builder()
-                    .parameters(JAVA_FSRS_1_PARAMETERS)
-                    .build();
-            Card memo = Card.builder().cardId(101).build();
-            Instant t = Instant.parse("2022-11-29T12:30:00Z");
-            Rating[] chain = {
-                Rating.AGAIN, Rating.GOOD, Rating.GOOD, Rating.GOOD, Rating.GOOD, Rating.GOOD,
-            };
-            int[] gaps = {0, 0, 1, 3, 8, 21};
-            for (int i = 0; i < chain.length; i++) {
-                t = t.plus(Duration.ofDays(gaps[i]));
-                memo = sch2.reviewCard(memo, chain[i], t).getCard();
-            }
-            memo = sch2.reviewCard(memo, Rating.GOOD, t).getCard();
-            c.close("memo state stability", 49.4472, memo.getStability(), 1e-4);
-            c.close("memo state difficulty", 6.8271, memo.getDifficulty(), 1e-4);
-
-            // testRepeatedCorrectReviews: ten same-instant Easy ratings floor difficulty at 1.0.
-            Scheduler sch3 =
-                Scheduler.builder().enableFuzzing(false).build();
-            Card floor = Card.builder().cardId(102).build();
-            for (int i = 0; i < 10; i++) {
-                floor =
-                    sch3
-                        .reviewCard(
-                            floor, Rating.EASY, Instant.parse("2022-11-29T12:30:00Z").plusNanos(i * 1000))
-                        .getCard();
-            }
-            c.close("repeated easy floors difficulty", 1.0, floor.getDifficulty(), 1e-9);
+    private static void newCards(Check c) {
+        c.run("new cards start from the script's initial state", () -> {
+            Card fresh = Card.builder().cardId(2).build();
+            Card again = Fsrs.review(fresh, 1, T0, 0, 10 * 3600L);
+            c.close("again stability", 0.21, again.getStability(), 0);
+            c.close("again difficulty", 6.41, again.getDifficulty(), 0);
+            Card good = Fsrs.review(fresh, 3, T0, 0, 10 * 3600L);
+            c.close("good stability", 2.31, good.getStability(), 0);
+            c.close("good difficulty", 2.12, good.getDifficulty(), 0);
+            c.same("good stays learning", State.LEARNING, good.getState());
+            c.same("good moves to the second step", 1, good.getStep());
+            Card easy = Fsrs.review(fresh, 4, T0, 0, 10 * 3600L);
+            c.close("easy stability", 8.3, easy.getStability(), 0);
+            c.close("easy difficulty", 1.0, easy.getDifficulty(), 0);
+            c.same("easy graduates", State.REVIEW, easy.getState());
+            long days = (easy.getDue().getEpochSecond() - T0) / DAY;
+            c.ok("easy waits 7 to 10 days: " + days, days >= 7 && days <= 10);
+            c.fails("rejects invalid rating", "between 1 and 4",
+                () -> Fsrs.review(fresh, 5, T0, 0, 10 * 3600L));
         });
     }
 
     private static void learningSteps(Check c) {
-        c.run("learning steps", () -> {
-            Scheduler sch =
-                Scheduler.builder().build();
-            Card card = Card.builder().cardId(200).build();
-            c.same("starts learning step 0", 0, card.getStep());
-
-            // GOOD -> step 1, still learning; a second GOOD graduates to review.
-            Card once = sch.reviewCard(card, Rating.GOOD, card.getDue()).getCard();
-            c.same("good -> step 1", 1, once.getStep());
-            Card twice = sch.reviewCard(once, Rating.GOOD, once.getDue()).getCard();
-            c.same("second good graduates", State.REVIEW, twice.getState());
-            c.ok("step cleared on graduation", twice.getStep() == null);
-
-            // AGAIN resets to step 0 and reschedules within the first 1-min step.
-            Card again = sch.reviewCard(card, Rating.AGAIN, card.getDue()).getCard();
-            c.same("again resets step", 0, again.getStep());
-            c.ok(
-                "again reschedules within the minute",
-                Duration.between(card.getDue(), again.getDue()).toMinutes() <= 1);
-
-            // EASY skips the steps entirely and graduates at once.
-            Card easy = sch.reviewCard(card, Rating.EASY, card.getDue()).getCard();
-            c.same("easy graduates at once", State.REVIEW, easy.getState());
-
-            // A scheduler with no learning steps serves long-term intervals right away.
-            Scheduler sch0 =
-                Scheduler.builder()
-                    .learningSteps(new Duration[0])
-                    .build();
-            Card r0 =
-                sch0
-                    .reviewCard(
-                        Card.builder().cardId(201).build(), Rating.AGAIN, card.getDue())
-                    .getCard();
-            c.same("no learning steps -> review", State.REVIEW, r0.getState());
-            c.ok(
-                "long-term interval at least a day",
-                Duration.between(r0.getLastReview(), r0.getDue()).toDays() >= 1);
+        c.run("Anki's steps, up to 25% (at most 5 minutes) later", () -> {
+            for (int id = 0; id < 200; id++) {
+                Card fresh = Card.builder().cardId(id).build();
+                long again = Fsrs.review(fresh, 1, T0, 0, 10 * 3600L).getDue().getEpochSecond() - T0;
+                long hard = Fsrs.review(fresh, 2, T0, 0, 10 * 3600L).getDue().getEpochSecond() - T0;
+                Card good = Fsrs.review(fresh, 3, T0, 0, 10 * 3600L);
+                long ten = good.getDue().getEpochSecond() - T0;
+                if (again < 60 || again >= 75 || hard < 330 || hard >= 412 || ten < 600 || ten >= 750) {
+                    c.ok("card " + id + ": again " + again + " hard " + hard + " good " + ten, false);
+                    return;
+                }
+                Card second = Fsrs.review(good, 2, T0 + ten, 0, 10 * 3600L);
+                long repeat = second.getDue().getEpochSecond() - T0 - ten;
+                c.ok("hard on the second step repeats it", repeat >= 600 && repeat < 750 && second.getStep() == 1);
+            }
+            Card relearning = Card.builder().cardId(9).state(State.RELEARNING).step(0)
+                .stability(3.0).difficulty(5.0).due(Instant.ofEpochSecond(T0))
+                .lastReview(Instant.ofEpochSecond(T0 - 600)).build();
+            long hard = Fsrs.review(relearning, 2, T0, 0, 10 * 3600L).getDue().getEpochSecond() - T0;
+            c.ok("hard on the lone relearning step waits half again: " + hard, hard >= 900 && hard < 1125);
+            Card good = Fsrs.review(relearning, 3, T0, 0, 10 * 3600L);
+            c.same("good after the lone relearning step graduates", State.REVIEW, good.getState());
         });
     }
 
-    private static void correctedFsrsEdges(Check c) {
-        c.run("corrected FSRS edges", () -> {
-            Scheduler sch =
-                Scheduler.builder()
-                    .learningSteps(new Duration[]{Duration.ofMinutes(1)})
-                    .relearningSteps(
-                        new Duration[]{Duration.ofMinutes(2), Duration.ofMinutes(20)})
-                    .enableFuzzing(false)
-                    .build();
-            Instant now = Instant.ofEpochSecond(T0);
-            Card relearning =
-                Card.builder()
-                    .cardId(250)
-                    .state(State.RELEARNING)
-                    .step(0)
-                    .stability(5.0)
-                    .difficulty(5.0)
-                    .due(now)
-                    .lastReview(now)
-                    .build();
-            Card hard = sch.reviewCard(relearning, Rating.HARD, now).getCard();
-            c.same(
-                "custom relearning Hard averages relearning steps",
-                11L,
-                Duration.between(hard.getLastReview(), hard.getDue()).toMinutes());
-            c.ok("same-day Hard does not lower stability", hard.getStability() >= 5.0);
+    private static void hardInLearning(Check c) {
+        c.run("Hard in learning lowers stability, as the script's does", () -> {
+            Card fresh = Card.builder().cardId(3).build();
+            Card good = Fsrs.review(fresh, 3, T0, 0, 10 * 3600L);
+            Card hard = Fsrs.review(good, 2, T0 + 600, 0, 10 * 3600L);
+            c.close("hard: 2.31 -> 1.34", 1.34, hard.getStability(), 0);
+            Card graduated = Fsrs.review(hard, 3, T0 + 1200, 0, 10 * 3600L);
+            c.close("good: short-term growth", 1.38, graduated.getStability(), 0);
+            c.same("graduates", State.REVIEW, graduated.getState());
+            c.same("in a day", T0 + 1200 + DAY, graduated.getDue().getEpochSecond());
+        });
+    }
 
-            c.fails(
-                "rejects wrong parameter count",
-                "21 parameters",
-                () -> Scheduler.builder()
-                    .parameters(new double[20])
-                    .build());
-            c.fails(
-                "rejects invalid rating",
-                "between 1 and 4",
-                () -> Fsrs.review(Card.builder().cardId(251).build(), 5, T0));
+    private static void learningIsShortTermOvernight(Check c) {
+        c.run("learning stays short-term even days later", () -> {
+            Card learning = Card.builder().cardId(4).state(State.LEARNING).step(1)
+                .stability(2.31).difficulty(5.0).due(Instant.ofEpochSecond(T0 + 600))
+                .lastReview(Instant.ofEpochSecond(T0)).build();
+            Card good = Fsrs.review(learning, 3, T0 + 3 * DAY, 3, 10 * 3600L);
+            c.close("good keeps 2.31", 2.31, good.getStability(), 0);
+            c.same("graduates at 2 days", T0 + 5 * DAY, good.getDue().getEpochSecond());
+        });
+    }
+
+    private static void stepPastTheRollover(Check c) {
+        c.run("a step past the rollover waits for the next day", () -> {
+            Card fresh = Card.builder().cardId(5).build();
+            Card good = Fsrs.review(fresh, 3, T0, 0, 300);
+            c.same("due as the day starts", T0 + 300, good.getDue().getEpochSecond());
+            Card again = Fsrs.review(fresh, 1, T0, 0, 300);
+            long wait = again.getDue().getEpochSecond() - T0;
+            c.ok("a minute still fits: " + wait, wait >= 60 && wait < 75);
+        });
+    }
+
+    private static void reviewsCountAnkiDays(Check c) {
+        c.run("a review counts Anki days, not 24 hours", () -> {
+            // answered at 23:00 UTC, a day's interval; studied again at 09:00
+            long last = NOON + 11 * 3600L;
+            Deck deck = deckOf(1);
+            DeckCard card = deck.cards().get(0);
+            card.fsrs = Card.builder().cardId(6).state(State.REVIEW).stability(1.0).difficulty(5.0)
+                .due(Instant.ofEpochSecond(last + DAY)).lastReview(Instant.ofEpochSecond(last)).build();
+            ReviewSession s = session(deck);
+            long morning = last + 10 * 3600L;
+            Card good = s.preview(card.fsrs, 3, morning);
+            c.close("a day has passed: 1 -> 4.23", 4.23, good.getStability(), 0);
+            long days = (good.getDue().getEpochSecond() - morning) / DAY;
+            c.ok("3 to 5 days: " + days, days >= 3 && days <= 5);
+            Card sameDay = s.preview(card.fsrs, 3, last + 3600L);
+            c.close("before the rollover, no time has passed", 1.0, sameDay.getStability(), 0);
+            c.ok("recall then is 1", s.recall(card.fsrs, last + 3600L) == 1.0);
+            c.close("recall the next morning is 0.9", 0.9, s.recall(card.fsrs, morning), 1e-9);
+        });
+    }
+
+    private static void sameDayReview(Check c) {
+        c.run("a review card answered the same day counts recall as 1", () -> {
+            Card card = reviewed(10.0, 5.0, T0);
+            Card good = Fsrs.review(card, 3, T0 + 3600, 0, 10 * 3600L);
+            c.close("good leaves stability", 10.0, good.getStability(), 0);
+            Card again = Fsrs.review(card, 1, T0 + 3600, 0, 10 * 3600L);
+            c.close("again: the lapse formula at recall 1", Fsrs.nextForgetStability(5.0, 10.0, 1.0),
+                again.getStability(), 0);
+            c.close("which is 1.18", 1.18, again.getStability(), 0);
+        });
+    }
+
+    private static void buttonsInOrder(Check c) {
+        c.run("Hard <= Good < Easy, Good never below the last interval", () -> {
+            for (int id = 0; id < 300; id++) {
+                Card card = Card.builder().cardId(id).state(State.REVIEW).stability(0.5)
+                    .difficulty(9.0).due(Instant.ofEpochSecond(T0 + DAY))
+                    .lastReview(Instant.ofEpochSecond(T0)).build();
+                long now = T0 + DAY;
+                long hard = days(Fsrs.review(card, 2, now, 1, 10 * 3600L), now);
+                long good = days(Fsrs.review(card, 3, now, 1, 10 * 3600L), now);
+                long easy = days(Fsrs.review(card, 4, now, 1, 10 * 3600L), now);
+                if (!(hard >= 1 && good > hard && easy > good)) {
+                    c.ok("card " + id + ": " + hard + " " + good + " " + easy, false);
+                    return;
+                }
+            }
+            c.ok("in order", true);
         });
     }
 
     private static void fuzz(Check c) {
-        c.run("fuzz", () -> {
-            // At S=7 and desired retention 0.9, the unfuzzed interval is seven
-            // days. Reference fuzz bounds for seven days are [5, 9].
-            int[] seeds = {0, 1, 42, 12345, Integer.MAX_VALUE};
-            for (int seed : seeds) {
-                Scheduler sch =
-                    Scheduler.builder()
-                        .randomSeedNumber(seed)
-                        .build();
-                Instant t = Instant.parse("2022-11-29T12:30:00Z");
-                Card card = reviewed(7.0, 5.0, t.getEpochSecond());
-                card = sch.reviewCard(card, Rating.GOOD, t).getCard();
-                int intervalDays = (int) Duration.between(card.getLastReview(), card.getDue()).toDays();
-                c.ok("fuzz seed " + seed + " stays in bounds", intervalDays >= 5 && intervalDays <= 9);
+        c.run("fuzz: 5% and a day either side", () -> {
+            int lo = Integer.MAX_VALUE;
+            int hi = 0;
+            for (int id = 0; id < 400; id++) {
+                // stability 40, answered on time: Good alone would be 120ish days
+                Card card = Card.builder().cardId(id).state(State.REVIEW).stability(100.0)
+                    .difficulty(5.0).due(Instant.ofEpochSecond(T0 + 100 * DAY))
+                    .lastReview(Instant.ofEpochSecond(T0)).build();
+                long now = T0 + 100 * DAY;
+                int raw = Fsrs.nextInterval(Fsrs.nextRecallStability(5.0, 100.0,
+                    Fsrs.forgettingCurve(100, 100.0), 3), 0.5, -1);
+                int got = (int) days(Fsrs.review(card, 3, now, 100, 10 * 3600L), now);
+                lo = Math.min(lo, got - raw);
+                hi = Math.max(hi, got - raw);
+            }
+            c.ok("spread " + lo + ".." + hi, lo >= -Math.round(0.05 * 300 + 1) && hi <= Math.round(0.05 * 300 + 1) && hi > lo);
+            for (int id = 0; id < 200; id++) {
+                // Good, a day late on a 10-day card, may not drop to 10 or under
+                Card card = Card.builder().cardId(id).state(State.REVIEW).stability(4.0)
+                    .difficulty(8.0).due(Instant.ofEpochSecond(T0 + 10 * DAY))
+                    .lastReview(Instant.ofEpochSecond(T0)).build();
+                long now = T0 + 11 * DAY;
+                long good = days(Fsrs.review(card, 3, now, 11, 10 * 3600L), now);
+                if (good <= 10) {
+                    c.ok("card " + id + " grew to only " + good, false);
+                    return;
+                }
+            }
+            c.ok("grown intervals clear the last one", true);
+        });
+    }
+
+    /**
+     * Answers fsrs4anki_scheduler.js v6.1.1 gave, run in Node on these
+     * cards (state, stability, difficulty, Anki days elapsed, interval and
+     * rating in; stability and difficulty out).
+     */
+    private static void scriptVectors(Check c) {
+        c.run("the script's own answers", () -> {
+            double[][] v = {
+                // state, s, d, elapsed, scheduled, rating -> s, d (state 2 review, 1 learning)
+                {2, 39.21, 6.86, 37, 33, 1, 2.53, 8.96},
+                {2, 39.21, 6.86, 37, 33, 2, 66.59, 7.91},
+                {2, 39.21, 6.86, 37, 33, 3, 84.73, 6.85},
+                {2, 39.21, 6.86, 37, 33, 4, 124.47, 5.8},
+                {2, 3.5, 2, 12, 4, 1, 0.96, 7.36},
+                {2, 3.5, 2, 12, 4, 2, 21.05, 4.68},
+                {2, 3.5, 2, 12, 4, 3, 32.68, 2},
+                {2, 3.5, 2, 12, 4, 4, 58.15, 1},
+                {2, 250, 9.5, 120, 200, 1, 4.65, 9.83},
+                {2, 250, 9.5, 120, 200, 2, 277.49, 9.66},
+                {2, 250, 9.5, 120, 200, 3, 295.71, 9.49},
+                {2, 250, 9.5, 120, 200, 4, 335.6, 9.32},
+                {1, 2.31, 2.12, 0, 0, 1, 0.78, 7.4},
+                {1, 2.31, 2.12, 0, 0, 2, 1.34, 4.76},
+                {1, 2.31, 2.12, 0, 0, 3, 2.31, 2.12},
+                {1, 2.31, 2.12, 0, 0, 4, 3.95, 1},
+                {1, 0.21, 6.41, 0, 0, 1, 0.08, 8.81},
+                {1, 0.21, 6.41, 0, 0, 2, 0.14, 7.61},
+                {1, 0.21, 6.41, 0, 0, 3, 0.24, 6.4},
+                {1, 0.21, 6.41, 0, 0, 4, 0.42, 5.2},
+            };
+            for (double[] x : v) {
+                int rating = (int) x[5];
+                double s = x[1];
+                double d = x[2];
+                double gotS;
+                double gotD = Fsrs.nextDifficulty(d, rating);
+                if (x[0] == 2) {
+                    double r = Fsrs.forgettingCurve(x[3], s);
+                    gotS = rating == 1 ? Fsrs.nextForgetStability(d, s, r)
+                        : Fsrs.nextRecallStability(d, s, r, rating);
+                } else {
+                    gotS = Fsrs.shortTermStability(s, rating);
+                }
+                c.close("stability " + Arrays.toString(x), x[6], gotS, 0);
+                c.close("difficulty " + Arrays.toString(x), x[7], gotD, 0);
             }
         });
     }
 
-    private static void stabilityFloor(Check c) {
-        c.run("stability floor", () -> {
-            // Stability never dips under the library's STABILITY_MIN across a
-            // thousand daily-late lapses.
-            Scheduler sch =
-                Scheduler.builder().build();
-            Card card = Card.builder().cardId(400).build();
-            boolean bounded = true;
-            for (int i = 0; i < 1000; i++) {
-                card = sch.reviewCard(card, Rating.AGAIN, card.getDue().plus(Duration.ofDays(1))).getCard();
-                if (card.getStability() < Scheduler.STABILITY_MIN) {
-                    bounded = false;
-                }
-            }
-            c.ok("stability bounded below", bounded);
+    private static void lapses(Check c) {
+        c.run("Again on a review relearns, and S = 0.00 starts over", () -> {
+            Card card = reviewed(20.0, 5.0, T0);
+            Card again = Fsrs.review(card, 1, T0 + 20 * DAY, 20, 10 * 3600L);
+            c.same("relearning", State.RELEARNING, again.getState());
+            c.same("first step", 0, again.getStep());
+            long wait = again.getDue().getEpochSecond() - T0 - 20 * DAY;
+            c.ok("ten minutes, give or take: " + wait, wait >= 600 && wait < 750);
+            c.ok("stability falls", again.getStability() < 20.0);
+            Card spent = Card.builder().cardId(7).state(State.LEARNING).step(0).stability(0.0)
+                .difficulty(9.0).due(Instant.ofEpochSecond(T0)).lastReview(Instant.ofEpochSecond(T0)).build();
+            Card restarted = Fsrs.review(spent, 1, T0 + 60, 0, 10 * 3600L);
+            c.close("from Again's initial state", Fsrs.shortTermStability(0.21, 1), restarted.getStability(), 0);
+            c.close("difficulty too", Fsrs.nextDifficulty(6.41, 1), restarted.getDifficulty(), 0);
         });
+    }
+
+    private static void rounding(Check c) {
+        c.run("two decimals throughout, as the script keeps them", () -> {
+            Random rng = new Random(7);
+            Card card = Card.builder().cardId(8).build();
+            long now = T0;
+            for (int i = 0; i < 300; i++) {
+                card = Fsrs.review(card, 1 + rng.nextInt(4), now, i % 3, 10 * 3600L);
+                double s = card.getStability() * 100;
+                double d = card.getDifficulty() * 100;
+                if (Math.abs(s - Math.rint(s)) > 1e-6 || Math.abs(d - Math.rint(d)) > 1e-6) {
+                    c.ok("answer " + i + ": " + card, false);
+                    return;
+                }
+                now = Math.max(now + 60, card.getDue().getEpochSecond());
+            }
+            c.close("round2 halves up", 2.13, Fsrs.round2(2.125), 0);
+            c.close("round2 of 0.005 as a double", 0.01, Fsrs.round2(0.005000000000000001), 0);
+            c.close("round2 of 1.005 as a double (1.00499...)", 1.0, Fsrs.round2(1.005), 0);
+        });
+    }
+
+    private static long days(Card card, long now) {
+        return (card.getDue().getEpochSecond() - now) / DAY;
     }
 
     /* --- the Anki queue --- */
@@ -321,12 +321,8 @@ public final class AlgoTests {
 
     private static final long T0 = 1_000_000_000L;
     private static final Random RNG = new Random(42L);
-    private static final double[] JAVA_FSRS_1_PARAMETERS = {
-        0.2172, 1.1771, 3.2602, 16.1507, 7.0114, 0.57, 2.0966, 0.0069, 1.5261, 0.112,
-        1.0178, 1.849, 0.1133, 0.3127, 2.2934, 0.2191, 3.0004, 0.7536, 0.3332, 0.1437, 0.2
-    };
 
-    /** A reviewed card in the library's REVIEW state with canned memory. */
+    /** A review card with canned memory, answered at `lastSeconds` and due then. */
     private static Card reviewed(double stability, double difficulty, long lastSeconds) {
         return Card.builder()
             .state(State.REVIEW)
@@ -452,7 +448,7 @@ public final class AlgoTests {
             c.ok("learn ahead serves it when nothing else is left", s.next(NOON + 1) == card);
             s.rate(3, NOON + 60);
             long due = card.fsrs.getDue().getEpochSecond();
-            c.same("good goes to the 10m step", NOON + 60 + 600, due);
+            c.ok("good goes to the 10m step, give or take", due >= NOON + 60 + 600 && due < NOON + 60 + 750);
             c.same("next learning due", due, s.nextLearningDue(NOON + 60));
             c.ok("served again once due", s.next(due) == card);
             s.rate(3, due);
@@ -467,11 +463,11 @@ public final class AlgoTests {
             card.fsrs = reviewed(30.0, 5.0, NOON - 30L * 86400L);
             ReviewSession s = session(deck);
             s.next(NOON);
-            Card shown = ReviewSession.preview(card.fsrs, 3, NOON);
+            Card shown = s.preview(card.fsrs, 3, NOON);
             s.rate(3, NOON);
             c.same("same due as previewed", shown.getDue(), card.fsrs.getDue());
-            Card hard = ReviewSession.preview(shown, 2, NOON + 40L * 86400L);
-            Card easy = ReviewSession.preview(shown, 4, NOON + 40L * 86400L);
+            Card hard = s.preview(shown, 2, NOON + 40L * 86400L);
+            Card easy = s.preview(shown, 4, NOON + 40L * 86400L);
             c.ok("easy waits longer than hard", easy.getDue().isAfter(hard.getDue()));
         });
     }
