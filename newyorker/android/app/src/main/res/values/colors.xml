@@ -4,7 +4,6 @@
 <resources>
     <color name="page">#FFFFFF</color>
     <color name="ink">#231F20</color>
-    <color name="ink_soft">#4A4646</color>
     <color name="muted">#6F6B6B</color>
     <color name="rule">#DADADA</color>
     <color name="cream">#F6F4EF</color>

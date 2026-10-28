@@ -69,10 +69,6 @@ final class Look {
         }
     }
 
-    static int dp(Context context, float value) {
-        return Math.round(value * context.getResources().getDisplayMetrics().density);
-    }
-
     static TextView text(Context context, Typeface face, float sp, int colorRes) {
         TextView view = new TextView(context);
         view.setTypeface(face);

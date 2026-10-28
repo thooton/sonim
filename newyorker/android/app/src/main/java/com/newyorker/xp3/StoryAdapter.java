@@ -14,6 +14,7 @@ import com.newyorker.xp3.news.Feed;
 import com.newyorker.xp3.news.Story;
 
 import java.util.ArrayList;
+import com.xp3.common.ui.Ui;
 import java.util.List;
 
 /**
@@ -142,7 +143,7 @@ final class StoryAdapter extends BaseAdapter {
     }
 
     private int dp(float value) {
-        return Look.dp(context, value);
+        return Ui.dp(context, value);
     }
 
     private View title(String text, View convert) {
