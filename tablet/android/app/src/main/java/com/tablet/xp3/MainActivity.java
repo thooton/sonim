@@ -2,7 +2,6 @@ package com.tablet.xp3;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -13,7 +12,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextPaint;
@@ -24,9 +22,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.tablet.xp3.data.Browse;
@@ -42,6 +38,7 @@ import com.xp3.common.Disk;
 import com.xp3.common.Login;
 import com.xp3.common.ui.Card;
 import com.xp3.common.ui.CardGrant;
+import com.xp3.common.ui.Logins;
 import com.xp3.common.ui.Ui;
 
 import java.io.File;
@@ -153,7 +150,7 @@ public final class MainActivity extends Activity {
         worker = Ui.worker("tablet");
         pages = new Pages(this);
         pages.onChange(() -> library.shelf.invalidate());
-        login = loadLogin(prefs());
+        login = Logins.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         signIn();
         String saved = Disk.read(listingFile(), 8000000);
         if (saved != null) {
@@ -234,27 +231,6 @@ public final class MainActivity extends Activity {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
     }
 
-    /**
-     * The bundled login is adopted once per build that carries a new one;
-     * otherwise whatever was saved (perhaps typed in from Settings) is kept.
-     */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
-
     private void signIn() {
         tablet = login.ready() ? new Center(login) : null;
         pages.signIn(tablet);
@@ -262,43 +238,14 @@ public final class MainActivity extends Activity {
 
     /** The fallback for a build without a bundled login, and for moving to another command center. */
     private void askLogin() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        int pad = Look.dp(this, 12);
-        box.setPadding(pad, pad / 2, pad, 0);
-        final EditText server = new EditText(this);
-        server.setHint("https://…");
-        server.setSingleLine(true);
-        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(login.server() == null ? "" : login.server());
-        final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "••••••••" : "Token");
-        token.setSingleLine(true);
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        box.addView(server);
-        box.addView(token);
-        new AlertDialog.Builder(this)
-            .setTitle("Command center")
-            .setView(box)
-            .setPositiveButton("Save", (dialog, which) -> {
-                String typed = token.getText().toString();
-                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                try {
-                    Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                    login = next;
-                    prefs().edit().putString("login", next.toJson()).apply();
-                    signIn();
-                    say("", "Signed in to " + next.host());
-                    refresh();
-                } catch (IllegalArgumentException e) {
-                    say("", e.getMessage());
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
+        Logins.ask(this, login, next -> {
+            login = next;
+            Logins.save(prefs(), next);
+            signIn();
+            say("", "Signed in to " + next.host());
+            refresh();
+        }, why -> say("", why));
     }
-
     // ---- Reading the tablet.
 
     private File listingFile() {

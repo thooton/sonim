@@ -9,10 +9,8 @@ import com.xp3.common.Login;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -123,7 +121,7 @@ public final class Center {
                     : pages + (pages == 1 ? " page" : " pages"));
             }
             if (status < 200 || status >= 300) fail(status, small(stream.stream()), "show the page");
-            save(stream.stream(), dest, MAX_PAGE, "Page too big to show");
+            stream.save(dest, MAX_PAGE, "Page too big to show", "Couldn't save the file");
             return Math.max(pages, n);
         } finally {
             stream.close();
@@ -140,7 +138,7 @@ public final class Center {
         try {
             int status = stream.status();
             if (status < 200 || status >= 300) fail(status, small(stream.stream()), "download it");
-            save(stream.stream(), dest, MAX_FILE, "File too big");
+            stream.save(dest, MAX_FILE, "File too big", "Couldn't save the file");
         } finally {
             stream.close();
         }
@@ -176,32 +174,9 @@ public final class Center {
             int status = stream.status();
             if (status == 404) throw new IOException("File not found");
             if (status < 200 || status >= 300) fail(status, small(stream.stream()), "download it");
-            save(stream.stream(), dest, MAX_FILE, "File too big");
+            stream.save(dest, MAX_FILE, "File too big", "Couldn't save the file");
         } finally {
             stream.close();
-        }
-    }
-
-    /** Writes `in` to `dest` through a part file, so a broken download leaves nothing behind. */
-    private static void save(InputStream in, File dest, long max, String tooBig) throws IOException, InterruptedException {
-        File part = new File(dest.getPath() + ".part");
-        long total = 0;
-        boolean saved = false;
-        OutputStream out = new FileOutputStream(part);
-        try {
-            byte[] buffer = new byte[64 * 1024];
-            for (int count; (count = in.read(buffer)) != -1; ) {
-                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-                total += count;
-                if (total > max) throw new IOException(tooBig);
-                out.write(buffer, 0, count);
-            }
-            out.close();
-            saved = part.renameTo(dest);
-            if (!saved) throw new IOException("Couldn't save the file");
-        } finally {
-            out.close();
-            if (!saved) part.delete();
         }
     }
 
