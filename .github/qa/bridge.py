@@ -306,7 +306,19 @@ class Bridge:
             return json.loads(resp.read() or b"{}")
 
     def hello(self):
-        return self.call("POST", "/qa/device/hello", {"runner": self.args.runner, "run": self.args.run, "serials": self.serials})
+        """Says the emulators are ready, trying for a few minutes if the
+        command center is out of reach (restarting after an update, say)."""
+        for attempt in range(12):
+            try:
+                return self.call("POST", "/qa/device/hello", {"runner": self.args.runner, "run": self.args.run, "serials": self.serials})
+            except urllib.error.HTTPError as e:
+                if e.code in (401, 403):
+                    raise
+                log("hello failed:", e.code)
+            except Exception as e:
+                log("hello failed:", type(e).__name__)
+            time.sleep(min(60, 5 * (attempt + 1)))
+        raise RuntimeError("the command center is out of reach")
 
     def serve(self):
         started = time.time()
