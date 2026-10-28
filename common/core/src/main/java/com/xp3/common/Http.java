@@ -2,6 +2,8 @@ package com.xp3.common;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -363,6 +365,61 @@ public final class Http {
 
         public InputStream stream() {
             return stream;
+        }
+
+        /**
+         * The whole body, failing with `tooLarge` once it passes `max` bytes,
+         * and checking between reads that the work wasn't cancelled.
+         */
+        public byte[] bytes(int max, String tooLarge) throws IOException, InterruptedException {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[16384];
+            for (int count; (count = stream.read(buffer)) >= 0; ) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                out.write(buffer, 0, count);
+                if (out.size() > max) throw new IOException(tooLarge);
+            }
+            return out.toByteArray();
+        }
+
+        /**
+         * Copies the body to `out`, failing with `tooLarge` once it passes
+         * `max` bytes (or says it will), and telling `progress`, which may be
+         * null, how far it has got.
+         */
+        public void copy(OutputStream out, long max, String tooLarge, Sending progress)
+            throws IOException, InterruptedException {
+            if (length > max) throw new IOException(tooLarge);
+            long done = 0;
+            byte[] buffer = new byte[32768];
+            for (int count; (count = stream.read(buffer)) >= 0; ) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                done += count;
+                if (done > max) throw new IOException(tooLarge);
+                out.write(buffer, 0, count);
+                if (progress != null) progress.sent(done, length);
+            }
+        }
+
+        /**
+         * Writes the body to `dest` through a part file, so a broken download
+         * leaves nothing behind: `tooLarge` past `max` bytes, `unsaved` when
+         * the finished file can't be put in place.
+         */
+        public void save(File dest, long max, String tooLarge, String unsaved)
+            throws IOException, InterruptedException {
+            File part = new File(dest.getPath() + ".part");
+            boolean saved = false;
+            OutputStream out = new FileOutputStream(part);
+            try {
+                copy(out, max, tooLarge, null);
+                out.close();
+                saved = part.renameTo(dest);
+                if (!saved) throw new IOException(unsaved);
+            } finally {
+                out.close();
+                if (!saved) part.delete();
+            }
         }
 
         /**
