@@ -39,10 +39,6 @@ public final class Checklist {
         if (initial != null) items = bounded(initial);
     }
 
-    public synchronized Snapshot snapshot() {
-        return new Snapshot(Collections.unmodifiableList(new ArrayList<Item>(items)), version);
-    }
-
     public synchronized List<Item> items() {
         return Collections.unmodifiableList(new ArrayList<Item>(items));
     }
