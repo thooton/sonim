@@ -533,9 +533,9 @@ public class MainActivity extends Activity {
         if (found < 0 || (!dictionary.word(found).equals(q) && dictionary.word(found).startsWith(q))) {
             // Only a word it begins: a word only the shorthand has (into) comes first.
             int exact = pageOf(q);
-            if (exact >= 0) found = exact;
+            if (exact != -1) found = exact;
         }
-        if (found >= 0) {
+        if (found != -1) {
             found(found, DEFINITIONS);
             return;
         }
