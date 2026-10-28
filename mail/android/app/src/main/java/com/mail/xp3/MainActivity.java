@@ -59,6 +59,7 @@ import com.mail.xp3.net.Mime;
 import com.mail.xp3.net.Outgoing;
 import com.mail.xp3.net.People;
 import com.xp3.common.Login;
+import com.xp3.common.ui.LoginDialog;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Card;
 import com.xp3.common.ui.Family;
@@ -263,7 +264,7 @@ public final class MainActivity extends BaseActivity {
         offerPeople(ccField);
 
         SharedPreferences prefs = prefs();
-        login = loadLogin(prefs);
+        login = LoginDialog.load(prefs, Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         people = People.parse(prefs.getString("people", ""));
 
         Outgoing kept = Outgoing.parse(prefs.getString("compose", ""));
@@ -305,26 +306,6 @@ public final class MainActivity extends BaseActivity {
         super.onDestroy();
     }
 
-    /**
-     * The bundled login is adopted once per build that carries a new one;
-     * otherwise whatever was saved (perhaps typed in from the menu) is kept.
-     */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     private SharedPreferences prefs() {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
@@ -2204,61 +2185,18 @@ public final class MainActivity extends BaseActivity {
 
     /** The fallback for a build without a bundled login. */
     private void askLogin() {
-        LinearLayout box = vertical();
-        int pad = dp(12);
-        box.setPadding(pad, pad / 2, pad, 0);
-        final EditText server = new EditText(this);
-        server.setHint("https://…");
-        server.setSingleLine(true);
-        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(login.server() == null ? "" : login.server());
-        final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "••••••••" : "Token");
-        token.setSingleLine(true);
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        server.setImeOptions(EditorInfo.IME_ACTION_NEXT);
-        token.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        box.addView(server);
-        box.addView(token);
-        final AlertDialog ask = new AlertDialog.Builder(this)
-            .setTitle("Command center")
-            .setView(box)
-            .setPositiveButton("Save", null)
-            .setNegativeButton("Cancel", null)
-            .create();
-        final Runnable save = () -> {
-            String typed = token.getText().toString();
-            if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-            try {
-                Login next = Login.of(server.getText().toString(), typed);
-                if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                login = next;
-                if (gmail != null) gmail.close();
-                gmail = null;
-                me = null;
-                labelsLoaded = false;
-                whole.clear();
-                counts.clear();
-                countsAt = 0;
-                prefs().edit().putString("login", next.toJson()).apply();
-                ask.dismiss();
-                say("Saved: " + next.host());
-                if (screen == LIST) load();
-            } catch (IllegalArgumentException e) {
-                // The dialog stays, keeping what was typed for correcting.
-                toast(e.getMessage());
-            }
-        };
-        Map<EditText, Runnable> ok = new HashMap<EditText, Runnable>();
-        ok.put(server, () -> {
-            token.requestFocus();
-            token.setSelection(token.length());
+        LoginDialog.show(this, prefs(), login, next -> {
+            login = next;
+            if (gmail != null) gmail.close();
+            gmail = null;
+            me = null;
+            labelsLoaded = false;
+            whole.clear();
+            counts.clear();
+            countsAt = 0;
+            say("Saved: " + next.host());
+            if (screen == LIST) load();
         });
-        ok.put(token, save);
-        driveDialog(ask, ok);
-        ask.show();
-        // Save closes the dialog only once the login is taken.
-        ask.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> save.run());
     }
 
     // ---- Adapters ----
