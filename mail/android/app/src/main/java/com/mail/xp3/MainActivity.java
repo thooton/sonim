@@ -2117,7 +2117,7 @@ public final class MainActivity extends BaseActivity {
             field.setSelection(field.length());
         }
         box.addView(field);
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        final AlertDialog asked = new AlertDialog.Builder(this)
             .setTitle("Search mail")
             .setView(box)
             .setPositiveButton("Search", (dialog, which) -> {
@@ -2126,7 +2126,7 @@ public final class MainActivity extends BaseActivity {
             })
             .setNegativeButton("Cancel", null)
             .show();
-        onOk(field, () -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick());
+        onOk(field, () -> asked.getButton(AlertDialog.BUTTON_POSITIVE).performClick());
     }
 
     /** The fallback for a build without a bundled login. */
@@ -2145,7 +2145,7 @@ public final class MainActivity extends BaseActivity {
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);
         box.addView(token);
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        final AlertDialog asked = new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
             .setPositiveButton("Save", (dialog, which) -> {
@@ -2172,7 +2172,7 @@ public final class MainActivity extends BaseActivity {
             .setNegativeButton("Cancel", null)
             .show();
         onOk(server, token::requestFocus);
-        onOk(token, () -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick());
+        onOk(token, () -> asked.getButton(AlertDialog.BUTTON_POSITIVE).performClick());
     }
 
     /**
