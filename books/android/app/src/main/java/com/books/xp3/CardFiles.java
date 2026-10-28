@@ -69,7 +69,7 @@ final class CardFiles implements Shelf.Reader {
     public File readable(File file) throws IOException {
         if (canOpen(file)) return file;
         Uri doc = document(file);
-        if (doc == null) throw new FileNotFoundException("Can’t read " + file.getName());
+        if (doc == null) throw new FileNotFoundException("Can’t read it");
         synchronized (LOCK) {
             // Under its own name, so the reader is chosen and titled as for the book.
             File dir = new File(copies, key(file));
@@ -79,14 +79,14 @@ final class CardFiles implements Shelf.Reader {
                 return copy;
             }
             prune();
-            if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Can’t copy " + file.getName());
+            if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Can’t copy it");
             InputStream in;
             try {
                 in = resolver.openInputStream(doc);
             } catch (IOException | RuntimeException e) {
                 in = null;
             }
-            if (in == null) throw new FileNotFoundException("Can’t read " + file.getName());
+            if (in == null) throw new FileNotFoundException("Can’t read it");
             try {
                 OutputStream out = new FileOutputStream(copy);
                 try {

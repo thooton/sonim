@@ -269,6 +269,15 @@ public final class BookTests {
         check.same("fallback title", "Lines", lines.title);
         check.same("a paragraph per line", 3, lines.sections.get(0).paragraphs.size());
 
+        // Long hard-wrapped paragraphs, few blank lines: still joined.
+        StringBuilder wrapped = new StringBuilder();
+        for (int p = 0; p < 3; p++) {
+            for (int l = 0; l < 11; l++) wrapped.append("words words words words words words words words words words wo\n");
+            wrapped.append("end.\n\n");
+        }
+        Book prose = PlainText.parse(wrapped.toString(), "Prose");
+        check.same("long wrapped paragraphs", 3, prose.sections.get(0).paragraphs.size());
+
         byte[] cp1252 = {(byte) 'C', (byte) 'a', (byte) 'f', (byte) 0xE9, (byte) ' ', (byte) 0x93, (byte) 'q', (byte) 0x94};
         check.same("windows-1252", "Caf\u00E9 \u201Cq\u201D", PlainText.decode(cp1252));
         check.same("utf-8 bom", "x", PlainText.decode(new byte[] {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF, 'x'}));

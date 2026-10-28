@@ -68,8 +68,6 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
     private Runnable afterWrite;
     private final Runnable clearNotice = () -> view.setNotice(converting ? "Converting\u2026" : null);
     private boolean scanning;
-    /** Set when a book is opened, so the list comes back with it on top. */
-    private boolean returning;
     private Shelf.Entry menuBook;
 
     @Override
@@ -102,10 +100,6 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         List<Shelf.Entry> known = shelf.books();
         if (!known.isEmpty()) show(known);
         else if (!view.hasBooks()) view.setMessage("Looking for books\u2026", null);
-        if (returning) {
-            view.focusFirst();
-            returning = false;
-        }
         scan();
     }
 
@@ -290,7 +284,6 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         }
         final String path = book.path;
         Runnable open = () -> {
-            returning = true;
             Intent intent = new Intent(this, ReaderActivity.class);
             intent.putExtra(ReaderActivity.EXTRA_PATH, path);
             startActivity(intent);
@@ -466,12 +459,14 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
             try {
                 files.saveMobi(epub, mobi, new KindleImages());
                 MediaScannerConnection.scanFile(app, new String[] {mobi.getAbsolutePath()}, null, null);
-                said = "Saved " + mobi.getName();
+                said = "Saved as MOBI";
             } catch (FileNotFoundException e) {
-                // A message says the book couldn't be read; none, that the MOBI couldn't be written.
-                said = e.getMessage() != null ? e.getMessage() : "Couldn\u2019t save it beside the book";
+                // "Can't read it" is the book; anything else, the MOBI couldn't be written.
+                String message = e.getMessage();
+                said = message != null && message.startsWith("Can\u2019t read")
+                    ? message : "Couldn\u2019t save it beside the book";
             } catch (IOException e) {
-                said = e.getMessage() != null ? e.getMessage() : "Couldn\u2019t convert it";
+                said = "Couldn\u2019t convert it";
             } catch (RuntimeException | OutOfMemoryError e) {
                 said = "Couldn\u2019t convert it";
             }

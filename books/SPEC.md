@@ -70,14 +70,16 @@ Empty and waiting states, centred, title only:
 
 On every return to the library it shows the books it knows at once, then
 looks again in the background; new books appear, deleted ones disappear,
-and focus stays on the same book if it is still there. After reading a book,
-focus is on the first row (that book).
+and focus stays on the same book if it is still there, else on the row where
+it was (after a delete, the book that took its place). After reading a book,
+focus is on the first row (that book); a book that couldn't be opened stays
+where it was, focused.
 
 Notices replace the count for 5 seconds: "Deleted", "Couldn't delete it",
 "Not allowed to change storage", "Not allowed to use the SD card",
 "Already converting a book", "Converting…" (stays until the conversion ends),
-"Saved <name>.mobi", "Couldn't convert it", "Couldn't save it beside the
-book", or "Can't read <file>".
+"Saved as MOBI", "Couldn't convert it", "Couldn't save it beside the book", or
+"Can't read it". Each is short enough to show whole.
 
 ### Library action sheet
 
@@ -103,18 +105,20 @@ book and its place, and the notice says "Deleted".
 
 **Convert to MOBI** writes `<same name>.mobi` beside the EPUB (replacing an
 earlier one), off the main thread, one book at a time. The header says
-"Converting…" then "Saved <name>.mobi". The list stays usable meanwhile.
+"Converting…" then "Saved as MOBI". The list stays usable meanwhile.
 
 ### Reader
 
 Fullscreen, no status bar. "Opening…" in dim grey in the middle while the book
 loads; it then opens where it was left (the start for a new book; the last
-page for a finished one). A book that can't be read shows "This book can't be
-opened", with the reason flashed briefly over it.
+page for a finished one, which stays finished until a page is turned). A book
+that can't be read shows "This book can't be opened", with the reason flashed
+briefly over it ("Not an EPUB", "Can't read it", "Too large to open").
 
 The page: the text in the chosen font and size, soft white (`#E3E3E5`) on
 black, justified unless Justify is off, hyphenated; italic and bold kept;
-headings and scene breaks never left at the foot of a page. Bottom right,
+headings and scene breaks never left at the foot of a page, and set centred,
+never justified, even over two lines. Bottom right,
 small and dim: the percentage through the book (rounded down, 0% to 100%).
 
 | Key | |
@@ -150,7 +154,7 @@ focus on the first row. Rows:
 Steppers stop at their ends. Up / Down (also 2 / 8) move, skipping the FONT
 header, and stop at the first and last rows; the sheet scrolls, with a thin
 scroll bar at the right. Every change shows on the page behind at once and
-keeps the place. Menu or Back closes the sheet. 1, 3, # and * do nothing here.
+keeps the place: changing a setting and back returns to the same page. Menu or Back closes the sheet. 1, 3, # and * do nothing here.
 
 ### Contents
 
@@ -190,7 +194,8 @@ Back or Menu returns to the page where it was (not to the settings sheet).
 - **Screen**: stays on in the reader until 5 minutes after the last key;
   then the phone's normal timeout applies. The library has no such hold.
 - **Plain text**: Gutenberg's header and licence footer are left out.
-  Paragraphs are split at blank lines (hard-wrapped lines joined), else one
+  Paragraphs are split at blank lines (hard-wrapped lines joined) when the
+  file has short paragraphs or its lines are wrapped to a width, else one
   per line; a short line such as "Chapter 7", "PART TWO" or "XIV." starts a
   chapter, which Contents lists. UTF-8, else Windows-1252. Files over 24 MB
   are refused ("This book can't be opened").

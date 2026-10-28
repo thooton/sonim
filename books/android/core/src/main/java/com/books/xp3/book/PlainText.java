@@ -12,6 +12,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -98,13 +99,17 @@ public final class PlainText {
     static List<String> paragraphs(String text) {
         String[] lines = text.trim().split("\n", -1);
         int blank = 0;
-        int filled = 0;
+        List<Integer> lengths = new ArrayList<Integer>();
         for (String line : lines) {
-            if (line.trim().length() == 0) blank++;
-            else filled++;
+            int length = line.trim().length();
+            if (length == 0) blank++;
+            else lengths.add(Integer.valueOf(length));
         }
-        // Blank lines between paragraphs, or a paragraph per line?
-        boolean byBlankLines = blank > 0 && blank * 8 >= filled;
+        int filled = lengths.size();
+        // Blank lines between paragraphs, or a paragraph per line? Short
+        // paragraphs give it away, and so do lines hard-wrapped to a width,
+        // however long the paragraphs they make.
+        boolean byBlankLines = blank > 0 && (blank * 8 >= filled || hardWrapped(lengths));
         List<String> out = new ArrayList<String>();
         StringBuilder current = new StringBuilder();
         for (String line : lines) {
@@ -124,6 +129,18 @@ public final class PlainText {
         }
         flush(current, out);
         return out;
+    }
+
+    /** Whether most lines run nearly to one width of at most 100 columns, as hard-wrapped text does. */
+    private static boolean hardWrapped(List<Integer> lengths) {
+        if (lengths.size() < 10) return false;
+        List<Integer> sorted = new ArrayList<Integer>(lengths);
+        Collections.sort(sorted);
+        int width = sorted.get(sorted.size() * 9 / 10).intValue();
+        if (width < 30 || width > 100) return false;
+        int near = 0;
+        for (Integer length : lengths) if (length.intValue() * 4 >= width * 3) near++;
+        return near * 5 >= lengths.size() * 3;
     }
 
     private static void flush(StringBuilder current, List<String> out) {
@@ -193,7 +210,7 @@ public final class PlainText {
     // ------------------------------------------------------------------
 
     static String read(File file) throws IOException {
-        if (file.length() > MAX_FILE) throw new IOException(file.getName() + " is too large to open");
+        if (file.length() > MAX_FILE) throw new IOException("Too large to open");
         InputStream in = new FileInputStream(file);
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream((int) Math.max(16, file.length()));

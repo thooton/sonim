@@ -79,12 +79,16 @@ final class LibraryView extends View {
         setBackgroundColor(color(R.color.page));
     }
 
-    /** Replaces the list, keeping the highlight on the same book if it is still there. */
+    /**
+     * Replaces the list, keeping the highlight on the same book if it is
+     * still there (a book just read has moved to the top), else on the row
+     * where it was.
+     */
     void setBooks(List<Shelf.Entry> list) {
         String kept = focused() != null ? focused().path : null;
         books.clear();
         books.addAll(list);
-        focus = 0;
+        focus = Math.max(0, Math.min(focus, books.size() - 1));
         if (kept != null) {
             for (int i = 0; i < books.size(); i++) {
                 if (books.get(i).path.equals(kept)) focus = i;
@@ -92,13 +96,6 @@ final class LibraryView extends View {
         }
         message = null;
         reveal();
-        invalidate();
-    }
-
-    /** Puts the highlight on the first book: the one last read. */
-    void focusFirst() {
-        focus = 0;
-        scroll = 0;
         invalidate();
     }
 

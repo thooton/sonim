@@ -161,9 +161,9 @@ public final class Epub {
             }
         }
         if (opfPath == null || find(zip, opfPath) == null) opfPath = firstWithSuffix(zip, ".opf");
-        if (opfPath == null) throw new IOException("Not an EPUB: it has no package document");
+        if (opfPath == null) throw new IOException("Not an EPUB");
         byte[] opf = bytes(zip, opfPath);
-        if (opf == null) throw new IOException("Not an EPUB: its package document cannot be read");
+        if (opf == null) throw new IOException("Not an EPUB");
 
         Package pkg = new Package();
         String base = directory(opfPath);
@@ -349,9 +349,9 @@ public final class Epub {
             try {
                 new FileInputStream(file).close();
             } catch (FileNotFoundException unreadable) {
-                throw new FileNotFoundException("Can\u2019t read " + file.getName());
+                throw new FileNotFoundException("Can\u2019t read it");
             }
-            throw new IOException("Not an EPUB: " + file.getName() + " is not a zip file");
+            throw new IOException("Not an EPUB");
         }
     }
 

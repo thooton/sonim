@@ -70,7 +70,11 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
     private FrameLayout root;
 
     private Book book;
-    /** Where reading is, as a book offset: the start of the page on screen. */
+    /**
+     * Where reading is, as a book offset: the start of the page on screen
+     * once a page is turned. A relayout keeps it as it was, so changing the
+     * size and back, or opening a finished book, doesn't move the place.
+     */
     private long position;
     private int sectionIndex = -1;
     private int page;
@@ -209,11 +213,19 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
 
     private void display() {
         if (book == null || width == 0) return;
-        goTo(position, false);
+        goTo(position, false, true);
     }
 
-    /** Shows the page holding `target`; with `last`, the last page of its section. */
-    private void goTo(final long target, final boolean last) {
+    private void goTo(long target, boolean last) {
+        goTo(target, last, false);
+    }
+
+    /**
+     * Shows the page holding `target`; with `last`, the last page of its
+     * section. With `keep`, the place stays `target` rather than becoming
+     * the start of that page.
+     */
+    private void goTo(final long target, final boolean last, final boolean keep) {
         final int index = book.sectionAt(target);
         waiting = true;
         laid(index, pages -> {
@@ -223,7 +235,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
             Section section = pages.section;
             if (last || target >= book.length) page = pages.count() - 1;
             else page = pages.pageOf((int) Math.max(0, target - section.start));
-            showPage();
+            showPage(keep);
             prefetch(index - 1);
             prefetch(index + 1);
         });
@@ -314,8 +326,12 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
     }
 
     private void showPage() {
+        showPage(false);
+    }
+
+    private void showPage(boolean keep) {
         Section section = current.section;
-        position = section.start + current.startOf(page);
+        if (!keep) position = section.start + current.startOf(page);
         pageView.setChrome(false);
         pageView.showPage(current, page);
         status();

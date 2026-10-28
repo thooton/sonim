@@ -121,7 +121,14 @@ final class Pages {
         int lineAdd = Math.max(-natural / 4, Math.round(line - natural));
 
         Pages[] self = new Pages[1];
-        SpannableString text = styled(assets, section, font, size, line, paint, self);
+        SpannableString text = styled(assets, section, section.text, font, size, line, paint, self);
+        // Justification spreads every line but a paragraph's last, centred
+        // ones too: so a centred paragraph's lines are each made a paragraph
+        // of their own, the spaces they break at turned into newlines.
+        if (justify) {
+            String broken = breakCentred(text, section, paint, textWidth);
+            if (broken != null) text = styled(assets, section, broken, font, size, line, paint, self);
+        }
         StaticLayout.Builder builder = StaticLayout.Builder.obtain(text, 0, text.length(), paint, textWidth)
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setIncludePad(false)
@@ -179,9 +186,33 @@ final class Pages {
         return paragraphs.isEmpty() ? null : paragraphs.get(low);
     }
 
-    private static SpannableString styled(AssetManager assets, Section section, int font, int size, float line,
-                                          TextPaint paint, Pages[] owner) {
-        String raw = section.text;
+    /**
+     * The text with each centred paragraph (headings, scene breaks) broken
+     * into lines where an unjustified layout breaks it, or null if none
+     * wraps. Space becomes newline, so every offset stays where it was.
+     */
+    private static String breakCentred(SpannableString text, Section section, TextPaint paint, int width) {
+        char[] chars = null;
+        for (Paragraph p : section.paragraphs) {
+            if (!p.centered && p.kind != Paragraph.HEADING && p.kind != Paragraph.BREAK) continue;
+            if (p.end <= p.start) continue;
+            CharSequence one = text.subSequence(p.start, p.end);
+            StaticLayout measured = StaticLayout.Builder.obtain(one, 0, one.length(), paint, width)
+                .setIncludePad(false)
+                .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
+                .build();
+            for (int l = 0; l < measured.getLineCount() - 1; l++) {
+                int end = measured.getLineEnd(l);
+                if (end < 1 || one.charAt(end - 1) != ' ') continue;
+                if (chars == null) chars = section.text.toCharArray();
+                chars[p.start + end - 1] = '\n';
+            }
+        }
+        return chars == null ? null : new String(chars);
+    }
+
+    private static SpannableString styled(AssetManager assets, Section section, String raw, int font, int size,
+                                          float line, TextPaint paint, Pages[] owner) {
         SpannableString text = new SpannableString(raw);
         int length = raw.length();
         int indent = Math.round(size * 1.25f);
