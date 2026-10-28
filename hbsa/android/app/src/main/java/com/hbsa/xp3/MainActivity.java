@@ -78,7 +78,10 @@ public final class MainActivity extends BaseActivity {
         list.setOnItemClickListener((parent, view, position, id) -> open(position));
         Ui.onSelect(list, position -> {
             adapter.notifyDataSetChanged();
-            showHeading(position);
+            // The list scrolls only after telling of the move.
+            list.post(() -> {
+                if (list.getSelectedItemPosition() == position) showHeading(position);
+            });
         });
         setContentView(root);
 
