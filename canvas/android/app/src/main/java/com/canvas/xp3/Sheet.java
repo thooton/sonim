@@ -197,8 +197,11 @@ final class Sheet {
             onYes.run();
         });
         box.addView(primary, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 12, 10, 12, 0));
-        Item secondary = button(app, v, "ask:no", no, false, app::closeOverlay);
-        box.addView(secondary, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 12, 8, 12, 0));
+        // A statement has nothing to decline: one OK, and Back closes it too.
+        if (no != null) {
+            Item secondary = button(app, v, "ask:no", no, false, app::closeOverlay);
+            box.addView(secondary, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 12, 8, 12, 0));
+        }
 
         FrameLayout layer = new FrameLayout(app);
         View shade = new View(app);

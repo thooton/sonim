@@ -18,6 +18,7 @@ final class NoticesScreen extends Screen {
 
     private List<Notice> notices;
     private boolean loading;
+    private String problem;
 
     NoticesScreen(MainActivity app) {
         super(app);
@@ -26,9 +27,10 @@ final class NoticesScreen extends Screen {
         if (app.backend.canvasReady()) {
             loading = true;
             final com.canvas.xp3.data.Sync.Result known = app.snapshot;
-            app.background(() -> app.backend.notices(known), (fresh, problem) -> {
+            app.background(() -> app.backend.notices(known), (fresh, failure) -> {
                 loading = false;
                 if (fresh != null) notices = fresh;
+                problem = fresh == null ? failure : null;
                 refresh();
             });
         }
@@ -43,6 +45,16 @@ final class NoticesScreen extends Screen {
         root.addView(heading, Views.wide());
         if (notices.isEmpty() && loading) return parts.spinner();
         LinearLayout list = parts.page(this, root);
+        if (notices.isEmpty() && !app.backend.canvasReady()) {
+            list.addView(parts.empty(0, "Canvas isn't set up", "Sign in under Settings, then Account."),
+                v.margins(Views.wide(), 0, 60, 0, 0));
+            return root;
+        }
+        if (notices.isEmpty() && problem != null) {
+            list.addView(parts.empty(0, "Couldn't reach Canvas", problem),
+                v.margins(Views.wide(), 0, 60, 0, 0));
+            return root;
+        }
         if (notices.isEmpty()) {
             list.addView(parts.empty(0, "Nothing new", null),
                 v.margins(Views.wide(), 0, 60, 0, 0));

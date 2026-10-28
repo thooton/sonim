@@ -89,7 +89,8 @@ open tab is large ink text, the others small and muted.
 "Classes" with the term on the right; a row per class this semester: a
 tile in the class colour with its code ("THF" over "101"), title, teacher,
 "N due" when it has dated assigned work. OK opens the class. None: "No
-classes this semester".
+classes this semester". Not set up, or no cache and the sync failed: as
+Home ("Canvas isn't set up", "Couldn't reach Canvas" and why).
 
 ### A class
 
@@ -251,12 +252,14 @@ Grouped Today, Yesterday, "Tuesday, Oct 20"; rows: icon by kind (returned,
 posted, comment, reminder, message), title, "detail · time". OK: a comment
 opens private comments, other work its page, else its class, else "This
 one opens on a computer." Opening the screen marks all seen. Empty:
-"Nothing new".
+"Nothing new"; not set up, or nothing cached and the fetch failed: as
+Home.
 
 ### Settings, Account, field
 
 - Settings: Theme (Light, Dark, Follow phone), Text size (Default,
-  Large), Reminders (Off, Morning of 08:00, Evening before 18:00, Both),
+  Large), Reminders (Off, Morning of 08:00, Evening before 18:00, Both;
+  8:00 AM and 6:00 PM on a 12-hour phone),
   Week starts on (Monday, Sunday; "(region)" until chosen), Download
   files (Always, On Wi-Fi only, Never), Account (the Canvas host, or "Not
   set up"). OK opens the choices; theme and size apply at once.
@@ -264,7 +267,8 @@ one opens on a computer." Opening the screen marks all seen. Empty:
   service, Service token (dots), Time zone ("Not set"); "Use the bundled
   setup" when the build has one; Sign out, which asks, then removes the
   settings, saved work and everything fetched. A rejected value (both
-  addresses must be https): "Not saved" and why. A new address, service
+  addresses must be https): the field opens again with the text as typed,
+  under a "Not saved" dialog saying why (one OK). A new address, service
   or token drops the work on screen and syncs.
 - Field: "‹ Back", title, one-line field focused; OK saves and returns,
   Back returns unsaved. Options: Paste (with text on the clipboard),

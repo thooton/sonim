@@ -34,6 +34,16 @@ final class ClassesScreen extends Screen {
         root.addView(head, Views.wide());
         if ((app.snapshot == null || app.snapshot.courses.isEmpty()) && app.syncing) return parts.spinner();
         LinearLayout list = parts.page(this, root);
+        if (!app.backend.canvasReady()) {
+            list.addView(parts.empty(0, "Canvas isn't set up", "Sign in under Settings, then Account."),
+                v.margins(Views.wide(), 0, 50, 0, 0));
+            return root;
+        }
+        if (app.snapshot == null && app.syncError != null) {
+            list.addView(parts.empty(0, "Couldn't reach Canvas", app.syncError),
+                v.margins(Views.wide(), 0, 50, 0, 0));
+            return root;
+        }
         if (app.snapshot == null || app.snapshot.courses.isEmpty()) {
             list.addView(parts.empty(0, "No classes this semester", null),
                 v.margins(Views.wide(), 0, 50, 0, 0));

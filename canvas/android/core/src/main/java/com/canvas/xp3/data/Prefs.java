@@ -129,12 +129,12 @@ public final class Prefs {
         }
     }
 
-    /** The reminder setting's words as Settings shows them. */
-    public static String reminderLabel(String value) {
+    /** The reminder setting's words as Settings shows them, in the phone's 12/24-hour style. */
+    public static String reminderLabel(String value, boolean twentyFourHour) {
         if (OFF.equals(value)) return "Off";
-        if (MORNING.equals(value)) return "Morning of, 08:00";
+        if (MORNING.equals(value)) return "Morning of, " + (twentyFourHour ? "08:00" : "8:00 AM");
         if (BOTH.equals(value)) return "Both";
-        return "Evening before, 18:00";
+        return "Evening before, " + (twentyFourHour ? "18:00" : "6:00 PM");
     }
 
     public static List<String> reminderChoices() {

@@ -57,6 +57,10 @@ public final class Dates {
         twentyFourHour = value;
     }
 
+    public static boolean twentyFourHour() {
+        return twentyFourHour;
+    }
+
     public static void setWeekStart(int day) {
         firstDay = day == Calendar.SUNDAY ? Calendar.SUNDAY : Calendar.MONDAY;
     }

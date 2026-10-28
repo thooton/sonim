@@ -155,6 +155,10 @@ public final class MainActivity extends BaseActivity {
 
     /** Builds the frame in the current theme. Called again when the theme or text size changes. */
     void theme() {
+        theme(null, 0);
+    }
+
+    private void theme(String key, int y) {
         look = Look.of(this, prefs);
         views = new Views(this, look);
         getWindow().setStatusBarColor(look.bg);
@@ -178,7 +182,7 @@ public final class MainActivity extends BaseActivity {
             screen.look = look;
             screen.v = views;
         }
-        if (!stack.isEmpty()) show(top(), null, 0);
+        if (!stack.isEmpty()) show(top(), key, y);
     }
 
     private View softkeys() {
@@ -209,8 +213,15 @@ public final class MainActivity extends BaseActivity {
         backend.savePrefs(next);
         applyWeekStart();
         Alarms.schedule(this, backend);
-        if (restyle) theme();
-        else redraw();
+        if (!restyle) {
+            redraw();
+            return;
+        }
+        // A new look rebuilds the whole frame; the row that changed it keeps the d-pad.
+        View focused = getCurrentFocus();
+        Screen screen = top();
+        theme(focused instanceof Item ? ((Item) focused).key : null,
+            screen == null || screen.scroll == null ? 0 : screen.scroll.getScrollY());
     }
 
     /** A passing line at the bottom of the screen. */
@@ -220,7 +231,7 @@ public final class MainActivity extends BaseActivity {
 
     /** Something that went wrong, said once in the app's own dialog: what happened and what to do. */
     void tell(String title, String message) {
-        Sheet.ask(this, title, message, "OK", "Close", () -> { });
+        Sheet.ask(this, title, message, "OK", null, () -> { });
     }
 
     /** A preference that changes nothing on screen, such as when Notifications was last read. */

@@ -4,6 +4,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.canvas.xp3.data.Dates;
 import com.canvas.xp3.data.Prefs;
 
 import java.util.ArrayList;
@@ -33,7 +34,7 @@ final class SettingsScreen extends Screen {
         list.addView(setting("theme", "Theme", themeLabel(prefs.theme), this::theme), Views.wide());
         list.addView(setting("text", "Text size", Prefs.LARGE.equals(prefs.textSize) ? "Large" : "Default",
             this::textSize), Views.wide());
-        list.addView(setting("reminders", "Reminders", Prefs.reminderLabel(prefs.reminders), this::reminders),
+        list.addView(setting("reminders", "Reminders", Prefs.reminderLabel(prefs.reminders, Dates.twentyFourHour()), this::reminders),
             Views.wide());
         list.addView(setting("week", "Week starts on", weekLabel(prefs.weekStart), this::week), Views.wide());
         list.addView(setting("downloads", "Download files", downloadLabel(prefs.downloads), this::downloads),
@@ -102,14 +103,17 @@ final class SettingsScreen extends Screen {
     private void reminders() {
         List<String> values = Prefs.reminderChoices();
         String[] labels = new String[values.size()];
-        for (int i = 0; i < labels.length; i++) labels[i] = Prefs.reminderLabel(values.get(i));
+        for (int i = 0; i < labels.length; i++) labels[i] = Prefs.reminderLabel(values.get(i), Dates.twentyFourHour());
         choose("Remind me about due work", values.toArray(new String[0]), labels, app.prefs.reminders,
             "You can turn reminders off for one class from its menu.",
             value -> app.savePrefs(app.prefs.withReminders(value)));
     }
 
     private void week() {
-        String current = app.prefs.weekStart == null ? "" : app.prefs.weekStart;
+        // Until chosen the region decides, and its day is the one in use.
+        String current = app.prefs.weekStart != null ? app.prefs.weekStart
+            : java.util.Calendar.getInstance().getFirstDayOfWeek() == java.util.Calendar.SUNDAY
+            ? Prefs.SUNDAY : Prefs.MONDAY;
         choose("Week starts on", new String[] { Prefs.MONDAY, Prefs.SUNDAY }, new String[] { "Monday", "Sunday" },
             current, null, value -> app.savePrefs(app.prefs.withWeekStart(value)));
     }

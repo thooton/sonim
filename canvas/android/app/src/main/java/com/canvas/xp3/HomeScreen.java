@@ -394,6 +394,8 @@ final class HomeScreen extends Screen {
     private void jump(long day, boolean focusStrip) {
         long midnight = Dates.dayOf(day);
         selected = midnight;
+        // The student picked this day; a build must not re-pick the opening one.
+        chosen = true;
         long week = Dates.weekOf(midnight);
         weekStart = week;
         scrollToDay = true;

@@ -77,21 +77,28 @@ final class AccountScreen extends Screen {
         return row;
     }
 
-    private void edit(final String key, String label, boolean address) {
+    private void edit(String key, String label, boolean address) {
+        edit(key, label, address, app.backend.config().get(key));
+    }
+
+    private void edit(final String key, final String label, final boolean address, String start) {
         String help = Config.TIMEZONE.equals(key) ? "Leave empty to use the phone's own, or type one like "
             + "America/Phoenix." : Config.COOKIE_TOKEN.equals(key) ? "Copy it into a message to the phone, then "
             + "paste it here from Options." : null;
-        FieldScreen screen = new FieldScreen(app, label, app.backend.config().get(key), label,
-            value -> apply(key, value)).exact(address);
+        FieldScreen screen = new FieldScreen(app, label, start, label,
+            value -> apply(key, label, address, value)).exact(address);
         if (help != null) screen.help(help);
         app.push(screen);
     }
 
-    private void apply(String key, String value) {
+    private void apply(String key, String label, boolean address, String value) {
         Config next;
         try {
             next = app.backend.config().with(key, value);
         } catch (IllegalArgumentException e) {
+            // Back to the field with the text as typed: retyping a whole
+            // address on a keypad for one wrong letter is the real cost.
+            edit(key, label, address, value);
             app.tell("Not saved", e.getMessage() == null ? "That value wasn't accepted." : e.getMessage());
             return;
         }

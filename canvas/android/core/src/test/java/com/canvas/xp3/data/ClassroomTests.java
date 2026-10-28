@@ -179,6 +179,8 @@ public final class ClassroomTests {
         Reminders.Next first = Reminders.next(at(Calendar.OCTOBER, 19, 19, 0), Prefs.BOTH, all, quiet);
         check.same("both: whichever is next", at(Calendar.OCTOBER, 20, 8, 0), first.at);
         check.same("off is off", null, Reminders.next(monday, Prefs.OFF, all, quiet));
+        check.same("a 12-hour label", "Evening before, 6:00 PM", Prefs.reminderLabel(Prefs.EVENING, false));
+        check.same("a 24-hour label", "Morning of, 08:00", Prefs.reminderLabel(Prefs.MORNING, true));
         quiet.add("1");
         check.same("a quiet class is left out", null, Reminders.next(monday, Prefs.EVENING, all, quiet));
         check.ok("the line states the date", Reminders.text(evening).contains("due Oct 20"));
