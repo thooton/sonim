@@ -120,10 +120,20 @@ public final class Fsrs {
         return next;
     }
 
-    /** The probability of recall after `elapsedDays` Anki days (0 when unseen). */
+    /**
+     * The probability of recall after `elapsedDays` Anki days (0 when unseen).
+     * A stability rounded to 0 counts as the one its next answer starts from,
+     * as `review` does, rather than giving NaN.
+     */
     public static double retrievability(Card card, int elapsedDays) {
         if (card.getLastReview() == null || card.getStability() == null) return 0;
-        return forgettingCurve(Math.max(0, elapsedDays), card.getStability());
+        double s = card.getStability();
+        if (s == 0) {
+            s = card.getState() == State.REVIEW
+                ? round2(Math.max(scheduledDays(card), 0.1))
+                : initStability(1);
+        }
+        return forgettingCurve(Math.max(0, elapsedDays), s);
     }
 
     /** One step of Anki's learning or relearning, or graduation. */

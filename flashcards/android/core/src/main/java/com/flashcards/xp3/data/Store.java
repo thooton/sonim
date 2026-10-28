@@ -167,7 +167,7 @@ public final class Store {
         }
         return sl.stability != null
             && Double.isFinite(sl.stability)
-            && sl.stability > 0.0
+            && sl.stability >= 0.0
             && sl.difficulty != null
             && Double.isFinite(sl.difficulty)
             && sl.difficulty >= 1.0

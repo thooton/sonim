@@ -395,7 +395,11 @@ public final class Collection {
         return c;
     }
 
-    /** A card's FSRS state, or null when it isn't one java-fsrs could hold. */
+    /**
+     * A card's FSRS state, or null when it isn't one java-fsrs could hold. A
+     * stability of 0 is kept: the script's two-decimal rounding gives it to a
+     * card whose stability is under 0.005, and its next answer starts afresh.
+     */
     static Card fsrsOf(Map<String, Object> c, int cardId) {
         State state;
         try {
@@ -415,7 +419,7 @@ public final class Collection {
         }
         if (last == 0) {
             if (state != State.LEARNING || stability != null || difficulty != null) return null;
-        } else if (stability == null || !(stability > 0) || Double.isInfinite(stability)
+        } else if (stability == null || !(stability >= 0) || Double.isInfinite(stability)
             || difficulty == null || !(difficulty >= 1.0 && difficulty <= 10.0)) {
             return null;
         }

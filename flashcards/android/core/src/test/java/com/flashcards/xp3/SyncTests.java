@@ -1,6 +1,7 @@
 package com.flashcards.xp3;
 
 import com.flashcards.xp3.algo.ReviewSession;
+import com.flashcards.xp3.algo.Stats;
 import com.flashcards.xp3.data.CardDef;
 import com.flashcards.xp3.data.Collection;
 import com.flashcards.xp3.data.Deck;
@@ -35,6 +36,30 @@ public final class SyncTests {
         importedDeck(c);
         removedCard(c);
         copyIsApart(c);
+        stabilityRoundedToZero(c);
+    }
+
+    private static void stabilityRoundedToZero(Check c) {
+        c.run("a card whose stability rounds to 0 stays in its deck and its stats", () -> {
+            Collection one = bundled(2);
+            Deck deck = one.decks().get(0);
+            DeckCard card = deck.cards().get(0);
+            card.fsrs = io.github.openspacedrepetition.Card.builder()
+                .cardId(card.fsrs.getCardId()).state(State.LEARNING).step(0)
+                .stability(0.001).difficulty(5.0)
+                .due(java.time.Instant.ofEpochSecond(NOON - 60))
+                .lastReview(java.time.Instant.ofEpochSecond(NOON - 120)).build();
+            ReviewSession s = new ReviewSession(deck, ZoneOffset.UTC);
+            c.same("the learning card first", card, s.next(NOON));
+            s.rate(3, NOON);
+            c.close("rounded to 0", 0, card.fsrs.getStability(), 0);
+            Stats stats = Stats.of(deck.cards(), NOON + 60, ZoneOffset.UTC);
+            c.ok("recall is a number", !Double.isNaN(stats.averageRecall) && stats.averageRecall > 0);
+            c.ok("knowledge is a number", !Double.isNaN(stats.knowledge) && stats.knowledge > 0);
+            Collection back = Collection.read(one.write());
+            c.same("still in the deck", 2, back.decks().get(0).size());
+            c.close("still 0", 0, back.decks().get(0).byId("id0").fsrs.getStability(), 0);
+        });
     }
 
     private static void copyIsApart(Check c) {
