@@ -298,6 +298,8 @@ class Bridge:
         data = json.dumps(body).encode() if body is not None else None
         req = urllib.request.Request(self.args.server + path, data=data, method=method)
         req.add_header("Authorization", "Bearer " + self.args.token)
+        # The proxy in front of the command center turns away Python's own.
+        req.add_header("User-Agent", "delta-qa-bridge/1")
         if data is not None:
             req.add_header("Content-Type", "application/json")
         with urllib.request.urlopen(req, timeout=timeout) as resp:
