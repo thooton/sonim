@@ -87,7 +87,9 @@ The tablet's `session.earliest` is the same rule.
 - `setup-emulator.sh`: an x86_64 emulator for trying the app off the phone.
 
 **Sync.** The app keeps its copy of the command center's collection in
-`collection.json` (private), studies from it offline, and syncs on opening,
+`collection.json` (private; written off the main thread from a quick
+`Collection.copy`, since writing the whole file on it held up the keys),
+studies from it offline, and syncs on opening,
 30 seconds after the last answer, after an options change, on leaving, and
 from Menu > Sync. Each record carries `mod`, the phone's clock in
 milliseconds when it last changed, and a dirty flag until the command

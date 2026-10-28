@@ -96,6 +96,7 @@ public final class MainActivity extends BaseActivity {
 
     private final ExecutorService net = Ui.worker("flashcards-sync");
     private final ExecutorService disk = Ui.worker("flashcards-import");
+    private final ExecutorService saver = Ui.worker("flashcards-save");
     /** The file to import once Android lets the app read the SD card. */
     private File importing;
     private final ZoneId zone = ZoneId.systemDefault();
@@ -191,13 +192,22 @@ public final class MainActivity extends BaseActivity {
         return cards;
     }
 
+    /**
+     * Saves the collection off the main thread: writing the whole file takes
+     * long enough on the phone to hold up a key pressed meanwhile. The copy is
+     * quick; saves run one at a time, in order, so the last one wins.
+     */
     private void save() {
         getWindow().getDecorView().removeCallbacks(saveSoon);
-        try {
-            Disk.write(new File(getFilesDir(), FILE), collection.write(), true);
-        } catch (IOException e) {
-            // The last good copy stays; the next answer tries again.
-        }
+        final Collection copy = collection.copy();
+        final File file = new File(getFilesDir(), FILE);
+        saver.execute(() -> {
+            try {
+                Disk.write(file, copy.write(), true);
+            } catch (IOException e) {
+                // The last good copy stays; the next answer tries again.
+            }
+        });
     }
 
     private void later(Runnable task, long ms) {

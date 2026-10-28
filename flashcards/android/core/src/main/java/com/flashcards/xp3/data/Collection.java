@@ -309,6 +309,30 @@ public final class Collection {
     // ---------------------------------------------------------------------
     // The file
 
+    /**
+     * A copy to write out on another thread while this one goes on changing:
+     * every record copied, sharing the definitions and memory states, which
+     * are never changed in place (an answer or a sync puts in new ones).
+     */
+    public Collection copy() {
+        Collection copy = new Collection();
+        copy.usn = usn;
+        copy.zone = zone;
+        for (Deck deck : decks) {
+            List<DeckCard> cards = new ArrayList<>(deck.size());
+            for (DeckCard card : deck.cards()) cards.add(card.copy());
+            Deck kept = new Deck(deck.id, deck.name, deck.newPerDay, cards);
+            kept.mod = deck.mod;
+            kept.dirty = deck.dirty;
+            copy.add(kept);
+        }
+        for (Map.Entry<String, DeckCard> e : removed.entrySet()) {
+            copy.removed.put(e.getKey(), e.getValue().copy());
+            copy.removedFrom.put(e.getKey(), removedFrom.get(e.getKey()));
+        }
+        return copy;
+    }
+
     /** This copy as JSON, dirty flags included. */
     public String write() {
         List<Object> decks = new ArrayList<>();

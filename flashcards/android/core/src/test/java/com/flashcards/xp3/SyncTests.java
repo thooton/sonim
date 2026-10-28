@@ -34,6 +34,22 @@ public final class SyncTests {
         correctedText(c);
         importedDeck(c);
         removedCard(c);
+        copyIsApart(c);
+    }
+
+    private static void copyIsApart(Check c) {
+        c.run("a copy to save writes what was, whatever changes after", () -> {
+            Collection one = bundled(3);
+            one.remove(one.decks().get(0).cards().get(2), 5000L);
+            Collection copy = one.copy();
+            String before = one.write();
+            c.same("writes the same", before, copy.write());
+            ReviewSession s = new ReviewSession(one.decks().get(0), ZoneOffset.UTC);
+            s.next(NOON);
+            s.rate(3, NOON);
+            one.remove(one.decks().get(0).cards().get(1), 6000L);
+            c.same("unchanged by an answer or a removal", before, copy.write());
+        });
     }
 
     private static void removedCard(Check c) {

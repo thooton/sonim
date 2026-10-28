@@ -38,6 +38,16 @@ public final class DeckCard {
         this.fsrs = fsrs;
     }
 
+    /** Another record of the same card, sharing its definition and memory state. */
+    DeckCard copy() {
+        DeckCard copy = new DeckCard(def, fsrs);
+        copy.ord = ord;
+        copy.intro = intro;
+        copy.mod = mod;
+        copy.dirty = dirty;
+        return copy;
+    }
+
     /** Whether the user has never reviewed this card. */
     public boolean isNew() {
         return fsrs.getLastReview() == null;
