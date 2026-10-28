@@ -65,8 +65,9 @@ takes keys while searching. Menu acts on release, OK on press.
 
 ### A word's page
 
-- The headword at 25sp, cased as WordNet writes it ("March", "Paris",
-  "ice cream"), then up to three tabs: Definitions, Thesaurus, Shorthand.
+- The headword at 25sp (smaller when one of its words is wider than the
+  line, so no word breaks mid-word), cased as its first meaning writes it
+  ("March", "Paris", "ice cream"), then up to three tabs: Definitions, Thesaurus, Shorthand.
   The open tab is SemiBold over a 2dp ink rule.
 - **Definitions** (shown for every WordNet word): each part of speech
   (noun, verb, adjective, adverb, in that order) as a serif heading; senses
@@ -146,9 +147,10 @@ and capitals on.
   Shorthand tab.
 - **Outlines separated by spaces (a phrase):** first any outline they make
   joined (`IS 'US`: ice house); then one SemiBold line with the English each
-  reads as, in order, `?` for one that reads as nothing (`TH S`: this is),
-  which is a row that opens when the dictionary has that phrase and plain
-  text otherwise; then each outline's own rows.
+  reads as (its first row), in order, `?` for one that reads as nothing
+  (`S 'US`: his house), which is a row that opens when the dictionary has
+  that phrase and plain text otherwise; then each outline's own rows, less
+  any already shown as the joined outline.
 - Input that is not Grascii, or matches nothing: red query, "No results".
 - **OK:** the picked row, or else the first row.
 - **Menu:** one item, Words: switches to the word search, keeping the text.
@@ -162,7 +164,8 @@ and capitals on.
   read-only in the APK. The licences (WordNet, Grascii, IBM Plex) ship as
   assets.
 - **Survives a restart:** only Recent Searches (the app's own preferences,
-  key `recent`). The app always opens on home with an empty Back history.
+  key `recent`). The app always opens on home with an empty Back history,
+  also when launched from its icon while it is still running.
   Not backed up (`allowBackup="false"`).
 - **Network:** none. **Permissions:** none.
 - **Timed:** the Word of the Day follows the local date.

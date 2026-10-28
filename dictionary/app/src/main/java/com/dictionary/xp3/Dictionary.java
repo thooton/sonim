@@ -164,12 +164,15 @@ final class Dictionary {
             if (!letters) continue;
             List<Sense> senses = senses(at);
             boolean example = false;
-            boolean common = false;
+            // Plain lowercase as its page writes it: as its first meaning does.
+            String cased = null;
             for (Sense sense : senses) {
                 example |= sense.gloss.contains("; \"");
-                for (String form : sense.words) common |= form.equals(w);
+                for (String form : sense.words) {
+                    if (cased == null && form.equalsIgnoreCase(w)) cased = form;
+                }
             }
-            if (example && common) return at;
+            if (example && w.equals(cased)) return at;
         }
         return 0;
     }

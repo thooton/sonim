@@ -1,6 +1,7 @@
 package com.dictionary.xp3;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -8,6 +9,7 @@ import android.speech.tts.TextToSpeech;
 import android.text.Editable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
+import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.InputType;
 import android.text.TextWatcher;
@@ -181,6 +183,20 @@ public class MainActivity extends Activity {
         });
     }
 
+    /**
+     * Launched again from its icon while still running (singleTask delivers
+     * it here): it opens on home with an empty Back history, as a fresh start.
+     */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (searching) endSearch();
+        back.clear();
+        page = HOME;
+        tab = DEFINITIONS;
+        show();
+    }
+
     @Override
     protected void onDestroy() {
         if (tts != null) tts.shutdown();
@@ -320,6 +336,7 @@ public class MainActivity extends Activity {
         int group = group(page);
         String word = wordNet ? display(page, senses) : shorthand.name(group);
         headword.setText(word);
+        fitHeadword(word);
         // A word WordNet gives no synonyms for has no Thesaurus tab, one
         // Grascii has no outline for no Shorthand tab, and one only Grascii
         // has no Definitions.
@@ -339,6 +356,22 @@ public class MainActivity extends Activity {
         else if (tab == SHORTHAND) body.setText(outlines(group));
         else body.setText(definitions(senses));
         entry.scrollTo(0, 0);
+    }
+
+    /**
+     * The headword at 25sp, or smaller when one of its words is wider than the
+     * line: a word with no break in it would otherwise wrap mid-word.
+     */
+    private void fitHeadword(String word) {
+        float width = getResources().getDisplayMetrics().widthPixels
+            - headword.getTotalPaddingLeft() - headword.getTotalPaddingRight() - dp(24);
+        TextPaint paint = new TextPaint(headword.getPaint());
+        float size = sp(25);
+        paint.setTextSize(size);
+        for (String part : word.split("(?<=-)| ")) {
+            while (size > sp(10) && paint.measureText(part) > width) paint.setTextSize(--size);
+        }
+        headword.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
     }
 
     private void styleTab(TextView tab, boolean open) {
@@ -608,8 +641,11 @@ public class MainActivity extends Activity {
         }
         showNone(!any && joined.isEmpty());
         if (!any && joined.isEmpty()) return;
+        List<Integer> shown = new ArrayList<>();
         for (Shorthand.Match match : joined) {
-            if (match.kind == Shorthand.EXACT) addOutline(match.entry);
+            if (match.kind != Shorthand.EXACT) continue;
+            addOutline(match.entry);
+            shown.add(match.entry);
         }
         if (any) {
             // The phrase opens when a dictionary has it ("ice cream"), and
@@ -627,7 +663,10 @@ public class MainActivity extends Activity {
             }
         }
         for (List<Shorthand.Match> read : words) {
-            for (Shorthand.Match match : read) addOutline(match.entry);
+            // Not again what the joined outline already showed.
+            for (Shorthand.Match match : read) {
+                if (!shown.contains(match.entry)) addOutline(match.entry);
+            }
         }
     }
 
@@ -840,18 +879,16 @@ public class MainActivity extends Activity {
         return gist;
     }
 
-    /** The headword as its meanings write it ("March", "Paris"), lowercase as itself when it is one. */
+    /** The headword as its first meaning writes it ("March", "Paris", "ice cream"). */
     private String display(int index, List<Dictionary.Sense> senses) {
         String word = dictionary.word(index);
         if (senses == null) senses = dictionary.senses(index);
-        String cased = null;
         for (Dictionary.Sense sense : senses) {
             for (String w : sense.words) {
-                if (w.equals(word)) return word;
-                if (cased == null && w.equalsIgnoreCase(word)) cased = w;
+                if (w.equalsIgnoreCase(word)) return w;
             }
         }
-        return cased != null ? cased : word;
+        return word;
     }
 
     private static String label(char pos) {
