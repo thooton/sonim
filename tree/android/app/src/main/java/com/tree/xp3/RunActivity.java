@@ -20,7 +20,7 @@ import java.util.TimeZone;
 
 /**
  * One run, whole: the button for what OK does (Cancel run while it goes,
- * Run QA now after), its morning summary, each app's place in it and each
+ * Run QA now after), its nightly report, each app's place in it and each
  * job. Up and Down scroll; it asks again every 20 seconds while the run
  * goes.
  */
@@ -147,7 +147,7 @@ public final class RunActivity extends Screen {
 
         if (run.summary.trim().length() > 0) {
             LinearLayout summary = card();
-            summary.addView(label("Summary"));
+            summary.addView(label("Nightly report"));
             summary.addView(lead(run.summary.trim()));
             page.addView(summary, cardSpacing());
         }

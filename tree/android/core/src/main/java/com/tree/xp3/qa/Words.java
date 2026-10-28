@@ -78,9 +78,9 @@ public final class Words {
         return shown + (h < 12 ? " AM" : " PM");
     }
 
-    /** "Nightly at 3 AM", or "Nightly off". */
+    /** "Daily at 1 PM", or "Daily run off". */
     public static String schedule(Qa.Settings settings) {
-        return settings.enabled ? "Nightly at " + hour(settings.hour) : "Nightly off";
+        return settings.enabled ? "Daily at " + hour(settings.hour) : "Daily run off";
     }
 
     /**
@@ -116,9 +116,9 @@ public final class Words {
         return when.length() == 0 ? what : what + " " + when;
     }
 
-    /** "Nightly", or "Run by you". */
+    /** "Scheduled", or "Run by you". */
     public static String trigger(String trigger) {
-        if ("schedule".equals(trigger)) return "Nightly";
+        if ("schedule".equals(trigger)) return "Scheduled";
         if ("manual".equals(trigger)) return "Run by you";
         return name(trigger);
     }

@@ -33,7 +33,7 @@ import java.util.TimeZone;
 
 /**
  * Home: the header says how the latest run stands and when the nightly one
- * is; the first row is that run (its morning summary, or its progress while
+ * is; the first row is that run (its nightly report, or its progress while
  * it goes), then every app the QA goes through. OK opens the row; Menu has
  * Run QA now (or Cancel run), Refresh, the nightly schedule and the command
  * center.
@@ -210,9 +210,9 @@ public final class MainActivity extends Screen {
             labels.add("Refresh");
             actions.add(() -> load(true));
             if (qa != null) {
-                labels.add(qa.settings.enabled ? "Turn nightly off" : "Turn nightly on");
+                labels.add(qa.settings.enabled ? "Turn daily run off" : "Turn daily run on");
                 actions.add(() -> nightly(!qa.settings.enabled));
-                labels.add("Nightly hour…");
+                labels.add("Run hour…");
                 actions.add(this::chooseHour);
             }
         }
@@ -226,7 +226,7 @@ public final class MainActivity extends Screen {
         if (center == null) return;
         work(() -> center.nightly(on), settings -> {
             if (Tree.qa != null) Tree.qa = Tree.qa.withSettings(settings);
-            toast(settings.enabled ? "Nightly on" : "Nightly off");
+            toast(settings.enabled ? "Daily run on" : "Daily run off");
             show();
         }, null);
     }
@@ -239,7 +239,7 @@ public final class MainActivity extends Screen {
         for (int h = 0; h < 24; h++) hours[h] = Words.hour(h);
         String zone = qa.settings.timeZone;
         new AlertDialog.Builder(this)
-            .setTitle(zone.length() > 0 ? "Nightly hour, " + zone.replace('_', ' ') : "Nightly hour")
+            .setTitle(zone.length() > 0 ? "Run hour, " + zone.replace('_', ' ') : "Run hour")
             .setSingleChoiceItems(hours, qa.settings.hour, (dialog, which) -> {
                 dialog.dismiss();
                 if (which == qa.settings.hour) return;
@@ -247,7 +247,7 @@ public final class MainActivity extends Screen {
                 if (center == null) return;
                 work(() -> center.hour(which), settings -> {
                     if (Tree.qa != null) Tree.qa = Tree.qa.withSettings(settings);
-                    toast("Nightly at " + Words.hour(settings.hour));
+                    toast("Daily at " + Words.hour(settings.hour));
                     show();
                 }, null);
             })

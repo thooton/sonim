@@ -5,7 +5,7 @@
 Tree is the phone's front end for the command center's nightly QA. From it
 the user can:
 
-1. See the latest run: its morning summary, or while a run goes, its
+1. See the latest run: its nightly report, or while a run goes, its
    progress app by app.
 2. See every app the QA goes through (phone and tablet): its name, whether
    it grows, its open findings, those left for the user, grown features
@@ -16,7 +16,7 @@ the user can:
    screenshots; for a grown feature, give it 👍 (keep) or 👎 (take out), or
    clear the verdict. A 👎 has the next run take the feature out.
 5. Run the QA now for every app, and cancel a run that is going.
-6. Turn the nightly run on or off and choose its hour (0 to 23, in the
+6. Turn the daily run on or off and choose its hour (0 to 23, in the
    command center's time zone, which is shown and not changed).
 
 ## Not wanted
@@ -43,15 +43,15 @@ Back or the right soft key goes back (on Home, leaves the app).
 - Header left: how the latest run stands: `Running · 2 of 12` (apps done or
   skipped, of the run's apps), `Running · refactoring`, `Done 3:41 AM`,
   `Cancelled Yesterday 2:10 AM`, `Done Oct 27`, or `No runs yet`. Empty
-  before anything has been fetched. Header right: `Nightly at 3 AM` or
-  `Nightly off`.
+  before anything has been fetched. Header right: `Daily at 1 PM` or
+  `Daily run off`.
 - The list: first the latest run (the one going, else the newest), then
   every app in the order the command center sends them.
   - The run's row, while it goes: the app being worked on in green Medium
     (`Refactoring` in the refactor stage, `Starting` before any app), and
-    under it `Run by you` or `Nightly`, `since <time>` and `2 of 12 apps`.
+    under it `Run by you` or `Scheduled`, `since <time>` and `2 of 12 apps`.
   - The run's row, once over: the summary's first line in Medium, and up to
-    four of its further lines muted (or `Nightly` / `Run by you` when the
+    four of its further lines muted (or `Scheduled` / `Run by you` when the
     summary is one line). A run with no summary shows `Cancelled` (or `No
     summary`) and its error.
   - An app's row: its name (its directory capitalised: `list` is `List`) in
@@ -64,16 +64,16 @@ Back or the right soft key goes back (on Home, leaves the app).
 - Keys: Up/Down move the focus card. OK on the run opens **Run**; OK on an
   app opens **App**.
 - Menu: `Run QA now` (when no run is going) or `Cancel run` (when one is),
-  `Refresh`, `Turn nightly off` / `Turn nightly on`, `Nightly hour…`,
+  `Refresh`, `Turn daily run off` / `Turn daily run on`, `Run hour…`,
   `Command center…`. Without a login, only `Command center…`.
   - `Run QA now` starts a run of every app and toasts `Running QA on every
     app`.
   - `Cancel run` asks `Cancel this run?` with `Cancel run` and `Keep going`;
     cancelling toasts `Cancelled`.
-  - `Turn nightly off/on` toasts `Nightly off` / `Nightly on`, and the
+  - `Turn daily run off/on` toasts `Daily run off` / `Daily run on`, and the
     header's right follows.
-  - `Nightly hour…` lists `12 AM`, `1 AM` ... `11 PM` titled `Nightly hour,
-    <time zone>`, the current hour checked; choosing another toasts `Nightly
+  - `Run hour…` lists `12 AM`, `1 AM` ... `11 PM` titled `Run hour,
+    <time zone>`, the current hour checked; choosing another toasts `Daily
     at <hour>`. Cancel or Back closes it unchanged.
   - `Command center…` asks for the address (`https://…`) and the token
     (dots when one is saved; left empty, the saved one is kept). Save
@@ -88,7 +88,7 @@ Back or the right soft key goes back (on Home, leaves the app).
 
 ### Run
 
-- Header left as on Home for this run; right `Nightly` or `Run by you`.
+- Header left as on Home for this run; right `Scheduled` or `Run by you`.
 - A full-width button, drawn focused: `Cancel run` while this run goes,
   `Run QA now` once it is over, or greyed `Another run is going` when it is
   over and another one goes.

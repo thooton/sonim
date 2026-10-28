@@ -189,8 +189,8 @@ public final class SelfTest {
         check.same("morning", "3 AM", Words.hour(3));
         check.same("noon", "12 PM", Words.hour(12));
         check.same("evening", "11 PM", Words.hour(23));
-        check.same("schedule", "Nightly at 3 AM", Words.schedule(qa.settings));
-        check.same("schedule off", "Nightly off", Words.schedule(new Qa.Settings(false, 3, "")));
+        check.same("schedule", "Daily at 3 AM", Words.schedule(qa.settings));
+        check.same("schedule off", "Daily run off", Words.schedule(new Qa.Settings(false, 3, "")));
 
         check.same("today", "3:41 AM", Words.when(at("2026-10-28T10:41:00Z"), NOW, PHOENIX));
         check.same("yesterday", "Yesterday 11:30 PM", Words.when(at("2026-10-28T06:30:00Z"), NOW, PHOENIX));
@@ -205,7 +205,7 @@ public final class SelfTest {
         check.same("refactoring", "Running · refactoring", Words.run(refactor, NOW, PHOENIX));
         Qa.Run cancelled = Qa.Run.parse("{\"id\":\"r\",\"status\":\"cancelled\",\"created\":\"2026-10-28T09:10:00Z\"}");
         check.same("cancelled", "Cancelled 2:10 AM", Words.run(cancelled, NOW, PHOENIX));
-        check.same("trigger", "Nightly", Words.trigger("schedule"));
+        check.same("trigger", "Scheduled", Words.trigger("schedule"));
         check.same("manual", "Run by you", Words.trigger("manual"));
         check.same("role", "Refactor", Words.role("refactor"));
 

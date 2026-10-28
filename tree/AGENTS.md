@@ -16,7 +16,7 @@ findings (bug, problem, inconsistency, feature); a fix job triages each as
 fixed, passed (left for the user), declined, grown (a feature built, only
 for an app the user lets grow) or reverted (a grown feature the user gave a
 👎, taken out by the next run), and pushes fixes. Then a refactor job per
-repo, and last a short morning summary.
+repo, and last a short nightly report.
 
 Keep the app small: what it does is listed in SPEC.md's Purpose, and what
 it should not do in Not wanted.

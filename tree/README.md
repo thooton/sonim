@@ -3,7 +3,7 @@
 The phone's front end for the command center's nightly QA, which every
 night has cloud agents go through each phone app (sonim) and tablet app
 (thooton/tablet): write its spec, drive it in an emulator, file what they
-find, and fix it. Tree shows the morning summary, every app and what is
+find, and fix it. Tree shows the nightly report, every app and what is
 open in it, and each finding; it switches growing on or off per app, gives
 grown features a 👍 or 👎, runs the QA now, cancels a run, and sets the
 nightly hour.
