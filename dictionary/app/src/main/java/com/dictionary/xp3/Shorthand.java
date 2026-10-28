@@ -2,15 +2,12 @@ package com.dictionary.xp3;
 
 import android.content.res.AssetManager;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.zip.InflaterInputStream;
 
 /**
  * Anniversary Gregg shorthand, as Grascii writes it, read from the asset
@@ -76,7 +73,7 @@ final class Shorthand {
     private final int[] groupOf;
 
     Shorthand(AssetManager assets) throws IOException {
-        String[] lines = inflate(assets.open("shorthand.dat")).split("\n");
+        String[] lines = Dictionary.inflate(assets.open("shorthand.dat")).split("\n");
         int n = lines.length;
         outlines = new String[n];
         translations = new String[n];
@@ -327,17 +324,5 @@ final class Shorthand {
 
     private static String key(String translation) {
         return Dictionary.normalize(translation);
-    }
-
-    private static String inflate(InputStream raw) throws IOException {
-        InputStream in = new InflaterInputStream(raw);
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[65536];
-            for (int n; (n = in.read(buffer)) != -1; ) out.write(buffer, 0, n);
-            return out.toString("ISO-8859-1");
-        } finally {
-            in.close();
-        }
     }
 }
