@@ -145,8 +145,9 @@ The app opens on the deck list. There is no header naming the app.
 - Command center (from Menu): an address field and a password-style token
   field (dots shown when one is saved), Save and Cancel. Save with an empty
   token keeps the saved one; with either missing, a toast says `Both the
-  address and the token are needed`. Down and Up move between the two
-  fields and the buttons.
+  address and the token are needed` and the dialog stays with what was
+  typed. Down and Up move between the two fields and the buttons; OK in the
+  address moves to the token, and OK in the token saves.
 
 ## Behaviour
 
