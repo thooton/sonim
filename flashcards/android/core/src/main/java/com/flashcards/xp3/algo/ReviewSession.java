@@ -87,7 +87,7 @@ public final class ReviewSession {
                 review = card;
             }
         }
-        int[] counts = counts(now);
+        int[] counts = queued(now);
         if (counts[0] == 0) fresh = null;
 
         if (learning != null && dueOf(learning) <= now) current = learning;
@@ -192,8 +192,23 @@ public final class ReviewSession {
     /**
      * Anki's counts for the deck right now: new cards (as many as may come
      * in), learning cards due within learn-ahead, and reviews due today.
+     * Reviewing ahead, the reviews are every other studied card, as Anki's
+     * filtered deck counts the cards it holds.
      */
     public int[] counts(long now) {
+        int[] counts = queued(now);
+        if (ahead) {
+            int studied = 0;
+            for (DeckCard card : deck.cards()) {
+                if (!card.isNew()) studied++;
+            }
+            counts[2] = studied - counts[1];
+        }
+        return counts;
+    }
+
+    /** The counts as the queue is drawn from: what is due, never ahead. */
+    private int[] queued(long now) {
         int unseen = 0;
         for (DeckCard card : deck.cards()) {
             if (card.isNew()) unseen++;

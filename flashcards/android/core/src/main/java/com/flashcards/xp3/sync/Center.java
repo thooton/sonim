@@ -36,6 +36,19 @@ public final class Center {
 
     private static final Http HTTP = new Http();
 
+    /**
+     * What a failed request says on the phone's narrow screen: "No
+     * connection" for the network's own failures (a POST body's send passes
+     * Java's text, a hostname and resolver jargon, straight through).
+     */
+    public static String reason(IOException e) {
+        if (e instanceof java.net.UnknownHostException || e instanceof java.net.SocketException
+            || e instanceof java.net.SocketTimeoutException || e.getMessage() == null) {
+            return "No connection";
+        }
+        return e.getMessage();
+    }
+
     public static Pairing startPairing(String server) throws IOException, InterruptedException {
         Http.Response response = HTTP.send(Http.Request.to(URI.create(server + "/flashcards/pair"))
             .post("{\"name\":\"Phone\"}").header("Content-Type", "application/json").timeout(30000));

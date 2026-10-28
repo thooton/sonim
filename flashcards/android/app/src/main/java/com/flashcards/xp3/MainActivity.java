@@ -18,6 +18,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -304,7 +305,7 @@ public final class MainActivity extends BaseActivity {
             try {
                 got = Center.startPairing(server);
             } catch (IOException e) {
-                why = e.getMessage() == null ? "No connection" : e.getMessage();
+                why = Center.reason(e);
             } catch (InterruptedException e) {
                 why = "Interrupted";
             }
@@ -375,12 +376,16 @@ public final class MainActivity extends BaseActivity {
         if (pairing != null) {
             TextView label = text("PAIRING CODE", 10, color(R.color.text_subtle));
             label.setLetterSpacing(0.1f);
+            label.setGravity(Gravity.CENTER);
             panel.addView(label);
             TextView code = text(pairing.code, 24, color(R.color.text));
             code.setTypeface(Anki.MEDIUM);
             code.setLetterSpacing(0.06f);
+            code.setGravity(Gravity.CENTER);
             panel.addView(code);
-            panel.addView(text("Delta, Tablet", 11, color(R.color.text_subtle)));
+            TextView where = text("Delta, Tablet", 11, color(R.color.text_subtle));
+            where.setGravity(Gravity.CENTER);
+            panel.addView(where);
         } else if (pairError != null) {
             TextView why = text(pairError, 12, color(R.color.state_learn));
             why.setGravity(Gravity.CENTER);
@@ -391,7 +396,9 @@ public final class MainActivity extends BaseActivity {
             at.topMargin = dp(6);
             panel.addView(again, at);
         } else {
-            panel.addView(text("…", 20, color(R.color.text_subtle)));
+            TextView asking = text("…", 20, color(R.color.text_subtle));
+            asking.setGravity(Gravity.CENTER);
+            panel.addView(asking);
         }
         return panel;
     }
@@ -924,7 +931,7 @@ public final class MainActivity extends BaseActivity {
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);
         box.addView(token);
-        new AlertDialog.Builder(this)
+        AlertDialog shown = new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
             .setPositiveButton("Save", (dialog, which) -> {
@@ -945,5 +952,25 @@ public final class MainActivity extends BaseActivity {
             })
             .setNegativeButton("Cancel", null)
             .show();
+        // The fields keep Down and Up to themselves; on a keys-only phone the
+        // d-pad is how one goes from field to field and on to the buttons.
+        Button cancel = shown.getButton(AlertDialog.BUTTON_NEGATIVE);
+        Button save = shown.getButton(AlertDialog.BUTTON_POSITIVE);
+        upDown(server, null, token);
+        upDown(token, server, cancel);
+        upDown(cancel, token, null);
+        upDown(save, token, null);
+    }
+
+    /** Up and Down move the focus from `view` to `up` and `down` (null: stay as Android has it). */
+    private static void upDown(View view, View up, View down) {
+        if (view == null) return;
+        view.setOnKeyListener((v, keyCode, event) -> {
+            View to = keyCode == KeyEvent.KEYCODE_DPAD_UP ? up
+                : keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? down : null;
+            if (to == null) return false;
+            if (event.getAction() == KeyEvent.ACTION_DOWN) to.requestFocus();
+            return true;
+        });
     }
 }

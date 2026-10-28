@@ -141,6 +141,7 @@ public final class SyncTests {
             c.ok("nothing due", s.next(NOON) == null);
             s.setAhead(true);
             DeckCard first = s.next(NOON);
+            c.same("counts the two it holds as reviews", "[0, 0, 2]", java.util.Arrays.toString(s.counts(NOON)));
             c.ok("the likelier forgotten first", first == soon || first == later);
             c.ok("lowest recall first", s.recall(first.fsrs, NOON) <= s.recall((first == soon ? later : soon).fsrs, NOON));
             s.rate(3, NOON);
@@ -149,6 +150,14 @@ public final class SyncTests {
             c.ok("never a new card", !second.isNew());
             s.setAhead(false);
             c.ok("off again: nothing", s.next(NOON + 20) == null);
+            c.same("off again: counts nothing", "[0, 0, 0]", java.util.Arrays.toString(s.counts(NOON + 20)));
+        });
+        c.run("a failed pairing says No connection, not Java's text", () -> {
+            c.same("no address", "No connection", com.flashcards.xp3.sync.Center.reason(
+                new java.net.UnknownHostException("Unable to resolve host \"edit.mimilearn.org\": No address associated with hostname")));
+            c.same("refused", "No connection", com.flashcards.xp3.sync.Center.reason(new java.net.ConnectException("ECONNREFUSED")));
+            c.same("timed out", "No connection", com.flashcards.xp3.sync.Center.reason(new java.net.SocketTimeoutException("timeout")));
+            c.same("worded already", "The code expired", com.flashcards.xp3.sync.Center.reason(new java.io.IOException("The code expired")));
         });
     }
 
