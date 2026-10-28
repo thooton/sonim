@@ -917,26 +917,47 @@ public final class MainActivity extends BaseActivity {
         final AlertDialog asked = new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
-            .setPositiveButton("Save", (dialog, which) -> {
-                String typed = token.getText().toString();
-                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                try {
-                    Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                    login = next;
-                    places = null;
-                    prefs().edit().putString("login", next.toJson()).apply();
-                    toast("Saved: " + next.host());
-                    if (message.length() > 0) say("");
-                } catch (IllegalArgumentException e) {
-                    toast(e.getMessage());
-                }
-            })
+            .setPositiveButton("Save", null)
             .setNegativeButton("Cancel", null)
             .show();
+        // Save closes the dialog only once the login is whole, so a slip
+        // keeps what was typed for another try.
+        asked.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String typed = token.getText().toString();
+            if (typed.trim().length() == 0 && login.ready()) typed = login.token();
+            Login next;
+            try {
+                next = Login.of(server.getText().toString(), typed);
+            } catch (IllegalArgumentException e) {
+                toast(e.getMessage());
+                (fault(server) ? server : token).requestFocus();
+                return;
+            }
+            if (!next.ready()) {
+                toast("Both the address and the token are needed");
+                (server.getText().toString().trim().length() == 0 ? server : token).requestFocus();
+                return;
+            }
+            login = next;
+            places = null;
+            prefs().edit().putString("login", next.toJson()).apply();
+            toast("Saved: " + next.host());
+            if (message.length() > 0) say("");
+            asked.dismiss();
+        });
         // Down goes on to the next field, then to Save, as in the app's lists.
         downTo(server, token);
         downTo(token, asked.getButton(AlertDialog.BUTTON_POSITIVE));
+    }
+
+    /** Whether the typed address is what Login refuses. */
+    private static boolean fault(EditText server) {
+        try {
+            Login.of(server.getText().toString(), null);
+            return false;
+        } catch (IllegalArgumentException e) {
+            return true;
+        }
     }
 
     private static void downTo(View from, final View to) {
