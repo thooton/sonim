@@ -117,12 +117,6 @@ public final class Node {
         }
     }
 
-    /** Whether `ancestor` is this node or holds it. */
-    public boolean within(Node ancestor) {
-        for (Node at = this; at != null; at = at.parent) if (at == ancestor) return true;
-        return false;
-    }
-
     /** Its text with white space collapsed and trimmed, as a reader sees it. */
     public String text() {
         StringBuilder out = new StringBuilder();

@@ -95,20 +95,6 @@ public final class Canvas {
         return result;
     }
 
-    public Object grading(String course) throws IOException, InterruptedException {
-        return list("courses/" + course + "/assignment_groups",
-            new String[] { "id", "name", "group_weight", "rules", "position" });
-    }
-
-    public Object enrollment(String course) throws IOException, InterruptedException {
-        return list("courses/" + course + "/enrollments?user_id=self&type%5B%5D=StudentEnrollment",
-            new String[] { "course_id", "type", "enrollment_state", "grades", "html_url" });
-    }
-
-    public Object gradingStandard(String course, String standard) throws IOException, InterruptedException {
-        return get("courses/" + course + "/grading_standards/" + standard);
-    }
-
     public Object posts(String course, boolean announcements) throws IOException, InterruptedException {
         return list("courses/" + course + "/discussion_topics?order_by=recent_activity&only_announcements="
             + announcements, POST_FIELDS);

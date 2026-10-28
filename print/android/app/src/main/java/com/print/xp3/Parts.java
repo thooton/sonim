@@ -11,6 +11,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import com.xp3.common.ui.Ui;
 import android.widget.TextView;
 
 /** The proposal's components (section 4), built in code. */
@@ -46,7 +47,7 @@ final class Parts {
         ImageView view = new ImageView(c);
         view.setImageDrawable(Look.icon(c, id, color));
         view.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        int px = Look.dp(c, size);
+        int px = Ui.dp(c, size);
         view.setLayoutParams(new LinearLayout.LayoutParams(px, px));
         return view;
     }
@@ -59,7 +60,7 @@ final class Parts {
     static FrameLayout nav(Context c, String title, boolean back, View right) {
         FrameLayout bar = new FrameLayout(c);
         bar.setBackgroundColor(Look.BAR);
-        int side = Look.dp(c, 58);
+        int side = Ui.dp(c, 58);
         TextView name = Look.line(c, title, 13, Look.BOLD, Look.INK);
         name.setGravity(Gravity.CENTER);
         FrameLayout.LayoutParams middle = new FrameLayout.LayoutParams(FILL, FILL);
@@ -71,12 +72,12 @@ final class Parts {
             hint.addView(image(c, R.drawable.ic_chev_left, Look.BLUE, 12));
             hint.addView(Look.text(c, "Back", 12, Look.SEMIBOLD, Look.BLUE));
             FrameLayout.LayoutParams left = new FrameLayout.LayoutParams(WRAP, FILL, Gravity.LEFT);
-            left.leftMargin = Look.dp(c, 7);
+            left.leftMargin = Ui.dp(c, 7);
             bar.addView(hint, left);
         }
         if (right != null) {
             FrameLayout.LayoutParams at = new FrameLayout.LayoutParams(WRAP, FILL, Gravity.RIGHT);
-            at.rightMargin = Look.dp(c, 8);
+            at.rightMargin = Ui.dp(c, 8);
             bar.addView(right, at);
         }
         return bar;
@@ -86,7 +87,7 @@ final class Parts {
     static LinearLayout page(Context c, View nav, View body) {
         LinearLayout page = column(c);
         page.setBackgroundColor(Look.WHITE);
-        page.addView(nav, line(FILL, Look.dp(c, 28)));
+        page.addView(nav, line(FILL, Ui.dp(c, 28)));
         page.addView(rule(c), line(FILL, 1));
         page.addView(body, new LinearLayout.LayoutParams(FILL, 0, 1));
         return page;
@@ -102,7 +103,7 @@ final class Parts {
     static TextView header(Context c, String text) {
         TextView view = Look.line(c, text.toUpperCase(java.util.Locale.ROOT), 9.5f, Look.SEMIBOLD, Look.MUTE);
         view.setLetterSpacing(0.05f);
-        view.setPadding(Look.dp(c, 11), Look.dp(c, 7), Look.dp(c, 11), Look.dp(c, 4));
+        view.setPadding(Ui.dp(c, 11), Ui.dp(c, 7), Ui.dp(c, 11), Ui.dp(c, 4));
         return view;
     }
 
@@ -110,7 +111,7 @@ final class Parts {
     static TextView foot(Context c, String text) {
         TextView view = Look.text(c, text, 9.5f, Look.REGULAR, Look.MUTE);
         view.setGravity(Gravity.CENTER);
-        view.setPadding(Look.dp(c, 10), Look.dp(c, 8), Look.dp(c, 10), Look.dp(c, 7));
+        view.setPadding(Ui.dp(c, 10), Ui.dp(c, 8), Ui.dp(c, 10), Ui.dp(c, 7));
         return view;
     }
 
@@ -127,8 +128,8 @@ final class Parts {
             super(c);
             setOrientation(HORIZONTAL);
             setGravity(Gravity.CENTER_VERTICAL);
-            setMinimumHeight(Look.dp(c, height));
-            setPadding(Look.dp(c, 11), 0, Look.dp(c, 10), 0);
+            setMinimumHeight(Ui.dp(c, height));
+            setPadding(Ui.dp(c, 11), 0, Ui.dp(c, 10), 0);
             setFocusable(true);
             setBackground(new Look.RowFocus(c, Look.WHITE));
             setDefaultFocusHighlightEnabled(false);
@@ -139,7 +140,7 @@ final class Parts {
             sub = Look.line(c, "", 9.5f, Look.REGULAR, Look.MUTE);
             text.addView(title, line(FILL, WRAP));
             LinearLayout.LayoutParams under = line(FILL, WRAP);
-            under.topMargin = Look.dp(c, 2);
+            under.topMargin = Ui.dp(c, 2);
             text.addView(sub, under);
             sub.setVisibility(GONE);
         }
@@ -147,7 +148,7 @@ final class Parts {
         /** Adds what leads the row (an icon square, a thumbnail), 9dp before the text. */
         Row lead(View view, int width, int height) {
             LinearLayout.LayoutParams lp = line(width, height);
-            lp.rightMargin = Look.dp(getContext(), 9);
+            lp.rightMargin = Ui.dp(getContext(), 9);
             addView(view, lp);
             return this;
         }
@@ -164,14 +165,14 @@ final class Parts {
         Row chevron() {
             chevron = image(getContext(), R.drawable.ic_chev_right, Look.CHEVRON, 12);
             LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) chevron.getLayoutParams();
-            lp.leftMargin = Look.dp(getContext(), 6);
+            lp.leftMargin = Ui.dp(getContext(), 6);
             addView(chevron);
             return this;
         }
 
         Row trailing(View view) {
             LinearLayout.LayoutParams lp = line(WRAP, WRAP);
-            lp.leftMargin = Look.dp(getContext(), 6);
+            lp.leftMargin = Ui.dp(getContext(), 6);
             addView(view, lp);
             return this;
         }
@@ -204,7 +205,7 @@ final class Parts {
             row = new Row(c, height);
             row.titled(label, null);
             value = Look.line(c, "", 11.5f, Look.SEMIBOLD, Look.BLUE);
-            value.setMaxWidth(Look.dp(c, 120));
+            value.setMaxWidth(Ui.dp(c, 120));
             row.trailing(value);
             if (opens) row.chevron();
         }
@@ -215,7 +216,7 @@ final class Parts {
         FrameLayout square = new FrameLayout(c);
         square.setBackground(Look.rounded(Look.ICON_FILL, 6, c));
         ImageView glyph = image(c, icon, Look.BLUE, 14);
-        square.addView(glyph, new FrameLayout.LayoutParams(Look.dp(c, 14), Look.dp(c, 14), Gravity.CENTER));
+        square.addView(glyph, new FrameLayout.LayoutParams(Ui.dp(c, 14), Ui.dp(c, 14), Gravity.CENTER));
         return square;
     }
 
@@ -238,9 +239,9 @@ final class Parts {
         view.setSingleLine();
         view.setEllipsize(TextUtils.TruncateAt.END);
         view.setBackground(new Look.ButtonFace(c, kind));
-        int ring = Look.dp(c, 3.5f);
-        view.setPadding(ring + Look.dp(c, 4), ring, ring + Look.dp(c, 4), ring);
-        view.setMinHeight(Look.dp(c, 35));
+        int ring = Ui.dp(c, 3.5f);
+        view.setPadding(ring + Ui.dp(c, 4), ring, ring + Ui.dp(c, 4), ring);
+        view.setMinHeight(Ui.dp(c, 35));
         view.setFocusable(true);
         view.setDefaultFocusHighlightEnabled(false);
         view.setOnClickListener(v -> action.run());
@@ -250,11 +251,11 @@ final class Parts {
     /** Buttons stacked, 7dp apart, 12dp from the sides (the ring takes 3.5 of it). */
     static LinearLayout buttons(Context c, View... buttons) {
         LinearLayout column = column(c);
-        int side = Look.dp(c, 12 - 3.5f);
+        int side = Ui.dp(c, 12 - 3.5f);
         column.setPadding(side, 0, side, 0);
         for (int i = 0; i < buttons.length; i++) {
-            LinearLayout.LayoutParams lp = line(FILL, Look.dp(c, 35));
-            if (i > 0) lp.topMargin = Look.dp(c, 0);
+            LinearLayout.LayoutParams lp = line(FILL, Ui.dp(c, 35));
+            if (i > 0) lp.topMargin = Ui.dp(c, 0);
             column.addView(buttons[i], lp);
         }
         return column;
@@ -263,10 +264,10 @@ final class Parts {
     /** Two buttons side by side, sharing the width. */
     static LinearLayout pair(Context c, View left, View right) {
         LinearLayout row = row(c);
-        int side = Look.dp(c, 12 - 3.5f);
+        int side = Ui.dp(c, 12 - 3.5f);
         row.setPadding(side, 0, side, 0);
-        LinearLayout.LayoutParams a = new LinearLayout.LayoutParams(0, Look.dp(c, 35), 1);
-        LinearLayout.LayoutParams b = new LinearLayout.LayoutParams(0, Look.dp(c, 35), 1);
+        LinearLayout.LayoutParams a = new LinearLayout.LayoutParams(0, Ui.dp(c, 35), 1);
+        LinearLayout.LayoutParams b = new LinearLayout.LayoutParams(0, Ui.dp(c, 35), 1);
         row.addView(left, a);
         row.addView(right, b);
         return row;
@@ -280,7 +281,7 @@ final class Parts {
         Switch(Context c, boolean on) {
             super(c);
             this.on = on;
-            setLayoutParams(new LinearLayout.LayoutParams(Look.dp(c, 26), Look.dp(c, 15)));
+            setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(c, 26), Ui.dp(c, 15)));
         }
 
         void set(boolean value) {
@@ -291,7 +292,7 @@ final class Parts {
         /** Its own size, 26 x 15 dp, whatever layout params a row gives it. */
         @Override
         protected void onMeasure(int widthSpec, int heightSpec) {
-            setMeasuredDimension(resolveSize(Look.dp(getContext(), 26), widthSpec), resolveSize(Look.dp(getContext(), 15), heightSpec));
+            setMeasuredDimension(resolveSize(Ui.dp(getContext(), 26), widthSpec), resolveSize(Ui.dp(getContext(), 15), heightSpec));
         }
 
         @Override
@@ -301,7 +302,7 @@ final class Parts {
             paint.setColor(on ? Look.BLUE : 0xFFC9CCD4);
             canvas.drawRoundRect(0, 0, w, h, h / 2, h / 2, paint);
             paint.setColor(Look.WHITE);
-            float r = h / 2 - Look.dp(getContext(), 2);
+            float r = h / 2 - Ui.dp(getContext(), 2);
             canvas.drawCircle(on ? w - h / 2 : h / 2, h / 2, r, paint);
         }
     }
@@ -331,7 +332,7 @@ final class Parts {
             canvas.drawCircle(s / 2, s / 2, s / 2 - stroke / 2, paint);
             if (on) {
                 paint.setStyle(Paint.Style.FILL);
-                canvas.drawCircle(s / 2, s / 2, s / 2 - stroke - Look.dp(getContext(), 1.5f), paint);
+                canvas.drawCircle(s / 2, s / 2, s / 2 - stroke - Ui.dp(getContext(), 1.5f), paint);
             }
         }
     }
@@ -344,13 +345,13 @@ final class Parts {
             super(c);
             setOrientation(HORIZONTAL);
             setBackground(Look.outlined(Look.WHITE, 5, 1, Look.BLUE, c));
-            int in = Look.dp(c, 1);
+            int in = Ui.dp(c, 1);
             setPadding(in, in, in, in);
             tabs = new TextView[labels.length];
             for (int i = 0; i < labels.length; i++) {
                 TextView tab = Look.line(c, labels[i], 10.5f, Look.SEMIBOLD, Look.BLUE);
                 tab.setGravity(Gravity.CENTER);
-                tab.setPadding(0, Look.dp(c, 3), 0, Look.dp(c, 4));
+                tab.setPadding(0, Ui.dp(c, 3), 0, Ui.dp(c, 4));
                 addView(tab, new LinearLayout.LayoutParams(0, WRAP, 1));
                 tabs[i] = tab;
             }
@@ -373,7 +374,7 @@ final class Parts {
         circle.setColor(tint);
         badge.setBackground(circle);
         ImageView glyph = image(c, icon, color, 28);
-        badge.addView(glyph, new FrameLayout.LayoutParams(Look.dp(c, 28), Look.dp(c, 28), Gravity.CENTER));
+        badge.addView(glyph, new FrameLayout.LayoutParams(Ui.dp(c, 28), Ui.dp(c, 28), Gravity.CENTER));
         return badge;
     }
 
@@ -381,7 +382,7 @@ final class Parts {
     static TextView pill(Context c, String text, int fill, int color) {
         TextView view = Look.line(c, text, 9.5f, Look.BOLD, color);
         view.setBackground(Look.rounded(fill, 10, c));
-        view.setPadding(Look.dp(c, 8), Look.dp(c, 2), Look.dp(c, 8), Look.dp(c, 3));
+        view.setPadding(Ui.dp(c, 8), Ui.dp(c, 2), Ui.dp(c, 8), Ui.dp(c, 3));
         return view;
     }
 
@@ -393,31 +394,31 @@ final class Parts {
                                View buttons, int top) {
         LinearLayout page = column(c);
         page.setGravity(Gravity.CENTER_HORIZONTAL);
-        page.setPadding(0, Look.dp(c, top), 0, 0);
-        if (art != null) page.addView(art, line(Look.dp(c, artSize), Look.dp(c, artSize)));
+        page.setPadding(0, Ui.dp(c, top), 0, 0);
+        if (art != null) page.addView(art, line(Ui.dp(c, artSize), Ui.dp(c, artSize)));
         TextView title = Look.text(c, headline, 15, Look.BOLD, Look.INK);
         title.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = line(FILL, WRAP);
-        lp.topMargin = Look.dp(c, 10);
-        lp.leftMargin = lp.rightMargin = Look.dp(c, 16);
+        lp.topMargin = Ui.dp(c, 10);
+        lp.leftMargin = lp.rightMargin = Ui.dp(c, 16);
         page.addView(title, lp);
         if (message != null && message.length() > 0) {
             TextView body = Look.text(c, message, 10.5f, Look.REGULAR, Look.MUTE);
             body.setGravity(Gravity.CENTER);
             body.setLineSpacing(0, 1.15f);
             LinearLayout.LayoutParams under = line(FILL, WRAP);
-            under.topMargin = Look.dp(c, 4);
-            under.leftMargin = under.rightMargin = Look.dp(c, 16);
+            under.topMargin = Ui.dp(c, 4);
+            under.leftMargin = under.rightMargin = Ui.dp(c, 16);
             page.addView(body, under);
         }
         if (pill != null) {
             LinearLayout.LayoutParams under = line(WRAP, WRAP);
-            under.topMargin = Look.dp(c, 8);
+            under.topMargin = Ui.dp(c, 8);
             page.addView(pill, under);
         }
         if (buttons != null) {
             LinearLayout.LayoutParams under = line(FILL, WRAP);
-            under.topMargin = Look.dp(c, 14);
+            under.topMargin = Ui.dp(c, 14);
             page.addView(buttons, under);
         }
         return page;

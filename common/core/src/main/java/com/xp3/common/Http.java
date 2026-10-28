@@ -365,6 +365,18 @@ public final class Http {
             return stream;
         }
 
+        /** The rest of the body, read whole; one over `limit` bytes throws IOException(`tooBig`). */
+        public byte[] bytes(long limit, String tooBig) throws IOException, InterruptedException {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[16384];
+            for (int count; (count = stream.read(buffer)) >= 0; ) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                out.write(buffer, 0, count);
+                if (out.size() > limit) throw new IOException(tooBig);
+            }
+            return out.toByteArray();
+        }
+
         /**
          * One response header, or "" when absent: a redirect's Location is
          * the one a caller following it by hand needs, since redirects are

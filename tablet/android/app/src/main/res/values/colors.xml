@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The proposal's palette (DESIGN.md, "Tablet"): e-ink paper, graphite
-         ink, and the reMarkable highlighter as the only colour. Look holds
-         the same values for the views drawn in code. -->
+    <!-- The window's paper and ink, from the proposal's palette (DESIGN.md,
+         "Tablet"). Look holds the whole palette for the views drawn in code. -->
     <color name="paper">#E3E4DF</color>
-    <color name="sheet">#F7F7F3</color>
     <color name="ink">#222428</color>
-    <color name="graphite">#62666D</color>
-    <color name="rule">#C5C7C1</color>
-    <color name="mark">#F2D343</color>
 </resources>

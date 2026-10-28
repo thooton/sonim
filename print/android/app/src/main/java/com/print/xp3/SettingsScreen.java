@@ -7,6 +7,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import java.util.ArrayList;
+import com.xp3.common.ui.Ui;
 import java.util.List;
 
 /**
@@ -153,9 +154,9 @@ final class SettingsScreen extends Screen {
             list.addView(Parts.header(c, "Keys"));
             for (String[] key : keys) {
                 LinearLayout row = Parts.row(c);
-                row.setPadding(Look.dp(c, 11), Look.dp(c, 5), Look.dp(c, 10), Look.dp(c, 5));
+                row.setPadding(Ui.dp(c, 11), Ui.dp(c, 5), Ui.dp(c, 10), Ui.dp(c, 5));
                 TextView name = Look.text(c, key[0], 11.5f, Look.BOLD, Look.BLUE);
-                row.addView(name, Parts.line(Look.dp(c, 70), Parts.WRAP));
+                row.addView(name, Parts.line(Ui.dp(c, 70), Parts.WRAP));
                 row.addView(Look.text(c, key[1], 11, Look.REGULAR, Look.INK), Parts.weighted());
                 list.addView(row);
             }
@@ -164,7 +165,7 @@ final class SettingsScreen extends Screen {
                 + "printer that reads PDFs, and otherwise draws the pages on the phone in a language the printer takes. "
                 + "A printer it doesn't find can be added by its IP address, which the printer's own menu shows.",
                 10.5f, Look.REGULAR, Look.MUTE);
-            about.setPadding(Look.dp(c, 11), 0, Look.dp(c, 11), Look.dp(c, 10));
+            about.setPadding(Ui.dp(c, 11), 0, Ui.dp(c, 11), Ui.dp(c, 10));
             about.setLineSpacing(0, 1.15f);
             list.addView(about);
             ScrollView scroll = new ScrollView(c);

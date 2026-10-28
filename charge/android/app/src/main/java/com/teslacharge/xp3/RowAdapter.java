@@ -38,18 +38,6 @@ abstract class RowAdapter extends BaseAdapter {
         notifyDataSetChanged();
     }
 
-    /** Replaces one row without disturbing the current keypad selection. */
-    void replaceById(String id, JSONObject replacement) {
-        if (id == null || replacement == null) return;
-        for (int i = 0; i < rows.size(); i++) {
-            if (id.equals(rows.get(i).optString("id"))) {
-                rows.set(i, replacement);
-                notifyDataSetChanged();
-                return;
-            }
-        }
-    }
-
     void setSelectedPosition(int position) {
         if (position == selectedPosition) return;
         selectedPosition = position;

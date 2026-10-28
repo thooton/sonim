@@ -11,7 +11,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Finds the printers on the network: what announces itself over mDNS, and
@@ -253,9 +252,4 @@ public final class Finder {
         }
     }
 
-    /** Waits for the probes under way, for the tests. */
-    void settle(long millis) throws InterruptedException {
-        probes.shutdown();
-        probes.awaitTermination(millis, TimeUnit.MILLISECONDS);
-    }
 }

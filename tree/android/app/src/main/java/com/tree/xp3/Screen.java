@@ -2,13 +2,11 @@ package com.tree.xp3;
 
 import android.app.AlertDialog;
 import android.os.Bundle;
-import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -17,7 +15,7 @@ import android.widget.TextView;
 
 import com.tree.xp3.qa.Center;
 import com.tree.xp3.qa.Qa;
-import com.xp3.common.Login;
+import com.xp3.common.ui.LoginDialog;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Family;
 import com.xp3.common.ui.Ui;
@@ -251,53 +249,10 @@ abstract class Screen extends BaseActivity {
 
     /** The fallback for a build without a bundled login: the address and the token, typed. */
     protected final void askLogin() {
-        LinearLayout box = vertical();
-        int pad = dp(16);
-        box.setPadding(pad, pad / 2, pad, 0);
-        final Login login = Tree.login;
-        final EditText server = new EditText(this);
-        server.setHint("https://…");
-        server.setSingleLine(true);
-        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(login.server() == null ? "" : login.server());
-        final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "••••••••" : "Token");
-        token.setSingleLine(true);
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        box.addView(server);
-        box.addView(token);
-        final AlertDialog ask = new AlertDialog.Builder(this)
-            .setTitle("Command center")
-            .setView(box)
-            .setPositiveButton("Save", null)
-            .setNegativeButton("Cancel", null)
-            .create();
-        // Up and Down never left the address field here, so the d-pad moves
-        // between the fields and the buttons itself.
-        ask.setOnKeyListener((shown, code, event) -> {
-            if (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN) return false;
-            if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
-            View at = ask.getCurrentFocus();
-            View next = at == null ? null : at.focusSearch(code == KeyEvent.KEYCODE_DPAD_UP ? View.FOCUS_UP : View.FOCUS_DOWN);
-            if (next != null) next.requestFocus();
-            return true;
-        });
-        ask.show();
-        // Save closes the dialog only once the login is taken, so a mistake
-        // keeps what was typed for correcting.
-        ask.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            String typed = token.getText().toString();
-            if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-            try {
-                Login next = Login.of(server.getText().toString(), typed);
-                if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                Tree.saveLogin(this, next);
-                ask.dismiss();
-                toast("Saved: " + next.host());
-                loggedIn();
-            } catch (IllegalArgumentException e) {
-                toast(e.getMessage());
-            }
+        LoginDialog.show(this, Tree.prefs(this), Tree.login, next -> {
+            Tree.login = next;
+            toast("Saved: " + next.host());
+            loggedIn();
         });
     }
 

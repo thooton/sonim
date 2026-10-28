@@ -23,6 +23,7 @@ import com.list.xp3.data.Item;
 import com.xp3.common.ui.SelectableAdapter;
 
 import java.util.ArrayList;
+import com.xp3.common.ui.Ui;
 import java.util.List;
 
 /**
@@ -258,6 +259,6 @@ final class ItemAdapter extends SelectableAdapter {
     }
 
     private int dp(float value) {
-        return Math.round(value * context.getResources().getDisplayMetrics().density);
+        return Ui.dp(context, value);
     }
 }

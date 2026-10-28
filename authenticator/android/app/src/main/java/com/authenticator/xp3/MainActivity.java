@@ -7,13 +7,11 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
-import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
@@ -21,6 +19,7 @@ import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.MetricAffectingSpan;
 import android.text.TextPaint;
+import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -28,7 +27,6 @@ import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -38,6 +36,7 @@ import android.widget.TextView;
 
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
+import com.xp3.common.ui.LoginDialog;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
 
@@ -139,7 +138,7 @@ public final class MainActivity extends BaseActivity {
         setContentView(root);
 
         accounts = readCache();
-        login = loadLogin(prefs());
+        login = LoginDialog.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         show();
         if (login.ready()) sync();
         else askLogin();
@@ -790,86 +789,19 @@ public final class MainActivity extends BaseActivity {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
     }
 
-    /**
-     * The bundled login is adopted once per build that carries a new one;
-     * otherwise whatever was saved (typed in from the menu) is kept.
-     */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     /** The fallback for a build without a bundled login. */
     private void askLogin() {
-        LinearLayout box = vertical();
-        int pad = dp(16);
-        box.setPadding(pad, pad / 2, pad, 0);
-        final EditText server = new EditText(this);
-        server.setHint("https://…");
-        server.setSingleLine(true);
-        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(login.server() == null ? "" : login.server());
-        final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "••••••••" : "Token");
-        token.setSingleLine(true);
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        box.addView(server);
-        box.addView(token);
         // Taken by Save; otherwise what the entry form gave back goes back to it.
         final boolean[] saved = {false};
-        AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle("Command center")
-            .setView(box)
-            .setPositiveButton("Save", (shown, which) -> {
-                String typed = token.getText().toString();
-                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                try {
-                    Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                    login = next;
-                    prefs().edit().putString("login", next.toJson()).apply();
-                    toast("Saved: " + next.host());
-                    saved[0] = true;
-                    sync();
-                    if (unsaved != null) entered();
-                } catch (IllegalArgumentException e) {
-                    toast(e.getMessage());
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .setOnDismissListener(gone -> {
-                if (!saved[0]) reopen();
-            })
-            .show();
-        // A single-line field keeps Up and Down to itself; these go between
-        // the fields and on to the buttons.
-        server.setOnKeyListener((view, keyCode, event) -> {
-            if (keyCode != KeyEvent.KEYCODE_DPAD_DOWN) return false;
-            if (event.getAction() == KeyEvent.ACTION_DOWN) token.requestFocus();
-            return true;
-        });
-        token.setOnKeyListener((view, keyCode, event) -> {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) server.requestFocus();
-                return true;
-            }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) dialog.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus();
-                return true;
-            }
-            return false;
+        LoginDialog.show(this, prefs(), login, next -> {
+            saved[0] = true;
+            login = next;
+            toast("Saved: " + next.host());
+            sync();
+            if (unsaved != null) entered();
+        }).setOnDismissListener(gone -> {
+            if (!saved[0]) reopen();
         });
     }
 }

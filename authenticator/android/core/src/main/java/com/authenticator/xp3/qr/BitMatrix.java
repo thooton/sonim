@@ -21,10 +21,6 @@ final class BitMatrix {
         bits[y * width + x] = value;
     }
 
-    void flip(int x, int y) {
-        bits[y * width + x] ^= true;
-    }
-
     void setRegion(int left, int top, int regionWidth, int regionHeight) {
         for (int y = top; y < top + regionHeight; y++) {
             for (int x = left; x < left + regionWidth; x++) set(x, y, true);

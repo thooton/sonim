@@ -133,12 +133,15 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
 - `common/core` (plain Java, `com.xp3.common`): `Json` (strict codec), `Http`
   (deadlines, bounded bodies, no redirects), `Disk` (whole-file reads and
   atomic writes), `Login` (the command center address and delta token, as
-  Source, Places and Mail sign in); and, as test fixtures, `Check` (the test
-  harness) and `TestServer` (a loopback HTTP server).
+  every app that talks to the command center signs in); and, as test
+  fixtures, `Check` (the test harness) and `TestServer` (a loopback HTTP
+  server).
 - `common/ui` (Android, `com.xp3.common.ui`): `BaseActivity` (`dp`, `color`,
-  `toast`, `alert`, `vertical`, `text`, `listDialog`), `Ui` (workers, `fill`,
-  `weighted`, `isOk`, `onSelect`), `Card` (the SD card, where downloads
-  go), `CardGrant` (Android's grant for the whole card, which Android 8.1
+  `toast`, `alert`, `vertical`, `text`, `listDialog`), `Ui` (workers, `dp`,
+  `fill`, `weighted`, `isOk`, `onSelect`), `LoginDialog` (the bundled login
+  adopted once per build, and the "Command center" dialog that types one
+  in: use it rather than a dialog of the app's own), `Card` (the SD card,
+  where downloads go), `CardGrant` (Android's grant for the whole card, which Android 8.1
   wants before an app writes there, and sometimes before it reads what
   another app put there), `Tabs` (tab bar with d-pad cycling),
   `SelectableAdapter` (rows that paint their own highlight), `Markdown`, and

@@ -6,9 +6,7 @@ import android.graphics.BitmapFactory;
 import com.newyorker.xp3.news.Site;
 import com.xp3.common.Http;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 
 /**
@@ -60,7 +58,7 @@ final class Net {
         byte[] bytes;
         try {
             if (stream.status() != 200) throw new IOException("Picture " + stream.status());
-            bytes = read(stream.stream());
+            bytes = stream.bytes(4000000, "Picture too large");
         } finally {
             stream.close();
         }
@@ -74,17 +72,6 @@ final class Net {
         Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
         if (bitmap == null) throw new IOException("Not a picture");
         return bitmap;
-    }
-
-    private static byte[] read(InputStream in) throws IOException, InterruptedException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buffer = new byte[16384];
-        for (int count; (count = in.read(buffer)) >= 0; ) {
-            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-            out.write(buffer, 0, count);
-            if (out.size() > 4000000) throw new IOException("Picture too large");
-        }
-        return out.toByteArray();
     }
 
     /** The feed's pictures are asked for at this width, and resized from it as needed. */

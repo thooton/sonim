@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import com.xp3.common.ui.Ui;
 import java.util.Map;
 
 /**
@@ -84,7 +85,7 @@ final class PrintersScreen extends Screen {
         Context c = app;
         LinearLayout body = Parts.column(c);
         LinearLayout tabBar = Parts.column(c);
-        tabBar.setPadding(Look.dp(c, 10), Look.dp(c, 7), Look.dp(c, 10), Look.dp(c, 6));
+        tabBar.setPadding(Ui.dp(c, 10), Ui.dp(c, 7), Ui.dp(c, 10), Ui.dp(c, 6));
         tabs = new Parts.Tabs(c, "Nearby", "By IP address");
         tabBar.addView(tabs);
         body.addView(tabBar);
@@ -132,13 +133,13 @@ final class PrintersScreen extends Screen {
     private LinearLayout buildNearby(Context c) {
         LinearLayout page = Parts.column(c);
         LinearLayout header = Parts.row(c);
-        header.setPadding(Look.dp(c, 11), Look.dp(c, 7), Look.dp(c, 11), Look.dp(c, 4));
+        header.setPadding(Ui.dp(c, 11), Ui.dp(c, 7), Ui.dp(c, 11), Ui.dp(c, 4));
         spinner = spinner(c);
-        header.addView(spinner, Parts.line(Look.dp(c, 9), Look.dp(c, 9)));
+        header.addView(spinner, Parts.line(Ui.dp(c, 9), Ui.dp(c, 9)));
         searching = Look.line(c, "", 9.5f, Look.SEMIBOLD, Look.MUTE);
         searching.setLetterSpacing(0.05f);
         LinearLayout.LayoutParams lp = Parts.weighted();
-        lp.leftMargin = Look.dp(c, 5);
+        lp.leftMargin = Ui.dp(c, 5);
         header.addView(searching, lp);
         page.addView(header);
         list = Parts.column(c);
@@ -251,7 +252,7 @@ final class PrintersScreen extends Screen {
         Parts.Row row = new Parts.Row(c, 44);
         ImageView picture = new ImageView(c);
         picture.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        row.lead(picture, Look.dp(c, 38), Look.dp(c, 27));
+        row.lead(picture, Ui.dp(c, 38), Ui.dp(c, 27));
         row.titled(printer.shown(), " ");
         ImageView tick = Parts.image(c, R.drawable.ic_check, Look.BLUE, 14);
         row.trailing(tick);
@@ -361,15 +362,15 @@ final class PrintersScreen extends Screen {
         ring.setShape(android.graphics.drawable.GradientDrawable.OVAL);
         ring.setColor(0xFFEEF3FE);
         middle.setBackground(ring);
-        art.addView(middle, new FrameLayout.LayoutParams(Look.dp(c, 68), Look.dp(c, 68), Gravity.CENTER));
+        art.addView(middle, new FrameLayout.LayoutParams(Ui.dp(c, 68), Ui.dp(c, 68), Gravity.CENTER));
         View inner = new View(c);
         android.graphics.drawable.GradientDrawable white = new android.graphics.drawable.GradientDrawable();
         white.setShape(android.graphics.drawable.GradientDrawable.OVAL);
         white.setColor(Look.WHITE);
         inner.setBackground(white);
-        art.addView(inner, new FrameLayout.LayoutParams(Look.dp(c, 44), Look.dp(c, 44), Gravity.CENTER));
+        art.addView(inner, new FrameLayout.LayoutParams(Ui.dp(c, 44), Ui.dp(c, 44), Gravity.CENTER));
         ImageView sign = Parts.image(c, R.drawable.ic_wifi, Look.BLUE, 22);
-        art.addView(sign, new FrameLayout.LayoutParams(Look.dp(c, 22), Look.dp(c, 22), Gravity.CENTER));
+        art.addView(sign, new FrameLayout.LayoutParams(Ui.dp(c, 22), Ui.dp(c, 22), Gravity.CENTER));
         return art;
     }
 
@@ -392,43 +393,43 @@ final class PrintersScreen extends Screen {
 
     private LinearLayout buildAddress(Context c) {
         LinearLayout page = Parts.column(c);
-        page.setPadding(0, Look.dp(c, 9), 0, 0);
+        page.setPadding(0, Ui.dp(c, 9), 0, 0);
         TextView label = Look.text(c, "Printer IP address", 10, Look.SEMIBOLD, Look.MUTE);
-        label.setPadding(Look.dp(c, 12), 0, Look.dp(c, 12), 0);
+        label.setPadding(Ui.dp(c, 12), 0, Ui.dp(c, 12), 0);
         page.addView(label);
         addressRow = Parts.row(c);
         addressRow.setFocusable(true);
         addressRow.setDefaultFocusHighlightEnabled(false);
-        addressRow.setPadding(Look.dp(c, 10), Look.dp(c, 3), Look.dp(c, 10), 0);
+        addressRow.setPadding(Ui.dp(c, 10), Ui.dp(c, 3), Ui.dp(c, 10), 0);
         addressRow.setOnFocusChangeListener((v, has) -> paintBoxes());
         for (int i = 0; i < 4; i++) {
             if (i > 0) addressRow.addView(Look.text(c, ".", 12, Look.BOLD, Look.INK));
             TextView box = Look.text(c, "", 11.5f, Look.BOLD, Look.INK);
             box.setGravity(Gravity.CENTER);
-            box.setMinWidth(Look.dp(c, 34));
-            box.setPadding(Look.dp(c, 6), 0, Look.dp(c, 6), 0);
-            LinearLayout.LayoutParams lp = Parts.line(Parts.WRAP, Look.dp(c, 24));
-            lp.leftMargin = lp.rightMargin = Look.dp(c, 1);
+            box.setMinWidth(Ui.dp(c, 34));
+            box.setPadding(Ui.dp(c, 6), 0, Ui.dp(c, 6), 0);
+            LinearLayout.LayoutParams lp = Parts.line(Parts.WRAP, Ui.dp(c, 24));
+            lp.leftMargin = lp.rightMargin = Ui.dp(c, 1);
             addressRow.addView(box, lp);
             boxes[i] = box;
         }
         page.addView(addressRow);
         TextView hint = Look.text(c, "Type with the number keys. * moves to the next box.", 9.5f, Look.REGULAR, Look.MUTE);
-        hint.setPadding(Look.dp(c, 12), Look.dp(c, 5), Look.dp(c, 12), 0);
+        hint.setPadding(Ui.dp(c, 12), Ui.dp(c, 5), Ui.dp(c, 12), 0);
         page.addView(hint);
         result = Parts.row(c);
         result.setBackground(Look.outlined(Look.WHITE, 6, 1, Look.LINE, c));
-        result.setPadding(Look.dp(c, 8), Look.dp(c, 7), Look.dp(c, 8), Look.dp(c, 7));
+        result.setPadding(Ui.dp(c, 8), Ui.dp(c, 7), Ui.dp(c, 8), Ui.dp(c, 7));
         result.setVisibility(View.GONE);
         LinearLayout.LayoutParams resultAt = Parts.line(Parts.FILL, Parts.WRAP);
-        resultAt.setMargins(Look.dp(c, 10), Look.dp(c, 10), Look.dp(c, 10), 0);
+        resultAt.setMargins(Ui.dp(c, 10), Ui.dp(c, 10), Ui.dp(c, 10), 0);
         page.addView(result, resultAt);
         add = Parts.button(c, "Add printer", Parts.PRIMARY, () -> {
             if (found != null) pick(found);
         });
         add.setEnabled(false);
         LinearLayout.LayoutParams addAt = Parts.line(Parts.FILL, Parts.WRAP);
-        addAt.topMargin = Look.dp(c, 9);
+        addAt.topMargin = Ui.dp(c, 9);
         page.addView(Parts.buttons(c, add), addAt);
 
         // The phone's own network is the likely one: its first three parts are filled in.
@@ -525,15 +526,15 @@ final class PrintersScreen extends Screen {
             ImageView picture = new ImageView(c);
             picture.setImageResource(Readiness.picture(printer));
             picture.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            LinearLayout.LayoutParams lp = Parts.line(Look.dp(c, 40), Look.dp(c, 28));
-            lp.rightMargin = Look.dp(c, 8);
+            LinearLayout.LayoutParams lp = Parts.line(Ui.dp(c, 40), Ui.dp(c, 28));
+            lp.rightMargin = Ui.dp(c, 8);
             result.addView(picture, lp);
         }
         LinearLayout text = Parts.column(c);
         LinearLayout heading = Parts.row(c);
         if (printer != null) {
             ImageView tick = Parts.image(c, R.drawable.ic_check, Look.OK, 12);
-            ((LinearLayout.LayoutParams) tick.getLayoutParams()).rightMargin = Look.dp(c, 4);
+            ((LinearLayout.LayoutParams) tick.getLayoutParams()).rightMargin = Ui.dp(c, 4);
             heading.addView(tick);
         }
         heading.addView(Look.line(c, title, 11.5f, Look.BOLD, printer == null && detail != null ? Look.ERR : Look.INK));

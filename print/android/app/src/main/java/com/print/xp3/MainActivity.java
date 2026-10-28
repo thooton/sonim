@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import com.xp3.common.ui.Ui;
 import java.util.List;
 
 /**
@@ -260,10 +261,10 @@ public final class MainActivity extends Activity {
     void choose(String title, List<Choice> choices, int selected, String hint, final Chosen chosen) {
         final LinearLayout card = Parts.column(this);
         card.setBackground(Look.rounded(Look.WHITE, 8, this));
-        card.setElevation(Look.dp(this, 10));
+        card.setElevation(Ui.dp(this, 10));
         card.setClipToOutline(true);
         TextView heading = Look.line(this, title, 13, Look.BOLD, Look.INK);
-        heading.setPadding(Look.dp(this, 12), Look.dp(this, 10), Look.dp(this, 12), Look.dp(this, 6));
+        heading.setPadding(Ui.dp(this, 12), Ui.dp(this, 10), Ui.dp(this, 12), Ui.dp(this, 6));
         card.addView(heading);
         LinearLayout list = Parts.column(this);
         View focus = null;
@@ -274,7 +275,7 @@ public final class MainActivity extends Activity {
             Parts.Row row = new Parts.Row(this, 34);
             row.noDivider();
             // A list of actions (selected -1) has no radios: nothing is chosen.
-            if (selected >= 0) row.lead(new Parts.Radio(this, i == selected), Look.dp(this, 14), Look.dp(this, 14));
+            if (selected >= 0) row.lead(new Parts.Radio(this, i == selected), Ui.dp(this, 14), Ui.dp(this, 14));
             row.titled(choice.title, choice.sub);
             row.setOnClickListener(v -> {
                 closeOverlay();
@@ -290,7 +291,7 @@ public final class MainActivity extends Activity {
         if (hint != null) {
             card.addView(Parts.rule(this), Parts.line(Parts.FILL, 1));
             TextView help = Look.text(this, hint, 9, Look.REGULAR, Look.MUTE);
-            help.setPadding(Look.dp(this, 12), Look.dp(this, 6), Look.dp(this, 12), Look.dp(this, 8));
+            help.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 8));
             card.addView(help);
         }
         showOverlay(card, focus, null);
@@ -300,14 +301,14 @@ public final class MainActivity extends Activity {
     void ask(String title, String message, String yes, int kind, final Runnable then, String no) {
         LinearLayout card = Parts.column(this);
         card.setBackground(Look.rounded(Look.WHITE, 8, this));
-        card.setElevation(Look.dp(this, 10));
-        card.setPadding(0, Look.dp(this, 12), 0, Look.dp(this, 8));
+        card.setElevation(Ui.dp(this, 10));
+        card.setPadding(0, Ui.dp(this, 12), 0, Ui.dp(this, 8));
         TextView heading = Look.text(this, title, 13, Look.BOLD, Look.INK);
-        heading.setPadding(Look.dp(this, 12), 0, Look.dp(this, 12), 0);
+        heading.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 12), 0);
         card.addView(heading);
         if (message != null) {
             TextView body = Look.text(this, message, 10.5f, Look.REGULAR, Look.MUTE);
-            body.setPadding(Look.dp(this, 12), Look.dp(this, 4), Look.dp(this, 12), 0);
+            body.setPadding(Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12), 0);
             card.addView(body);
         }
         TextView keep = Parts.button(this, no, Parts.SECONDARY, this::closeOverlay);
@@ -317,7 +318,7 @@ public final class MainActivity extends Activity {
         });
         LinearLayout pair = Parts.pair(this, keep, act);
         LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Parts.WRAP);
-        lp.topMargin = Look.dp(this, 10);
+        lp.topMargin = Ui.dp(this, 10);
         card.addView(pair, lp);
         // The safe answer is focused, so OK by accident changes nothing.
         showOverlay(card, keep, null);
@@ -335,9 +336,9 @@ public final class MainActivity extends Activity {
         FrameLayout layer = new FrameLayout(this);
         layer.setBackgroundColor(0x8C0C1020);
         FrameLayout.LayoutParams at = new FrameLayout.LayoutParams(Parts.FILL, Parts.WRAP, Gravity.TOP);
-        at.leftMargin = at.rightMargin = Look.dp(this, 14);
-        at.topMargin = Look.dp(this, 50);
-        at.bottomMargin = Look.dp(this, 14);
+        at.leftMargin = at.rightMargin = Ui.dp(this, 14);
+        at.topMargin = Ui.dp(this, 50);
+        at.bottomMargin = Ui.dp(this, 14);
         layer.addView(card, at);
         root.addView(layer, new FrameLayout.LayoutParams(Parts.FILL, Parts.FILL));
         overlay = layer;

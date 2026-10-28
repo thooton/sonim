@@ -9,7 +9,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.xp3.common.ui.Ui;
 
 import java.util.List;
 
@@ -268,7 +267,4 @@ final class Sheet {
         return layer;
     }
 
-    static boolean isOk(int code) {
-        return Ui.isOk(code);
-    }
 }

@@ -13,6 +13,7 @@ import android.widget.TextView;
 import com.print.xp3.ipp.Capabilities;
 import java.util.ArrayList;
 import java.util.List;
+import com.xp3.common.ui.Ui;
 import java.util.Locale;
 
 /**
@@ -62,7 +63,7 @@ final class InkScreen extends Screen {
         ImageView picture = new ImageView(c);
         picture.setImageResource(Readiness.picture(printer));
         picture.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        head.lead(picture, Look.dp(c, 38), Look.dp(c, 27));
+        head.lead(picture, Ui.dp(c, 38), Ui.dp(c, 27));
         head.titled(printer.shown(), "Checking…");
         if (printers.size() > 1) {
             head.trailing(Look.text(c, (at + 1) + " of " + printers.size(), 9.5f, Look.SEMIBOLD, Look.MUTE));
@@ -104,7 +105,7 @@ final class InkScreen extends Screen {
         }
         LinearLayout row = Parts.row(c);
         row.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        row.setPadding(Look.dp(c, 14), Look.dp(c, 10), Look.dp(c, 14), 0);
+        row.setPadding(Ui.dp(c, 14), Ui.dp(c, 10), Ui.dp(c, 14), 0);
         Capabilities.Marker lowest = null;
         for (Capabilities.Marker marker : markers) {
             LinearLayout one = Parts.column(c);
@@ -112,8 +113,8 @@ final class InkScreen extends Screen {
             boolean low = marker.isLow();
             if (low && (lowest == null || marker.level < lowest.level)) lowest = marker;
             one.addView(Look.text(c, marker.level < 0 ? "?" : marker.level + "%", 12, Look.BOLD, low ? Look.WARN : Look.INK));
-            LinearLayout.LayoutParams tubeAt = Parts.line(Look.dp(c, 24), Look.dp(c, markers.size() > 4 ? 80 : 96));
-            tubeAt.topMargin = tubeAt.bottomMargin = Look.dp(c, 3);
+            LinearLayout.LayoutParams tubeAt = Parts.line(Ui.dp(c, 24), Ui.dp(c, markers.size() > 4 ? 80 : 96));
+            tubeAt.topMargin = tubeAt.bottomMargin = Ui.dp(c, 3);
             one.addView(new Tube(c, marker.level, color(marker)), tubeAt);
             String name = Readiness.colorName(marker);
             one.addView(Look.line(c, name.isEmpty() ? "Ink" : name, 9.5f, Look.SEMIBOLD, Look.MUTE));
@@ -124,20 +125,20 @@ final class InkScreen extends Screen {
             LinearLayout note = Parts.row(c);
             note.setGravity(Gravity.TOP);
             note.setBackground(Look.rounded(0xFFFFF5E1, 6, c));
-            note.setPadding(Look.dp(c, 9), Look.dp(c, 7), Look.dp(c, 9), Look.dp(c, 7));
+            note.setPadding(Ui.dp(c, 9), Ui.dp(c, 7), Ui.dp(c, 9), Ui.dp(c, 7));
             ImageView sign = Parts.image(c, R.drawable.ic_alert, Look.WARN, 13);
-            ((LinearLayout.LayoutParams) sign.getLayoutParams()).rightMargin = Look.dp(c, 6);
+            ((LinearLayout.LayoutParams) sign.getLayoutParams()).rightMargin = Ui.dp(c, 6);
             note.addView(sign);
             String what = Readiness.supply(lowest);
             TextView text = Look.text(c, what + (lowest.level == 0 ? " is empty. Replace it to print in color." : " is low. Have a new one ready."),
                 10, Look.REGULAR, 0xFF7A4A00);
             note.addView(text, Parts.weighted());
             LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Parts.WRAP);
-            lp.setMargins(Look.dp(c, 10), Look.dp(c, 10), Look.dp(c, 10), 0);
+            lp.setMargins(Ui.dp(c, 10), Ui.dp(c, 10), Ui.dp(c, 10), 0);
             into.addView(note, lp);
         }
         TextView updated = Parts.foot(c, "Updated just now");
-        updated.setPadding(0, Look.dp(c, 6), 0, 0);
+        updated.setPadding(0, Ui.dp(c, 6), 0, 0);
         into.addView(updated);
     }
 

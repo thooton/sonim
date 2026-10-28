@@ -65,10 +65,6 @@ public final class Dates {
         firstDay = day == Calendar.SUNDAY ? Calendar.SUNDAY : Calendar.MONDAY;
     }
 
-    public static int weekStartDay() {
-        return firstDay;
-    }
-
     /** "Tuesday, Oct 20": the due date as the assignment page states it. */
     public static String longDay(long when) {
         return format("EEEE, MMM d", when);
@@ -114,11 +110,6 @@ public final class Dates {
     /** "20". */
     public static String dayOfMonth(long when) {
         return format("d", when);
-    }
-
-    /** "Due Tue, Oct 20 at 10:30", the line under a title with room for one. */
-    public static String dueLine(long when) {
-        return "Due " + shortDay(when) + " at " + time(when);
     }
 
     /** Midnight at the start of the week `when` falls in. */
@@ -168,11 +159,6 @@ public final class Dates {
         return format(twentyFourHour ? "HH:mm" : "h:mm a", when);
     }
 
-    /** "Tomorrow, 11:59 PM", for the places with a full line to spend. */
-    public static String dayAndTime(long when, long now) {
-        return day(when, now) + ", " + time(when);
-    }
-
     /**
      * Whole days from one instant to the other, counted between the calendar
      * days they fall on rather than between the instants themselves. Something
@@ -196,15 +182,6 @@ public final class Dates {
         return (int) Math.round(
             (double) (startOfWeek(to) - startOfWeek(from)) / (double) (7L * DAY_MS)
         );
-    }
-
-    /** Whether two instants fall in the same calendar year. */
-    public static boolean sameYear(long from, long to) {
-        Calendar first = Calendar.getInstance(Locale.US);
-        first.setTimeInMillis(from);
-        Calendar second = Calendar.getInstance(Locale.US);
-        second.setTimeInMillis(to);
-        return first.get(Calendar.YEAR) == second.get(Calendar.YEAR);
     }
 
     private static String weekday(long when, boolean shortened) {
