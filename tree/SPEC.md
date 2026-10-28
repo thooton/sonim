@@ -79,7 +79,8 @@ Back or the right soft key goes back (on Home, leaves the app).
     (dots when one is saved; left empty, the saved one is kept). Save
     toasts `Saved: <host>`; an address that isn't https, or a missing part,
     toasts why and saves nothing, and the dialog stays open with what was
-    typed. Up/Down move between the fields and the buttons.
+    typed. Up/Down move between the fields and the buttons; OK in the
+    address moves to the token, and OK in the token saves.
 - With nothing to list: a spinner during the first fetch; otherwise a
   centred title and a button that has the focus: `No command center` with
   `Sign in` (opens the login dialog), `Couldn't reach the command center`
