@@ -11,7 +11,6 @@ import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
-import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.KeyEvent;
 import android.view.View;
@@ -32,6 +31,7 @@ import com.places.xp3.net.Place;
 import com.places.xp3.net.Places;
 import com.xp3.common.Json;
 import com.xp3.common.Login;
+import com.xp3.common.ui.LoginDialog;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
@@ -154,7 +154,7 @@ public final class MainActivity extends BaseActivity {
         list.setSelector(new ColorDrawable(0));
 
         SharedPreferences prefs = prefs();
-        login = loadLogin(prefs);
+        login = LoginDialog.load(prefs, Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         anchor = Anchor.parse(prefs.getString("anchor", ""));
         near.setText(prefs.getString("near", ""));
         openNow = prefs.getBoolean("open_now", false);
@@ -224,26 +224,6 @@ public final class MainActivity extends BaseActivity {
         super.onDestroy();
     }
 
-    /**
-     * The bundled login is adopted once per build that carries a new one;
-     * otherwise whatever was saved (perhaps typed in from the menu) is kept.
-     */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     private SharedPreferences prefs() {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
@@ -900,71 +880,11 @@ public final class MainActivity extends BaseActivity {
 
     /** The fallback for a build without a bundled login. */
     private void askLogin() {
-        LinearLayout box = vertical();
-        int pad = dp(16);
-        box.setPadding(pad, pad / 2, pad, 0);
-        final EditText server = new EditText(this);
-        server.setHint("https://…");
-        server.setSingleLine(true);
-        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(login.server() == null ? "" : login.server());
-        final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "••••••••" : "Token");
-        token.setSingleLine(true);
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        box.addView(server);
-        box.addView(token);
-        final AlertDialog asked = new AlertDialog.Builder(this)
-            .setTitle("Command center")
-            .setView(box)
-            .setPositiveButton("Save", null)
-            .setNegativeButton("Cancel", null)
-            .show();
-        // Save closes the dialog only once the login is whole, so a slip
-        // keeps what was typed for another try.
-        asked.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            String typed = token.getText().toString();
-            if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-            Login next;
-            try {
-                next = Login.of(server.getText().toString(), typed);
-            } catch (IllegalArgumentException e) {
-                toast(e.getMessage());
-                (fault(server) ? server : token).requestFocus();
-                return;
-            }
-            if (!next.ready()) {
-                toast("Both the address and the token are needed");
-                (server.getText().toString().trim().length() == 0 ? server : token).requestFocus();
-                return;
-            }
+        LoginDialog.show(this, prefs(), login, next -> {
             login = next;
             places = null;
-            prefs().edit().putString("login", next.toJson()).apply();
             toast("Saved: " + next.host());
             if (message.length() > 0) say("");
-            asked.dismiss();
-        });
-        // Down goes on to the next field, then to Save, as in the app's lists.
-        downTo(server, token);
-        downTo(token, asked.getButton(AlertDialog.BUTTON_POSITIVE));
-    }
-
-    /** Whether the typed address is what Login refuses. */
-    private static boolean fault(EditText server) {
-        try {
-            Login.of(server.getText().toString(), null);
-            return false;
-        } catch (IllegalArgumentException e) {
-            return true;
-        }
-    }
-
-    private static void downTo(View from, final View to) {
-        from.setOnKeyListener((v, key, event) -> {
-            if (key != KeyEvent.KEYCODE_DPAD_DOWN || to == null) return false;
-            if (event.getAction() == KeyEvent.ACTION_DOWN) to.requestFocus();
-            return true;
         });
     }
 

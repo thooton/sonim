@@ -151,7 +151,10 @@ URL (each when present), Back to results, Test location, Command center...
 Title "Command center": an address field (hint "https://...") filled with the
 current address, a token field (dots as its hint when a token is saved,
 else "Token"), Cancel and Save. Save with the token empty keeps the saved
-token. Both needed, else a toast says so. On save: toast "Saved: <host>".
+token. Both needed, else a toast says so and the dialog stays with what was
+typed. OK in the address moves to the token, OK in the token saves, and
+Up/Down move between the fields and the buttons. On save: toast "Saved:
+<host>".
 
 ### A Maps link
 
