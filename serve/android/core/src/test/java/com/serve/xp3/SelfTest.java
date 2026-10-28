@@ -164,6 +164,20 @@ public final class SelfTest {
                     get(port, "GET / HTTP/1.1");
                 });
             });
+
+            check.run("rebinds the same port straight after stopping", () -> {
+                Server first = new Server(root, 0);
+                first.start();
+                int port = first.port();
+                first.stop();
+                Server next = new Server(root, port);
+                next.start();
+                try {
+                    check.same("served again", 200, get(port, "GET /hello.txt HTTP/1.1").status);
+                } finally {
+                    next.stop();
+                }
+            });
         } finally {
             delete(root);
             delete(outside);

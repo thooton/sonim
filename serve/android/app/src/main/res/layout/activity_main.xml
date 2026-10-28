@@ -78,7 +78,7 @@
                 android:paddingTop="7dp">
                 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" android:text="@string/label_folder" android:textColor="@color/text_muted" android:textSize="@dimen/text_label" />
-                    <TextView android:id="@+id/folder" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:ellipsize="start" android:includeFontPadding="false" android:maxLines="3" android:textColor="@color/text" android:textSize="@dimen/text_value" />
+                    <TextView android:id="@+id/folder" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:includeFontPadding="false" android:maxLines="3" android:textColor="@color/text" android:textSize="@dimen/text_value" />
                 </LinearLayout>
             </LinearLayout>
 

@@ -64,7 +64,7 @@ Keys:
 | Key | Does |
 | --- | --- |
 | OK (centre / Enter) | Serving: stops. Stopped with a folder: starts serving it. No folder yet: opens the folder picker. Acts on key release. |
-| Menu | Opens a menu: "Start serving" / "Stop serving" (does what OK does), "Choose folder…" |
+| Menu | Opens a menu: "Start serving" / "Stop serving" (does what OK does), "Choose folder…". Before a folder is chosen, only "Choose folder…". |
 | Back | Leaves the app. Serving carries on under its notification. |
 | D-pad, number keys | Nothing. |
 
@@ -73,7 +73,8 @@ notification) or fails, and re-reads the addresses every time it is shown.
 
 ### Menu
 
-A plain list dialog with no title and no buttons: two rows as above. Up/Down
+A plain list dialog with no title and no buttons: two rows as above (one
+before a folder is chosen). Up/Down
 move, OK picks, Back closes it with nothing changed.
 
 ### Storage list (only with an SD card)
@@ -86,7 +87,8 @@ the folder list opens at the phone's root.
 ### Folder list
 
 A list dialog titled with the folder it shows ("Phone", "Phone/Music"),
-with a Cancel button.
+with a Cancel button. A long title is cut at the start with "…", as on the
+main screen, so the folder itself is always named.
 
 - First row: "✓ Serve this folder".
 - Then each sub-folder as "name/", case-insensitive A–Z. Hidden folders
@@ -96,7 +98,7 @@ with a Cancel button.
   starts serving it straight away. If it was already serving another folder,
   it moves over to the new one (same address).
 - OK on a folder: opens that folder's list.
-- Back: goes up one level. At the top of a volume, goes back to the storage
+- Back: goes up one level, with the folder just left selected. At the top of a volume, goes back to the storage
   list if there is a card, else closes the picker.
 - Cancel: closes the picker entirely, from any depth; nothing changes.
 - Up on the first row / Down on the last row stay put (stock list dialog).
@@ -149,7 +151,8 @@ Low-importance, ongoing (can't be swiped away), no time shown, teal accent.
   downloads included. Request heads over 16 KB are refused.
 - **Permissions**: storage read is asked the first time a folder is chosen
   or serving starts; once granted, the action that asked carries on by
-  itself. Refused: "No storage access", and nothing else happens.
+  itself. Refused: "No storage access", and nothing else happens; the line
+  goes once access is granted.
 - **Errors** (the red problem line, shown only while not serving):
   - Saved folder deleted or card removed, then OK: "That folder is gone".
   - Port already taken: "Port 28413 is in use". A failed start's message

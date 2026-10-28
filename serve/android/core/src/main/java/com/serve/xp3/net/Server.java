@@ -56,6 +56,7 @@ public final class Server {
     private final int port;
     private final Set<Socket> open = Collections.synchronizedSet(new HashSet<Socket>());
     private ServerSocket listener;
+    private Thread accepting;
     private volatile boolean stopped;
 
     public Server(File root, int port) throws IOException {
@@ -81,7 +82,7 @@ public final class Server {
             throw new IOException("Port " + port + " is in use", e);
         }
         listener = socket;
-        Thread accepting = new Thread(() -> accept(), "serve-accept");
+        accepting = new Thread(() -> accept(), "serve-accept");
         accepting.setDaemon(true);
         accepting.start();
     }
@@ -91,14 +92,28 @@ public final class Server {
         return listener == null ? port : listener.getLocalPort();
     }
 
-    /** Stops listening and drops every open connection, a download included. */
+    /**
+     * Stops listening and drops every open connection, a download included.
+     * Returns once the port is free, so a new server can bind it straight
+     * away: Android keeps a closed socket bound until the thread blocked in
+     * accept() on it has woken.
+     */
     public void stop() {
         stopped = true;
         ServerSocket socket;
+        Thread thread;
         synchronized (this) {
             socket = listener;
+            thread = accepting;
         }
         closeQuietly(socket);
+        if (thread != null && thread != Thread.currentThread()) {
+            try {
+                thread.join(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
         List<Socket> clients;
         synchronized (open) {
             clients = new ArrayList<Socket>(open);
