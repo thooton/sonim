@@ -410,6 +410,9 @@ public final class AppDrawerActivity extends Activity {
         }
         targetsBeforeMove = new ArrayList<>(targets);
         adapter.setMoving(position);
+        // The moving card has rounded corners; the square selection outline
+        // would show behind them.
+        grid.setSelector(android.R.color.transparent);
         selectPosition(position);
     }
 
@@ -428,7 +431,7 @@ public final class AppDrawerActivity extends Activity {
         }
         targets.add(to, targets.remove(from));
         adapter.move(from, to);
-        grid.setSelection(to);
+        showSelection(to);
     }
 
     /** Puts the moving app down, keeping its new place or restoring the old order. */
@@ -442,6 +445,7 @@ public final class AppDrawerActivity extends Activity {
         }
         targetsBeforeMove = null;
         adapter.setMoving(AdapterView.INVALID_POSITION);
+        grid.setSelector(R.drawable.grid_selector);
         if (keep) {
             saveTargets();
         }
@@ -595,10 +599,29 @@ public final class AppDrawerActivity extends Activity {
             public void run() {
                 grid.requestFocus();
                 if (position >= 0) {
-                    grid.setSelection(position);
+                    showSelection(position);
                 }
             }
         });
+    }
+
+    /**
+     * Selects {@code position}, scrolling the grid only as far as it takes to
+     * show that row. GridView.setSelection would instead put the row at the top
+     * whenever the grid isn't in touch mode, as on the XP3.
+     */
+    private void showSelection(int position) {
+        View first = grid.getChildAt(0);
+        int columns = grid.getNumColumns();
+        if (first == null || columns <= 0) {
+            grid.setSelection(position);
+            return;
+        }
+        int rowHeight = first.getHeight();
+        int firstRow = grid.getFirstVisiblePosition() / columns;
+        int top = first.getTop() + (position / columns - firstRow) * rowHeight;
+        int lowest = grid.getHeight() - grid.getPaddingTop() - grid.getPaddingBottom() - rowHeight;
+        grid.setSelectionFromTop(position, Math.max(0, Math.min(lowest, top - grid.getPaddingTop())));
     }
 
     private int dp(int value) {

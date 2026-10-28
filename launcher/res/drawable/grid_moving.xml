@@ -2,7 +2,7 @@
 <!-- The app being moved: lifted out of the grid in a solid lavender card. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#4D9599E4" />
+    <solid android:color="@color/selection" />
     <stroke android:width="2dp" android:color="@color/selection" />
     <corners android:radius="6dp" />
 </shape>
