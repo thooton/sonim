@@ -134,6 +134,13 @@ final class WeatherView extends View {
         return true;
     }
 
+    /** `color` under the sheet's scrim (black at .45) while a sheet is open, as the page is. */
+    private int dimmed(int color) {
+        if (sheet == null) return color;
+        int r = Math.round(((color >> 16) & 0xFF) * .55f), g = Math.round(((color >> 8) & 0xFF) * .55f), b = Math.round((color & 0xFF) * .55f);
+        return 0xFF000000 | r << 16 | g << 8 | b;
+    }
+
     /** Says the status bar's colour again, after something else took it. */
     void forceStatusBar() {
         lastBar = 0;
@@ -162,10 +169,10 @@ final class WeatherView extends View {
             drawHourly(c, SKY + 2);
             drawDaily(c, SKY + 2 + HOURLY_H + 2);
             c.restore();
-            int bar = scroll > SKY - 10 ? theme.bg : Condition.card(cond);
+            int bar = dimmed(scroll > SKY - 10 ? theme.bg : Condition.card(cond));
             if (bar != lastBar && chrome != null && !covered) {
                 lastBar = bar;
-                chrome.statusBar(bar, scroll > SKY - 10 && !theme.dark);
+                chrome.statusBar(bar, scroll > SKY - 10 && !theme.dark && sheet == null);
             }
         }
         if (loading) {
@@ -179,12 +186,12 @@ final class WeatherView extends View {
     }
 
     private void drawEmpty(Canvas c) {
-        int bar = Colors.CARD_DAY;
+        int bar = dimmed(Colors.CARD_DAY);
         if (bar != lastBar && chrome != null && !covered) {
             lastBar = bar;
             chrome.statusBar(bar, false);
         }
-        Art.rect(c, 0, 0, W, SKY, 0, bar, 1);
+        Art.rect(c, 0, 0, W, SKY, 0, Colors.CARD_DAY, 1);
         Art.scenery(c, Condition.Scenery.DAY, SKY - 55);
         label(c, W / 2, 70, error != null ? "No forecast" : "Getting the forecast", 14, MEDIUM, 0xFFFFFFFF, Paint.Align.CENTER);
         if (error != null) wrapped(c, error, W / 2, SKY + 30, 12, theme.muted);
@@ -425,7 +432,7 @@ final class WeatherView extends View {
         return s.substring(0, n).trim() + "…";
     }
 
-    private void wrapped(Canvas c, String s, float cx, float y, float size, int color) {
+    void wrapped(Canvas c, String s, float cx, float y, float size, int color) {
         text.setTypeface(REGULAR);
         text.setTextSize(size);
         StringBuilder lineText = new StringBuilder();

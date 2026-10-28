@@ -67,7 +67,7 @@ final class LocationView extends View {
         Art.stroke(c, "M10,10 L14,14", th.muted, 1.8f, 1);
         c.restore();
         if (rows.isEmpty() && message != null) {
-            painter.label(c, WeatherView.W / 2, TOP + 26, message, 12, WeatherView.regular(), th.muted, Paint.Align.CENTER);
+            painter.wrapped(c, message, WeatherView.W / 2, TOP + 26, 12, th.muted);
         }
         int first = Math.max(0, selected - fits() + 1);
         for (int k = 0; k + first < rows.size() && k <= fits(); k++) {

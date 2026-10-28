@@ -97,7 +97,7 @@ Up, Down, Left, Right do nothing; OK retries.
 
 ### Menu
 
-A sheet up from the foot over the dimmed page, titled with the place's name
+A sheet up from the foot over the dimmed page (status bar included), titled with the place's name
 (or "Weather" with no forecast). Rows, each with a blue icon, the value
 greyed on the right:
 
@@ -138,7 +138,8 @@ by hairlines.
   dropped. Up to ten places, the likeliest first: "Portland, OR" over
   "Oregon, United States" (US states abbreviated in the name; elsewhere the
   name over region and country). "No places found" when none match; the
-  error's text when the search fails.
+  error's text, wrapped, when the search fails. One character shows nothing
+  (search needs two).
 
 Keys:
 
@@ -161,7 +162,8 @@ the first recent place (a place already in the list moves to the top; the
 list stays at five).
 
 **Current location**: asks for the location permission the first time.
-Denied: "Weather may not use the phone's location" in place of the rows.
+Denied: "Weather may not use the phone's location" in place of the rows,
+with the d-pad back in the field.
 Granted: "Finding where the phone is", using the phone's last fix if under
 30 minutes old, otherwise one new fix from network or GPS. After 45 seconds
 with no fix it uses an older fix if there is one, else says "Couldn't find
@@ -176,14 +178,17 @@ recent places.
 - **Kept** (app preferences, survive restarts): the place, whether it
   follows the phone, the five recent places, the hourly data shown, units
   (default °F, mph), theme (default dark). The last forecast Open-Meteo sent
-  is kept in the app's files (`forecast.json`) with when it was fetched.
+  is kept in the app's files (`forecast.json`) with when it was fetched and
+  the place it is for; it is shown only for that place.
 - **Opening**: shows the kept forecast at once (if readable), then fetches
   a new one. **Coming back** to the app fetches only if the shown forecast
   is more than 30 minutes old.
 - **Network**: Open-Meteo forecast (current, 48 hours, 10 days, US units,
-  the place's own time zone; 30s timeout), Open-Meteo geocoding for search
-  (needs at least two characters), BigDataCloud for naming the phone's
-  position. HTTPS only, no keys, no login.
+  the place's own time zone), Open-Meteo geocoding for search (needs at
+  least two characters), BigDataCloud for naming the phone's
+  position. HTTPS only, no keys, no login. A forecast or search that has no
+  answer after 30 seconds is given up on ("The connection timed out."), and
+  a late answer is dropped.
 - **Errors**: with a forecast on screen, a failed refresh leaves it there
   and shows the reason in a toast. With none, the empty page says "No
   forecast" and the reason. An unreadable answer reads "The forecast came
@@ -216,18 +221,12 @@ recent places.
 
 ## Open questions
 
-1. The kept forecast isn't tied to its place. If a newly chosen place's
-   first fetch fails, the next launch shows the old place's forecast under
-   the new place's name. Presumably the cache should be dropped (or kept per
-   place) when the place changes.
-2. The README says opening refreshes only when the forecast is over half
+1. The README says opening refreshes only when the forecast is over half
    an hour old; the code always refreshes on opening (and only checks age
    when coming back). Which is wanted?
-3. Following the phone only reads the last known fix on refresh and never
+2. Following the phone only reads the last known fix on refresh and never
    asks for a new one, so it moves only when another app has updated the
    fix. Should a refresh ask for a fresh fix?
-4. Typing one character shows "No places found" (search needs two). Should
-   it stay quiet until a second character?
-5. Error text is the raw service message ("Open-Meteo HTTP 429: rate or
+3. Error text is the raw service message ("Open-Meteo HTTP 429: rate or
    usage limit reached…", or Java's own wording when offline). Should the
    app say something plainer, such as "No connection"?

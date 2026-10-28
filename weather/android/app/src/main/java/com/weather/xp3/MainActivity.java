@@ -51,7 +51,8 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
     private final Handler main = new Handler(Looper.getMainLooper());
 
     private final OpenMeteo weather = new OpenMeteo(new Http());
-    private final ExecutorService worker = Ui.workers("weather", 2);
+    // Room for a request or two left hanging past its deadline.
+    private final ExecutorService worker = Ui.workers("weather", 4);
 
     private Place place;
     /** Follow the phone: each refresh asks where it is now. */
@@ -62,6 +63,14 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
     /** Bumped by each search, so an answer to an older one is dropped. */
     private int searching;
     private boolean fetching;
+    /** Bumped by each fetch, so one given up on is dropped when it comes. */
+    private int loads;
+    /** The Back being held deleted from the field, so letting go of it doesn't close Location. */
+    private boolean backDeleted;
+
+    /** How long a fetch or search may take before it is given up on. */
+    private static final long DEADLINE_MS = 30000;
+    private static final String TIMED_OUT = "The connection timed out.";
 
     /** How old a forecast may be before coming back to the app refreshes it. */
     private static final long STALE_MS = 30 * 60 * 1000L;
@@ -87,7 +96,14 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         locationLayer = new FrameLayout(this);
         locationView = new LocationView(this, view);
         locationLayer.addView(locationView, new FrameLayout.LayoutParams(-1, -1));
-        field = new EditText(this);
+        field = new EditText(this) {
+            // Back comes to the activity, which deletes a character itself:
+            // a plain field's Back would close the app.
+            @Override public boolean onKeyPreIme(int keyCode, KeyEvent event) {
+                if (keyCode != KeyEvent.KEYCODE_BACK) return super.onKeyPreIme(keyCode, event);
+                return MainActivity.this.dispatchKeyEvent(event);
+            }
+        };
         field.setBackground(null);
         field.setPadding(0, 0, 0, 0);
         field.setSingleLine(true);
@@ -146,8 +162,10 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         return new File(getFilesDir(), "forecast.json");
     }
 
-    /** The last forecast fetched, at once, while a new one comes. */
+    /** The last forecast fetched, at once, while a new one comes: only if it is for this place. */
     private void showCached() {
+        Place cached = Place.fromJsonString(prefs.getString("cached", null));
+        if (cached == null || !cached.same(place)) return;
         String body = Disk.read(cache(), 2000000);
         if (body == null) return;
         try {
@@ -179,9 +197,13 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         }
         if (place == null || fetching) return;
         fetching = true;
+        final int turn = ++loads;
         view.loading = true;
         view.error = null;
         view.invalidate();
+        main.postDelayed(() -> {
+            if (turn == loads && fetching) failed(TIMED_OUT);
+        }, DEADLINE_MS);
         final Place asked = place;
         final Location fix = here && quietLocate ? lastKnown() : null;
         worker.execute(() -> {
@@ -193,9 +215,9 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
                 String body = weather.forecastBody(p);
                 long now = System.currentTimeMillis();
                 Forecast f = OpenMeteo.parse(body, p.name, now);
-                Disk.write(cache(), body, false);
                 final Place got = p;
                 main.post(() -> {
+                    if (turn != loads) return;
                     fetching = false;
                     view.loading = false;
                     if (!got.same(place) && asked.same(place)) {
@@ -203,21 +225,31 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
                         prefs.edit().putString("place", Place.toJsonString(got)).apply();
                     }
                     if (!got.same(place)) return; // Moved on to somewhere else meanwhile.
-                    prefs.edit().putLong("fetched", now).apply();
+                    try {
+                        Disk.write(cache(), body, false);
+                        prefs.edit().putLong("fetched", now).putString("cached", Place.toJsonString(got)).apply();
+                    } catch (IOException e) {
+                        // Shown, just not kept.
+                    }
                     view.forecast = f;
                     view.invalidate();
                 });
             } catch (IOException | InterruptedException e) {
                 final String why = e.getMessage();
                 main.post(() -> {
-                    fetching = false;
-                    view.loading = false;
-                    if (view.forecast == null) view.error = why;
-                    else toast(why);
-                    view.invalidate();
+                    if (turn == loads) failed(why);
                 });
             }
         });
+    }
+
+    private void failed(String why) {
+        loads++;
+        fetching = false;
+        view.loading = false;
+        if (view.forecast == null) view.error = why;
+        else toast(why);
+        view.invalidate();
     }
 
     @Override
@@ -387,8 +419,19 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
             return;
         }
         rows.clear();
+        if (q.length() < 2) {
+            // Search needs two characters: say nothing until then.
+            locationView.invalidate();
+            return;
+        }
         locationView.message = "Searching";
         locationView.invalidate();
+        main.postDelayed(() -> {
+            if (ask != searching || !"Searching".equals(locationView.message) || !rows.isEmpty()) return;
+            searching++;
+            locationView.message = TIMED_OUT;
+            locationView.invalidate();
+        }, 450 + DEADLINE_MS);
         // Typing on a keypad is slow: wait for a pause before asking.
         main.postDelayed(() -> {
             if (ask != searching) return;
@@ -430,15 +473,26 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
                 if (!down && lv.selected == -1 && !lv.rows.isEmpty()) {
                     lv.selected = lv.rows.get(0).here && lv.rows.size() > 1 && field.length() > 0 ? 1 : 0;
                     lv.invalidate();
-                } else if (!down && lv.selected >= 0) {
+                } else if (!down && lv.selected >= 0 && lv.selected < lv.rows.size()) {
                     choose(lv.rows.get(lv.selected));
                 }
                 return true;
             case KeyEvent.KEYCODE_BACK:
             case KeyEvent.KEYCODE_SOFT_RIGHT:
                 // Back deletes what was typed first, as a field's Back does.
-                if (field.length() > 0 && lv.selected == -1) return false;
-                if (!down) closeLocation();
+                if (down && field.length() > 0 && lv.selected == -1) {
+                    int at = field.getSelectionStart();
+                    if (at <= 0 || at > field.length()) at = field.length();
+                    field.getText().delete(at - 1, at);
+                    backDeleted = true;
+                    return true;
+                }
+                if (down) {
+                    if (event.getRepeatCount() == 0) backDeleted = false;
+                    return true;
+                }
+                if (backDeleted) backDeleted = false;
+                else closeLocation();
                 return true;
             case KeyEvent.KEYCODE_MENU:
             case KeyEvent.KEYCODE_SOFT_LEFT:
@@ -576,6 +630,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         } else {
             locationView.message = "Weather may not use the phone's location";
             locationView.rows.clear();
+            locationView.selected = -1;
             locationView.invalidate();
         }
     }
