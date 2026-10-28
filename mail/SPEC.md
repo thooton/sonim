@@ -45,7 +45,8 @@ Menu while sending or saving shows nothing.
   empty with "Mail isn't set up" and the Command center dialog opens.
 - With a login, the Inbox loads. If a message was being written when the
   app was last stopped, writing opens instead with it, and the status line
-  says "Your unfinished message was kept."
+  says "Your unfinished message was kept." One nothing was typed in isn't
+  kept.
 - Coming back to the app on the list more than 2 minutes after it last
   loaded fetches it again.
 
@@ -186,7 +187,9 @@ with its files, is added under the text when sent, not shown.
   address: "Not an address: …". Otherwise "Sending…", then toast "Sent"
   and back where writing began (a conversation reloads with the reply in
   it; the list reloads). A failure leaves the message as it was with the
-  reason in the status line.
+  reason in the status line. With no command center login, Send and Save
+  draft say "Mail isn't set up", keep the message and open the Command
+  center dialog.
 - Save draft: "Saving the draft…", toast "Saved to Drafts", back. A draft
   opened again is saved in place, not duplicated.
 - Discard: a new message goes at once ("Discarded"). A saved draft asks
@@ -209,12 +212,14 @@ with a pill and a comma; Back hides them. Leaving the field hides them.
 
 - Search mail (*): a one-line field, prefilled with the open search;
   Search opens the results as a folder named “query” (Gmail syntax, e.g.
-  `from:jane has:attachment`); empty or Cancel does nothing. Back from it
-  returns to Inbox.
+  `from:jane has:attachment`); OK in the field searches too; empty or
+  Cancel does nothing. Back from it returns to Inbox.
 - Command center: address ("https://…") and token (dots when one is
-  saved; left empty, the saved one is kept). Save with either missing:
-  "Both the address and the token are needed". Saved: "Saved: <host>" and
-  the list reloads.
+  saved; left empty, the saved one is kept). OK in the address moves to the
+  token; OK in the token saves. Save with either missing: "Both the address
+  and the token are needed", and the dialog stays with what was typed.
+  Saved: "Saved: <host>" and the list reloads.
+- In every dialog, Up/Down move between its fields and buttons.
 - Open email file…: asks for storage the first time ("Storage not allowed"
   if refused). Lists `.eml` files from Documents and Download on the SD
   card and the phone, newest first, without ".eml". None: "No email files

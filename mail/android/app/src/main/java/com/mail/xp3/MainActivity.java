@@ -21,6 +21,7 @@ import android.os.storage.StorageVolume;
 import android.provider.DocumentsContract;
 import android.text.Editable;
 import android.text.InputType;
+import android.text.Layout;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -35,6 +36,7 @@ import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
@@ -271,7 +273,8 @@ public final class MainActivity extends BaseActivity {
         } else {
             refresh();
         }
-        if (login.ready() && kept == null) load();
+        // Signed out, load() opens the Command center dialog.
+        if (kept == null) load();
     }
 
     @Override
@@ -283,9 +286,11 @@ public final class MainActivity extends BaseActivity {
     @Override
     protected void onPause() {
         // What is being written survives the app being stopped.
+        // A message nothing was typed in is dropped, as Back drops it.
         if (screen == WRITE && writing != null && !sending) {
             collect();
-            prefs().edit().putString("compose", writing.toJson()).apply();
+            if (writing.untouched(writingStart)) prefs().edit().remove("compose").apply();
+            else prefs().edit().putString("compose", writing.toJson()).apply();
         }
         super.onPause();
     }
@@ -1264,9 +1269,18 @@ public final class MainActivity extends BaseActivity {
         writing.text = bodyField.getText().toString();
     }
 
+    /** Sending and saving need the login: without one, the message stays and the Command center dialog opens. */
+    private boolean signedIn() {
+        if (login.ready()) return true;
+        say("Mail isn't set up");
+        askLogin();
+        return false;
+    }
+
     private void send() {
         if (sending) return;
         collect();
+        if (!signedIn()) return;
         final List<Address> to;
         try {
             to = writing.recipients();
@@ -1300,6 +1314,7 @@ public final class MainActivity extends BaseActivity {
     private void saveDraft() {
         if (sending) return;
         collect();
+        if (!signedIn()) return;
         final Outgoing out = writing;
         final Gmail client = gmail();
         sending = true;
@@ -1971,7 +1986,68 @@ public final class MainActivity extends BaseActivity {
             }
             return true;
         }
+        if (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN) {
+            EditText to = nextField(key == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1);
+            if (to == null) return super.dispatchKeyEvent(event);
+            if (down) {
+                to.requestFocus();
+                to.setSelection(to == bodyField ? 0 : to.length());
+            }
+            return true;
+        }
         return super.dispatchKeyEvent(event);
+    }
+
+    /**
+     * Up and Down between To, Cc, Subject and the message: Android's own
+     * focus search never leaves a field here. In the message they move the
+     * cursor, and Up on its first line goes to Subject. Null: leave the key be.
+     */
+    private EditText nextField(int by) {
+        View focus = getCurrentFocus();
+        if (focus == bodyField) {
+            if (by > 0) return null;
+            Layout layout = bodyField.getLayout();
+            int at = Math.max(0, bodyField.getSelectionStart());
+            if (layout != null && layout.getLineForOffset(at) > 0) return null;
+        }
+        List<EditText> fields = new ArrayList<EditText>();
+        fields.add(toField);
+        if (ccRow.getVisibility() == View.VISIBLE) fields.add(ccField);
+        fields.add(subjectField);
+        fields.add(bodyField);
+        int at = fields.indexOf(focus);
+        if (at < 0) return null;
+        // At the first or last field the key does nothing.
+        return fields.get(Math.max(0, Math.min(fields.size() - 1, at + by)));
+    }
+
+    /**
+     * In a dialog, Up and Down move between its fields and buttons (Android's
+     * own focus search never leaves a field here), and OK in a field does
+     * `ok`, as OK commits a typed field in the other apps.
+     */
+    private static void driveDialog(final AlertDialog dialog, final Map<EditText, Runnable> ok) {
+        dialog.setOnKeyListener((shown, code, event) -> {
+            View at = dialog.getCurrentFocus();
+            boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+            if (Ui.isOk(code) && ok.containsKey(at)) {
+                if (down && event.getRepeatCount() == 0) ok.get(at).run();
+                return true;
+            }
+            if (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN) return false;
+            if (!down) return true;
+            View next = at == null ? null : at.focusSearch(code == KeyEvent.KEYCODE_DPAD_UP ? View.FOCUS_UP : View.FOCUS_DOWN);
+            if (next != null) next.requestFocus();
+            return true;
+        });
+        for (final Map.Entry<EditText, Runnable> each : ok.entrySet()) {
+            each.getKey().setOnEditorActionListener((view, action, event) -> {
+                if (event != null) return false;
+                each.getValue().run();
+                return true;
+            });
+        }
     }
 
     // ---- Menus ----
@@ -2104,16 +2180,26 @@ public final class MainActivity extends BaseActivity {
             field.setText(folder.query);
             field.setSelection(field.length());
         }
+        field.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         box.addView(field);
-        new AlertDialog.Builder(this)
+        final AlertDialog ask = new AlertDialog.Builder(this)
             .setTitle("Search mail")
             .setView(box)
-            .setPositiveButton("Search", (dialog, which) -> {
-                String query = field.getText().toString().trim();
-                if (query.length() > 0) setFolder(Folder.search(query));
-            })
+            .setPositiveButton("Search", (dialog, which) -> search(field))
             .setNegativeButton("Cancel", null)
-            .show();
+            .create();
+        Map<EditText, Runnable> ok = new HashMap<EditText, Runnable>();
+        ok.put(field, () -> {
+            ask.dismiss();
+            search(field);
+        });
+        driveDialog(ask, ok);
+        ask.show();
+    }
+
+    private void search(EditText field) {
+        String query = field.getText().toString().trim();
+        if (query.length() > 0) setFolder(Folder.search(query));
     }
 
     /** The fallback for a build without a bundled login. */
@@ -2130,34 +2216,49 @@ public final class MainActivity extends BaseActivity {
         token.setHint(login.ready() ? "••••••••" : "Token");
         token.setSingleLine(true);
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        server.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+        token.setImeOptions(EditorInfo.IME_ACTION_DONE);
         box.addView(server);
         box.addView(token);
-        new AlertDialog.Builder(this)
+        final AlertDialog ask = new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
-            .setPositiveButton("Save", (dialog, which) -> {
-                String typed = token.getText().toString();
-                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                try {
-                    Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                    login = next;
-                    if (gmail != null) gmail.close();
-                    gmail = null;
-                    me = null;
-                    labelsLoaded = false;
-                    whole.clear();
-                    counts.clear();
-                    countsAt = 0;
-                    prefs().edit().putString("login", next.toJson()).apply();
-                    say("Saved: " + next.host());
-                    if (screen == LIST) load();
-                } catch (IllegalArgumentException e) {
-                    say(e.getMessage());
-                }
-            })
+            .setPositiveButton("Save", null)
             .setNegativeButton("Cancel", null)
-            .show();
+            .create();
+        final Runnable save = () -> {
+            String typed = token.getText().toString();
+            if (typed.trim().length() == 0 && login.ready()) typed = login.token();
+            try {
+                Login next = Login.of(server.getText().toString(), typed);
+                if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
+                login = next;
+                if (gmail != null) gmail.close();
+                gmail = null;
+                me = null;
+                labelsLoaded = false;
+                whole.clear();
+                counts.clear();
+                countsAt = 0;
+                prefs().edit().putString("login", next.toJson()).apply();
+                ask.dismiss();
+                say("Saved: " + next.host());
+                if (screen == LIST) load();
+            } catch (IllegalArgumentException e) {
+                // The dialog stays, keeping what was typed for correcting.
+                toast(e.getMessage());
+            }
+        };
+        Map<EditText, Runnable> ok = new HashMap<EditText, Runnable>();
+        ok.put(server, () -> {
+            token.requestFocus();
+            token.setSelection(token.length());
+        });
+        ok.put(token, save);
+        driveDialog(ask, ok);
+        ask.show();
+        // Save closes the dialog only once the login is taken.
+        ask.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> save.run());
     }
 
     // ---- Adapters ----
@@ -2296,8 +2397,9 @@ public final class MainActivity extends BaseActivity {
             View row = convert != null ? convert : getLayoutInflater().inflate(R.layout.row_folder, parent, false);
             boolean picked = position == drawerPick;
             boolean open = entry.folder != null && entry.folder.is(folder);
+            // The wash is a background of its own: ListView sets its rows' selected state itself.
+            row.setBackgroundResource(open && !picked ? R.drawable.drawer_open : R.drawable.drawer_item);
             row.setActivated(picked);
-            row.setSelected(open);
             int ink = picked ? color(R.color.on_primary) : open ? color(R.color.focus_rule) : color(R.color.text);
             ImageView icon = (ImageView) row.findViewById(R.id.icon);
             icon.setImageResource(entry.icon);
