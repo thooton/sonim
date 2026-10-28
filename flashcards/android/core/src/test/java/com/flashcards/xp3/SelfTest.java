@@ -17,6 +17,7 @@ public final class SelfTest {
         AlgoTests.run(check);
         DataTests.run(check);
         SyncTests.run(check);
+        StatsTests.run(check);
         if (!check.report()) System.exit(1);
     }
 }

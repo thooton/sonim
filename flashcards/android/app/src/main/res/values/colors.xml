@@ -15,6 +15,17 @@
     <color name="state_learn">#DC2626</color>
     <color name="state_review">#16A34A</color>
 
+    <!-- Anki's statistics: Card Counts' slices (d3's Blues, Oranges, Reds
+         and Greens, as Anki picks them) and its histograms' bars. -->
+    <color name="count_new">#6BAED6</color>
+    <color name="count_learn">#FD8D3C</color>
+    <color name="count_relearn">#FB6A4A</color>
+    <color name="count_young">#74C476</color>
+    <color name="count_mature">#31A354</color>
+    <color name="bar_due">#31A354</color>
+    <color name="bar_interval">#3182BD</color>
+    <color name="bar_recall">#74C476</color>
+
     <!-- Anki's focus ring and the wash of a row under the pointer, here
          under the d-pad. -->
     <color name="focus">#3B82F6</color>

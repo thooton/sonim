@@ -38,6 +38,11 @@ The tablet's `session.earliest` is the same rule.
   - `algo/ReviewSession`: one deck's queue: which card is next, the
     new/learning/review counts, the daily limit or Auto, and the interval
     each rating would give.
+  - `algo/Stats`: the statistics, from the cards' state alone (no review
+    log is kept): Today, Future Due, Card Counts, Review Intervals and
+    Card Retrievability. The tablet's `stats.go` is the same arithmetic,
+    and its `TestStatsMatchThePhone` wants `StatsTests`' numbers; change
+    them together.
   - `data/`: `Deck` (name, new cards/day), `DeckCard`, `CardDef`,
     `Collection` (every deck and card, its JSON file, the sync merge, and
     `imported`, a new deck from a file), `Store` (the bundled deck's text
@@ -46,7 +51,10 @@ The tablet's `session.earliest` is the same rule.
 - `android/app`: `MainActivity` (deck list, overview, sync, the
   login), `ReviewPane` (the reviewer: OK shows the answer; only 1 to 4
   answer, each button labelled with its key), `OptionsPane` (New cards/day: Left and Right step
-  it, digits type it, below 0 is Auto, Back keeps it), `Anki` (the look).
+  it, digits type it, below 0 is Auto, Back keeps it), `StatsPane` (Anki's
+  Statistics window: Stats beside Options and in Menu; the deck's or, with
+  Left and Right, the collection's; Up and Down scroll; Card Counts' pie and
+  the histograms in Anki's colours), `Anki` (the look).
 - `android/app/src/main/assets/decks/`: the Spanish deck and its starting
   state, built from an Anki profile by `tools/import_anki_spanish.py`.
   Only the first run of 1.2 reads them, to bring the deck (with the state

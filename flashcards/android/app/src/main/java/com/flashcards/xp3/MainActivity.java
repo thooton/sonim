@@ -63,8 +63,8 @@ import java.util.concurrent.ExecutorService;
 
 /**
  * Anki's desktop window on a flip phone: the deck list, a deck's overview
- * with Study Now, the reviewer ({@link ReviewPane}) and the deck's options
- * ({@link OptionsPane}).
+ * with Study Now, the reviewer ({@link ReviewPane}), the deck's options
+ * ({@link OptionsPane}) and its statistics ({@link StatsPane}).
  *
  * The decks are the command center's (see {@link Collection}): the app
  * studies its own copy, saved in the app's private directory, and syncs it
@@ -92,7 +92,7 @@ public final class MainActivity extends BaseActivity {
     private static final int CARD_GRANT = 2;
     private static final long MAX_FKV = 16L << 20;
 
-    private enum Screen { DECKS, OVERVIEW, REVIEW, OPTIONS }
+    private enum Screen { DECKS, OVERVIEW, REVIEW, OPTIONS, STATS }
 
     private final ExecutorService net = Ui.worker("flashcards-sync");
     private final ExecutorService disk = Ui.worker("flashcards-import");
@@ -518,10 +518,11 @@ public final class MainActivity extends BaseActivity {
     private void deckMenu(final Deck deck) {
         List<String> items = deck == null
             ? Arrays.asList("Sync", "Import", "Command center")
-            : Arrays.asList("Options", "Sync", "Import", "Command center");
+            : Arrays.asList("Options", "Stats", "Sync", "Import", "Command center");
         listDialog(deck == null ? "Flashcards" : deck.name, items, at -> {
             String chose = items.get(at);
             if (chose.equals("Options")) showOptions(deck);
+            else if (chose.equals("Stats")) showStats(deck);
             else if (chose.equals("Sync")) syncNow();
             else if (chose.equals("Import")) chooseImport();
             else askLogin();
@@ -749,6 +750,11 @@ public final class MainActivity extends BaseActivity {
         TextView options = Anki.button(this, "Options");
         options.setOnClickListener(v -> showOptions(open));
         bar.addView(options, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(28)));
+        TextView stats = Anki.button(this, "Stats");
+        stats.setOnClickListener(v -> showStats(open));
+        LinearLayout.LayoutParams statsAt = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(28));
+        statsAt.leftMargin = dp(8);
+        bar.addView(stats, statsAt);
         box.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         Ui.fill(content, box);
         if (study != null) {
@@ -810,6 +816,17 @@ public final class MainActivity extends BaseActivity {
     }
 
     // ---------------------------------------------------------------------
+    // A deck's statistics
+
+    private void showStats(Deck deck) {
+        open = deck;
+        screen = Screen.STATS;
+        StatsPane pane = new StatsPane(this, deck, collection, zone);
+        Ui.fill(content, pane);
+        pane.requestFocus();
+    }
+
+    // ---------------------------------------------------------------------
     // Keys
 
     @Override
@@ -826,6 +843,7 @@ public final class MainActivity extends BaseActivity {
     public void onBackPressed() {
         switch (screen) {
             case REVIEW:
+            case STATS:
                 showOverview();
                 return;
             case OPTIONS:
