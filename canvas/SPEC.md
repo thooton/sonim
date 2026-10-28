@@ -259,7 +259,7 @@ Home.
 
 - Settings: Theme (Light, Dark, Follow phone), Text size (Default,
   Large), Reminders (Off, Morning of 08:00, Evening before 18:00, Both;
-  8:00 AM and 6:00 PM on a 12-hour phone),
+  8 AM and 6 PM on a 12-hour phone),
   Week starts on (Monday, Sunday; "(region)" until chosen), Download
   files (Always, On Wi-Fi only, Never), Account (the Canvas host, or "Not
   set up"). OK opens the choices; theme and size apply at once.
