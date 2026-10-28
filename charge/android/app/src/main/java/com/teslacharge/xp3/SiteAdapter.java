@@ -38,7 +38,7 @@ final class SiteAdapter extends RowAdapter {
         if (!site.isNull("availableStalls")) {
             stalls = site.optInt("availableStalls") + "/" + site.optInt("totalStalls") + " open";
         } else {
-            stalls = site.optInt("totalStalls") > 0 ? site.optInt("totalStalls") + " stalls" : "Availability unknown";
+            stalls = site.optInt("totalStalls") > 0 ? site.optInt("totalStalls") + (site.optInt("totalStalls") == 1 ? " stall" : " stalls") : "Availability unknown";
         }
         String status = site.isNull("distanceMiles") ? stalls
             : String.format(Locale.US, "%.1f mi", site.optDouble("distanceMiles")) + " · " + stalls;

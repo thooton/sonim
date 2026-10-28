@@ -86,7 +86,7 @@ content area. The open tab is marked. The app opens on Favorites.
 - Status line: "Within 12 miles" before any search; "Searching for
   chargers…" while searching; "N chargers near <what was typed>" after;
   "No chargers found" for none; the error message on failure. One line,
-  never wraps.
+  never wraps; text that does not fit ends in "…".
 - Find opens a dialog "Find Chargers" with a single-line field (hint "ZIP
   code or address", prefilled with the last query), Find and Cancel. Find
   or the keyboard's Enter with an empty field shows "Enter a ZIP code or
@@ -172,7 +172,9 @@ Starting a charge (real money; never press Start in QA):
 - The page updates every ~4 s while the app is open on any screen (the
   service's readings); no key press needed.
 - If the app opens with a session already running (started elsewhere), the
-  Session tab shows it.
+  Session tab shows it. Every app open (resume) with no session known asks
+  Tesla again, so an old "Could not check" does not outlive the open it
+  belongs to.
 
 ### History
 
@@ -205,7 +207,8 @@ Starting a charge (real money; never press Start in QA):
 - Refresh this page: re-fetches what is shown: the open detail or receipt,
   the active session, all favorites, history from page one, or re-runs the
   last search on Discover.
-- Search radius: "5 miles", "12 miles" (default), "30 miles", "60 miles".
+- Search radius: "5 miles", "12 miles" (default), "30 miles", "60 miles";
+  the list opens on, and ticks, the radius in use.
   The choice applies to the next search and to the status line; it resets to
   12 when the app is restarted.
 - Account info: a dialog with a spinner, then:

@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -121,6 +122,10 @@ public final class MainActivity extends BaseActivity {
     private String historyMoreError;
     private HistoryAdapter historyAdapter;
     private JSONObject currentSite;
+    /** The charger the open detail is for, set as soon as it is asked for, so
+     *  Refresh retries one that failed to load rather than the last one that
+     *  did. */
+    private String siteGuid;
     /** The charger {@link #openSite} is currently waiting on. A response for
      *  any other one belongs to a screen that has since been left, and drawing
      *  it would put a detail over whatever replaced it. */
@@ -190,8 +195,7 @@ public final class MainActivity extends BaseActivity {
         content = findViewById(R.id.content);
         tabs = new Tabs(this, tab -> showTab(tab, true), R.id.tab_favorites, R.id.tab_discover, R.id.tab_session, R.id.tab_history);
         favoriteSites.addAll(favorites.all());
-        showTab(FAVORITES, false);
-        resumeActiveSession();
+        showTab(FAVORITES, true);
     }
 
     @Override
@@ -199,7 +203,7 @@ public final class MainActivity extends BaseActivity {
         super.onResume();
         // onResume is the app-open boundary even when Android kept this
         // Activity alive in the background, so do not rely on onCreate alone.
-        refreshFavorites(false);
+        refreshFavorites(true);
         // Registering also tells the service someone is watching, which is what
         // moves it off its background interval onto a live one.
         ChargingService.observe(sessionUpdates);
@@ -223,6 +227,11 @@ public final class MainActivity extends BaseActivity {
             // is over.
             if (ChargingService.latest() != null) startWatchingSession();
             else resumeActiveSession();
+        } else if (currentSession == null) {
+            // Nothing known yet, or the last ask failed: a session started
+            // from the car while this was away, or a signal that has come
+            // back, only shows if every open asks again.
+            resumeActiveSession();
         }
     }
 
@@ -409,7 +418,10 @@ public final class MainActivity extends BaseActivity {
         final Button find = primaryAction("Find");
         root.addView(find);
         final TextView status = small(searchStatus());
-        status.setMaxLines(1);
+        // Ellipsized, so a cut-off message shows it was cut rather than
+        // stopping at the last whole word that fits.
+        status.setSingleLine(true);
+        status.setEllipsize(TextUtils.TruncateAt.END);
         root.addView(status);
         root.addView(divider());
         final SiteAdapter adapter = new SiteAdapter(this);
@@ -581,6 +593,8 @@ public final class MainActivity extends BaseActivity {
     private void openSite(final String locationGuid) {
         detailVisible = true;
         currentHistorySession = null;
+        currentSite = null;
+        siteGuid = locationGuid;
         pendingSiteGuid = locationGuid;
         final int generation = ++pendingSiteGeneration;
         // A bare spinner reads better than a placeholder title that is about to
@@ -1706,8 +1720,8 @@ public final class MainActivity extends BaseActivity {
             openHistorySession(currentHistorySession);
             return;
         }
-        if (detailVisible && currentSite != null) {
-            openSite(currentSite.optString("id"));
+        if (detailVisible && siteGuid != null) {
+            openSite(siteGuid);
             return;
         }
         if (currentTab == SESSION) resumeActiveSession();
@@ -1903,11 +1917,17 @@ public final class MainActivity extends BaseActivity {
     private void chooseRadius() {
         final double[] values = { 5, 12, 30, 60 };
         String[] labels = { "5 miles", "12 miles", "30 miles", "60 miles" };
-        new AlertDialog.Builder(this).setTitle("Search radius").setItems(
+        int current = 0;
+        for (int i = 0; i < values.length; i++) if (values[i] == radiusMiles) current = i;
+        new AlertDialog.Builder(this).setTitle("Search radius").setSingleChoiceItems(
                 labels,
+                current,
                 (dialog, which) -> {
+                    dialog.dismiss();
                     radiusMiles = values[which];
-                    if (currentTab == DISCOVER) renderDiscover();
+                    // Only the Discover list shows the radius; redrawing it
+                    // over a charger detail would strand that detail.
+                    if (discoverVisible()) renderDiscover();
                 }
             ).show();
     }
@@ -1925,7 +1945,8 @@ public final class MainActivity extends BaseActivity {
                 : searchOrigin == null
                   ? "your search"
                   : searchOrigin.optString("label", "your search");
-        return searchResults.size() + " chargers near " + where;
+        return searchResults.size() +
+            (searchResults.size() == 1 ? " charger near " : " chargers near ") + where;
     }
 
     private <T> void async(
