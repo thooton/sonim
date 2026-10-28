@@ -94,7 +94,7 @@ public final class Releases {
                 in.close();
             }
         } catch (IOException e) {
-            throw friendly(e);
+            throw friendly(e, "The connection was lost.");
         } finally {
             connection.disconnect();
         }
@@ -153,7 +153,7 @@ public final class Releases {
             if (!part.renameTo(to)) throw new IOException("Can't save the download.");
         } catch (IOException e) {
             part.delete();
-            throw friendly(e);
+            throw friendly(e, "The download was cut short.");
         } finally {
             connection.disconnect();
         }
@@ -181,7 +181,7 @@ public final class Releases {
             connection.setRequestProperty("Accept-Encoding", "identity");
             return connection;
         } catch (IOException e) {
-            throw friendly(e);
+            throw friendly(e, "Could not connect.");
         }
     }
 
@@ -195,8 +195,11 @@ public final class Releases {
     /**
      * The network failures worth naming, in words for a 240px screen.
      * Anything already phrased for a person passes through untouched.
+     * Over https a connection that drops mid-read surfaces as an
+     * SSLException too; only a failed handshake or certificate is the
+     * secure connection failing, anything else is `cut`.
      */
-    private static IOException friendly(IOException e) {
+    public static IOException friendly(IOException e, String cut) {
         if (e instanceof java.net.SocketTimeoutException) {
             return new IOException("The connection timed out.");
         }
@@ -206,8 +209,12 @@ public final class Releases {
         if (e instanceof java.net.ConnectException) {
             return new IOException("Could not connect.");
         }
-        if (e instanceof javax.net.ssl.SSLException) {
+        if (e instanceof javax.net.ssl.SSLHandshakeException
+                || e instanceof javax.net.ssl.SSLPeerUnverifiedException) {
             return new IOException("The secure connection failed.");
+        }
+        if (e instanceof javax.net.ssl.SSLException) {
+            return new IOException(cut);
         }
         return e;
     }

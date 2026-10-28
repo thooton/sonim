@@ -316,6 +316,7 @@ public final class MainActivity extends BaseActivity {
         Ui.onSelect(list, position -> {
             adapter.trackSelectedPosition(position);
             selectedName = adapter.getItem(position).entry.name;
+            list.post(() -> reveal(list, position));
         });
         list.setOnItemClickListener((parent, view, position, id) -> {
             adapter.setSelectedPosition(position);
@@ -334,6 +335,26 @@ public final class MainActivity extends BaseActivity {
         messageView = null;
         listView = list;
         Ui.fill(content, list);
+    }
+
+    /**
+     * Scrolls the whole of the selected row into view. ListView scrolls at
+     * most a third of its height per press, less than a row with two lines
+     * of notes, and then spends the next Down finishing the scroll rather
+     * than moving; so Down moved only every other press. Like ListView, it
+     * leaves a few pixels of the next row showing below, so that press
+     * moves.
+     */
+    private static void reveal(ListView list, int position) {
+        if (list.getSelectedItemPosition() != position) return;
+        View row = list.getChildAt(position - list.getFirstVisiblePosition());
+        if (row == null) return;
+        int top = list.getPaddingTop();
+        int bottom = list.getHeight() - list.getPaddingBottom();
+        if (position < list.getCount() - 1) bottom -= Math.max(2, list.getVerticalFadingEdgeLength());
+        if (row.getHeight() > bottom - top) return;
+        if (row.getBottom() > bottom) list.scrollListBy(row.getBottom() - bottom);
+        else if (row.getTop() < top) list.scrollListBy(row.getTop() - top);
     }
 
     /** Checking (a spinner, as the App Store shows), the reason a check failed, or an empty release. */
@@ -520,9 +541,22 @@ public final class MainActivity extends BaseActivity {
         ScrollView scroll = new ScrollView(this);
         scroll.setDefaultFocusHighlightEnabled(false);
         scroll.addView(page);
+        // Focus stays on the text so Up/Down scroll it, and OK closes it
+        // wherever it is scrolled, as Done would. Only an OK pressed here
+        // counts: a release left over from the menu does nothing.
+        final boolean[] down = {false};
         new AlertDialog.Builder(this)
             .setView(scroll)
             .setPositiveButton("Done", null)
+            .setOnKeyListener((dialog, keyCode, event) -> {
+                if (!Ui.isOk(keyCode)) return false;
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    down[0] = true;
+                } else if (event.getAction() == KeyEvent.ACTION_UP && down[0]) {
+                    dialog.dismiss();
+                }
+                return true;
+            })
             .show();
     }
 

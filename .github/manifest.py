@@ -6,8 +6,9 @@
 For each <app>.apk in the directory, read from the APK itself (so it can't
 drift from the build files): versionName, versionCode, package name and
 label; then its size and SHA-256, and what's new in it, from the newest
-commits that touched the app's directory (git log, so CI needs the history:
-checkout with fetch-depth 0).
+commits that touched the app's directory, leaving out those that changed
+only its docs (git log, so CI needs the history: checkout with
+fetch-depth 0).
 
 A commit subject leads with the apps it changes ("Updater 1.2.4: drop
 "more" from every row"). That lead is cut off, leaving the sentence ("Drop
@@ -29,6 +30,9 @@ import sys
 # Release names whose sources aren't in a directory of the same name.
 DIRS = {"AppDrawer": "launcher"}
 NOTES = 10
+# Files in an app's directory that aren't built into its APK (SPEC.md,
+# AGENTS.md, mockups): a commit touching only these isn't what's new in it.
+DOCS = ["*.md", "mockups"]
 
 NAME = r"[A-Za-z][\w-]*(?: v?\d+(?:\.\d+)*)?"
 LEAD = re.compile(r"^(%s(?:\s*(?:,|&|/|\band\b)\s*%s)*):\s*(.+)$" % (NAME, NAME))
@@ -76,7 +80,8 @@ def notes(app, label):
     if not os.path.isdir(directory):
         return []
     log = subprocess.run(
-        ["git", "log", "--no-merges", "-n", str(NOTES), "--format=%h%x00%cI%x00%s", "--", directory],
+        ["git", "log", "--no-merges", "-n", str(NOTES), "--format=%h%x00%cI%x00%s", "--", directory]
+        + [":(exclude)%s/%s" % (directory, docs) for docs in DOCS],
         check=True, capture_output=True, text=True).stdout
     out = []
     for line in log.splitlines():

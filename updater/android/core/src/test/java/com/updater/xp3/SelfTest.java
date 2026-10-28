@@ -30,6 +30,7 @@ public final class SelfTest {
         check.run("Status", () -> status(check));
         check.run("Notes", () -> notes(check));
         check.run("Releases", () -> releases(check));
+        check.run("Errors", () -> errors(check));
         if (!check.report()) System.exit(1);
     }
 
@@ -106,6 +107,18 @@ public final class SelfTest {
         check.same("today", "Today", Notes.when(now - 3600000L, now, utc));
         check.same("yesterday", "Yesterday", Notes.when(now - 20 * 3600000L, now, utc));
         check.same("a date", "Oct 14, 2026", Notes.when(now - 3 * 86400000L, now, utc));
+    }
+
+    private static void errors(Check check) {
+        String cut = "The download was cut short.";
+        check.same("dropped mid-read", cut, Releases.friendly(
+            new javax.net.ssl.SSLException("Read error: I/O error during system call, Connection reset by peer"), cut).getMessage());
+        check.same("handshake", "The secure connection failed.", Releases.friendly(
+            new javax.net.ssl.SSLHandshakeException("bad certificate"), cut).getMessage());
+        check.same("unverified", "The secure connection failed.", Releases.friendly(
+            new javax.net.ssl.SSLPeerUnverifiedException("no peer"), cut).getMessage());
+        check.same("no network", "No network.", Releases.friendly(
+            new java.net.UnknownHostException("github.com"), cut).getMessage());
     }
 
     private static void releases(Check check) throws Exception {

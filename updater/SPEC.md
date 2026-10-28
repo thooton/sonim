@@ -136,7 +136,9 @@ A manifest whose `schema` isn't 1 is "The release's manifest is
 unreadable."
 
 **Errors**, in words: "No network.", "The connection timed out.",
-"Could not connect.", "The secure connection failed.", "The release has no
+"Could not connect.", "The connection was lost.", "The secure connection
+failed." (only a failed handshake or certificate; a connection dropped
+during a download is "The download was cut short."), "The release has no
 manifest.json.", "GitHub answered <code> for <file>.". A failed check with
 no list shows the message screen; with a list already showing, the list
 stays and a toast says "Couldn't check: <reason>".
