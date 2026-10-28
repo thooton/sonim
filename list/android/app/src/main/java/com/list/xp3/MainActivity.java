@@ -216,8 +216,8 @@ public final class MainActivity extends BaseActivity {
     private void revealBelow(int position) {
         View heading = rowView(position);
         if (heading == null || listAdapter.getSelectedPosition() != position) return;
-        View next = rowView(position + 1);
-        int below = next != null ? next.getHeight() : heading.getHeight();
+        if (position + 1 >= listAdapter.getCount()) return;
+        int below = rowHeight(position + 1);
         int bottom = listView.getHeight() - listView.getPaddingBottom();
         if (heading.getBottom() + below <= bottom) return;
         listView.setSelectionFromTop(position,
@@ -225,6 +225,12 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void itemAction(int action, final int row, final int index, final Item chosen) {
+        if ((action == MENU_ADD || action == MENU_INSERT_ABOVE || action == MENU_INSERT_BELOW)
+                && backend.checklist().size() >= Checklist.MAX_ITEMS) {
+            // Refused before the sheet opens, not after the task is written.
+            toast("The list is full");
+            return;
+        }
         if (action == MENU_ADD) {
             // New tasks go to the top, as Google Tasks puts them.
             promptText("", text -> insertNear(-1, null, 0, text));
@@ -333,6 +339,7 @@ public final class MainActivity extends BaseActivity {
         window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         window.setGravity(Gravity.BOTTOM);
 
+        ((SheetLayout) sheet.findViewById(R.id.sheet)).setOnBack(sheet::cancel);
         final EditText field = sheet.findViewById(R.id.sheet_field);
         final TextView save = sheet.findViewById(R.id.sheet_save);
         // Single-line input so ENTER is never a newline, but wrapped so a long
@@ -478,7 +485,6 @@ public final class MainActivity extends BaseActivity {
         if (row == null) {
             y = listView.getHeight() / 3f;
         } else if (menuRow < 0) {
-            x = listView.getWidth() / 4f;
             y = (row.getTop() + row.getBottom()) / 2f;
         } else {
             y = Math.max(0, Math.min(row.getBottom(), listView.getHeight()));
@@ -545,6 +551,17 @@ public final class MainActivity extends BaseActivity {
     private static void add(List<Integer> ids, List<String> titles, int id, String title) {
         ids.add(Integer.valueOf(id));
         titles.add(title);
+    }
+
+    /** The height of row `position`, measured if it is not laid out yet (below the screen). */
+    private int rowHeight(int position) {
+        View row = rowView(position);
+        if (row != null) return row.getHeight();
+        row = listAdapter.getView(position, null, listView);
+        int width = listView.getWidth() - listView.getPaddingLeft() - listView.getPaddingRight();
+        row.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        return row.getMeasuredHeight();
     }
 
     private View rowView(int position) {
