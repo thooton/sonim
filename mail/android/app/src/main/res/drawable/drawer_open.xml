@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The folder open now in the folder pane: drawer_item's pill while the
+     d-pad is on it, else a pale wash. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_activated="true">
+        <inset android:insetLeft="6dp" android:insetRight="6dp" android:insetTop="1dp" android:insetBottom="1dp">
+            <shape android:shape="rectangle">
+                <solid android:color="@color/pill" />
+                <corners android:radius="17dp" />
+            </shape>
+        </inset>
+    </item>
+    <item>
+        <inset android:insetLeft="6dp" android:insetRight="6dp" android:insetTop="1dp" android:insetBottom="1dp">
+            <shape android:shape="rectangle">
+                <solid android:color="@color/pill_wash" />
+                <corners android:radius="17dp" />
+            </shape>
+        </inset>
+    </item>
+</selector>

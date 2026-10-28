@@ -35,6 +35,7 @@ import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
@@ -271,7 +272,7 @@ public final class MainActivity extends BaseActivity {
         } else {
             refresh();
         }
-        if (login.ready() && kept == null) load();
+        if (kept == null) load();
     }
 
     @Override
@@ -282,10 +283,11 @@ public final class MainActivity extends BaseActivity {
 
     @Override
     protected void onPause() {
-        // What is being written survives the app being stopped.
+        // What is being written survives the app being stopped; a message left as it began is dropped, as Back drops it.
         if (screen == WRITE && writing != null && !sending) {
             collect();
-            prefs().edit().putString("compose", writing.toJson()).apply();
+            if (writing.untouched(writingStart)) prefs().edit().remove("compose").apply();
+            else prefs().edit().putString("compose", writing.toJson()).apply();
         }
         super.onPause();
     }
@@ -323,6 +325,14 @@ public final class MainActivity extends BaseActivity {
 
     private SharedPreferences prefs() {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
+    }
+
+    /** Whether there is a login to reach Gmail with; if not, says so and asks for one. */
+    private boolean signedIn() {
+        if (login.ready()) return true;
+        say("Mail isn't set up");
+        askLogin();
+        return false;
     }
 
     /** One client per login, so its access token is reused. */
@@ -1274,6 +1284,7 @@ public final class MainActivity extends BaseActivity {
             say(e.getMessage());
             return;
         }
+        if (!signedIn()) return;
         final Outgoing out = writing;
         final Gmail client = gmail();
         sending = true;
@@ -1300,6 +1311,7 @@ public final class MainActivity extends BaseActivity {
     private void saveDraft() {
         if (sending) return;
         collect();
+        if (!signedIn()) return;
         final Outgoing out = writing;
         final Gmail client = gmail();
         sending = true;
@@ -2105,7 +2117,7 @@ public final class MainActivity extends BaseActivity {
             field.setSelection(field.length());
         }
         box.addView(field);
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle("Search mail")
             .setView(box)
             .setPositiveButton("Search", (dialog, which) -> {
@@ -2114,6 +2126,7 @@ public final class MainActivity extends BaseActivity {
             })
             .setNegativeButton("Cancel", null)
             .show();
+        onOk(field, () -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick());
     }
 
     /** The fallback for a build without a bundled login. */
@@ -2132,7 +2145,7 @@ public final class MainActivity extends BaseActivity {
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);
         box.addView(token);
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
             .setPositiveButton("Save", (dialog, which) -> {
@@ -2158,6 +2171,34 @@ public final class MainActivity extends BaseActivity {
             })
             .setNegativeButton("Cancel", null)
             .show();
+        onOk(server, token::requestFocus);
+        onOk(token, () -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick());
+    }
+
+    /**
+     * OK (or the keyboard's Done) in a dialog's one-line field does `then`, as
+     * OK commits a typed field in the other apps. It acts on the key's release,
+     * so the release doesn't reach whatever is under the dialog.
+     */
+    private static void onOk(EditText field, Runnable then) {
+        field.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        field.setOnEditorActionListener((view, action, event) -> {
+            if (action != EditorInfo.IME_ACTION_DONE) return false;
+            then.run();
+            return true;
+        });
+        // Only a press that began here: the release of the OK that opened the dialog is not one.
+        final boolean[] pressed = {false};
+        field.setOnKeyListener((view, keyCode, event) -> {
+            if (!Ui.isOk(keyCode)) return false;
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                pressed[0] = true;
+            } else if (event.getAction() == KeyEvent.ACTION_UP && pressed[0]) {
+                pressed[0] = false;
+                if (!event.isCanceled()) then.run();
+            }
+            return true;
+        });
     }
 
     // ---- Adapters ----
@@ -2296,8 +2337,11 @@ public final class MainActivity extends BaseActivity {
             View row = convert != null ? convert : getLayoutInflater().inflate(R.layout.row_folder, parent, false);
             boolean picked = position == drawerPick;
             boolean open = entry.folder != null && entry.folder.is(folder);
+            // The wash is the row's own background: the ListView sets and clears rows' selected state itself.
+            int left = row.getPaddingLeft(), right = row.getPaddingRight();
+            row.setBackgroundResource(open ? R.drawable.drawer_open : R.drawable.drawer_item);
+            row.setPadding(left, 0, right, 0);
             row.setActivated(picked);
-            row.setSelected(open);
             int ink = picked ? color(R.color.on_primary) : open ? color(R.color.focus_rule) : color(R.color.text);
             ImageView icon = (ImageView) row.findViewById(R.id.icon);
             icon.setImageResource(entry.icon);
