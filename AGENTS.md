@@ -37,6 +37,25 @@ never reaches the phone. A change touching several apps bumps each of them,
 and so does a change to `common/` or `gradle/`: bump every app that uses what
 changed.
 
+## Nightly QA
+
+Every night the Delta command center has cloud sessions go through each app
+here (see "Nightly QA" in thooton/delta's AGENTS.md): one explores it in an
+emulator and files findings, another fixes what should be fixed and pushes
+to master, and then one refactors the whole repository. The Tree app
+(`tree/`) shows what they found and did, and starts runs.
+
+- Each app has a `SPEC.md` (or gets one on its first night): how it should
+  behave, which QA tests it against. When you change what an app does,
+  change its `SPEC.md` in the same commit. A change to `SPEC.md` alone is
+  not part of the app's build and needs no version bump.
+- `qa/...` branches are QA jobs' work in progress; leave them alone.
+- `.github/workflows/qa-devices.yml` and `.github/qa/bridge.py` run the
+  Android 8.1 emulators QA drives (XP3-shaped, 240x320 mdpi), on GitHub
+  Actions; the command center dispatches the workflow. They need the
+  `QA_DELTA_SERVER` and `QA_DEVICE_TOKEN` secrets, which `delta qa setup`
+  sets.
+
 ## Writing to the SD card needs Android's grant for the card
 
 Every agent that has saved a file onto the SD card has hit this. On the

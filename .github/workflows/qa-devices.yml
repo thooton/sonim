@@ -1,0 +1,74 @@
+# The emulators for a nightly QA run. Nobody starts this by hand: the Delta
+# command center dispatches it when a run has phone apps to explore (see
+# "Nightly QA" in thooton/delta's AGENTS.md), and QA agents drive the
+# emulators through it with `delta qa device ...`.
+#
+# Each job boots three Android 8.1 emulators shaped like the XP3, installs
+# the run's apps built from master, and lends them to the run until it no
+# longer needs them (.github/qa/bridge.py). The command center's address and
+# the device token come from the QA_DELTA_SERVER and QA_DEVICE_TOKEN secrets
+# (`delta qa setup` sets them), so neither appears in these public logs.
+name: QA emulators
+
+on:
+  workflow_dispatch:
+    inputs:
+      run:
+        description: The QA run's id
+        required: true
+      runners:
+        description: One entry per job, as a JSON list
+        required: true
+        default: "[1]"
+      apps:
+        description: The apps' directories, space-separated
+        required: true
+
+concurrency:
+  group: qa-devices-${{ inputs.run }}
+
+env:
+  ANDROID_BUILD_TOOLS: 35.0.1
+
+jobs:
+  emulators:
+    name: Emulators ${{ matrix.runner }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(inputs.runners) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-35 build-tools;${{ env.ANDROID_BUILD_TOOLS }} platform-tools emulator system-images;android-27;default;x86_64
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Hardware acceleration, without which the emulators crawl.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # As in build-apks.yml: Charge won't build without one.
+      - name: Placeholder Charge token
+        run: echo '{"refreshToken":"ci-placeholder"}' > charge/android/.tokens.json
+
+      - name: Lend the emulators to the run
+        env:
+          QA_DELTA_SERVER: ${{ secrets.QA_DELTA_SERVER }}
+          QA_DEVICE_TOKEN: ${{ secrets.QA_DEVICE_TOKEN }}
+          RUN: ${{ inputs.run }}
+          APPS: ${{ inputs.apps }}
+          RUNNER: ${{ github.run_id }}-${{ matrix.runner }}
+        run: python3 .github/qa/bridge.py --run "$RUN" --runner "$RUNNER" --apps "$APPS"
