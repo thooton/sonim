@@ -63,8 +63,6 @@ final class ResultRow extends LinearLayout {
 
         folders = line(context, R.dimen.text_meta, R.color.text_muted);
         folders.setSingleLine(true);
-        // From the start, so the folders nearest the file stay in view.
-        folders.setEllipsize(TextUtils.TruncateAt.START);
         folders.setCompoundDrawablePadding(Ui.dp(context, 3));
         lines.addView(folders);
 
@@ -123,7 +121,13 @@ final class ResultRow extends LinearLayout {
         title.setTextColor(getContext().getColor(picked ? R.color.on_accent_container : R.color.text));
     }
 
+    /**
+     * Whether the second line holds folders: then it is cut from the start,
+     * so the folders nearest the file stay in view; a book's author keeps
+     * its start.
+     */
     private void folderIcon(boolean on) {
+        folders.setEllipsize(on ? TextUtils.TruncateAt.START : TextUtils.TruncateAt.END);
         if (!on) {
             folders.setCompoundDrawablesRelative(null, null, null, null);
             return;
@@ -180,8 +184,9 @@ final class ResultRow extends LinearLayout {
         picked(picked);
     }
 
-    /** A saved download, from the history. */
+    /** A saved download, from the history: ticked while its first file is still there. */
     void entry(History.Entry entry, boolean picked) {
+        boolean there = Download.saved(entry.key) != null;
         cover.set(entry.kind, entry.title, false, Download.IDLE);
         title.setText(entry.title);
         boolean music = !Download.BOOK.equals(entry.kind);
@@ -189,9 +194,9 @@ final class ResultRow extends LinearLayout {
         folderIcon(music);
         ((View) meta.getParent()).setVisibility(GONE);
         String when = entry.time > 0 ? DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(entry.time)) : "";
-        show(extra, join(entry.bytes > 0 ? Download.human(entry.bytes) : "", when));
+        show(extra, there ? join(entry.bytes > 0 ? Download.human(entry.bytes) : "", when) : join("No longer on the phone", when));
         button.set(Download.SAVED, -1, picked);
-        button.setVisibility(VISIBLE);
+        button.setVisibility(there ? VISIBLE : GONE);
         picked(picked);
     }
 

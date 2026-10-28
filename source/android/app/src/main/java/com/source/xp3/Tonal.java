@@ -64,6 +64,7 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        lightStatusBar(!dark(this));
         loadFonts();
         Download.init(this);
         login = loadLogin(prefs());
@@ -103,6 +104,18 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
 
     static boolean dark(Context context) {
         return prefs(context).getBoolean("dark", false);
+    }
+
+    /**
+     * The status bar's icons dark on the light theme and light on the dark.
+     * The theme sets this only on a new window, and recreate() keeps the old
+     * one, so it is set here as well.
+     */
+    private void lightStatusBar(boolean on) {
+        View decor = getWindow().getDecorView();
+        int flags = decor.getSystemUiVisibility();
+        int light = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        decor.setSystemUiVisibility(on ? flags | light : flags & ~light);
     }
 
     /** Switches the theme, and redraws this screen in it. */

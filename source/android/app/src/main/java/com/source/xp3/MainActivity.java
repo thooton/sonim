@@ -929,7 +929,7 @@ public final class MainActivity extends Tonal {
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);
         box.addView(token);
-        new AlertDialog.Builder(this)
+        final AlertDialog ask = new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
             .setPositiveButton("Save", (dialog, which) -> {
@@ -946,7 +946,18 @@ public final class MainActivity extends Tonal {
                 }
             })
             .setNegativeButton("Cancel", null)
-            .show();
+            .create();
+        // Up and Down never left the address field here, so the d-pad moves
+        // between the fields and the buttons itself.
+        ask.setOnKeyListener((shown, code, event) -> {
+            if (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN) return false;
+            if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
+            View at = ask.getCurrentFocus();
+            View next = at == null ? null : at.focusSearch(code == KeyEvent.KEYCODE_DPAD_UP ? View.FOCUS_UP : View.FOCUS_DOWN);
+            if (next != null) next.requestFocus();
+            return true;
+        });
+        ask.show();
     }
 
     /** The results, songs, albums or books, each ending in its state button. */

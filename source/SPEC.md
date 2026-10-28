@@ -176,7 +176,8 @@ The title bar says "Downloads". From the top: the full storage card (free of
 total, a bar split into Music, Books and the rest, and a "● Music X ● Books Y"
 legend once measured), then the sections "Downloading" (running first, then
 queued), "Failed" (this session, newest first) and "Saved" (newest first, up to
-100, with size and date). With none of these it shows the heading "Nothing
+100, with size and date, and the tick; one whose first file is gone has no
+tick and reads "No longer on the phone" before its date). With none of these it shows the heading "Nothing
 downloaded yet".
 
 The first download row is picked on opening. Up/Down move between download
