@@ -61,6 +61,8 @@ final class Pages {
     private final ExecutorService worker = Ui.worker("tablet-pages");
     private final LruCache<String, Bitmap> memory;
     private final Map<String, Integer> counts = new HashMap<>();
+    /** Documents the command center said have no pages at all (an ePub nothing is written on). */
+    private final Set<String> empty = new HashSet<>();
     /** What couldn't be had, by key, so a cover drawn every frame isn't asked for every frame. */
     private final Map<String, String> missing = new HashMap<>();
     private final Set<String> pending = new HashSet<>();
@@ -115,6 +117,11 @@ final class Pages {
     int count(String id, long stamp) {
         Integer n = counts.get(id + "@" + stamp);
         return n == null ? 0 : n;
+    }
+
+    /** Whether the command center said the document has no pages at all, not just that one couldn't come. */
+    boolean empty(String id, long stamp) {
+        return empty.contains(id + "@" + stamp);
     }
 
     /**
@@ -172,11 +179,12 @@ final class Pages {
     private void fetch(Center signedIn, String id, long stamp, int n, int width, String key) {
         Bitmap bitmap = null;
         int pages = 0;
+        boolean none = false;
         String problem = null;
         File file = new File(dir, safe(id) + "-" + stamp + "-" + n + ".pdf");
         try {
             if (!file.isFile()) {
-                if (signedIn == null) throw new IOException("Not signed in.");
+                if (signedIn == null) throw new IOException("Not signed in");
                 pages = signedIn.page(id, n, file);
                 trim();
             }
@@ -184,6 +192,7 @@ final class Pages {
             file.setLastModified(System.currentTimeMillis());
         } catch (Center.NoPage e) {
             pages = e.pages;
+            none = e.pages == 0;
             problem = e.getMessage();
         } catch (IOException | RuntimeException e) {
             problem = e.getMessage() == null ? "Couldn't show the page." : e.getMessage();
@@ -194,9 +203,11 @@ final class Pages {
         final Bitmap drawn = bitmap;
         final int count = pages;
         final String why = problem;
+        final boolean nothing = none;
         main.post(() -> {
             pending.remove(key);
             if (count > 0) counts.put(id + "@" + stamp, count);
+            if (nothing) empty.add(id + "@" + stamp);
             if (drawn != null) memory.put(key, drawn);
             else missing.put(key, why);
             List<Ready> told = waiting.remove(key);
@@ -293,29 +304,35 @@ final class Pages {
             return Viewport.PAGE_H;
         }
 
-        private static StaticLayout layout(String text, TextPaint paint, float spacing) {
+        private static StaticLayout layout(String text, TextPaint paint, float spacing, int lines) {
             return StaticLayout.Builder.obtain(text, 0, text.length(), paint, 240)
                 .setAlignment(Layout.Alignment.ALIGN_CENTER)
                 .setLineSpacing(0, spacing)
                 .setIncludePad(false)
+                .setMaxLines(lines)
+                .setEllipsize(android.text.TextUtils.TruncateAt.END)
                 .build();
         }
 
         @Override
         public void draw(Canvas canvas) {
             canvas.drawColor(Look.PAGE);
+            // With a note (loading, or why the page can't come) the name is
+            // smaller and higher, so the note stays above the preview's pill
+            // and minimap at 100%.
+            boolean noted = says.length() > 0;
             if (nameLayout == null) {
                 title.setTypeface(Look.serifBold);
-                title.setTextSize(26);
+                title.setTextSize(noted ? 20 : 26);
                 title.setColor(Look.INK);
-                nameLayout = layout(name, title, 1.1f);
+                nameLayout = layout(name, title, 1.1f, noted ? 2 : Integer.MAX_VALUE);
                 note.setTypeface(Look.ui);
                 note.setTextSize(15);
                 note.setColor(Look.GRAPHITE);
-                noteLayout = layout(says, note, 1.25f);
+                noteLayout = layout(says, note, 1.25f, 4);
             }
             canvas.save();
-            canvas.translate(30, 110);
+            canvas.translate(30, noted ? 70 : 110);
             nameLayout.draw(canvas);
             canvas.translate(0, nameLayout.getHeight() + 22);
             noteLayout.draw(canvas);

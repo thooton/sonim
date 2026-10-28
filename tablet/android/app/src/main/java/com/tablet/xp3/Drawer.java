@@ -43,7 +43,7 @@ final class Drawer extends LinearLayout {
         setPadding(Look.dp(c, 8), Look.dp(c, 10), Look.dp(c, 9.5f), Look.dp(c, 8));
 
         LinearLayout device = Parts.column(c);
-        device.setPadding(Look.dp(c, 6), 0, Look.dp(c, 6), Look.dp(c, 10));
+        device.setPadding(Look.dp(c, 6), 0, Look.dp(c, 6), Look.dp(c, 7));
         device.addView(Look.text(c, "Tablet", Look.serifBold, 13, Look.INK));
         synced = Look.text(c, "", Look.ui, 9, Look.GRAPHITE);
         device.addView(synced, top(c, 3));
@@ -68,7 +68,7 @@ final class Drawer extends LinearLayout {
         addView(spring, grow);
         addView(Parts.rule(c), Parts.line(Parts.FILL, 1));
         LinearLayout foot = Parts.column(c);
-        foot.setPadding(Look.dp(c, 6), Look.dp(c, 8), Look.dp(c, 6), 0);
+        foot.setPadding(Look.dp(c, 6), Look.dp(c, 6), Look.dp(c, 6), 0);
         foot.addView(Look.cap(c, "Command center", Look.GRAPHITE));
         host = Look.text(c, "", Look.ui, 9, Look.GRAPHITE);
         host.setSingleLine();
@@ -101,9 +101,10 @@ final class Drawer extends LinearLayout {
         grow.weight = 1;
         box.addView(text, grow);
         if (badge != null) box.addView(badge, new LayoutParams(Parts.WRAP, Parts.WRAP));
-        box.setPadding(0, Look.dp(c, 4), 0, Look.dp(c, 4));
+        box.setPadding(0, Look.dp(c, 3), 0, Look.dp(c, 3));
         LayoutParams lp = new LayoutParams(Parts.FILL, Parts.WRAP);
-        lp.topMargin = Look.dp(c, 8);
+        // Tight enough that the four places and the foot fit the XP3's 296px under the status bar.
+        lp.topMargin = Look.dp(c, 4);
         addView(box, lp);
         return action;
     }

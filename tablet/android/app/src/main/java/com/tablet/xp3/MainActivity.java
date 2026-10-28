@@ -583,7 +583,7 @@ public final class MainActivity extends Activity {
             if (count > 0) previewPages = count;
             if (page != null) {
                 preview.show(page, previewName, n, previewPages);
-            } else if (count == 0 && n == 1) {
+            } else if (n == 1 && pages.empty(id, previewStamp)) {
                 // Nothing to show at all (an ePub nothing is written on): back where it was opened from.
                 screen = previewFrom;
                 say("", why);
@@ -720,7 +720,7 @@ public final class MainActivity extends Activity {
                     switch (picked) {
                         case LibraryScreen.OPEN:
                             closeSheet();
-                            openPreview(doc.id, doc.modified, doc.name, 0, LIBRARY);
+                            openPreview(doc.id, doc.modified, doc.name, doc.pages, LIBRARY);
                             break;
                         case LibraryScreen.TRANSFORM:
                             Job running = jobs.runningOn(doc.id);
