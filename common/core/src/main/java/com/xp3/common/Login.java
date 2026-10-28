@@ -6,9 +6,9 @@ import java.util.Map;
 
 /**
  * The command center login: its address and the delta token, the same pair
- * `delta set-auth` saves for the CLI and the Delta app bakes in.
+ * `delta set-auth` saves for the CLI and gradle/bundled.gradle bakes in.
  *
- * Validated the way the Delta app validates it: https only (the token would
+ * Validated here: https only (the token would
  * otherwise cross the network readable by anyone on the way), a host and an
  * optional path prefix, no trailing slash, and a token of visible characters
  * that can sit in a header.

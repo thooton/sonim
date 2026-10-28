@@ -123,22 +123,25 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
   are a plain `SelfTest` main class, `com.<app>.xp3.SelfTest`, run by
   `:core:selfTest`; there is no test framework.
 - `gradle/bundled.gradle`: bakes a deployment's login into an app as a
-  generated `Bundled` class (Canvas, Charge, Mail, Places, Source, Tablet). The files it reads are gitignored, and CI has none, so its APKs
-  carry no login.
+  generated `Bundled` class (Authenticator, Canvas, Charge, Flashcards, Mail,
+  Places, Source, Tablet, Tree), which `Logins.load` adopts. The files it
+  reads are gitignored, and CI has none, so its APKs carry no login.
 
 ## Shared code
 
 `common/` holds what more than one app uses. Use it rather than copying.
 
 - `common/core` (plain Java, `com.xp3.common`): `Json` (strict codec), `Http`
-  (deadlines, bounded bodies, no redirects), `Disk` (whole-file reads and
-  atomic writes), `Login` (the command center address and delta token, as
-  Source, Places and Mail sign in); and, as test fixtures, `Check` (the test
+  (deadlines, bounded bodies, no redirects; a `Stream`'s `bytes`, `copy`
+  and `save` read a download whole, into a stream or through a part file),
+  `Disk` (whole-file reads and atomic writes), `Login` (the command center
+  address and delta token, as every app that signs in keeps it); and, as test fixtures, `Check` (the test
   harness) and `TestServer` (a loopback HTTP server).
 - `common/ui` (Android, `com.xp3.common.ui`): `BaseActivity` (`dp`, `color`,
   `toast`, `alert`, `vertical`, `text`, `listDialog`), `Ui` (workers, `fill`,
-  `weighted`, `isOk`, `onSelect`), `Card` (the SD card, where downloads
-  go), `CardGrant` (Android's grant for the whole card, which Android 8.1
+  `weighted`, `isOk`, `onSelect`), `Logins` (the bundled login, adopted once per
+  build, and the Command center dialog for typing one in), `Card` (the SD
+  card, where downloads go), `CardGrant` (Android's grant for the whole card, which Android 8.1
   wants before an app writes there, and sometimes before it reads what
   another app put there), `Tabs` (tab bar with d-pad cycling),
   `SelectableAdapter` (rows that paint their own highlight), `Markdown`, and
