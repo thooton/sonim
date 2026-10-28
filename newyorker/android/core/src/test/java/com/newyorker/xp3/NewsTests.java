@@ -50,6 +50,7 @@ final class NewsTests {
         check.same("issue page", null, Site.article("/magazine/2026/10/26"));
         check.same("podcast", null, Site.article("/podcast/political-scene/an-episode"));
         check.same("puzzle", null, Site.article("/puzzles-and-games-dept/crossword/2026/10/20"));
+        check.same("cartoon gallery", null, Site.article("/gallery/cartoons-from-the-november-2-2026-issue"));
         check.same("elsewhere", null, Site.article("https://example.com/news/a/b"));
         check.same("picture resized", "https://media.newyorker.com/photos/abc/4:3/w_320%2Cc_limit/x.jpg",
             Site.picture("https://media.newyorker.com/photos/abc/4:3/w_1600%2Cc_limit/x.jpg", 320));

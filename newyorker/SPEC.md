@@ -45,8 +45,8 @@ short ink rule; the others grey.
 - Saved: masthead "Saved". Saved articles as rows, newest saved first.
 - A row: rubric (red), headline, up to two lines of italic dek ending in
   "…", byline, and a square picture on the right when the story has one.
-  Hairlines between rows, none over the first row under a title. A row whose
-  picture fails to load shows no picture (no empty box).
+  Hairlines between rows, none over the first row under a title. A row (or a
+  lead) whose picture fails to load shows no picture (no empty box).
 - The selected row is washed cream.
 
 Keys:
@@ -64,7 +64,8 @@ Keys:
 - OK: opens the selected story's article.
 - Menu or left soft key (on release): a popup with Open (when a story is
   selected), Remove from Saved (Saved tab only), Refresh (Today and
-  Magazine only). On Saved with nothing saved, Menu does nothing.
+  Magazine only). It opens beside the selected story, or under the
+  masthead when the story is a lead too tall to leave it room. On Saved with nothing saved, Menu does nothing.
 - Remove from Saved removes it at once; the list redraws with the first
   story selected. Removing the last shows the empty state.
 - Back: leaves the app.
@@ -97,7 +98,8 @@ block quotes (indented), list items (hanging indent), pictures with
 captions, and breaks. The first paragraph and each section's opening
 paragraph start on a three-line drop cap (an opening quotation mark goes
 with the letter; paragraphs under 160 characters get none). The last
-paragraph ends with " ♦". A picture that fails to load is dropped with its
+paragraph ends with " ♦", once (the site's own mark is not doubled), a
+small diamond in ink, never the red emoji. A picture that fails to load is dropped with its
 caption, leaving no gap.
 
 A saved article opens from its saved copy at once, without the network.

@@ -292,7 +292,8 @@ public final class MainActivity extends BaseActivity {
             if (down) {
                 int step = keyCode == KeyEvent.KEYCODE_DPAD_LEFT ? TABS.length - 1 : 1;
                 show((tab + step) % TABS.length);
-                if (tab != SAVED && feeds[tab] != null && !loading[tab] && stale(tab)) load(tab);
+                // A tab that failed with nothing to show tries again too, as show() leaves its error up.
+                if (tab != SAVED && !loading[tab] && (feeds[tab] == null || feeds[tab].isEmpty() || stale(tab))) load(tab);
             }
             return true;
         }
@@ -352,7 +353,10 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void menu() {
-        View anchor = list.getParent() != null && list.getSelectedView() != null ? list.getSelectedView() : header;
+        // Under the story chosen; but a lead fills most of the screen, leaving the
+        // popup no room beside it, so then under the masthead.
+        View selected = list.getParent() != null ? list.getSelectedView() : null;
+        View anchor = selected != null && selected.getHeight() <= list.getHeight() / 2 ? selected : header;
         PopupMenu popup = new PopupMenu(this, anchor, Gravity.END);
         Menu menu = popup.getMenu();
         final Story story = list.getParent() != null ? adapter.story(list.getSelectedItemPosition()) : null;

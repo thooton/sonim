@@ -57,7 +57,8 @@ within www.newyorker.com (the shared `Http` never follows them).
   and saving), `PdfExport` (Save as PDF: PdfDocument and StaticLayout on
   US Letter, into `Download/New Yorker`, pictures fetched again at print
   size; it shares `ArticleActivity.styled` and `DropCap` with the screen),
-  `DropCap`, `Pictures` (background loading, an in-memory LRU),
+  `DropCap`, `EndMark` (the ♦ drawn in ink: the Caslon has no glyph for it),
+  `Pictures` (background loading, an in-memory LRU),
   `Net`, `Look` (fonts and text helpers).
 
 ## Look

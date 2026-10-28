@@ -208,8 +208,8 @@ final class StoryAdapter extends BaseAdapter {
             box.setTag(holder);
         }
         holder.picture.getLayoutParams().height = dp(top ? 150 : 118);
-        holder.picture.setVisibility(View.VISIBLE);
-        Pictures.show(holder.picture, Net.sized(story.image, 320), 320, null);
+        // A picture that can't be had leaves the lead its words, not an empty box.
+        Pictures.showOrHide(holder.picture, Net.sized(story.image, 320), 320);
         fill(holder, story, 4);
         return box;
     }

@@ -301,7 +301,8 @@ public final class ArticleActivity extends BaseActivity {
 
     /**
      * The block's runs in their italic and bold, and the end mark after the
-     * article's last words. Shared with the PDF.
+     * article's last words (once, whether or not the site's text has it).
+     * Shared with the PDF.
      */
     static SpannableStringBuilder styled(Context context, Block block, boolean end) {
         SpannableStringBuilder text = new SpannableStringBuilder();
@@ -313,7 +314,18 @@ public final class ArticleActivity extends BaseActivity {
                 text.setSpan(new Face(Look.caslon(context, style)), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
-        if (end) text.append(" ♦");
+        // The site's last paragraph often carries the end mark already; it is set once.
+        int length = text.length();
+        while (length > 0 && (Character.isWhitespace(text.charAt(length - 1)) || "\u2666\uFE0E\uFE0F".indexOf(text.charAt(length - 1)) >= 0)) length--;
+        boolean marked = length < text.length() && text.toString().indexOf('\u2666', length) >= 0;
+        if (end || marked) {
+            text.delete(length, text.length());
+            text.append(" \u2666");
+        }
+        // Every ♦ in ink rather than the emoji Android would fall back to.
+        for (int at = text.toString().indexOf('\u2666'); at >= 0; at = text.toString().indexOf('\u2666', at + 1)) {
+            text.setSpan(new EndMark(), at, at + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
         return text;
     }
 

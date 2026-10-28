@@ -13,9 +13,10 @@ public final class Site {
 
     private static final String HOST = "www.newyorker.com";
 
-    /** Sections whose pages are not articles to read: sound, games, video, cartoon galleries. */
+    /** Sections whose pages are not articles to read: sound, games, video, cartoon and photo galleries. */
     private static final String[] NOT_ARTICLES = {
         "/podcast", "/podcasts", "/audio", "/video", "/videos", "/cartoons", "/cartoon",
+        "/gallery",
         "/puzzles-and-games-dept", "/crossword", "/crossword-puzzles-and-games", "/games",
         "/newsletter", "/newsletters", "/events", "/account", "/subscribe", "/search",
         "/contributors", "/about", "/tag", "/store", "/shop", "/sitemap", "/plus",

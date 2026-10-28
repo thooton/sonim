@@ -9,8 +9,8 @@ android {
 
     defaultConfig {
         applicationId "com.newyorker.xp3"
-        versionCode 8
-        versionName "1.2.1"
+        versionCode 9
+        versionName "1.2.2"
     }
 
     // The fonts are already compressed glyph outlines; leaving them stored
