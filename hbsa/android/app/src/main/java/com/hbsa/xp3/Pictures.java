@@ -11,11 +11,9 @@ import android.widget.ImageView;
 import com.xp3.common.Http;
 import com.xp3.common.ui.Ui;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.util.concurrent.ExecutorService;
 
@@ -81,7 +79,7 @@ final class Pictures {
         byte[] bytes;
         try {
             if (stream.status() != 200) throw new IOException("Picture " + stream.status());
-            bytes = read(stream.stream());
+            bytes = stream.bytes(6000000, "Picture too large");
         } finally {
             stream.close();
         }
@@ -115,17 +113,6 @@ final class Pictures {
         options.inSampleSize = 1;
         while (bounds.outWidth / (options.inSampleSize * 2) >= width) options.inSampleSize *= 2;
         return BitmapFactory.decodeFile(file.getPath(), options);
-    }
-
-    private static byte[] read(InputStream in) throws IOException, InterruptedException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buffer = new byte[16384];
-        for (int count; (count = in.read(buffer)) >= 0; ) {
-            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-            out.write(buffer, 0, count);
-            if (out.size() > 6000000) throw new IOException("Picture too large");
-        }
-        return out.toByteArray();
     }
 
     /** Drops pictures of posts no longer among the latest. */
