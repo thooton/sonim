@@ -22,9 +22,9 @@ import android.provider.DocumentsContract;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.TextWatcher;
-import android.text.Spanned;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.TypefaceSpan;
@@ -60,6 +60,7 @@ import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Card;
 import com.xp3.common.ui.Family;
+import com.xp3.common.ui.Logins;
 import com.xp3.common.ui.Ui;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -261,7 +262,7 @@ public final class MainActivity extends BaseActivity {
         offerPeople(ccField);
 
         SharedPreferences prefs = prefs();
-        login = loadLogin(prefs);
+        login = Logins.load(prefs, Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         people = People.parse(prefs.getString("people", ""));
 
         Outgoing kept = Outgoing.parse(prefs.getString("compose", ""));
@@ -298,27 +299,6 @@ public final class MainActivity extends BaseActivity {
         changes.shutdown();
         if (gmail != null) gmail.close();
         super.onDestroy();
-    }
-
-    /**
-     * The bundled login is adopted once per build that carries a new one;
-     * otherwise whatever was saved (perhaps typed in from the menu) is kept.
-     */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
     }
 
     private SharedPreferences prefs() {
@@ -2118,48 +2098,20 @@ public final class MainActivity extends BaseActivity {
 
     /** The fallback for a build without a bundled login. */
     private void askLogin() {
-        LinearLayout box = vertical();
-        int pad = dp(12);
-        box.setPadding(pad, pad / 2, pad, 0);
-        final EditText server = new EditText(this);
-        server.setHint("https://…");
-        server.setSingleLine(true);
-        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(login.server() == null ? "" : login.server());
-        final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "••••••••" : "Token");
-        token.setSingleLine(true);
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        box.addView(server);
-        box.addView(token);
-        new AlertDialog.Builder(this)
-            .setTitle("Command center")
-            .setView(box)
-            .setPositiveButton("Save", (dialog, which) -> {
-                String typed = token.getText().toString();
-                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                try {
-                    Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                    login = next;
-                    if (gmail != null) gmail.close();
-                    gmail = null;
-                    me = null;
-                    labelsLoaded = false;
-                    whole.clear();
-                    counts.clear();
-                    countsAt = 0;
-                    prefs().edit().putString("login", next.toJson()).apply();
-                    say("Saved: " + next.host());
-                    if (screen == LIST) load();
-                } catch (IllegalArgumentException e) {
-                    say(e.getMessage());
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
+        Logins.ask(this, login, next -> {
+            login = next;
+            if (gmail != null) gmail.close();
+            gmail = null;
+            me = null;
+            labelsLoaded = false;
+            whole.clear();
+            counts.clear();
+            countsAt = 0;
+            Logins.save(prefs(), next);
+            say("Saved: " + next.host());
+            if (screen == LIST) load();
+        }, this::say);
     }
-
     // ---- Adapters ----
 
     /**
