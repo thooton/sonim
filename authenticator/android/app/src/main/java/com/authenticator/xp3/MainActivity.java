@@ -92,12 +92,17 @@ public final class MainActivity extends BaseActivity {
     private int busy;
     /** Why the last sync failed, or null. */
     private String error;
+    /**
+     * What the entry form gave back, until the command center has taken it:
+     * when it can't, the form opens again with it rather than losing what
+     * was typed.
+     */
+    private Intent unsaved;
 
     private FrameLayout content;
     private ProgressBar working;
     private ListView list;
     private Adapter adapter;
-    private View fab;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -167,7 +172,6 @@ public final class MainActivity extends BaseActivity {
                 list.requestFocus();
                 if (list.getSelectedItemPosition() < 0) list.setSelection(0);
             }
-            fab = null;
             return;
         }
         LinearLayout empty = vertical();
@@ -178,7 +182,6 @@ public final class MainActivity extends BaseActivity {
             spinner.setIndeterminateTintList(getColorStateList(R.color.ink));
             empty.addView(spinner, new LinearLayout.LayoutParams(dp(30), dp(30)));
             Ui.fill(content, empty);
-            fab = null;
             return;
         }
         TextView title = text(login.ready() ? "No accounts" : "No command center", 14, color(R.color.ink));
@@ -204,7 +207,6 @@ public final class MainActivity extends BaseActivity {
         empty.addView(plus, at);
         Ui.fill(content, empty);
         plus.requestFocus();
-        fab = plus;
     }
 
     private Account selected() {
@@ -423,8 +425,9 @@ public final class MainActivity extends BaseActivity {
     // Menu.
 
     private void menu() {
-        View anchor = list.getParent() != null && list.getSelectedView() != null ? list.getSelectedView()
-            : fab != null ? fab : content;
+        // On the empty list the popup hangs from the top: from the + it would
+        // run off the bottom and hide Command center.
+        View anchor = list.getParent() != null && list.getSelectedView() != null ? list.getSelectedView() : content;
         PopupMenu popup = new PopupMenu(this, anchor, Gravity.END);
         Menu menu = popup.getMenu();
         menu.add(0, ADD_CAMERA, 0, "Add by camera");
@@ -515,29 +518,48 @@ public final class MainActivity extends BaseActivity {
             final Uri uri = data.getData();
             scan(() -> Pictures.read(this, uri));
         } else if (request == ENTRY && data != null) {
-            String link = data.getStringExtra(EntryActivity.LINK);
-            String id = data.getStringExtra(EntryActivity.ID);
-            try {
-                if (link != null) {
-                    add(OtpLink.parse(link));
+            unsaved = data;
+            entered();
+        }
+    }
+
+    /** Adds or changes what the entry form gave back. */
+    private void entered() {
+        Intent data = unsaved;
+        String link = data.getStringExtra(EntryActivity.LINK);
+        String id = data.getStringExtra(EntryActivity.ID);
+        try {
+            if (link != null) {
+                add(OtpLink.parse(link));
+                return;
+            }
+            String secret = data.getStringExtra(EntryActivity.SECRET);
+            if (id != null) {
+                Account old = null;
+                for (Account account : accounts) if (id.equals(account.id)) old = account;
+                if (old == null) {
+                    unsaved = null;
                     return;
                 }
-                String secret = data.getStringExtra(EntryActivity.SECRET);
-                if (id != null) {
-                    Account old = null;
-                    for (Account account : accounts) if (id.equals(account.id)) old = account;
-                    if (old == null) return;
-                    if (secret == null || secret.length() == 0) secret = old.secret;
-                }
-                Account typed = new Account(id, data.getStringExtra(EntryActivity.ISSUER), data.getStringExtra(EntryActivity.ACCOUNT),
-                    secret, data.getStringExtra(EntryActivity.ALGORITHM),
-                    data.getIntExtra(EntryActivity.DIGITS, 6), data.getIntExtra(EntryActivity.PERIOD, 30));
-                if (id != null) edit(typed);
-                else add(Collections.singletonList(typed));
-            } catch (IllegalArgumentException e) {
-                toast(e.getMessage());
+                if (secret == null || secret.length() == 0) secret = old.secret;
             }
+            Account typed = new Account(id, data.getStringExtra(EntryActivity.ISSUER), data.getStringExtra(EntryActivity.ACCOUNT),
+                secret, data.getStringExtra(EntryActivity.ALGORITHM),
+                data.getIntExtra(EntryActivity.DIGITS, 6), data.getIntExtra(EntryActivity.PERIOD, 30));
+            if (id != null) edit(typed);
+            else add(Collections.singletonList(typed));
+        } catch (IllegalArgumentException e) {
+            toast(e.getMessage());
+            reopen();
         }
+    }
+
+    /** The entry form again, as it was typed, when the command center didn't take it. */
+    private void reopen() {
+        Intent typed = unsaved;
+        unsaved = null;
+        if (typed == null) return;
+        startActivityForResult(new Intent(this, EntryActivity.class).putExtras(typed), ENTRY);
     }
 
     private interface Reading {
@@ -569,6 +591,7 @@ public final class MainActivity extends BaseActivity {
                     return;
                 }
                 try {
+                    unsaved = null;
                     add(OtpLink.parse(found));
                 } catch (IllegalArgumentException e) {
                     toast(e.getMessage());
@@ -638,8 +661,10 @@ public final class MainActivity extends BaseActivity {
                 if (got == null) {
                     show();
                     toast(failed);
+                    reopen();
                     return;
                 }
+                unsaved = null;
                 accounts = got;
                 error = null;
                 synced = System.currentTimeMillis();
@@ -678,8 +703,10 @@ public final class MainActivity extends BaseActivity {
                 if (got == null) {
                     show();
                     toast(failed);
+                    reopen();
                     return;
                 }
+                unsaved = null;
                 accounts = got;
                 error = null;
                 synced = System.currentTimeMillis();
@@ -737,6 +764,10 @@ public final class MainActivity extends BaseActivity {
     private static String message(Exception e) {
         if (e instanceof java.net.UnknownHostException || e instanceof java.net.ConnectException) return "Offline";
         if (e instanceof java.net.SocketTimeoutException) return "The command center didn't answer";
+        // Http words these itself; the app says them its own short way.
+        String said = String.valueOf(e.getMessage());
+        if (said.equals("No network, or that address does not exist.") || said.equals("Could not connect.")) return "Offline";
+        if (said.equals("The connection timed out.") || said.equals("Request timed out")) return "The command center didn't answer";
         return e.getMessage() == null ? "Something went wrong" : e.getMessage();
     }
 
@@ -796,10 +827,12 @@ public final class MainActivity extends BaseActivity {
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);
         box.addView(token);
-        new AlertDialog.Builder(this)
+        // Taken by Save; otherwise what the entry form gave back goes back to it.
+        final boolean[] saved = {false};
+        AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
-            .setPositiveButton("Save", (dialog, which) -> {
+            .setPositiveButton("Save", (shown, which) -> {
                 String typed = token.getText().toString();
                 if (typed.trim().length() == 0 && login.ready()) typed = login.token();
                 try {
@@ -808,12 +841,35 @@ public final class MainActivity extends BaseActivity {
                     login = next;
                     prefs().edit().putString("login", next.toJson()).apply();
                     toast("Saved: " + next.host());
+                    saved[0] = true;
                     sync();
+                    if (unsaved != null) entered();
                 } catch (IllegalArgumentException e) {
                     toast(e.getMessage());
                 }
             })
             .setNegativeButton("Cancel", null)
+            .setOnDismissListener(gone -> {
+                if (!saved[0]) reopen();
+            })
             .show();
+        // A single-line field keeps Up and Down to itself; these go between
+        // the fields and on to the buttons.
+        server.setOnKeyListener((view, keyCode, event) -> {
+            if (keyCode != KeyEvent.KEYCODE_DPAD_DOWN) return false;
+            if (event.getAction() == KeyEvent.ACTION_DOWN) token.requestFocus();
+            return true;
+        });
+        token.setOnKeyListener((view, keyCode, event) -> {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) server.requestFocus();
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) dialog.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus();
+                return true;
+            }
+            return false;
+        });
     }
 }

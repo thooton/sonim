@@ -88,7 +88,8 @@ Keys:
 
 ### The menu
 
-A rounded popup over the selected card (or the + button). Items, in order:
+A rounded popup over the selected card (or, on the empty list, from the
+top of the screen, so every item shows). Items, in order:
 
 1. Add by camera
 2. Add by image
@@ -135,9 +136,10 @@ has the keys:
   (default SHA1);
 - a full-width navy button, "Add" or "Save".
 
-Focus starts in Service with the cursor at the end. Down/Up move between
-fields, the row and the button; the keyboard's Next goes to the next field
-and Done in Seconds saves, as OK on the button does.
+Focus starts in Service with the cursor at the end. Down/Up move one step
+through Service, Account, Secret key, Digits, Seconds, Algorithm and the
+button, in that order; Enter (or the keyboard's Next) in a field goes to
+the next one, and in Seconds it saves, as OK on the button does.
 
 - Algorithm is not typed: OK or Right steps SHA1 → SHA256 → SHA512 → SHA1,
   Left steps back.
@@ -175,7 +177,11 @@ A form that passes closes, back to the list.
 - A Google Authenticator "Transfer accounts" code adds every TOTP account
   in it at once.
 - After Edit: "Saved <service>", and that account stays selected.
-- With no command center set, adding or saving opens the login dialog.
+- With no command center set, adding or saving opens the login dialog;
+  once a login is saved there, the account is added (or saved).
+- What was typed in the form is never lost: if the command center can't
+  take it (offline, a refusal, or the login dialog cancelled), the form
+  opens again as it was typed, after the toast saying why.
 
 ### The login dialog (Command center)
 
@@ -183,6 +189,7 @@ Title "Command center", an address field (hint "https://…", filled with
 the saved address), a token field (masked; hint "Token", or "••••••••"
 when one is saved), Save and Cancel.
 
+- Down and Up move between the address, the token and the buttons.
 - Save with an empty token keeps the saved one.
 - Saved: toasts "Saved: <host>" and syncs at once.
 - Missing address or token: "Both the address and the token are needed".
@@ -205,7 +212,8 @@ when one is saved), Save and Cancel.
 - **Offline.** Codes keep working from the kept list. A failed sync leaves
   the list as it was and adds Command center to the menu. Adding, editing
   and deleting need the command center; when one fails, a toast says why
-  and nothing changes. Messages: "Offline", "The command center didn't
+  and nothing changes (an add or edit from the form reopens it). No
+  connection is always "Offline", wherever it shows. Messages: "Offline", "The command center didn't
   answer", "The command center needs updating for two-factor accounts", or
   the command center's own words about a bad account.
 - **Network.** HTTPS only (cleartext is refused), 30-second deadline per

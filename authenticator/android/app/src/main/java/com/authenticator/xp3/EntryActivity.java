@@ -53,6 +53,10 @@ public final class EntryActivity extends BaseActivity {
     private EditText digits;
     private EditText period;
     private TextView algorithm;
+    /** The fields and the button, in the order Up, Down and Enter go through them. */
+    private View[] order;
+    /** Enter went down in a field and moved on; its release is not for the next one. */
+    private boolean swallowEnter;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -80,13 +84,6 @@ public final class EntryActivity extends BaseActivity {
         digits = field(column(settings, 1), "Digits", InputType.TYPE_CLASS_NUMBER);
         period = field(column(settings, 1), "Seconds", InputType.TYPE_CLASS_NUMBER);
         period.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        period.setOnEditorActionListener((view, action, event) -> {
-            if (action == EditorInfo.IME_ACTION_DONE) {
-                save();
-                return true;
-            }
-            return false;
-        });
         algorithm = choice(column(settings, 1.3f), "Algorithm");
 
         issuer.setText(text(given, ISSUER, ""));
@@ -94,6 +91,9 @@ public final class EntryActivity extends BaseActivity {
         digits.setText(Integer.toString(given.getIntExtra(DIGITS, 6)));
         period.setText(Integer.toString(given.getIntExtra(PERIOD, 30)));
         algorithm.setText(text(given, ALGORITHM, "SHA1"));
+        // Given back when the command center couldn't take what was typed.
+        String typed = given.getStringExtra(LINK);
+        secret.setText(typed != null ? typed : text(given, SECRET, ""));
 
         TextView add = new TextView(this);
         add.setText(id == null ? "Add" : "Save");
@@ -112,6 +112,14 @@ public final class EntryActivity extends BaseActivity {
         LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36));
         at.topMargin = dp(8);
         page.addView(add, at);
+        order = new View[] {issuer, account, secret, digits, period, algorithm, add};
+        for (EditText edit : new EditText[] {issuer, account, secret, digits, period}) {
+            edit.setOnEditorActionListener((view, action, event) -> {
+                if (action != EditorInfo.IME_ACTION_NEXT && action != EditorInfo.IME_ACTION_DONE) return false;
+                next(view);
+                return true;
+            });
+        }
 
         ScrollView scroll = new ScrollView(this);
         scroll.setSmoothScrollingEnabled(false);
@@ -121,6 +129,53 @@ public final class EntryActivity extends BaseActivity {
         setContentView(scroll);
         issuer.requestFocus();
         issuer.setSelection(issuer.length());
+    }
+
+    /**
+     * Up and Down go through the fields, the row and the button in order, and
+     * Enter in a field goes on to the next (in Seconds it saves): a single-line
+     * field keeps Up and Down to itself, and Android's own next field skips
+     * about the row.
+     */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+        View focused = getCurrentFocus();
+        int at = order == null ? -1 : java.util.Arrays.asList(order).indexOf(focused);
+        if (at >= 0 && (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_DPAD_UP)) {
+            int to = at + (keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : -1);
+            if (down && to >= 0 && to < order.length) focus(order[to]);
+            return true;
+        }
+        boolean enter = keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER;
+        if (enter && !down && swallowEnter) {
+            swallowEnter = false;
+            return true;
+        }
+        if (enter && focused instanceof EditText && at >= 0) {
+            if (down && event.getRepeatCount() == 0) {
+                swallowEnter = true;
+                next(focused);
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    /** On from a field to the next, or from Seconds, saves. */
+    private void next(View from) {
+        if (from == period) {
+            save();
+            return;
+        }
+        int at = java.util.Arrays.asList(order).indexOf(from);
+        if (at >= 0 && at + 1 < order.length) focus(order[at + 1]);
+    }
+
+    private static void focus(View view) {
+        view.requestFocus();
+        if (view instanceof EditText) ((EditText) view).setSelection(((EditText) view).length());
     }
 
     private static String text(Intent intent, String name, String otherwise) {
@@ -257,27 +312,35 @@ public final class EntryActivity extends BaseActivity {
             places = Integer.parseInt(digits.getText().toString().trim());
         } catch (NumberFormatException e) {
             toast("Codes have 6 to 8 digits");
-            digits.requestFocus();
+            focus(digits);
             return;
         }
         try {
             seconds = Integer.parseInt(period.getText().toString().trim());
         } catch (NumberFormatException e) {
             toast("A code lasts 1 to 300 seconds");
-            period.requestFocus();
+            focus(period);
             return;
         }
         String chosen = algorithm.getText().toString();
         boolean keeps = id != null && key.length() == 0;
+        // Each field is checked on its own, in the form's order, so the one at
+        // fault is known without reading the message.
+        View wrong = issuer;
         try {
             // A kept secret is checked with a stand-in; the one it has is fine.
-            new Account(id, issuer.getText().toString(), account.getText().toString(), keeps ? "AAAAAAAAAAAAAAAA" : key,
+            String stand = "AAAAAAAAAAAAAAAA";
+            new Account(id, issuer.getText().toString(), account.getText().toString(), stand, chosen, 6, 30);
+            wrong = digits;
+            new Account(id, "-", "", stand, chosen, places, 30);
+            wrong = period;
+            new Account(id, "-", "", stand, chosen, places, seconds);
+            wrong = secret;
+            new Account(id, issuer.getText().toString(), account.getText().toString(), keeps ? stand : key,
                 chosen, places, seconds);
         } catch (IllegalArgumentException e) {
             toast(e.getMessage());
-            String why = e.getMessage();
-            View wrong = why.contains("name") ? issuer : why.contains("digits") ? digits : why.contains("seconds") ? period : secret;
-            wrong.requestFocus();
+            focus(wrong);
             return;
         }
         if (id != null) result.putExtra(ID, id);
