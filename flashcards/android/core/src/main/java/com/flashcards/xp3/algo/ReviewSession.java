@@ -60,10 +60,6 @@ public final class ReviewSession {
         this.zone = zone;
     }
 
-    public boolean hasCards() {
-        return deck.size() > 0;
-    }
-
     /** The card being shown, or null when the deck is done for now. */
     public DeckCard current() {
         return current;

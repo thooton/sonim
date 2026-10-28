@@ -1,7 +1,6 @@
 package com.source.xp3;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -16,6 +15,7 @@ import android.widget.ListView;
 import com.source.xp3.net.Music;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Logins;
 
 /**
  * What every screen of Source shares: the Tonal look (DESIGN.md, "Source:
@@ -66,7 +66,7 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
         super.onCreate(state);
         loadFonts();
         Download.init(this);
-        login = loadLogin(prefs());
+        login = Logins.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
     }
 
     @Override
@@ -109,27 +109,6 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
     protected final void setDark(boolean on) {
         prefs().edit().putBoolean("dark", on).apply();
         recreate();
-    }
-
-    /**
-     * The bundled login is adopted once per build that carries a new one;
-     * otherwise whatever was saved (perhaps typed in from Options) is kept.
-     */
-    private static Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
     }
 
     /**

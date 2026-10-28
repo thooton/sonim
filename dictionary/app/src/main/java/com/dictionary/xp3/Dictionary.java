@@ -254,7 +254,8 @@ final class Dictionary {
         }
     }
 
-    private static String inflate(InputStream raw) throws IOException {
+    /** A deflated asset (Shorthand's too) as Latin-1 text. */
+    static String inflate(InputStream raw) throws IOException {
         InputStream in = new InflaterInputStream(raw);
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();

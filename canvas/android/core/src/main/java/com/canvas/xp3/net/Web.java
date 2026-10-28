@@ -3,7 +3,6 @@ package com.canvas.xp3.net;
 import com.xp3.common.Http;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -86,18 +85,7 @@ public final class Web {
                 if (status == 401 || status == 403) throw new IOException("That link needs a login");
                 if (status == 404 || status == 410) throw new IOException("That link is gone");
                 Http.requireSuccess(status, "The link");
-                if (stream.length() > limit) throw new IOException("This file is too large for the phone.");
-                long total = stream.length();
-                long done = 0;
-                byte[] buffer = new byte[32768];
-                InputStream in = stream.stream();
-                for (int count; (count = in.read(buffer)) >= 0; ) {
-                    if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-                    done += count;
-                    if (done > limit) throw new IOException("This file is too large for the phone.");
-                    out.write(buffer, 0, count);
-                    if (progress != null) progress.sent(done, total);
-                }
+                stream.copy(out, limit, "This file is too large for the phone.", progress);
                 return new Got(stream.contentType(), name(stream.header("Content-Disposition"), uri), uri);
             } finally {
                 stream.close();

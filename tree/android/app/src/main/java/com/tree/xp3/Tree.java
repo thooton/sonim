@@ -7,6 +7,7 @@ import com.tree.xp3.qa.Center;
 import com.tree.xp3.qa.Qa;
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
+import com.xp3.common.ui.Logins;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,7 +35,7 @@ final class Tree {
     static void init(Context context) {
         if (loaded) return;
         loaded = true;
-        login = loadLogin(prefs(context));
+        login = Logins.load(prefs(context), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         String json = Disk.read(new File(context.getFilesDir(), CACHE), 4 << 20);
         if (json != null) {
             try {
@@ -69,27 +70,6 @@ final class Tree {
     static void saveLogin(Context context, Login next) {
         login = next;
         prefs(context).edit().putString("login", next.toJson()).apply();
-    }
-
-    /**
-     * The bundled login is adopted once per build that carries a new one;
-     * otherwise whatever was saved (typed in from the menu) is kept.
-     */
-    private static Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
     }
 
     /** A failure, for the screen. */

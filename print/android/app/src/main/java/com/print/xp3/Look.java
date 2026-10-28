@@ -119,19 +119,11 @@ final class Look {
     }
 
     /**
-     * A list row: white at rest; focused, the focus fill with a 3dp brand
-     * blue edge on the left.
+     * A drawable lit while its view is focused or pressed, which it keeps in
+     * `on`. Opaque unless it says otherwise.
      */
-    static final class RowFocus extends Drawable {
-        private final Paint paint = new Paint();
-        private final int edge;
-        private final int rest;
-        private boolean on;
-
-        RowFocus(Context context, int rest) {
-            this.edge = dp(context, 3);
-            this.rest = rest;
-        }
+    abstract static class Face extends Drawable {
+        boolean on;
 
         @Override
         public boolean isStateful() {
@@ -151,17 +143,6 @@ final class Look {
         }
 
         @Override
-        public void draw(Canvas canvas) {
-            Rect b = getBounds();
-            paint.setColor(on ? SEL : rest);
-            canvas.drawRect(b, paint);
-            if (on) {
-                paint.setColor(BLUE);
-                canvas.drawRect(b.left, b.top, b.left + edge, b.bottom, paint);
-            }
-        }
-
-        @Override
         public void setAlpha(int alpha) {}
 
         @Override
@@ -174,11 +155,37 @@ final class Look {
     }
 
     /**
+     * A list row: white at rest; focused, the focus fill with a 3dp brand
+     * blue edge on the left.
+     */
+    static final class RowFocus extends Face {
+        private final Paint paint = new Paint();
+        private final int edge;
+        private final int rest;
+
+        RowFocus(Context context, int rest) {
+            this.edge = dp(context, 3);
+            this.rest = rest;
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            Rect b = getBounds();
+            paint.setColor(on ? SEL : rest);
+            canvas.drawRect(b, paint);
+            if (on) {
+                paint.setColor(BLUE);
+                canvas.drawRect(b.left, b.top, b.left + edge, b.bottom, paint);
+            }
+        }
+    }
+
+    /**
      * A button. Its body is inset 3.5dp from its bounds to leave room for
      * the focus ring, which the proposal draws outside the body: 2dp of white,
      * then 1.5dp of blue.
      */
-    static final class ButtonFace extends Drawable {
+    static final class ButtonFace extends Face {
         static final int PRIMARY = 0;
         static final int SECONDARY = 1;
         static final int DANGER = 2;
@@ -189,7 +196,6 @@ final class Look {
         private final float ring;
         private final float radius;
         private final float density;
-        private boolean on;
         private boolean enabled = true;
 
         ButtonFace(Context context, int kind) {
@@ -198,11 +204,6 @@ final class Look {
             this.ring = 3.5f * density;
             this.radius = 4 * density;
             stroke.setStyle(Paint.Style.STROKE);
-        }
-
-        @Override
-        public boolean isStateful() {
-            return true;
         }
 
         @Override
@@ -246,12 +247,6 @@ final class Look {
         }
 
         @Override
-        public void setAlpha(int alpha) {}
-
-        @Override
-        public void setColorFilter(ColorFilter filter) {}
-
-        @Override
         public int getOpacity() {
             return PixelFormat.TRANSLUCENT;
         }
@@ -261,13 +256,12 @@ final class Look {
      * A home tile: a top-to-bottom gradient; focused, slightly brighter, with
      * a 2dp navy ring at its edge and a 2dp white ring inside that.
      */
-    static final class TileFace extends Drawable {
+    static final class TileFace extends Face {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final int top;
         private final int bottom;
         private final float width;
-        private boolean on;
 
         TileFace(Context context, int top, int bottom) {
             this.top = top;
@@ -275,23 +269,6 @@ final class Look {
             this.width = 2 * context.getResources().getDisplayMetrics().density;
             ring.setStyle(Paint.Style.STROKE);
             ring.setStrokeWidth(width);
-        }
-
-        @Override
-        public boolean isStateful() {
-            return true;
-        }
-
-        @Override
-        protected boolean onStateChange(int[] state) {
-            boolean focused = false;
-            for (int each : state) {
-                if (each == android.R.attr.state_focused || each == android.R.attr.state_pressed) focused = true;
-            }
-            if (focused == on) return false;
-            on = focused;
-            invalidateSelf();
-            return true;
         }
 
         @Override
@@ -315,48 +292,19 @@ final class Look {
             int b = Math.min(255, Math.round((color & 0xFF) * 1.12f));
             return 0xFF000000 | (r << 16) | (g << 8) | b;
         }
-
-        @Override
-        public void setAlpha(int alpha) {}
-
-        @Override
-        public void setColorFilter(ColorFilter filter) {}
-
-        @Override
-        public int getOpacity() {
-            return PixelFormat.OPAQUE;
-        }
     }
 
     /** The printer banner: a navy gradient left to right; focused, a white inner ring. */
-    static final class BannerFace extends Drawable {
+    static final class BannerFace extends Face {
         private final Paint paint = new Paint();
         private final Paint ring = new Paint();
         private final float width;
-        private boolean on;
 
         BannerFace(Context context) {
             width = 2 * context.getResources().getDisplayMetrics().density;
             ring.setStyle(Paint.Style.STROKE);
             ring.setStrokeWidth(width);
             ring.setColor(WHITE);
-        }
-
-        @Override
-        public boolean isStateful() {
-            return true;
-        }
-
-        @Override
-        protected boolean onStateChange(int[] state) {
-            boolean focused = false;
-            for (int each : state) {
-                if (each == android.R.attr.state_focused || each == android.R.attr.state_pressed) focused = true;
-            }
-            if (focused == on) return false;
-            on = focused;
-            invalidateSelf();
-            return true;
         }
 
         @Override
@@ -368,17 +316,6 @@ final class Look {
                 float half = width / 2;
                 canvas.drawRect(b.left + half, b.top + half, b.right - half, b.bottom - half, ring);
             }
-        }
-
-        @Override
-        public void setAlpha(int alpha) {}
-
-        @Override
-        public void setColorFilter(ColorFilter filter) {}
-
-        @Override
-        public int getOpacity() {
-            return PixelFormat.OPAQUE;
         }
     }
 

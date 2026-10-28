@@ -4,7 +4,6 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
-import android.text.InputType;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.TypedValue;
@@ -27,6 +26,7 @@ import com.source.xp3.data.Recents;
 import com.source.xp3.net.Books;
 import com.source.xp3.net.Music;
 import com.xp3.common.Login;
+import com.xp3.common.ui.Logins;
 import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -914,41 +914,12 @@ public final class MainActivity extends Tonal {
 
     /** The fallback for a build without a bundled login. */
     private void askLogin() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(12);
-        box.setPadding(pad, pad / 2, pad, 0);
-        final EditText server = new EditText(this);
-        server.setHint("https://…");
-        server.setSingleLine(true);
-        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(login.server() == null ? "" : login.server());
-        final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "••••••••" : "Token");
-        token.setSingleLine(true);
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        box.addView(server);
-        box.addView(token);
-        new AlertDialog.Builder(this)
-            .setTitle("Command center")
-            .setView(box)
-            .setPositiveButton("Save", (dialog, which) -> {
-                String typed = token.getText().toString();
-                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                try {
-                    Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                    login = next;
-                    prefs().edit().putString("login", next.toJson()).apply();
-                    say("Saved: " + next.host());
-                } catch (IllegalArgumentException e) {
-                    say(e.getMessage());
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
+        Logins.ask(this, login, next -> {
+            login = next;
+            Logins.save(prefs(), next);
+            say("Saved: " + next.host());
+        }, this::say);
     }
-
     /** The results, songs, albums or books, each ending in its state button. */
     private final class ResultAdapter extends BaseAdapter {
 

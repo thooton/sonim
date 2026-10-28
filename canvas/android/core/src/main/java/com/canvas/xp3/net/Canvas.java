@@ -7,10 +7,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.SequenceInputStream;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -95,18 +95,9 @@ public final class Canvas {
         return result;
     }
 
-    public Object grading(String course) throws IOException, InterruptedException {
-        return list("courses/" + course + "/assignment_groups",
-            new String[] { "id", "name", "group_weight", "rules", "position" });
-    }
-
     public Object enrollment(String course) throws IOException, InterruptedException {
         return list("courses/" + course + "/enrollments?user_id=self&type%5B%5D=StudentEnrollment",
             new String[] { "course_id", "type", "enrollment_state", "grades", "html_url" });
-    }
-
-    public Object gradingStandard(String course, String standard) throws IOException, InterruptedException {
-        return get("courses/" + course + "/grading_standards/" + standard);
     }
 
     public Object posts(String course, boolean announcements) throws IOException, InterruptedException {
@@ -325,18 +316,7 @@ public final class Canvas {
                     continue;
                 }
                 Http.requireSuccess(status, "Download");
-                if (stream.length() > limit) throw new IOException("This file is too large for the phone.");
-                long total = stream.length();
-                long done = 0;
-                byte[] buffer = new byte[32768];
-                InputStream in = stream.stream();
-                for (int count; (count = in.read(buffer)) >= 0; ) {
-                    if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-                    done += count;
-                    if (done > limit) throw new IOException("This file is too large for the phone.");
-                    out.write(buffer, 0, count);
-                    if (progress != null) progress.sent(done, total);
-                }
+                stream.copy(out, limit, "This file is too large for the phone.", progress);
                 return;
             } finally {
                 stream.close();

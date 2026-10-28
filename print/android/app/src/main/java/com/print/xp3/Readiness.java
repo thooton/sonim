@@ -5,7 +5,6 @@ import android.os.Looper;
 import com.print.xp3.find.Sweep;
 import com.print.xp3.ipp.Capabilities;
 import java.io.IOException;
-import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 
@@ -169,10 +168,5 @@ final class Readiness {
         if (all.contains("canon")) return R.drawable.printer_dark;
         if (all.contains("brother") || all.contains("lexmark") || all.contains("kyocera")) return R.drawable.printer_pale;
         return R.drawable.printer_light;
-    }
-
-    static boolean anyLow(List<Capabilities.Marker> markers) {
-        for (Capabilities.Marker marker : markers) if (marker.isLow()) return true;
-        return false;
     }
 }

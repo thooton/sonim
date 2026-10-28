@@ -5,10 +5,8 @@ import com.xp3.common.Json;
 import com.xp3.common.Login;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -134,26 +132,7 @@ public final class Center {
         try {
             int status = stream.status();
             if (status < 200 || status >= 300) fail(status, small(stream.stream()), "show the screenshot");
-            File part = new File(dest.getPath() + ".part");
-            boolean saved = false;
-            OutputStream out = new FileOutputStream(part);
-            try {
-                InputStream in = stream.stream();
-                byte[] buffer = new byte[32 * 1024];
-                long total = 0;
-                for (int count; (count = in.read(buffer)) != -1; ) {
-                    if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-                    total += count;
-                    if (total > MAX_SHOT) throw new IOException("Screenshot too big");
-                    out.write(buffer, 0, count);
-                }
-                out.close();
-                saved = part.renameTo(dest);
-                if (!saved) throw new IOException("Couldn't keep the screenshot");
-            } finally {
-                out.close();
-                if (!saved) part.delete();
-            }
+            stream.save(dest, MAX_SHOT, "Screenshot too big", "Couldn't keep the screenshot");
         } finally {
             stream.close();
         }

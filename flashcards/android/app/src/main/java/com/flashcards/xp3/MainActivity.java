@@ -1,7 +1,6 @@
 package com.flashcards.xp3;
 
 import android.Manifest;
-import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -11,15 +10,12 @@ import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -37,6 +33,7 @@ import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Card;
 import com.xp3.common.ui.CardGrant;
+import com.xp3.common.ui.Logins;
 import com.xp3.common.ui.Ui;
 
 import java.io.ByteArrayOutputStream;
@@ -132,7 +129,7 @@ public final class MainActivity extends BaseActivity {
         super.onCreate(onIce);
         setContentView(R.layout.activity_main);
         content = findViewById(R.id.content);
-        login = loadLogin(prefs());
+        login = Logins.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         collection = load();
         collection.zone = zone.getId();
         showDecks();
@@ -898,79 +895,14 @@ public final class MainActivity extends BaseActivity {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
     }
 
-    /** The bundled login, adopted once per build that carries a new one, else what was typed in. */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
-
     private void askLogin() {
-        LinearLayout box = vertical();
-        int pad = dp(16);
-        box.setPadding(pad, pad / 2, pad, 0);
-        final EditText server = new EditText(this);
-        server.setHint("https://…");
-        server.setSingleLine(true);
-        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(login.server() == null ? "" : login.server());
-        final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "••••••••" : "Token");
-        token.setSingleLine(true);
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        box.addView(server);
-        box.addView(token);
-        AlertDialog shown = new AlertDialog.Builder(this)
-            .setTitle("Command center")
-            .setView(box)
-            .setPositiveButton("Save", (dialog, which) -> {
-                String typed = token.getText().toString();
-                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                try {
-                    Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                    login = next;
-                    prefs().edit().putString("login", next.toJson()).apply();
-                    syncError = null;
-                    pairing = null;
-                    if (screen == Screen.DECKS) showDecks();
-                    sync();
-                } catch (IllegalArgumentException e) {
-                    toast(e.getMessage());
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
-        // The fields keep Down and Up to themselves; on a keys-only phone the
-        // d-pad is how one goes from field to field and on to the buttons.
-        Button cancel = shown.getButton(AlertDialog.BUTTON_NEGATIVE);
-        Button save = shown.getButton(AlertDialog.BUTTON_POSITIVE);
-        upDown(server, null, token);
-        upDown(token, server, cancel);
-        upDown(cancel, token, null);
-        upDown(save, token, null);
-    }
-
-    /** Up and Down move the focus from `view` to `up` and `down` (null: stay as Android has it). */
-    private static void upDown(View view, View up, View down) {
-        if (view == null) return;
-        view.setOnKeyListener((v, keyCode, event) -> {
-            View to = keyCode == KeyEvent.KEYCODE_DPAD_UP ? up
-                : keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? down : null;
-            if (to == null) return false;
-            if (event.getAction() == KeyEvent.ACTION_DOWN) to.requestFocus();
-            return true;
-        });
+        Logins.ask(this, login, next -> {
+            login = next;
+            Logins.save(prefs(), next);
+            syncError = null;
+            pairing = null;
+            if (screen == Screen.DECKS) showDecks();
+            sync();
+        }, this::toast);
     }
 }

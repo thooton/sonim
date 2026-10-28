@@ -1,11 +1,9 @@
 package com.canvas.xp3;
 
 import android.Manifest;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
-import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
@@ -503,29 +501,6 @@ public final class MainActivity extends BaseActivity {
         } else if (then != null) {
             toast("The phone didn't allow it.");
         }
-    }
-
-    private ActivityResult pendingResult;
-
-    interface ActivityResult {
-        void done(int code, Intent data);
-    }
-
-    void startForResult(Intent intent, ActivityResult then) {
-        pendingResult = then;
-        try {
-            startActivityForResult(intent, 2);
-        } catch (RuntimeException e) {
-            pendingResult = null;
-            toast("This phone has no app for that.");
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int request, int code, Intent data) {
-        ActivityResult then = pendingResult;
-        pendingResult = null;
-        if (then != null) then.done(code, data);
     }
 
     // ------------------------------------------------------------------
