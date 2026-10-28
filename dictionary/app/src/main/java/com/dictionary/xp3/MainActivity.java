@@ -529,6 +529,12 @@ public class MainActivity extends Activity {
             return;
         }
         int found = dictionary.find(query);
+        String q = Dictionary.normalize(query);
+        if (found < 0 || (!dictionary.word(found).equals(q) && dictionary.word(found).startsWith(q))) {
+            // Only a word it begins: a word only the shorthand has (into) comes first.
+            int exact = pageOf(q);
+            if (exact >= 0) found = exact;
+        }
         if (found >= 0) {
             found(found, DEFINITIONS);
             return;

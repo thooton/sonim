@@ -123,7 +123,8 @@ the hint "Search a word or phrase", the cursor, and the keys.
 - **Left/Right:** move the cursor in the box; nothing while a row is picked.
 - **OK:** on a row opens that word; on Clear empties Recent Searches (the
   list goes blank, focus back to the box). With no row picked: opens the
-  word typed, else its dictionary form, else the first word it begins, else
+  word typed, else its dictionary form, else the word typed as only the
+  shorthand dictionary has it (into), else the first word it begins, else
   the first suggestion; with an empty box or no match, nothing.
 - Every word opened from the search goes to the top of Recent Searches.
 - **Menu:** popup with one item, Shorthand: switches to the shorthand
