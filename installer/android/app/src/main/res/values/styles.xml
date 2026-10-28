@@ -8,6 +8,18 @@
         <item name="android:statusBarColor">#1F4037</item>
         <item name="android:navigationBarColor">#1F4037</item>
         <item name="android:windowBackground">@android:color/white</item>
+        <!-- Buttons read as SPEC.md writes them, not in capitals. -->
+        <item name="android:textAppearanceButton">@style/ButtonText</item>
+        <item name="android:alertDialogTheme">@style/Dialog</item>
+    </style>
+
+    <style name="ButtonText" parent="android:style/TextAppearance.Material.Button">
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <style name="Dialog" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">#2E5B4F</item>
+        <item name="android:textAppearanceButton">@style/ButtonText</item>
     </style>
 
     <!-- The caller stays on screen while an install runs. -->

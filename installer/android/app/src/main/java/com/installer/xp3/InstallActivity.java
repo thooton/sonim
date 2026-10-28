@@ -153,13 +153,44 @@ public final class InstallActivity extends Activity {
         finish();
     }
 
+    /**
+     * A short sentence for the caller to show, from the session's status.
+     * Android's own text (constant names, temp paths) only when nothing fits.
+     */
     private static String message(Intent intent) {
+        int status = intent.getIntExtra(
+            PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
         String why = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
-        return why != null ? why : "The install failed.";
+        String raw = why == null ? "" : why;
+        if (raw.contains("DOWNGRADE")) return "A newer version is already installed.";
+        if (raw.contains("inconsistent with")) return "The file is a different app.";
+        switch (status) {
+            case PackageInstaller.STATUS_FAILURE_STORAGE:
+                return "There isn't enough storage.";
+            case PackageInstaller.STATUS_FAILURE_INVALID:
+                return "The file isn't a working app.";
+            case PackageInstaller.STATUS_FAILURE_CONFLICT:
+                return "It doesn't match the installed app.";
+            case PackageInstaller.STATUS_FAILURE_INCOMPATIBLE:
+                return "It doesn't work on this phone.";
+            case PackageInstaller.STATUS_FAILURE_BLOCKED:
+                return "Android blocked the install.";
+            case PackageInstaller.STATUS_FAILURE_ABORTED:
+                return "The install was stopped.";
+            default:
+                return why != null ? why : "The install failed.";
+        }
     }
 
+    /** The same for a failure before the commit: reading the file in. */
     private static String reason(Exception e) {
         String why = e.getMessage();
+        if (why != null && (why.contains("ENOSPC") || why.contains("No space"))) {
+            return "There isn't enough storage.";
+        }
+        if (e instanceof java.io.IOException || e instanceof SecurityException) {
+            return "Can't read the file.";
+        }
         return why != null ? why : e.getClass().getSimpleName();
     }
 

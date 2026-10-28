@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.admin.DevicePolicyManager;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -43,6 +44,10 @@ public final class MainActivity extends Activity {
         release = new Button(this);
         release.setText("Stop being device owner");
         release.setOnClickListener(view -> confirmRelease());
+        // The stock focus state is a barely darker grey; show it in the accent.
+        int[][] states = { { android.R.attr.state_focused }, {} };
+        release.setBackgroundTintList(new ColorStateList(states, new int[] { 0xFF2E5B4F, 0xFFD6D7D7 }));
+        release.setTextColor(new ColorStateList(states, new int[] { Color.WHITE, 0xDE000000 }));
 
         LinearLayout column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);

@@ -56,6 +56,8 @@ on whether Installer is the device owner, checked when the screen opens.
 - Heading "Ready", 22sp, dark green (`#1F4037`).
 - No command line.
 - One button, "Stop being device owner", focused when the screen opens.
+  Focused, it is the accent green (`#2E5B4F`) with white text; unfocused,
+  the stock grey.
 - OK on the button opens the dialog below. Up/Down keep focus on it.
 
 **Stop being device owner?** dialog (stock AlertDialog):
@@ -89,9 +91,15 @@ Results to the caller:
 | Installed | `RESULT_OK` | none |
 | No data URI | `RESULT_CANCELED` | `No file to install.` |
 | Not device owner | `RESULT_CANCELED` | `Installer isn't the device owner.` |
-| URI unreadable | `RESULT_CANCELED` | the exception's message, or `Can't read the file.` |
-| `package` given and the APK is a different app | `RESULT_CANCELED` | Android's message |
-| Android rejects the APK (bad signature for an update, downgrade, corrupt) | `RESULT_CANCELED` | Android's message, or `The install failed.` |
+| URI unreadable | `RESULT_CANCELED` | `Can't read the file.` |
+| Not enough storage | `RESULT_CANCELED` | `There isn't enough storage.` |
+| `package` given and the APK is a different app | `RESULT_CANCELED` | `The file is a different app.` |
+| Older than the installed version | `RESULT_CANCELED` | `A newer version is already installed.` |
+| Corrupt or not an APK | `RESULT_CANCELED` | `The file isn't a working app.` |
+| Signed differently from the installed app (or another conflict) | `RESULT_CANCELED` | `It doesn't match the installed app.` |
+| Needs a newer Android or another CPU | `RESULT_CANCELED` | `It doesn't work on this phone.` |
+| Blocked / aborted by Android | `RESULT_CANCELED` | `Android blocked the install.` / `The install was stopped.` |
+| Any other rejection | `RESULT_CANCELED` | Android's message, or `The install failed.` |
 | Android asks for confirmation anyway | `RESULT_CANCELED` | `Android asked for confirmation even though Installer is the device owner.` |
 | The APK is Installer itself | `RESULT_CANCELED` | none: Android stops Installer to replace it; the caller checks the installed version |
 
@@ -130,7 +138,8 @@ refused with a permission error (the shell lacks the signature permission).
 
 Not one of the family-look apps in DESIGN.md: a stock Material Light page
 (white, status bar `#1F4037`, accent `#2E5B4F`) with a stock button and
-dialog. Heading 22sp; command monospace 14sp dark grey. The launcher icon
+dialog. Buttons read in sentence case, as written here, not in capitals.
+Heading 22sp; command monospace 14sp dark grey. The launcher icon
 sits in the family's 40-unit rounded square.
 
 ## Open questions
