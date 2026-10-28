@@ -85,11 +85,14 @@ the pages; a lock in place of the thumbnail when protected). Dates read
 
 - Phone storage (and its folders) lists folders first, then PDFs, each by
   name; the line reads "3 folders · 2 PDFs" or "No folders or PDFs here".
-  OK on a folder opens it as a new file list.
+  OK on a folder opens it as a new file list. "By name" reads runs of
+  digits as numbers: Scan_2 comes before Scan_10.
 - At most 300 rows are built; then the foot reads "Showing 300 of N. Type
   to find the others."
 - Number keys search at once: each key stands for its letters, as in
-  contact search. The box shows the letters matched in the first result
+  contact search. Results whose name starts with the match come first,
+  then those where a later word starts with it, then the rest, each in
+  the list's order. The box shows the letters matched in the first result
   with a "T9" tag and takes the focus; the matches are highlighted in
   yellow; the line reads "N results for “abc”" or "No PDFs match “abc”".
 - With the box focused: Down goes to the first row, OK opens the first
@@ -107,7 +110,8 @@ Top bar: the file's name. "Opening…" while it opens. Then the page as it
 will print, with a paper chip ("Letter 8.5 x 11 in") top right, arrows at
 the sides (dimmed at the ends) and "Page 2 of 6" at the bottom; a line
 "<printer> · 1 copy · Color" (adds "2-sided" and the pages when not all;
-"N pages, may take several minutes" for 50+ pages; "No printer chosen"
+a second line "N pages, may take several minutes" when 50+ pages are
+to print (the range chosen, not the whole file); "No printer chosen"
 with none); and two buttons, Settings and Print.
 
 - Focus starts on Print, so OK prints.
@@ -200,7 +204,9 @@ Top bar "Printers", tabs Nearby and By IP address. Left/Right switch tabs
   connected to “NAME”, the same Wi-Fi as this phone.", buttons Search again
   (focused) and Add by IP address. Wi-Fi off: "Wi-Fi is off", "Turn on
   Wi-Fi to find printers on your network.", Open Wi-Fi settings and Add by
-  IP address.
+  IP address; with the Wi-Fi off this page shows in place of the list, kept
+  printers or not. The page scrolls, so its buttons are reached on the
+  small screen.
 - Menu: Forget printer (on a kept printer; it is no longer the one in use)
   and Search again (once a search has ended with printers listed).
 - By IP address: "Printer IP address", four boxes with the phone's first
@@ -218,7 +224,8 @@ Top bar "Printers", tabs Nearby and By IP address. Left/Right switch tabs
 
 ### Recent
 
-The last 50 prints, newest first, under "Today", "Yesterday", "This week",
+The last 50 prints (jobs a printer accepted; one that never got
+through isn't listed), newest first, under "Today", "Yesterday", "This week",
 "Earlier". Each row: thumbnail, title, "Printed 2:48 PM · OfficeJet"
 ("Tue", "Oct 3" for older). A file that's gone reads "Moved or deleted" in
 grey and does nothing on OK, but can still be focused. Empty: "Nothing
@@ -274,13 +281,19 @@ Help lists the keys in brief and how printers are found.
 - Jobs run one at a time in a foreground service with a progress
   notification ("<title>" / status, tapping opens its Printing screen), a
   wake lock and a Wi-Fi lock, so Hide, Back or the screen going off don't
-  stop them. A failed job leaves a notification "<title> didn't print".
+  stop them. A failed job leaves a notification "<title> didn't print", taken away
+  when the job is sent again (Retry, Use another printer, Print in black &
+  white, Print again). Failures read in plain words ("The printer stopped
+  taking the job"), never the system's ("Connection reset").
   When a printer accepts a job the phone vibrates once (200 ms) if Vibrate
   when done is on.
 - If the printer refuses the format, the job falls back to the next way
   (PDF over IPP → PWG → URF → PCLm → PostScript → PCL; IPP → 9100 → LPD).
 - All traffic is bound to the Wi-Fi, even one without internet. No
   internet is ever used. Offline (Wi-Fi off) shows the Wi-Fi is off screen.
+- Each PDF is first opened in a small process of its own: on Android 8.1
+  one protected or damaged PDF spoils the phone's PDF renderer for the
+  rest of the process, so that process is started afresh after one.
 - "Open with" from another app goes straight to Preview (a content link
   is copied into the cache first). Permissions: storage (asked on 1),
   location (asked once, only for the Wi-Fi's name).

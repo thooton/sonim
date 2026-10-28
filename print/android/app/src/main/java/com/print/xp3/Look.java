@@ -328,7 +328,7 @@ final class Look {
         }
     }
 
-    /** The printer banner: a navy gradient left to right; focused, a white inner ring. */
+    /** The printer banner: a navy gradient left to right; focused, brighter, with a white ring 2dp inside its edge. */
     static final class BannerFace extends Drawable {
         private final Paint paint = new Paint();
         private final Paint ring = new Paint();
@@ -362,11 +362,14 @@ final class Look {
         @Override
         public void draw(Canvas canvas) {
             Rect b = getBounds();
-            paint.setShader(new LinearGradient(b.left, 0, b.right, 0, BANNER_FROM, BANNER_TO, Shader.TileMode.CLAMP));
+            int from = on ? TileFace.brighter(BANNER_FROM) : BANNER_FROM;
+            int to = on ? TileFace.brighter(BANNER_TO) : BANNER_TO;
+            paint.setShader(new LinearGradient(b.left, 0, b.right, 0, from, to, Shader.TileMode.CLAMP));
             canvas.drawRect(b, paint);
             if (on) {
-                float half = width / 2;
-                canvas.drawRect(b.left + half, b.top + half, b.right - half, b.bottom - half, ring);
+                // Inside a band of navy: at the very edge a white ring melts into the white page.
+                float inset = width * 1.5f;
+                canvas.drawRect(b.left + inset, b.top + inset, b.right - inset, b.bottom - inset, ring);
             }
         }
 

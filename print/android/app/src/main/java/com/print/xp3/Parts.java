@@ -288,6 +288,12 @@ final class Parts {
             invalidate();
         }
 
+        /** Its own size, 26 x 15 dp, whatever layout params a row gives it. */
+        @Override
+        protected void onMeasure(int widthSpec, int heightSpec) {
+            setMeasuredDimension(resolveSize(Look.dp(getContext(), 26), widthSpec), resolveSize(Look.dp(getContext(), 15), heightSpec));
+        }
+
         @Override
         protected void onDraw(Canvas canvas) {
             float h = getHeight();

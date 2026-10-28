@@ -16,6 +16,7 @@ public final class SelfTest {
         SendTests.run(check);
         FindTests.run(check);
         PlanTests.run(check);
+        SearchTests.run(check);
         JobTests.run(check);
         if (!check.report()) System.exit(1);
     }

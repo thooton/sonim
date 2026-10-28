@@ -41,6 +41,7 @@ public final class PrintService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         startForeground(NOTIFICATION, notification(null));
+        Pages.start(this);
         Wifi.bind(this);
         if (worker == null) {
             hold();
@@ -161,16 +162,18 @@ public final class PrintService extends Service {
     private void update(Queue.Entry entry, Job.Status status) {
         if (!entry.active()) return;
         entry.status = status;
-        if (status.phase >= Job.PRINTING) accepted(entry);
+        // Failed and canceled come after printing, but the printer never took those.
+        if (status.phase == Job.PRINTING || status.phase == Job.DONE) accepted(entry);
         Queue.changed(entry);
         NotificationManager notifications = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         notifications.notify(NOTIFICATION, notification(entry));
     }
 
-    /** The printer has the job: buzz once, if that's wanted. */
+    /** The printer has the job: it goes in Recent, and the phone buzzes once, if that's wanted. */
     private void accepted(Queue.Entry entry) {
         if (entry.accepted) return;
         entry.accepted = true;
+        Store.get(this).printed(entry.file.getPath(), entry.title, entry.printer, entry.pages, entry.options);
         if (!Store.get(this).vibrate()) return;
         Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
         if (vibrator != null && vibrator.hasVibrator()) {
@@ -213,6 +216,12 @@ public final class PrintService extends Service {
             .setContentIntent(PendingIntent.getActivity(this, entry.id, Queue.open(this, entry), PendingIntent.FLAG_UPDATE_CURRENT))
             .setAutoCancel(true)
             .build());
+    }
+
+    /** Takes away a job's "didn't print", once it is sent again. */
+    static void forget(Context context, Queue.Entry entry) {
+        NotificationManager notifications = (NotificationManager) context.getSystemService(NOTIFICATION_SERVICE);
+        if (notifications != null) notifications.cancel(100 + entry.id);
     }
 
     private void hold() {

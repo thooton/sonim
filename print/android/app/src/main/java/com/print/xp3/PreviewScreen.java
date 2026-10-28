@@ -31,6 +31,8 @@ final class PreviewScreen extends Screen {
     private View right;
     private TextView summaryName;
     private TextView summaryRest;
+    /** "60 pages, may take several minutes", under the summary, when that many will print. */
+    private TextView slow;
     private TextView settings;
     private TextView print;
     private int drawn = -1;
@@ -137,6 +139,10 @@ final class PreviewScreen extends Screen {
         summaryRest = Look.line(c, "", 10, Look.REGULAR, Look.MUTE);
         summary.addView(summaryRest, Parts.weighted());
         foot.addView(summary);
+        slow = Look.line(c, "", 10, Look.REGULAR, Look.MUTE);
+        slow.setPadding(Look.dp(c, 28), 0, Look.dp(c, 12), Look.dp(c, 5));
+        slow.setVisibility(View.GONE);
+        foot.addView(slow);
         settings = Parts.button(c, "Settings", Parts.SECONDARY, () -> app.open(new PrintSettingsScreen(draft, this::print)));
         settings.setCompoundDrawablesRelativeWithIntrinsicBounds(scaled(c, R.drawable.ic_gear, 13), null, null, null);
         settings.setCompoundDrawablePadding(Look.dp(c, 5));
@@ -176,10 +182,12 @@ final class PreviewScreen extends Screen {
             summaryRest.setText("");
         } else {
             summaryName.setText(draft.printer.shown());
-            String rest = draft.summary();
-            if (draft.pages >= 50) rest = draft.pages + " pages, may take several minutes";
-            summaryRest.setText(" · " + rest);
+            summaryRest.setText(" · " + draft.summary());
         }
+        // The pages that will print, not the document's: two pages of a long manual are quick.
+        int printing = draft.options.to - draft.options.from + 1;
+        slow.setText(printing + " pages, may take several minutes");
+        slow.setVisibility(draft.printer != null && printing >= 50 ? View.VISIBLE : View.GONE);
         draw();
     }
 

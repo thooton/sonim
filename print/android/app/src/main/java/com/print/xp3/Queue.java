@@ -88,7 +88,6 @@ final class Queue {
     static Entry add(Context context, File file, String title, Printer printer, Options options, int pages) {
         Entry entry = new Entry(nextId++, file, title, printer, Store.copy(options), pages);
         entries.add(entry);
-        Store.get(context).printed(file.getPath(), title, printer, pages, options);
         PrintService.wake(context);
         changed(entry);
         return entry;
@@ -98,6 +97,8 @@ final class Queue {
     static Entry again(Context context, Entry old, Printer printer, boolean color) {
         Options options = Store.copy(old.options);
         if (!color) options.color = false;
+        // Sent again, the old job's "didn't print" is no longer news.
+        PrintService.forget(context, old);
         return add(context, old.file, old.title, printer == null ? old.printer : printer, options, old.pages);
     }
 

@@ -141,7 +141,7 @@ final class Library {
     static void sort(List<Pdf> pdfs, int order) {
         Comparator<Pdf> by;
         if (order == NAME) {
-            by = (a, b) -> a.name.compareToIgnoreCase(b.name);
+            by = (a, b) -> T9.compare(a.name, b.name);
         } else if (order == SIZE) {
             by = (a, b) -> Long.compare(b.size, a.size);
         } else {
@@ -154,7 +154,7 @@ final class Library {
     static List<File> folder(File dir) {
         File[] all = dir.listFiles();
         if (all == null) return Collections.emptyList();
-        Arrays.sort(all, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        Arrays.sort(all, (a, b) -> T9.compare(a.getName(), b.getName()));
         List<File> out = new ArrayList<File>();
         for (File each : all) if (each.isDirectory() && !each.getName().startsWith(".")) out.add(each);
         for (File each : all) if (isPdf(each)) out.add(each);

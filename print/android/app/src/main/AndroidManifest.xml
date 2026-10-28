@@ -47,5 +47,12 @@
         <service
             android:name=".PrintService"
             android:exported="false" />
+
+        <!-- Opens each PDF first, in a process of its own: see PdfCheck. -->
+        <provider
+            android:name=".PdfCheck"
+            android:authorities="com.print.xp3.check"
+            android:process=":check"
+            android:exported="false" />
     </application>
 </manifest>

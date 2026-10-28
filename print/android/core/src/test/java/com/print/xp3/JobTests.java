@@ -174,6 +174,13 @@ final class JobTests {
     }
 
     static void run(final Check check) {
+        check.run("job: failures read in the user's words", () -> {
+            check.same("reset", "The printer stopped taking the job", Job.message(new java.net.SocketException("Connection reset")));
+            check.same("pipe", "The printer stopped taking the job", Job.message(new java.net.SocketException("Broken pipe")));
+            check.same("refused", "The printer can't be reached", Job.message(new java.net.ConnectException("Connection refused")));
+            check.same("tls", "The printer's secure connection failed", Job.message(new java.io.IOException("TLS: handshake")));
+            check.same("own words kept", "The printer wants a password", Job.message(new java.io.IOException("The printer wants a password")));
+        });
         check.run("probe: a Brother at /ipp/port1 that takes only IPP 1.1", () -> {
             try (FakePrinter fake = new FakePrinter("image/urf", "application/octet-stream")) {
                 fake.onlyPath = "/ipp/port1";

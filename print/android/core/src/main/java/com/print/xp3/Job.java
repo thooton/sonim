@@ -156,10 +156,11 @@ public final class Job {
         } catch (IOException e) {
             report(canceled ? CANCELED : FAILED, canceled ? "Canceled" : message(e), -1);
         } catch (RuntimeException e) {
-            report(FAILED, "Something went wrong: " + e, -1);
+            report(FAILED, "Something went wrong getting the job ready", -1);
         }
     }
 
+    /** What went wrong, in the user's words: the system's own messages ("Connection reset") aren't. */
     static String message(IOException e) {
         String message = e.getMessage();
         if (e instanceof java.net.ConnectException || e instanceof java.net.NoRouteToHostException) {
@@ -167,7 +168,17 @@ public final class Job {
         }
         if (e instanceof java.net.SocketTimeoutException) return "The printer stopped answering";
         if (e instanceof java.net.UnknownHostException) return "The printer can't be found";
+        if (e instanceof javax.net.ssl.SSLException || (message != null && message.startsWith("TLS:"))) {
+            return "The printer's secure connection failed";
+        }
+        // Reset, broken pipe, aborted: the printer (or the Wi-Fi) dropped the job part way.
+        if (e instanceof java.net.SocketException || e instanceof java.io.EOFException) return "The printer stopped taking the job";
+        if (e instanceof java.io.FileNotFoundException) return "The file can't be read";
         if (message == null || message.isEmpty()) return "The printer couldn't be reached";
+        if (message.startsWith("IPP ") || message.startsWith("HTTP ") || message.equals("Not an HTTP answer")
+            || message.startsWith("Bad chunk")) {
+            return "The printer's answer couldn't be read";
+        }
         return message;
     }
 

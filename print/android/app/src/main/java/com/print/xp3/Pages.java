@@ -1,12 +1,16 @@
 package com.print.xp3;
 
+import android.content.ContentProviderClient;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.pdf.PdfRenderer;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
+import android.os.RemoteException;
 import android.util.LruCache;
 import java.io.File;
 import java.io.IOException;
@@ -18,7 +22,8 @@ import java.util.concurrent.ExecutorService;
  * Reads PDFs with the phone's own renderer: how many pages a file has, its
  * pages drawn small (list thumbnails, the page strip) or to fit the
  * preview. One worker does it all, in the order asked, and answers on the
- * main thread.
+ * main thread. A file is first opened by {@link PdfCheck}, in its own
+ * process, and only drawn here once it opened there.
  */
 final class Pages {
 
@@ -46,6 +51,13 @@ final class Pages {
             return value.getByteCount();
         }
     };
+
+    private static Context context;
+
+    /** Before anything else is asked: from the activity and the service. */
+    static void start(Context c) {
+        context = c.getApplicationContext();
+    }
 
     private static String key(File file) {
         return file.getPath() + "@" + file.lastModified() + ":" + file.length();
@@ -77,17 +89,27 @@ final class Pages {
     static int countNow(File file) {
         int known = known(file);
         if (known != -1) return known;
-        int count;
-        try (ParcelFileDescriptor fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
-             PdfRenderer renderer = new PdfRenderer(fd)) {
-            count = renderer.getPageCount();
-        } catch (SecurityException e) {
-            count = LOCKED;
-        } catch (IOException | RuntimeException e) {
-            count = BROKEN;
-        }
+        int count = check(file);
         keep(file, count);
         return count;
+    }
+
+    /** Asks {@link PdfCheck}, starting it afresh when it ended after a bad file. */
+    private static int check(File file) {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            if (attempt > 0) android.os.SystemClock.sleep(50);
+            ContentProviderClient client = context.getContentResolver().acquireUnstableContentProviderClient(PdfCheck.URI);
+            if (client == null) break;
+            try {
+                Bundle answer = client.call(PdfCheck.PAGES, file.getPath(), null);
+                if (answer != null) return answer.getInt(PdfCheck.PAGES, BROKEN);
+            } catch (RemoteException | RuntimeException e) {
+                // That process ended: the next attempt starts another.
+            } finally {
+                client.release();
+            }
+        }
+        return BROKEN;
     }
 
     /** Page `index` of `file`, to fit `width` x `height` pixels (kept small ones are reused). */
@@ -106,9 +128,10 @@ final class Pages {
     }
 
     private static Bitmap drawNow(File file, int index, int width, int height) {
+        // Only a file that opened in PdfCheck is opened here, so one bad file can't spoil the rest.
+        if (index >= countNow(file)) return null;
         try (ParcelFileDescriptor fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
              PdfRenderer renderer = new PdfRenderer(fd)) {
-            keep(file, renderer.getPageCount());
             if (index >= renderer.getPageCount()) return null;
             try (PdfRenderer.Page page = renderer.openPage(index)) {
                 float scale = Math.min(width / (float) page.getWidth(), height / (float) page.getHeight());
@@ -121,9 +144,6 @@ final class Pages {
                 page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
                 return bitmap;
             }
-        } catch (SecurityException e) {
-            keep(file, LOCKED);
-            return null;
         } catch (IOException | RuntimeException | OutOfMemoryError e) {
             return null;
         }

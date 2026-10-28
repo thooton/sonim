@@ -28,6 +28,10 @@ final class PdfDocument implements Job.Document, Closeable {
     private final PdfRenderer renderer;
 
     PdfDocument(File file) throws IOException {
+        // Tried in PdfCheck first, so a bad file can't spoil the phone's renderer for the files after it.
+        int pages = Pages.countNow(file);
+        if (pages == Pages.LOCKED) throw new IOException("This PDF is protected with a password");
+        if (pages <= 0) throw new IOException("This PDF can't be opened");
         fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
         try {
             renderer = new PdfRenderer(fd);

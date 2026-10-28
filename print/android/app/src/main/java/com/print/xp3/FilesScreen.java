@@ -15,6 +15,7 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -139,7 +140,10 @@ final class FilesScreen extends Screen {
         String shownMatch = null;
         if (pdfs != null) {
             Library.sort(pdfs, sort);
-            for (Library.Pdf pdf : pdfs) {
+            List<Library.Pdf> shown = new ArrayList<Library.Pdf>(pdfs);
+            // A search puts names that start with what was typed first, then a later word's start.
+            if (!typed.isEmpty()) Collections.sort(shown, (a, b) -> Integer.compare(rank(a.name, typed), rank(b.name, typed)));
+            for (Library.Pdf pdf : shown) {
                 int[] match = typed.isEmpty() ? null : T9.match(pdf.name, typed);
                 if (!typed.isEmpty() && match == null) continue;
                 total++;
@@ -147,7 +151,9 @@ final class FilesScreen extends Screen {
                 if (lines.size() < MOST) addPdf(c, pdf.file, pdf, match);
             }
         } else {
-            for (File entry : entries) {
+            List<File> shown = new ArrayList<File>(entries);
+            if (!typed.isEmpty()) Collections.sort(shown, (a, b) -> Integer.compare(rank(display(a), typed), rank(display(b), typed)));
+            for (File entry : shown) {
                 int[] match = typed.isEmpty() ? null : T9.match(display(entry), typed);
                 if (!typed.isEmpty() && match == null) continue;
                 total++;
@@ -178,6 +184,12 @@ final class FilesScreen extends Screen {
             list.addView(Parts.foot(c, "Showing " + lines.size() + " of " + total + ". Type to find the others."));
         }
         scroll.post(this::loadVisible);
+    }
+
+    /** {@link T9#rank} of a name, 3 when it doesn't match. */
+    private static int rank(String name, String typed) {
+        int[] match = T9.match(name, typed);
+        return match == null ? 3 : T9.rank(name, match);
     }
 
     private String folderSummary() {

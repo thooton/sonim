@@ -50,6 +50,10 @@ final class PrintersScreen extends Screen {
     // Nearby.
     private LinearLayout nearby;
     private LinearLayout list;
+    private ScrollView listScroll;
+    /** The "No printers found" or "Wi-Fi is off" page in the list's place, or null. */
+    private View empty;
+    private boolean emptyWifi;
     private TextView searching;
     private View spinner;
     private final Map<String, Parts.Row> rows = new HashMap<String, Parts.Row>();
@@ -138,11 +142,11 @@ final class PrintersScreen extends Screen {
         header.addView(searching, lp);
         page.addView(header);
         list = Parts.column(c);
-        ScrollView scroll = new ScrollView(c);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setDefaultFocusHighlightEnabled(false);
-        scroll.addView(list);
-        page.addView(scroll, new LinearLayout.LayoutParams(Parts.FILL, 0, 1));
+        listScroll = new ScrollView(c);
+        listScroll.setVerticalScrollBarEnabled(false);
+        listScroll.setDefaultFocusHighlightEnabled(false);
+        listScroll.addView(list);
+        page.addView(listScroll, new LinearLayout.LayoutParams(Parts.FILL, 0, 1));
         return page;
     }
 
@@ -180,6 +184,7 @@ final class PrintersScreen extends Screen {
         header();
         if (!Wifi.on(app)) {
             searchOver = true;
+            header();
             refreshRows();
             return;
         }
@@ -276,11 +281,13 @@ final class PrintersScreen extends Screen {
             row.sub.setVisibility(View.VISIBLE);
             ((View) tag[2]).setVisibility(current != null && current.key().equals(printer.key()) ? View.VISIBLE : View.INVISIBLE);
         }
-        View empty = nearby.findViewWithTag("empty");
-        if (rows.isEmpty() && searchOver) {
+        // Kept printers can't be reached with the Wi-Fi off: that page says so instead.
+        boolean wifiOn = Wifi.on(app);
+        if (searchOver && (rows.isEmpty() || !wifiOn)) {
+            if (empty != null && emptyWifi != wifiOn) hideEmpty();
             if (empty == null) showEmpty();
-        } else if (empty != null) {
-            nearby.removeView(empty);
+        } else {
+            hideEmpty();
         }
         if (tab == 0 && !hadFocus && app.top() == this) {
             View focus = focusRow();
@@ -290,8 +297,7 @@ final class PrintersScreen extends Screen {
 
     /** The printer in use, else the first. */
     private View focusRow() {
-        if (rows.isEmpty()) {
-            View empty = nearby.findViewWithTag("empty");
+        if (empty != null || rows.isEmpty()) {
             return empty == null ? null : empty.findFocus() != null ? empty.findFocus() : empty.findViewWithTag("primary");
         }
         Printer current = Store.get(app).current();
@@ -307,7 +313,7 @@ final class PrintersScreen extends Screen {
         TextView primary;
         if (wifiOn) {
             primary = Parts.button(c, "Search again", Parts.PRIMARY, () -> {
-                nearby.removeView(nearby.findViewWithTag("empty"));
+                hideEmpty();
                 search();
             });
         } else {
@@ -323,9 +329,24 @@ final class PrintersScreen extends Screen {
             : "Turn on Wi-Fi to find printers on your network.";
         LinearLayout page = Parts.status(c, rings, 84, wifiOn ? "No printers found" : "Wi-Fi is off", message, null,
             Parts.buttons(c, primary, other), 8);
-        page.setTag("empty");
-        nearby.addView(page, new LinearLayout.LayoutParams(Parts.FILL, 0, 1));
+        // In the list's place, and scrolling, so the buttons are reached on a short screen.
+        ScrollView holder = new ScrollView(c);
+        holder.setVerticalScrollBarEnabled(false);
+        holder.setDefaultFocusHighlightEnabled(false);
+        holder.setFillViewport(true);
+        holder.addView(page);
+        listScroll.setVisibility(View.GONE);
+        nearby.addView(holder, new LinearLayout.LayoutParams(Parts.FILL, 0, 1));
+        empty = holder;
+        emptyWifi = wifiOn;
         if (tab == 0) primary.requestFocus();
+    }
+
+    private void hideEmpty() {
+        if (empty == null) return;
+        nearby.removeView(empty);
+        empty = null;
+        listScroll.setVisibility(View.VISIBLE);
     }
 
     /** The Wi-Fi sign in soft rings. */
@@ -517,7 +538,9 @@ final class PrintersScreen extends Screen {
         }
         heading.addView(Look.line(c, title, 11.5f, Look.BOLD, printer == null && detail != null ? Look.ERR : Look.INK));
         text.addView(heading);
-        if (detail != null) text.addView(Look.line(c, detail, 9.5f, Look.REGULAR, Look.MUTE));
+        // A found printer's details fit one line; why none was found is advice, read whole.
+        if (detail != null) text.addView(printer != null ? Look.line(c, detail, 9.5f, Look.REGULAR, Look.MUTE)
+            : Look.text(c, detail, 9.5f, Look.REGULAR, Look.MUTE));
         result.addView(text, Parts.weighted());
     }
 
