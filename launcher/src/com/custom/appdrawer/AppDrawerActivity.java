@@ -337,7 +337,8 @@ public final class AppDrawerActivity extends Activity {
             ActivityInfo activity = info.activityInfo;
             if (activity == null
                     || getPackageName().equals(activity.packageName)
-                    || indexOfTarget(activity.packageName, activity.name) >= 0) {
+                    || indexOfTarget(activity.packageName, activity.name) >= 0
+                    || adapter.launches(new ComponentName(activity.packageName, activity.name))) {
                 continue;
             }
             CharSequence label = info.loadLabel(pm);
@@ -517,13 +518,15 @@ public final class AppDrawerActivity extends Activity {
             CharSequence label = target.fallbackLabel;
             Intent launchIntent = null;
 
-            try {
-                Presentation cached = presentations.get(component);
-                if (cached == null) {
-                    ActivityInfo info = pm.getActivityInfo(component, 0);
-                    cached = new Presentation(info.loadIcon(pm), info.loadLabel(pm));
+            Presentation cached = presentations.get(component);
+            if (cached == null) {
+                cached = loadPresentation(pm, component);
+                if (cached != null) {
                     presentations.put(component, cached);
                 }
+            }
+            // Otherwise keep the slot visible, dimmed, so installation problems are obvious.
+            if (cached != null) {
                 if (cached.icon != null) {
                     icon = cached.icon;
                 }
@@ -532,17 +535,37 @@ public final class AppDrawerActivity extends Activity {
                 }
                 launchIntent = new Intent(Intent.ACTION_MAIN)
                         .addCategory(Intent.CATEGORY_LAUNCHER)
-                        .setComponent(component)
+                        .setComponent(cached.component)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            } catch (PackageManager.NameNotFoundException ignored) {
-                // Keep the slot visible so installation problems are obvious.
-                // A package-level launch intent also tolerates a renamed entry activity.
-                launchIntent = pm.getLaunchIntentForPackage(target.packageName);
             }
 
             entries.add(new Entry(label, icon, launchIntent));
         }
         adapter.replace(entries);
+    }
+
+    /**
+     * Reads the icon and label of the activity a target starts: its own, or, if
+     * that activity was renamed, the package's main activity, which the entry then
+     * stands for. Null when neither is installed.
+     */
+    private static Presentation loadPresentation(PackageManager pm, ComponentName component) {
+        ActivityInfo info;
+        try {
+            info = pm.getActivityInfo(component, 0);
+        } catch (PackageManager.NameNotFoundException missing) {
+            Intent launchIntent = pm.getLaunchIntentForPackage(component.getPackageName());
+            if (launchIntent == null || launchIntent.getComponent() == null) {
+                return null;
+            }
+            component = launchIntent.getComponent();
+            try {
+                info = pm.getActivityInfo(component, 0);
+            } catch (PackageManager.NameNotFoundException ignored) {
+                return null;
+            }
+        }
+        return new Presentation(info.loadIcon(pm), info.loadLabel(pm), component);
     }
 
     private void launch(Entry entry) {
@@ -624,10 +647,13 @@ public final class AppDrawerActivity extends Activity {
     private static final class Presentation {
         final Drawable icon;
         final CharSequence label;
+        /** The activity the entry starts. */
+        final ComponentName component;
 
-        Presentation(Drawable icon, CharSequence label) {
+        Presentation(Drawable icon, CharSequence label, ComponentName component) {
             this.icon = icon;
             this.label = label;
+            this.component = component;
         }
     }
 
@@ -666,6 +692,16 @@ public final class AppDrawerActivity extends Activity {
 
         Entry getEntry(int position) {
             return entries.get(position);
+        }
+
+        /** Whether some entry already starts {@code component}. */
+        boolean launches(ComponentName component) {
+            for (Entry entry : entries) {
+                if (entry.intent != null && component.equals(entry.intent.getComponent())) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override

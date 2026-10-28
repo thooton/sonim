@@ -47,7 +47,8 @@ the defaults: Todo, Charge, Flashcards, List, Dictionary.
   label at about 45% opacity), with the generic Android icon and its saved
   label.
 - If the exact activity is gone but the package is installed, the entry is
-  not dimmed and launching starts the package's main activity.
+  not dimmed, launching starts the package's main activity, and the entry
+  shows that activity's icon and label (Add program then doesn't offer it).
 - Long labels are cut to one line with an ellipsis; the cell never grows.
 - An empty drawer shows "No programs", centred.
 - More apps than fit (about 3 full rows below the status bar) scroll; the
@@ -164,10 +165,10 @@ lavender.
 
 1. The default "Todo" entry points at `com.todo.xp3/com.todo.xp3.MainActivity`.
    That package is now Canvas, whose activity is `com.canvas.xp3.MainActivity`,
-   so on a fresh install the first slot falls back to the package launch:
-   it opens Canvas but reads "Todo" with the generic icon. Should the
-   default be Canvas (`com.todo.xp3/com.canvas.xp3.MainActivity`), and is
-   the default list still the right five?
+   so on a fresh install the first slot falls back to the package launch
+   (it shows and opens Canvas). Should the default be Canvas
+   (`com.todo.xp3/com.canvas.xp3.MainActivity`), and is the default list
+   still the right five?
 2. The saved label is never refreshed after an app is renamed, so an
    uninstalled app shows its name from when it was added. Is that fine?
 3. Remove program has no confirmation and no undo. Wanted, or should it ask?
