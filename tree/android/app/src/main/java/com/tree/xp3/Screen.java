@@ -41,7 +41,6 @@ abstract class Screen extends BaseActivity {
     private TextView meta;
     private ProgressBar working;
     private int busy;
-    protected View header;
     protected FrameLayout content;
 
     interface Done<T> {
@@ -70,7 +69,6 @@ abstract class Screen extends BaseActivity {
         LinearLayout.LayoutParams right = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         right.leftMargin = dp(8);
         bar.addView(meta, right);
-        header = bar;
         root.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36)));
 
         FrameLayout body = new FrameLayout(this);
@@ -171,7 +169,9 @@ abstract class Screen extends BaseActivity {
 
     /** A popup of choices under the header's right end. */
     protected final void popup(String[] labels, final Ui.Selected chose) {
-        PopupMenu menu = new PopupMenu(this, header, Gravity.END);
+        // Hung from the content, not the header: on API 27 the popup
+        // overlaps its anchor, and from the header it covered it.
+        PopupMenu menu = new PopupMenu(this, content, Gravity.END);
         for (int i = 0; i < labels.length; i++) menu.getMenu().add(0, i, i, labels[i]);
         menu.setOnMenuItemClickListener(item -> {
             chose.at(item.getItemId());
@@ -266,24 +266,39 @@ abstract class Screen extends BaseActivity {
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);
         box.addView(token);
-        new AlertDialog.Builder(this)
+        final AlertDialog ask = new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
-            .setPositiveButton("Save", (dialog, which) -> {
-                String typed = token.getText().toString();
-                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                try {
-                    Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                    Tree.saveLogin(this, next);
-                    toast("Saved: " + next.host());
-                    loggedIn();
-                } catch (IllegalArgumentException e) {
-                    toast(e.getMessage());
-                }
-            })
+            .setPositiveButton("Save", null)
             .setNegativeButton("Cancel", null)
-            .show();
+            .create();
+        // Up and Down never left the address field here, so the d-pad moves
+        // between the fields and the buttons itself.
+        ask.setOnKeyListener((shown, code, event) -> {
+            if (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN) return false;
+            if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
+            View at = ask.getCurrentFocus();
+            View next = at == null ? null : at.focusSearch(code == KeyEvent.KEYCODE_DPAD_UP ? View.FOCUS_UP : View.FOCUS_DOWN);
+            if (next != null) next.requestFocus();
+            return true;
+        });
+        ask.show();
+        // Save closes the dialog only once the login is taken, so a mistake
+        // keeps what was typed for correcting.
+        ask.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String typed = token.getText().toString();
+            if (typed.trim().length() == 0 && login.ready()) typed = login.token();
+            try {
+                Login next = Login.of(server.getText().toString(), typed);
+                if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
+                Tree.saveLogin(this, next);
+                ask.dismiss();
+                toast("Saved: " + next.host());
+                loggedIn();
+            } catch (IllegalArgumentException e) {
+                toast(e.getMessage());
+            }
+        });
     }
 
     /** After a login is typed in. */

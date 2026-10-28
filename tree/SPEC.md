@@ -78,7 +78,8 @@ Back or the right soft key goes back (on Home, leaves the app).
   - `Command center…` asks for the address (`https://…`) and the token
     (dots when one is saved; left empty, the saved one is kept). Save
     toasts `Saved: <host>`; an address that isn't https, or a missing part,
-    toasts why and saves nothing.
+    toasts why and saves nothing, and the dialog stays open with what was
+    typed. Up/Down move between the fields and the buttons.
 - With nothing to list: a spinner during the first fetch; otherwise a
   centred title and a button that has the focus: `No command center` with
   `Sign in` (opens the login dialog), `Couldn't reach the command center`
@@ -93,7 +94,8 @@ Back or the right soft key goes back (on Home, leaves the app).
   `Run QA now` once it is over, or greyed `Another run is going` when it is
   over and another one goes.
 - Under it, on white cards: `Started` and (once over) `Ended` times;
-  `Summary` with the whole summary; `Apps`: each app's name and tag, its
+  `Summary` with the whole summary; `Apps`: each app's name and its tag
+  (small and muted after the name, as on Home), its
   status on the right (`Done` green, `Running` accent, `Waiting` and
   `Skipped` muted) and the reason under it if there is one; `Jobs`: each
   as `Explore · List` with its status on the right (`Done` green, `Running`
@@ -125,8 +127,8 @@ Back or the right soft key goes back (on Home, leaves the app).
      Left for you and Grown without a verdict green accent; Open dark;
      the rest muted. With none: `No findings yet` (`Loading findings`
      first, or `Couldn't read the findings` and why).
-- Keys: Up/Down move between Grow, the button and the findings. OK on a
-  finding opens **Finding**.
+- Keys: Up/Down move between Grow, the button (passed over while it is
+  greyed) and the findings. OK on a finding opens **Finding**.
 - Menu: `Turn growing on` / `Turn growing off`, `Run QA now` (only when no
   run is going), `Refresh`.
 - The findings are fetched again each time the screen comes back.
@@ -146,7 +148,8 @@ Back or the right soft key goes back (on Home, leaves the app).
 - Keys: Up/Down scroll 48dp a press. On a grown feature Left/Right move
   between the two buttons; OK gives that verdict (toasts `Kept` or `The
   next run takes it out`), and OK on the one already given clears it
-  (toasts `Verdict cleared`).
+  (toasts `Verdict cleared`). While the buttons are scrolled out of view,
+  OK gives no verdict: it scrolls back to them.
 - Menu (a grown feature only): `👍 Keep`, `👎 Take out`, `Clear verdict`.
 
 ## Behaviour

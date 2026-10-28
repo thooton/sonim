@@ -3,6 +3,10 @@ package com.tree.xp3;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -20,7 +24,7 @@ import java.util.TimeZone;
 
 /**
  * One run, whole: the button for what OK does (Cancel run while it goes,
- * Run QA now after), its nightly report, each app's place in it and each
+ * Run QA now after), its summary, each app's place in it and each
  * job. Up and Down scroll; it asks again every 20 seconds while the run
  * goes.
  */
@@ -147,7 +151,7 @@ public final class RunActivity extends Screen {
 
         if (run.summary.trim().length() > 0) {
             LinearLayout summary = card();
-            summary.addView(label("Nightly report"));
+            summary.addView(label("Summary"));
             summary.addView(lead(run.summary.trim()));
             page.addView(summary, cardSpacing());
         }
@@ -156,7 +160,7 @@ public final class RunActivity extends Screen {
             LinearLayout apps = card();
             apps.addView(label("Apps"));
             for (Qa.Progress progress : run.apps) {
-                apps.addView(line(progress.name() + "  " + Words.tag(progress.repo), Words.progress(progress.status),
+                apps.addView(line(tagged(progress.name(), Words.tag(progress.repo)), Words.progress(progress.status),
                     progressColor(progress.status), progress.why));
             }
             page.addView(apps, cardSpacing());
@@ -174,8 +178,20 @@ public final class RunActivity extends Screen {
         scroll.post(() -> scroll.scrollTo(0, y));
     }
 
+    /** An app's name with its tag after it, small and muted as on Home, kept on the name's line. */
+    private CharSequence tagged(String name, String tag) {
+        SpannableStringBuilder out = new SpannableStringBuilder(name);
+        if (tag.length() == 0) return out;
+        out.append("\u00A0\u00A0");
+        int start = out.length();
+        out.append(tag);
+        out.setSpan(new AbsoluteSizeSpan(11, true), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        out.setSpan(new ForegroundColorSpan(color(R.color.text_muted)), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return out;
+    }
+
     /** One line of a card: what on the left, its state on the right, and why under it. */
-    private View line(String what, String state, int stateColor, String why) {
+    private View line(CharSequence what, String state, int stateColor, String why) {
         LinearLayout box = vertical();
         box.setPadding(0, dp(3), 0, dp(3));
         LinearLayout top = new LinearLayout(this);

@@ -120,6 +120,16 @@ public final class AppActivity extends Screen {
         int at = adapter.find(keep);
         if (at >= 0 && at != list.getSelectedItemPosition()) list.setSelection(at);
         else if (list.getSelectedItemPosition() < 0) list.setSelection(0);
+        // The run button greys once a run starts: the focus leaves it.
+        int now = list.getSelectedItemPosition();
+        if (now >= 0 && !adapter.isEnabled(now)) list.setSelection(selectable(now));
+    }
+
+    /** The nearest row the focus can rest on, below `from` first, else above. */
+    private int selectable(int from) {
+        for (int i = from + 1; i < adapter.getCount(); i++) if (adapter.isEnabled(i)) return i;
+        for (int i = from - 1; i >= 0; i--) if (adapter.isEnabled(i)) return i;
+        return 0;
     }
 
     private void press(int position) {
@@ -241,10 +251,11 @@ public final class AppActivity extends Screen {
             return false;
         }
 
+        /** The run button is passed over while it is greyed: OK would do nothing there. */
         @Override
         public boolean isEnabled(int position) {
             int type = getItemViewType(position);
-            return type == GROW || type == RUN || type == FINDING;
+            return type == GROW || type == RUN && running() == null || type == FINDING;
         }
 
         @Override

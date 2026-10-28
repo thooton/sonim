@@ -40,6 +40,8 @@ public final class FindingActivity extends Screen {
     private LinearLayout page;
     private Button up;
     private Button down;
+    /** An OK that went down while the buttons were scrolled off, so its up is swallowed too. */
+    private boolean okHidden;
     /** Screenshots already drawn, by name, so a redraw doesn't fetch them again. */
     private final java.util.Map<String, Bitmap> shots = new java.util.HashMap<>();
 
@@ -198,6 +200,19 @@ public final class FindingActivity extends Screen {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int key = event.getKeyCode();
+        // OK gives a verdict only while its button is on screen; scrolled
+        // off, OK brings the buttons back into view instead.
+        if (Ui.isOk(key) && up != null) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) okHidden = !buttonsShown();
+            if (okHidden) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    okHidden = false;
+                    View row = (View) up.getParent();
+                    scroll.smoothScrollTo(0, Math.max(0, row.getBottom() + dp(6) - scroll.getHeight()));
+                }
+                return true;
+            }
+        }
         if (key == KeyEvent.KEYCODE_DPAD_DOWN || key == KeyEvent.KEYCODE_DPAD_UP) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 scroll.scrollBy(0, key == KeyEvent.KEYCODE_DPAD_DOWN ? dp(48) : -dp(48));
@@ -205,6 +220,12 @@ public final class FindingActivity extends Screen {
             return true;
         }
         return super.dispatchKeyEvent(event);
+    }
+
+    private boolean buttonsShown() {
+        View row = (View) up.getParent();
+        int y = scroll.getScrollY();
+        return row.getTop() >= y && row.getBottom() <= y + scroll.getHeight();
     }
 
     @Override
