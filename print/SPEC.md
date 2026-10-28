@@ -35,10 +35,9 @@ goes back one screen, and on Home leaves the app. Menu (or the left soft
 key) opens Options when the screen offers any, and does nothing otherwise;
 Menu again closes Options. Exactly one thing is focused on every screen.
 
-Dialogs: a choice dialog is a white card over the dimmed screen with radio
-rows, the saved value marked and focused; OK picks, Back closes and changes
-nothing. A question ("Cancel this print job?") has two buttons with the
-safe one ("Keep printing", "Keep") focused.
+A choice dialog has radio rows with the saved value marked and focused; OK
+picks, Back changes nothing. A question ("Cancel this print job?") has two
+buttons, the safe one ("Keep printing", "Keep") focused.
 
 ### Home
 
@@ -262,8 +261,7 @@ default by the phone's country). "App": Vibrate when done (switch, on by
 default), Help, About ("Version x.y.z", not focusable). OK flips a switch
 or opens a choice. Jobs already queued keep what they were sent with.
 
-Help: the keys in brief (1 to 6, 0, number keys, Menu, ◀ ▶, *, Back) and
-a paragraph on how printers are found. Up/Down scroll; Back goes back.
+Help lists the keys in brief and how printers are found.
 
 ## Behaviour
 
@@ -283,18 +281,15 @@ a paragraph on how printers are found. Up/Down scroll; Back goes back.
   (PDF over IPP → PWG → URF → PCLm → PostScript → PCL; IPP → 9100 → LPD).
 - All traffic is bound to the Wi-Fi, even one without internet. No
   internet is ever used. Offline (Wi-Fi off) shows the Wi-Fi is off screen.
-- Opening a PDF from another app ("Open with") goes straight to Preview;
-  a content link is copied into the app's cache first.
-- Permissions: storage (asked on 1 or opening a file), location (asked
-  once, for the Wi-Fi's name only).
+- "Open with" from another app goes straight to Preview (a content link
+  is copied into the cache first). Permissions: storage (asked on 1),
+  location (asked once, only for the Wi-Fi's name).
 
 ## Look
 
-Print does not use the family look in DESIGN.md: it is drawn to its own
-design proposal, Keypad Grid (light grey top bar with a blue "‹ Back",
-coloured numbered tiles, Source Sans 3 bundled, blue focus outlines;
-colours and sizes in `Look`, parts in `Parts`). Text sizes are in sp, so a
-larger system font grows them. Portrait only.
+Not the family look of DESIGN.md: its own design, Keypad Grid (grey top
+bar with blue "‹ Back", coloured numbered tiles, bundled Source Sans 3,
+blue focus outlines; `Look`, `Parts`). Text in sp; portrait only.
 
 ## Open questions
 
