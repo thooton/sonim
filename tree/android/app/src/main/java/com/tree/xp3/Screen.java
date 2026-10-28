@@ -2,13 +2,11 @@ package com.tree.xp3;
 
 import android.app.AlertDialog;
 import android.os.Bundle;
-import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -17,9 +15,9 @@ import android.widget.TextView;
 
 import com.tree.xp3.qa.Center;
 import com.tree.xp3.qa.Qa;
-import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Family;
+import com.xp3.common.ui.Logins;
 import com.xp3.common.ui.Ui;
 
 import java.util.List;
@@ -251,41 +249,12 @@ abstract class Screen extends BaseActivity {
 
     /** The fallback for a build without a bundled login: the address and the token, typed. */
     protected final void askLogin() {
-        LinearLayout box = vertical();
-        int pad = dp(16);
-        box.setPadding(pad, pad / 2, pad, 0);
-        final Login login = Tree.login;
-        final EditText server = new EditText(this);
-        server.setHint("https://…");
-        server.setSingleLine(true);
-        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(login.server() == null ? "" : login.server());
-        final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "••••••••" : "Token");
-        token.setSingleLine(true);
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        box.addView(server);
-        box.addView(token);
-        new AlertDialog.Builder(this)
-            .setTitle("Command center")
-            .setView(box)
-            .setPositiveButton("Save", (dialog, which) -> {
-                String typed = token.getText().toString();
-                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                try {
-                    Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                    Tree.saveLogin(this, next);
-                    toast("Saved: " + next.host());
-                    loggedIn();
-                } catch (IllegalArgumentException e) {
-                    toast(e.getMessage());
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
+        Logins.ask(this, Tree.login, next -> {
+            Tree.saveLogin(this, next);
+            toast("Saved: " + next.host());
+            loggedIn();
+        }, this::toast);
     }
-
     /** After a login is typed in. */
     protected void loggedIn() {}
 }
