@@ -3,6 +3,7 @@ package com.list.xp3;
 import android.app.Dialog;
 import android.os.Bundle;
 import android.text.Editable;
+import android.text.Layout;
 import android.text.TextWatcher;
 import android.view.ContextMenu;
 import android.view.Gravity;
@@ -196,6 +197,7 @@ public final class MainActivity extends BaseActivity {
         if (row.type == ItemAdapter.COMPLETED) {
             showCompleted = !showCompleted;
             showRows(position);
+            if (showCompleted) listView.post(() -> revealBelow(position));
             return;
         }
         Checklist list = backend.checklist();
@@ -203,6 +205,23 @@ public final class MainActivity extends BaseActivity {
         list.toggle(row.index);
         saveList();
         showRows(position);
+    }
+
+    /**
+     * Once the list has laid out the opened Completed card, scrolls it so the
+     * first finished task shows under the heading, which keeps the highlight.
+     * Opened at the bottom of the screen, the card would otherwise seem not
+     * to have opened at all.
+     */
+    private void revealBelow(int position) {
+        View heading = rowView(position);
+        if (heading == null || listAdapter.getSelectedPosition() != position) return;
+        View next = rowView(position + 1);
+        int below = next != null ? next.getHeight() : heading.getHeight();
+        int bottom = listView.getHeight() - listView.getPaddingBottom();
+        if (heading.getBottom() + below <= bottom) return;
+        listView.setSelectionFromTop(position,
+            Math.max(listView.getPaddingTop(), bottom - below - heading.getHeight()));
     }
 
     private void itemAction(int action, final int row, final int index, final Item chosen) {
@@ -334,6 +353,16 @@ public final class MainActivity extends BaseActivity {
             }
         };
         field.setOnKeyListener((view, keyCode, event) -> {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                // Down from the last line goes on to Save; on earlier lines
+                // it moves the cursor down as usual.
+                Layout layout = field.getLayout();
+                if (layout != null && layout.getLineForOffset(field.getSelectionEnd()) < layout.getLineCount() - 1) {
+                    return false;
+                }
+                if (event.getAction() == KeyEvent.ACTION_DOWN) save.requestFocus();
+                return true;
+            }
             if (!Ui.isOk(keyCode)) return false;
             if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                 consumedOkDownTime = event.getDownTime();
@@ -347,10 +376,10 @@ public final class MainActivity extends BaseActivity {
             return true;
         });
         save.setOnClickListener(view -> commit.run());
-        // Save is greyed out while there is nothing to save.
+        // Save is greyed out while there is nothing to save. It stays enabled so
+        // Down can still reach it; commit ignores blank text.
         final Runnable paintSave = () -> {
             boolean ready = field.getText().toString().trim().length() > 0;
-            save.setEnabled(ready);
             save.setTextColor(color(ready ? R.color.accent : R.color.save_off));
         };
         paintSave.run();
