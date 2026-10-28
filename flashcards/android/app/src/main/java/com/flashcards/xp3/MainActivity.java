@@ -792,6 +792,21 @@ public final class MainActivity extends BaseActivity {
         review.requestFocus();
     }
 
+    /** Menu on a card: Remove from deck takes it out here, and the next sync everywhere. */
+    private void cardMenu() {
+        final DeckCard card = session(open).current();
+        if (card == null || review == null) return;
+        final ReviewPane shown = review;
+        listDialog("Card", Arrays.asList("Remove from deck"), at -> {
+            if (screen != Screen.REVIEW || review != shown || session(open).current() != card) return;
+            collection.remove(card, System.currentTimeMillis());
+            save();
+            sync();
+            toast("Removed from " + open.name);
+            review.showNext();
+        }, null);
+    }
+
     // ---------------------------------------------------------------------
     // A deck's options
 
@@ -834,6 +849,7 @@ public final class MainActivity extends BaseActivity {
         if (keyCode == KeyEvent.KEYCODE_MENU && !event.isCanceled()) {
             if (screen == Screen.DECKS) deckMenu(null);
             else if (screen == Screen.OVERVIEW) deckMenu(open);
+            else if (screen == Screen.REVIEW) cardMenu();
             return true;
         }
         return super.onKeyUp(keyCode, event);

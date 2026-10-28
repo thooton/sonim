@@ -21,7 +21,8 @@ import io.github.openspacedrepetition.State;
  * a rule and the back; and under it Anki's bottom bar, the queue counts
  * over Show Answer, then the four answer buttons, each under the interval
  * it gives and labelled with its key. OK shows the answer; only 1 to 4
- * answer, Again, Hard, Good and Easy.
+ * answer, Again, Hard, Good and Easy. Menu > Remove from deck (the
+ * activity's) takes the card out and shows the next.
  */
 final class ReviewPane extends LinearLayout {
 

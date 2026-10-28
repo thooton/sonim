@@ -73,7 +73,8 @@ The tablet's `session.earliest` is the same rule.
   - `sync/Center`: `POST /flashcards/sync`, and pairing.
 - `android/app`: `MainActivity` (deck list, overview, sync, the
   login), `ReviewPane` (the reviewer: OK shows the answer; only 1 to 4
-  answer, each button labelled with its key), `OptionsPane` (New cards/day: Left and Right step
+  answer, each button labelled with its key; Menu > Remove from deck takes
+  the card out, see Removing), `OptionsPane` (New cards/day: Left and Right step
   it, digits type it, below 0 is Auto, Back keeps it), `StatsPane` (Anki's
   Statistics window: Stats beside Options and in Menu; the deck's or, with
   Left and Right, the collection's; Up and Down scroll; Card Counts' pie and
@@ -93,6 +94,13 @@ milliseconds when it last changed, and a dirty flag until the command
 center has it; where the phone and the tablet both changed a card, the
 later change wins, except for a card's text, which only the command center changes (`PATCH /flashcards/cards/{id}`): a sync takes corrected text into the card's `def`. The phone sends its time zone (`zone`) too, so the
 tablet, which keeps UTC, rolls the day over at 4am here.
+
+**Removing.** On a card, Menu > Remove from deck takes it out of the deck
+at once, without asking (`Collection.remove`); the collection keeps it
+aside, written in the file as itself with `deleted`, until a sync has taken
+it to the command center, which keeps it as a tombstone so the tablet drops
+it too. The tablet can't remove cards itself. A removal wins over any
+answer, made here or on the tablet, before it or after.
 
 **Import.** Menu > Import (on the deck list or a deck's overview) lists
 the `.fkv` files in Documents and Download, on the SD card and the phone,

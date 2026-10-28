@@ -21,6 +21,11 @@ import java.util.Map;
  * sends the dirty records ({@link #outgoing}) with the `usn` last seen, and
  * takes back what changed there ({@link #apply}): where both sides changed a
  * record, the later `mod` wins, as on the command center.
+ *
+ * A card removed from its deck ({@link #remove}) is gone from here at once,
+ * and kept aside only until a sync has taken it to the command center as a
+ * tombstone (`deleted`), which every device then drops. A removal wins over
+ * any answer, wherever it was made.
  */
 public final class Collection {
 
@@ -35,6 +40,9 @@ public final class Collection {
     private final Map<String, Deck> decksById = new LinkedHashMap<>();
     private final Map<String, DeckCard> cardsById = new LinkedHashMap<>();
     private final Map<String, String> deckOf = new LinkedHashMap<>();
+    /** Cards removed here that the command center hasn't heard of yet, by id. */
+    private final Map<String, DeckCard> removed = new LinkedHashMap<>();
+    private final Map<String, String> removedFrom = new LinkedHashMap<>();
 
     public List<Deck> decks() {
         return decks;
@@ -56,7 +64,7 @@ public final class Collection {
         for (DeckCard card : cardsById.values()) {
             if (card.dirty) return true;
         }
-        return false;
+        return !removed.isEmpty();
     }
 
     /** Adds a deck, with its cards, that this device brings (the bundled one). */
@@ -123,6 +131,28 @@ public final class Collection {
         return false;
     }
 
+    /**
+     * Removes a card from its deck (Menu > Remove from deck): it is gone here
+     * at once, and the next sync takes the removal to the command center and
+     * from there to the tablet.
+     */
+    public void remove(DeckCard card, long nowMillis) {
+        String id = card.def.identity;
+        String deckId = deckOf.remove(id);
+        if (deckId == null || cardsById.remove(id) == null) return;
+        decksById.get(deckId).remove(card);
+        touch(card, nowMillis);
+        removed.put(id, card);
+        removedFrom.put(id, deckId);
+    }
+
+    /** Takes a card out of this copy, as a removal elsewhere does. */
+    private void drop(String id) {
+        DeckCard card = cardsById.remove(id);
+        String deckId = deckOf.remove(id);
+        if (card != null && deckId != null) decksById.get(deckId).remove(card);
+    }
+
     /** Marks a deck's setting changed, to be sent at the next sync. */
     public static void touch(Deck deck, long nowMillis) {
         deck.mod = Math.max(nowMillis, deck.mod + 1);
@@ -143,6 +173,7 @@ public final class Collection {
         public final String body;
         final Map<String, Long> deckMods = new LinkedHashMap<>();
         final Map<String, Long> cardMods = new LinkedHashMap<>();
+        final Map<String, Long> removedMods = new LinkedHashMap<>();
 
         Outgoing(Collection from) {
             List<Object> decks = new ArrayList<>();
@@ -157,6 +188,10 @@ public final class Collection {
                 if (!card.dirty) continue;
                 cards.add(cardJson(card, from.deckOf.get(e.getKey()), false));
                 cardMods.put(card.def.identity, card.mod);
+            }
+            for (Map.Entry<String, DeckCard> e : from.removed.entrySet()) {
+                cards.add(tombstone(e.getValue(), from.removedFrom.get(e.getKey()), false));
+                removedMods.put(e.getKey(), e.getValue().mod);
             }
             Map<String, Object> body = Json.map("usn", from.usn, "decks", decks, "cards", cards);
             if (from.zone != null) body.put("zone", from.zone);
@@ -184,7 +219,16 @@ public final class Collection {
             DeckCard card = cardsById.get(e.getKey());
             if (card != null && card.mod == e.getValue()) card.dirty = false;
         }
+        // Merged while the removals are still kept aside, so an answer
+        // coming back for a removed card can't bring it back.
         merge(root, false);
+        for (Map.Entry<String, Long> e : sent.removedMods.entrySet()) {
+            DeckCard card = removed.get(e.getKey());
+            if (card != null && card.mod == e.getValue()) {
+                removed.remove(e.getKey());
+                removedFrom.remove(e.getKey());
+            }
+        }
         usn = longOf(root, "usn", usn);
     }
 
@@ -218,6 +262,21 @@ public final class Collection {
             Map<String, Object> c = Json.object(item);
             String id = Json.text(c, "id");
             String deckId = Json.text(c, "deck");
+            if (id == null || removed.containsKey(id)) continue;
+            if (Json.flag(c, "deleted")) {
+                if (local && Json.flag(c, "dirty")) {
+                    // Removed here, not yet sent.
+                    Card fsrs = fsrsOf(c, DeckCard.idFor(id));
+                    if (fsrs == null || deckId == null) continue;
+                    DeckCard card = new DeckCard(new CardDef(text(c, "front"), text(c, "back"), text(c, "aux"), id), fsrs);
+                    card.mod = longOf(c, "mod", 0);
+                    removed.put(id, card);
+                    removedFrom.put(id, deckId);
+                } else {
+                    drop(id);
+                }
+                continue;
+            }
             Deck deck = deckId == null ? null : decksById.get(deckId);
             Card fsrs = id == null ? null : fsrsOf(c, DeckCard.idFor(id));
             if (deck == null || fsrs == null) continue;
@@ -257,6 +316,9 @@ public final class Collection {
         for (Deck deck : this.decks) {
             decks.add(deckJson(deck, true));
             for (DeckCard card : deck.cards()) cards.add(cardJson(card, deck.id, true));
+        }
+        for (Map.Entry<String, DeckCard> e : removed.entrySet()) {
+            cards.add(tombstone(e.getValue(), removedFrom.get(e.getKey()), true));
         }
         return Json.write(Json.map("usn", usn, "decks", decks, "cards", cards));
     }
@@ -298,6 +360,14 @@ public final class Collection {
             "intro", card.intro,
             "mod", card.mod);
         if (local && card.dirty) c.put("dirty", true);
+        return c;
+    }
+
+    /** A removed card as a sync sends it, and as the file keeps it until then. */
+    private static Map<String, Object> tombstone(DeckCard card, String deckId, boolean local) {
+        Map<String, Object> c = cardJson(card, deckId, false);
+        c.put("deleted", true);
+        if (local) c.put("dirty", true);
         return c;
     }
 

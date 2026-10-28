@@ -70,6 +70,12 @@ public final class Deck {
         cards.add(card);
     }
 
+    /** Takes a card out (Menu > Remove from deck). */
+    void remove(DeckCard card) {
+        byId.remove(id(card.def));
+        cards.remove(card);
+    }
+
     void sort() {
         Collections.sort(cards, (a, b) -> Integer.compare(a.ord, b.ord));
     }

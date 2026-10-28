@@ -33,6 +33,44 @@ public final class SyncTests {
         reviewAhead(c);
         correctedText(c);
         importedDeck(c);
+        removedCard(c);
+    }
+
+    private static void removedCard(Check c) {
+        c.run("a removed card is gone, and its removal goes out", () -> {
+            Collection one = bundled(3);
+            one.apply(Json.write(Json.map("usn", 1L)), one.outgoing());
+            Deck deck = one.decks().get(0);
+            DeckCard gone = deck.cards().get(1);
+            one.remove(gone, 9000L);
+            c.same("out of the deck", 2, deck.size());
+            c.ok("not looked up", deck.byId("id1") == null);
+            c.same("not counted", 2, one.cardCount());
+            Collection kept = Collection.read(one.write());
+            c.same("still gone in the file", 2, kept.decks().get(0).size());
+            c.ok("still to send", kept.dirty());
+            Collection.Outgoing sent = kept.outgoing();
+            List<Object> cards = Json.children(Json.object(Json.parse(sent.body)), "cards");
+            c.same("sent once", 1, cards.size());
+            Map<String, Object> tomb = Json.object(cards.get(0));
+            c.same("as itself", "id1", Json.text(tomb, "id"));
+            c.ok("removed", Json.flag(tomb, "deleted"));
+            // The command center sends back an answer the tablet made meanwhile.
+            kept.apply(Json.write(Json.map("usn", 2L, "decks", Json.list(),
+                "cards", Json.list(Json.object(Json.parse(cardJson("id1", 2, 99_000L)))))), sent);
+            c.same("the removal wins", 2, kept.decks().get(0).size());
+            c.ok("sent", !kept.dirty());
+
+            Map<String, Object> elsewhere = Json.object(Json.parse(cardJson("id0", 1, 0L)));
+            elsewhere.put("deleted", true);
+            Deck mine = kept.decks().get(0);
+            ReviewSession s = new ReviewSession(mine, ZoneOffset.UTC);
+            s.next(NOON);
+            s.rate(3, NOON);
+            kept.apply(Json.write(Json.map("usn", 3L, "decks", Json.list(), "cards", Json.list(elsewhere))), kept.outgoing());
+            c.same("removed elsewhere, though answered here", 1, mine.size());
+            c.same("what is left", "id2", mine.cards().get(0).def.identity);
+        });
     }
 
     private static void importedDeck(Check c) {
