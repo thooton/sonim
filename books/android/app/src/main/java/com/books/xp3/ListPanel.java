@@ -11,6 +11,7 @@ import android.text.TextUtils;
 import android.view.View;
 
 import java.util.ArrayList;
+import com.xp3.common.ui.Ui;
 import java.util.List;
 
 /**
@@ -406,6 +407,6 @@ final class ListPanel extends View {
     }
 
     private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(getContext(), value);
     }
 }

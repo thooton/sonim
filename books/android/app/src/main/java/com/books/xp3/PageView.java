@@ -9,6 +9,7 @@ import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.text.TextPaint;
 import android.text.TextUtils;
+import com.xp3.common.ui.Ui;
 import android.view.View;
 
 /**
@@ -216,6 +217,6 @@ final class PageView extends View {
     }
 
     private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(getContext(), value);
     }
 }
