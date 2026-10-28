@@ -96,7 +96,9 @@ later change wins, except for a card's text, which only the command center chang
 tablet, which keeps UTC, rolls the day over at 4am here.
 
 **Removing.** On a card, Menu > Remove from deck takes it out of the deck
-at once, without asking (`Collection.remove`); the collection keeps it
+at once, without asking (`Collection.remove`), and is saved and synced
+later, as an answer is, so the next card shows without waiting on the
+whole file being written; the collection keeps it
 aside, written in the file as itself with `deleted`, until a sync has taken
 it to the command center, which keeps it as a tombstone so the tablet drops
 it too. The tablet can't remove cards itself. A removal wins over any

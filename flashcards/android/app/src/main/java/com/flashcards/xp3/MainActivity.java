@@ -800,10 +800,11 @@ public final class MainActivity extends BaseActivity {
         listDialog("Card", Arrays.asList("Remove from deck"), at -> {
             if (screen != Screen.REVIEW || review != shown || session(open).current() != card) return;
             collection.remove(card, System.currentTimeMillis());
-            save();
-            sync();
-            toast("Removed from " + open.name);
             review.showNext();
+            toast("Removed from " + open.name);
+            // Saved and synced as an answer is: later, off the key press.
+            later(saveSoon, SAVE_AFTER_MS);
+            later(syncSoon, SYNC_AFTER_MS);
         }, null);
     }
 
