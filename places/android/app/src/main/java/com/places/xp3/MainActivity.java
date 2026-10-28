@@ -212,7 +212,8 @@ public final class MainActivity extends BaseActivity {
 
     @Override
     protected void onPause() {
-        saveNear();
+        // Mid-edit, the saved Near stays what it was: Back can still drop the edit.
+        if (zone != Zone.NEAR) saveNear();
         super.onPause();
     }
 
@@ -913,7 +914,7 @@ public final class MainActivity extends BaseActivity {
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);
         box.addView(token);
-        new AlertDialog.Builder(this)
+        final AlertDialog asked = new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
             .setPositiveButton("Save", (dialog, which) -> {
@@ -933,6 +934,17 @@ public final class MainActivity extends BaseActivity {
             })
             .setNegativeButton("Cancel", null)
             .show();
+        // Down goes on to the next field, then to Save, as in the app's lists.
+        downTo(server, token);
+        downTo(token, asked.getButton(AlertDialog.BUTTON_POSITIVE));
+    }
+
+    private static void downTo(View from, final View to) {
+        from.setOnKeyListener((v, key, event) -> {
+            if (key != KeyEvent.KEYCODE_DPAD_DOWN || to == null) return false;
+            if (event.getAction() == KeyEvent.ACTION_DOWN) to.requestFocus();
+            return true;
+        });
     }
 
     private android.graphics.drawable.GradientDrawable circle(int fill) {

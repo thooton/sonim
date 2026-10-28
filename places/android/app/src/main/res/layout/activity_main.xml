@@ -28,13 +28,13 @@
                 android:layout_height="20dp"
                 android:layout_marginRight="10dp"
                 android:importantForAccessibility="no" />
-            <EditText
+            <com.places.xp3.Field
                 android:id="@+id/query"
                 style="@style/HeaderField"
                 android:hint="@string/hint_query"
                 android:imeOptions="actionSearch|flagNoExtractUi"
                 android:inputType="textCapSentences" />
-            <EditText
+            <com.places.xp3.Field
                 android:id="@+id/near"
                 style="@style/HeaderField"
                 android:hint="@string/hint_near"

@@ -190,7 +190,7 @@ even if it is already open; an open place page is closed first). It shows
 - **Survives a restart** (SharedPreferences `places`): login, Near and its
   point, Open now, Top rated, up to 12 recent searches (newest first, a
   repeat moved to the top, compared ignoring case). Near is also saved
-  when the app is paused.
+  when the app is paused, unless it is being edited.
 - **Kept in memory only**: the key, the results, fetched details (by id),
   and photos (fetched 240px wide, about 10 MB kept). Leaving the app loses
   them.
