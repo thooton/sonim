@@ -8,27 +8,25 @@ import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
-import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
+import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.MetricAffectingSpan;
-import android.text.TextPaint;
-import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -39,6 +37,7 @@ import android.widget.TextView;
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Logins;
 import com.xp3.common.ui.Ui;
 
 import java.io.File;
@@ -139,7 +138,7 @@ public final class MainActivity extends BaseActivity {
         setContentView(root);
 
         accounts = readCache();
-        login = loadLogin(prefs());
+        login = Logins.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         show();
         if (login.ready()) sync();
         else askLogin();
@@ -602,8 +601,20 @@ public final class MainActivity extends BaseActivity {
 
     // The command center.
 
-    private void sync() {
-        if (!login.ready()) return;
+    private interface VaultCall {
+        List<Account> call(Vault vault) throws Exception;
+    }
+
+    private interface Answer {
+        void got(List<Account> fresh, String failure);
+    }
+
+    /**
+     * Runs `call` on the command center's vault off the main thread, keeps
+     * the accounts it comes back with, and hands them (or, when it failed,
+     * null and why) to `then` on the main thread.
+     */
+    private void vault(VaultCall call, Answer then) {
         busy++;
         show();
         final Login using = login;
@@ -611,7 +622,7 @@ public final class MainActivity extends BaseActivity {
             List<Account> fresh = null;
             String failure = null;
             try {
-                fresh = new Vault(using).list();
+                fresh = call.call(new Vault(using));
                 writeCache(fresh);
             } catch (Exception e) {
                 failure = message(e);
@@ -620,19 +631,33 @@ public final class MainActivity extends BaseActivity {
             final String failed = failure;
             runOnUiThread(() -> {
                 busy--;
-                error = failed;
-                if (got != null) {
-                    String keep = selected() == null ? null : selected().secret;
-                    accounts = got;
-                    synced = System.currentTimeMillis();
-                    show();
-                    logos.keep(accounts);
-                    if (keep != null) select(keep);
-                } else {
-                    show();
-                }
+                then.got(got, failed);
             });
         });
+    }
+
+    private void sync() {
+        if (!login.ready()) return;
+        vault(Vault::list, (got, failed) -> {
+            error = failed;
+            if (got != null) {
+                String keep = selected() == null ? null : selected().secret;
+                accounts = got;
+                synced = System.currentTimeMillis();
+                show();
+                logos.keep(accounts);
+                if (keep != null) select(keep);
+            } else {
+                show();
+            }
+        });
+    }
+
+    /** What was typed couldn't be saved: back to the entry form, as it was. */
+    private void refused(String failed) {
+        show();
+        toast(failed);
+        reopen();
     }
 
     private void add(final List<Account> found) {
@@ -642,40 +667,22 @@ public final class MainActivity extends BaseActivity {
         }
         final Set<String> had = new HashSet<>();
         for (Account account : accounts) had.add(account.secret);
-        busy++;
-        show();
-        final Login using = login;
-        worker.execute(() -> {
-            List<Account> fresh = null;
-            String failure = null;
-            try {
-                fresh = new Vault(using).add(found);
-                writeCache(fresh);
-            } catch (Exception e) {
-                failure = message(e);
+        vault(vault -> vault.add(found), (got, failed) -> {
+            if (got == null) {
+                refused(failed);
+                return;
             }
-            final List<Account> got = fresh;
-            final String failed = failure;
-            runOnUiThread(() -> {
-                busy--;
-                if (got == null) {
-                    show();
-                    toast(failed);
-                    reopen();
-                    return;
-                }
-                unsaved = null;
-                accounts = got;
-                error = null;
-                synced = System.currentTimeMillis();
-                show();
-                int added = 0;
-                for (Account account : found) if (!had.contains(account.secret)) added++;
-                Account first = found.get(0);
-                if (added == 0) toast(found.size() == 1 ? first.title() + " is already here" : "These are already here");
-                else toast(added == 1 ? "Added " + first.title() : "Added " + added + " accounts");
-                select(first.secret);
-            });
+            unsaved = null;
+            accounts = got;
+            error = null;
+            synced = System.currentTimeMillis();
+            show();
+            int added = 0;
+            for (Account account : found) if (!had.contains(account.secret)) added++;
+            Account first = found.get(0);
+            if (added == 0) toast(found.size() == 1 ? first.title() + " is already here" : "These are already here");
+            else toast(added == 1 ? "Added " + first.title() : "Added " + added + " accounts");
+            select(first.secret);
         });
     }
 
@@ -684,37 +691,19 @@ public final class MainActivity extends BaseActivity {
             askLogin();
             return;
         }
-        busy++;
-        show();
-        final Login using = login;
-        worker.execute(() -> {
-            List<Account> fresh = null;
-            String failure = null;
-            try {
-                fresh = new Vault(using).update(changed);
-                writeCache(fresh);
-            } catch (Exception e) {
-                failure = message(e);
+        vault(vault -> vault.update(changed), (got, failed) -> {
+            if (got == null) {
+                refused(failed);
+                return;
             }
-            final List<Account> got = fresh;
-            final String failed = failure;
-            runOnUiThread(() -> {
-                busy--;
-                if (got == null) {
-                    show();
-                    toast(failed);
-                    reopen();
-                    return;
-                }
-                unsaved = null;
-                accounts = got;
-                error = null;
-                synced = System.currentTimeMillis();
-                show();
-                logos.keep(accounts);
-                toast("Saved " + changed.title());
-                select(changed.secret);
-            });
+            unsaved = null;
+            accounts = got;
+            error = null;
+            synced = System.currentTimeMillis();
+            show();
+            logos.keep(accounts);
+            toast("Saved " + changed.title());
+            select(changed.secret);
         });
     }
 
@@ -731,33 +720,17 @@ public final class MainActivity extends BaseActivity {
     private void delete(final Account account) {
         if (account.id == null) return;
         final int at = list.getSelectedItemPosition();
-        busy++;
-        show();
-        final Login using = login;
-        worker.execute(() -> {
-            List<Account> fresh = null;
-            String failure = null;
-            try {
-                fresh = new Vault(using).remove(account.id);
-                writeCache(fresh);
-            } catch (Exception e) {
-                failure = message(e);
-            }
-            final List<Account> got = fresh;
-            final String failed = failure;
-            runOnUiThread(() -> {
-                busy--;
-                if (got == null) {
-                    show();
-                    toast(failed);
-                    return;
-                }
-                accounts = got;
+        vault(vault -> vault.remove(account.id), (got, failed) -> {
+            if (got == null) {
                 show();
-                logos.keep(accounts);
-                if (!accounts.isEmpty()) list.setSelection(Math.max(0, Math.min(at, accounts.size() - 1)));
-                toast("Deleted " + account.title());
-            });
+                toast(failed);
+                return;
+            }
+            accounts = got;
+            show();
+            logos.keep(accounts);
+            if (!accounts.isEmpty()) list.setSelection(Math.max(0, Math.min(at, accounts.size() - 1)));
+            toast("Deleted " + account.title());
         });
     }
 
@@ -790,86 +763,19 @@ public final class MainActivity extends BaseActivity {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
     }
 
-    /**
-     * The bundled login is adopted once per build that carries a new one;
-     * otherwise whatever was saved (typed in from the menu) is kept.
-     */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
-
     /** The fallback for a build without a bundled login. */
     private void askLogin() {
-        LinearLayout box = vertical();
-        int pad = dp(16);
-        box.setPadding(pad, pad / 2, pad, 0);
-        final EditText server = new EditText(this);
-        server.setHint("https://…");
-        server.setSingleLine(true);
-        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(login.server() == null ? "" : login.server());
-        final EditText token = new EditText(this);
-        token.setHint(login.ready() ? "••••••••" : "Token");
-        token.setSingleLine(true);
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        box.addView(server);
-        box.addView(token);
         // Taken by Save; otherwise what the entry form gave back goes back to it.
         final boolean[] saved = {false};
-        AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle("Command center")
-            .setView(box)
-            .setPositiveButton("Save", (shown, which) -> {
-                String typed = token.getText().toString();
-                if (typed.trim().length() == 0 && login.ready()) typed = login.token();
-                try {
-                    Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
-                    login = next;
-                    prefs().edit().putString("login", next.toJson()).apply();
-                    toast("Saved: " + next.host());
-                    saved[0] = true;
-                    sync();
-                    if (unsaved != null) entered();
-                } catch (IllegalArgumentException e) {
-                    toast(e.getMessage());
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .setOnDismissListener(gone -> {
-                if (!saved[0]) reopen();
-            })
-            .show();
-        // A single-line field keeps Up and Down to itself; these go between
-        // the fields and on to the buttons.
-        server.setOnKeyListener((view, keyCode, event) -> {
-            if (keyCode != KeyEvent.KEYCODE_DPAD_DOWN) return false;
-            if (event.getAction() == KeyEvent.ACTION_DOWN) token.requestFocus();
-            return true;
-        });
-        token.setOnKeyListener((view, keyCode, event) -> {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) server.requestFocus();
-                return true;
-            }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) dialog.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus();
-                return true;
-            }
-            return false;
+        Logins.ask(this, login, next -> {
+            login = next;
+            Logins.save(prefs(), next);
+            toast("Saved: " + next.host());
+            saved[0] = true;
+            sync();
+            if (unsaved != null) entered();
+        }, this::toast).setOnDismissListener(gone -> {
+            if (!saved[0]) reopen();
         });
     }
 }
