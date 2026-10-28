@@ -128,12 +128,14 @@ prediction is on. The field shows up to four lines and wraps long text.
   blank, and closes the sheet. With blank text nothing happens and the
   sheet stays. The OK release does not tick the task underneath.
 - **Down** from the field reaches Save; OK on Save saves.
-- **Back**: closes the sheet without saving; the list is unchanged.
+- **Back**: closes the sheet without saving, in one press, wherever focus
+  is (even while the keyboard counts as shown); the list is unchanged.
 - Surrounding spaces are trimmed and runs of whitespace become one space.
 - Text over 500 characters is refused with the toast "An item can be at
   most 500 characters", and the sheet closes without saving.
-- When the list already holds 500 items, adding or inserting is refused
-  with the toast "The list is full".
+- When the list already holds 500 items, Add a task and Insert above /
+  below are refused with the toast "The list is full", before the sheet
+  opens.
 
 ## Behaviour
 
