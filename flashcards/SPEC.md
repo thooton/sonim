@@ -101,6 +101,8 @@ The app opens on the deck list. There is no header naming the app.
 - Review Ahead serves studied cards not yet due, lowest predicted recall
   first (then earliest due), never the same card twice running, and goes
   on until Back. A deck with one studied card ends Review Ahead after it.
+  Its bar counts the deck's studied cards as reviews (those in learning as
+  learning), as Anki's filtered deck counts the cards it holds.
 
 ### Options
 
@@ -143,7 +145,8 @@ The app opens on the deck list. There is no header naming the app.
 - Command center (from Menu): an address field and a password-style token
   field (dots shown when one is saved), Save and Cancel. Save with an empty
   token keeps the saved one; with either missing, a toast says `Both the
-  address and the token are needed`.
+  address and the token are needed`. Down and Up move between the two
+  fields and the buttons.
 
 ## Behaviour
 
@@ -185,7 +188,8 @@ app asks the command center for a pairing code and shows `PAIRING CODE`,
 the code in large letters, and `Delta, Tablet` (where to type it), or `…`
 while asking. It polls every 3 s while the app is in front; once the code
 is typed on the website it saves the token and syncs. An expired code or a
-failed request shows the reason in red with a `Try Again` button.
+failed request shows the reason in red with a `Try Again` button
+(`No connection` when the network fails). The panel's lines are centred.
 
 **Import.** Reads `.fkv` files from Documents and Download, on the SD card
 and the phone. A good file becomes a new deck named after the file (` (2)`,
