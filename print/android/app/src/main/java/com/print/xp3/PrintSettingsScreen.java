@@ -9,6 +9,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import com.print.xp3.raster.Frame;
 import java.util.ArrayList;
+import com.xp3.common.ui.Ui;
 import java.util.List;
 
 /**
@@ -54,9 +55,9 @@ final class PrintSettingsScreen extends Screen {
         stepper.addView(step(c, "◀"));
         copies = Look.text(c, "", 13, Look.BOLD, Look.INK);
         copies.setGravity(Gravity.CENTER);
-        copies.setMinWidth(Look.dp(c, 18));
+        copies.setMinWidth(Ui.dp(c, 18));
         LinearLayout.LayoutParams mid = Parts.line(Parts.WRAP, Parts.WRAP);
-        mid.leftMargin = mid.rightMargin = Look.dp(c, 6);
+        mid.leftMargin = mid.rightMargin = Ui.dp(c, 6);
         stepper.addView(copies, mid);
         stepper.addView(step(c, "▶"));
         copiesRow.trailing(stepper);
@@ -100,9 +101,9 @@ final class PrintSettingsScreen extends Screen {
         android.graphics.drawable.GradientDrawable circle = new android.graphics.drawable.GradientDrawable();
         circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
         circle.setColor(Look.WHITE);
-        circle.setStroke(Math.max(1, Look.dp(c, 1)), 0xFFBFD0F6);
+        circle.setStroke(Math.max(1, Ui.dp(c, 1)), 0xFFBFD0F6);
         view.setBackground(circle);
-        view.setLayoutParams(new LinearLayout.LayoutParams(Look.dp(c, 16), Look.dp(c, 16)));
+        view.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(c, 16), Ui.dp(c, 16)));
         return view;
     }
 

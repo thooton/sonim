@@ -16,6 +16,8 @@ import android.text.TextUtils;
 import android.util.TypedValue;
 import android.widget.TextView;
 
+import com.xp3.common.ui.Ui;
+
 /**
  * The Keypad Grid proposal's visual system (see AGENTS.md): its palette, its
  * one typeface in three weights, its type scale, and the focus styles it
@@ -73,10 +75,6 @@ final class Look {
         return weight == BOLD ? bold : weight == SEMIBOLD ? semibold : regular;
     }
 
-    static int dp(Context context, float value) {
-        return Math.round(value * context.getResources().getDisplayMetrics().density);
-    }
-
     static TextView text(Context context, CharSequence value, float size, int weight, int color) {
         TextView view = new TextView(context);
         style(view, size, weight, color);
@@ -108,13 +106,13 @@ final class Look {
     static GradientDrawable rounded(int fill, float radius, Context context) {
         GradientDrawable shape = new GradientDrawable();
         shape.setColor(fill);
-        shape.setCornerRadius(dp(context, radius));
+        shape.setCornerRadius(Ui.dp(context, radius));
         return shape;
     }
 
     static GradientDrawable outlined(int fill, float radius, float stroke, int strokeColor, Context context) {
         GradientDrawable shape = rounded(fill, radius, context);
-        shape.setStroke(Math.max(1, dp(context, stroke)), strokeColor);
+        shape.setStroke(Math.max(1, Ui.dp(context, stroke)), strokeColor);
         return shape;
     }
 
@@ -129,7 +127,7 @@ final class Look {
         private boolean on;
 
         RowFocus(Context context, int rest) {
-            this.edge = dp(context, 3);
+            this.edge = Ui.dp(context, 3);
             this.rest = rest;
         }
 
@@ -391,7 +389,7 @@ final class Look {
         GradientDrawable halo = on ? outlined(0xFFDCE7FD, 5, 0, 0, context) : rounded(0, 5, context);
         GradientDrawable edge = on ? outlined(WHITE, 3, 1.5f, BLUE, context) : outlined(WHITE, 3, 1, 0xFFB9BDC8, context);
         android.graphics.drawable.LayerDrawable both = new android.graphics.drawable.LayerDrawable(new Drawable[] {halo, edge});
-        int in = dp(context, 2);
+        int in = Ui.dp(context, 2);
         both.setLayerInset(1, in, in, in, in);
         return both;
     }

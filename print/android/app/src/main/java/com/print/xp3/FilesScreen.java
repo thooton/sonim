@@ -18,6 +18,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import com.xp3.common.ui.Ui;
 import java.util.Locale;
 
 /**
@@ -83,24 +84,24 @@ final class FilesScreen extends Screen {
         LinearLayout body = Parts.column(c);
 
         field = Parts.row(c);
-        field.setPadding(Look.dp(c, 8), 0, Look.dp(c, 8), 0);
+        field.setPadding(Ui.dp(c, 8), 0, Ui.dp(c, 8), 0);
         field.setDefaultFocusHighlightEnabled(false);
         field.addView(Parts.image(c, R.drawable.ic_search, Look.MUTE, 12));
         fieldText = Look.line(c, "Type to search", 11, Look.REGULAR, Look.MUTE);
         LinearLayout.LayoutParams lp = Parts.weighted();
-        lp.leftMargin = Look.dp(c, 6);
+        lp.leftMargin = Ui.dp(c, 6);
         field.addView(fieldText, lp);
         mode = Look.line(c, "T9", 9, Look.BOLD, Look.BLUE);
         mode.setBackground(Look.rounded(Look.ICON_FILL, 3, c));
-        mode.setPadding(Look.dp(c, 4), Look.dp(c, 1), Look.dp(c, 4), Look.dp(c, 1));
+        mode.setPadding(Ui.dp(c, 4), Ui.dp(c, 1), Ui.dp(c, 4), Ui.dp(c, 1));
         field.addView(mode);
-        LinearLayout.LayoutParams at = Parts.line(Parts.FILL, Look.dp(c, 26));
-        at.setMargins(Look.dp(c, 9), Look.dp(c, 6), Look.dp(c, 9), Look.dp(c, 4));
+        LinearLayout.LayoutParams at = Parts.line(Parts.FILL, Ui.dp(c, 26));
+        at.setMargins(Ui.dp(c, 9), Ui.dp(c, 6), Ui.dp(c, 9), Ui.dp(c, 4));
         body.addView(field, at);
         fieldLook(false);
 
         meta = Look.line(c, "", 9.5f, Look.REGULAR, Look.MUTE);
-        meta.setPadding(Look.dp(c, 11), Look.dp(c, 3), Look.dp(c, 11), Look.dp(c, 4));
+        meta.setPadding(Ui.dp(c, 11), Ui.dp(c, 3), Ui.dp(c, 11), Ui.dp(c, 4));
         body.addView(meta);
 
         list = Parts.column(c);
@@ -222,7 +223,7 @@ final class FilesScreen extends Screen {
         thumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
         thumb.setBackgroundColor(0xFFDCDEE3);
         thumb.setPadding(1, 1, 1, 1);
-        row.lead(thumb, Look.dp(c, 24), Look.dp(c, 31));
+        row.lead(thumb, Ui.dp(c, 24), Ui.dp(c, 31));
         row.titled(marked(pdf.name, match), about(pdf));
         row.setOnClickListener(v -> app.open(new PreviewScreen(file, null)));
         list.addView(row, Parts.line(Parts.FILL, Parts.WRAP));
@@ -231,7 +232,7 @@ final class FilesScreen extends Screen {
 
     private void addFolder(Context c, final File dir, int[] match) {
         Parts.Row row = new Parts.Row(c, 40);
-        row.lead(Parts.square(c, R.drawable.ic_folder), Look.dp(c, 26), Look.dp(c, 26));
+        row.lead(Parts.square(c, R.drawable.ic_folder), Ui.dp(c, 26), Ui.dp(c, 26));
         row.titled(marked(dir.getName(), match), "Folder");
         row.chevron();
         row.setOnClickListener(v -> app.open(new FilesScreen(dir.getName(), dir)));
@@ -260,13 +261,13 @@ final class FilesScreen extends Screen {
 
     /** Draws the thumbnails of the rows in sight (and a few past them), each once. */
     private void loadVisible() {
-        int top = scroll.getScrollY() - Look.dp(app, 100);
-        int bottom = scroll.getScrollY() + scroll.getHeight() + Look.dp(app, 200);
+        int top = scroll.getScrollY() - Ui.dp(app, 100);
+        int bottom = scroll.getScrollY() + scroll.getHeight() + Ui.dp(app, 200);
         for (final Line line : lines) {
             if (line.asked || line.pdf == null) continue;
             if (line.row.getBottom() < top || (line.row.getTop() > bottom && line.row.getTop() > 0)) continue;
             line.asked = true;
-            Pages.draw(line.file, 0, Look.dp(app, 22), Look.dp(app, 29), (Bitmap bitmap) -> {
+            Pages.draw(line.file, 0, Ui.dp(app, 22), Ui.dp(app, 29), (Bitmap bitmap) -> {
                 if (bitmap != null) line.thumb.setImageBitmap(bitmap);
                 else if (Pages.known(line.file) == Pages.LOCKED) line.thumb.setImageDrawable(Look.icon(app, R.drawable.ic_lock, Look.MUTE));
                 line.row.sub.setText(about(line.pdf));

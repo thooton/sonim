@@ -9,6 +9,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import com.xp3.common.ui.Ui;
 import java.util.Locale;
 
 /**
@@ -109,8 +110,8 @@ final class QueueScreen extends Screen implements Queue.Listener {
         thumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
         thumb.setBackgroundColor(0xFFDCDEE3);
         thumb.setPadding(1, 1, 1, 1);
-        row.lead(thumb, Look.dp(c, 24), Look.dp(c, 31));
-        Pages.draw(entry.file, 0, Look.dp(c, 22), Look.dp(c, 29), bitmap -> {
+        row.lead(thumb, Ui.dp(c, 24), Ui.dp(c, 31));
+        Pages.draw(entry.file, 0, Ui.dp(c, 22), Ui.dp(c, 29), bitmap -> {
             if (bitmap != null) thumb.setImageBitmap(bitmap);
         });
         String printer = RecentScreen.shortName(entry.printer.shown());
@@ -121,8 +122,8 @@ final class QueueScreen extends Screen implements Queue.Listener {
             Parts.Bar bar = new Parts.Bar(c);
             int percent = entry.status == null ? -1 : entry.status.phase < Job.PRINTING ? Math.max(0, entry.status.percent) : -1;
             bar.set(percent);
-            LinearLayout.LayoutParams lp = Parts.line(Look.dp(c, 110), Look.dp(c, 3));
-            lp.topMargin = Look.dp(c, 4);
+            LinearLayout.LayoutParams lp = Parts.line(Ui.dp(c, 110), Ui.dp(c, 3));
+            lp.topMargin = Ui.dp(c, 4);
             row.text.addView(bar, lp);
             row.chevron();
         } else if (entry.state == Queue.WAITING) {

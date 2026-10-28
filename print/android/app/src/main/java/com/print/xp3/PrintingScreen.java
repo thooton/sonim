@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import com.xp3.common.ui.Ui;
 import android.widget.TextView;
 
 /**
@@ -117,28 +118,28 @@ final class PrintingScreen extends Screen implements Queue.Listener {
         Context c = app;
         LinearLayout page = Parts.column(c);
         page.setGravity(Gravity.CENTER_HORIZONTAL);
-        page.setPadding(0, Look.dp(c, 12), 0, 0);
+        page.setPadding(0, Ui.dp(c, 12), 0, 0);
         FrameLayout art = new FrameLayout(c);
         ImageView printer = new ImageView(c);
         printer.setImageResource(Readiness.picture(entry.printer));
-        art.addView(printer, new FrameLayout.LayoutParams(Look.dp(c, 140), Look.dp(c, 98)));
+        art.addView(printer, new FrameLayout.LayoutParams(Ui.dp(c, 140), Ui.dp(c, 98)));
         LinearLayout sheet = Parts.column(c);
         sheet.setBackground(Look.outlined(Look.WHITE, 0, 1, 0xFFDCDEE3, c));
-        sheet.setPadding(Look.dp(c, 6), Look.dp(c, 5), Look.dp(c, 6), 0);
+        sheet.setPadding(Ui.dp(c, 6), Ui.dp(c, 5), Ui.dp(c, 6), 0);
         for (int i = 0; i < 3; i++) {
             View rule = new View(c);
             rule.setBackgroundColor(0xFFC7CBD4);
-            LinearLayout.LayoutParams lp = Parts.line(i == 1 ? Look.dp(c, 32) : Parts.FILL, Look.dp(c, 2));
-            lp.bottomMargin = Look.dp(c, 3);
+            LinearLayout.LayoutParams lp = Parts.line(i == 1 ? Ui.dp(c, 32) : Parts.FILL, Ui.dp(c, 2));
+            lp.bottomMargin = Ui.dp(c, 3);
             sheet.addView(rule, lp);
         }
-        FrameLayout.LayoutParams sheetAt = new FrameLayout.LayoutParams(Look.dp(c, 52), Look.dp(c, 34));
-        sheetAt.leftMargin = Look.dp(c, 44);
-        sheetAt.topMargin = Look.dp(c, 73);
+        FrameLayout.LayoutParams sheetAt = new FrameLayout.LayoutParams(Ui.dp(c, 52), Ui.dp(c, 34));
+        sheetAt.leftMargin = Ui.dp(c, 44);
+        sheetAt.topMargin = Ui.dp(c, 73);
         art.addView(sheet, sheetAt);
-        page.addView(art, Parts.line(Look.dp(c, 140), Look.dp(c, 112)));
+        page.addView(art, Parts.line(Ui.dp(c, 140), Ui.dp(c, 112)));
         // A page feeding out, over and over.
-        feed = ObjectAnimator.ofFloat(sheet, "translationY", -Look.dp(c, 10), 0);
+        feed = ObjectAnimator.ofFloat(sheet, "translationY", -Ui.dp(c, 10), 0);
         feed.setDuration(1800);
         feed.setRepeatCount(ValueAnimator.INFINITE);
         feed.start();
@@ -146,22 +147,22 @@ final class PrintingScreen extends Screen implements Queue.Listener {
         headline = Look.text(c, "", 15, Look.BOLD, Look.INK);
         headline.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Parts.WRAP);
-        lp.topMargin = Look.dp(c, 6);
+        lp.topMargin = Ui.dp(c, 6);
         page.addView(headline, lp);
         bar = new Parts.Bar(c);
-        LinearLayout.LayoutParams barAt = Parts.line(Parts.FILL, Look.dp(c, 6));
-        barAt.setMargins(Look.dp(c, 16), Look.dp(c, 8), Look.dp(c, 16), 0);
+        LinearLayout.LayoutParams barAt = Parts.line(Parts.FILL, Ui.dp(c, 6));
+        barAt.setMargins(Ui.dp(c, 16), Ui.dp(c, 8), Ui.dp(c, 16), 0);
         page.addView(bar, barAt);
         TextView about = Look.text(c, entry.title + " · " + copies() + "\nto " + entry.printer.shown(), 10.5f, Look.REGULAR, Look.MUTE);
         about.setGravity(Gravity.CENTER);
         about.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams aboutAt = Parts.line(Parts.FILL, Parts.WRAP);
-        aboutAt.setMargins(Look.dp(c, 16), Look.dp(c, 4), Look.dp(c, 16), 0);
+        aboutAt.setMargins(Ui.dp(c, 16), Ui.dp(c, 4), Ui.dp(c, 16), 0);
         page.addView(about, aboutAt);
         TextView hide = Parts.button(c, "Hide", Parts.PRIMARY, () -> app.home());
         TextView cancel = Parts.button(c, "Cancel print", Parts.DANGER, this::askCancel);
         LinearLayout.LayoutParams buttonsAt = Parts.line(Parts.FILL, Parts.WRAP);
-        buttonsAt.topMargin = Look.dp(c, 10);
+        buttonsAt.topMargin = Ui.dp(c, 10);
         page.addView(Parts.pair(c, hide, cancel), buttonsAt);
         frame.addView(page);
         progress();

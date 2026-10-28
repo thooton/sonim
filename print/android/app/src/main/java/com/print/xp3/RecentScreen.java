@@ -10,6 +10,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import com.xp3.common.ui.Ui;
 import java.util.Locale;
 
 /**
@@ -66,13 +67,13 @@ final class RecentScreen extends Screen {
             thumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
             thumb.setBackgroundColor(0xFFDCDEE3);
             thumb.setPadding(1, 1, 1, 1);
-            row.lead(thumb, Look.dp(c, 24), Look.dp(c, 31));
+            row.lead(thumb, Ui.dp(c, 24), Ui.dp(c, 31));
             row.titled(print.title, there ? "Printed " + time(print.when, midnight) + " · " + shortName(print.printerName)
                 : "Moved or deleted");
             if (there) {
                 row.chevron();
                 row.setOnClickListener(v -> app.open(new PreviewScreen(new File(print.path), print)));
-                Pages.draw(new File(print.path), 0, Look.dp(c, 22), Look.dp(c, 29), bitmap -> {
+                Pages.draw(new File(print.path), 0, Ui.dp(c, 22), Ui.dp(c, 29), bitmap -> {
                     if (bitmap != null) thumb.setImageBitmap(bitmap);
                 });
             } else {

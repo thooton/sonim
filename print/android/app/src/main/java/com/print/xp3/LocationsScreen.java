@@ -6,11 +6,11 @@ import android.os.Looper;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.xp3.common.ui.Ui;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -135,7 +135,7 @@ final class LocationsScreen extends Screen {
     private static Parts.Row row(Context c, String id, int icon, String name, String sub) {
         Parts.Row row = new Parts.Row(c, 40);
         row.setTag(id);
-        row.lead(Parts.square(c, icon), Look.dp(c, 26), Look.dp(c, 26));
+        row.lead(Parts.square(c, icon), Ui.dp(c, 26), Ui.dp(c, 26));
         row.titled(name, sub);
         row.chevron();
         return row;
