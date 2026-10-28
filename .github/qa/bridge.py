@@ -35,6 +35,10 @@ EMULATOR = str(SDK / "emulator" / "emulator")
 IMAGE = "system-images;android-27;default;x86_64"
 BUILD_TOOLS = os.environ.get("ANDROID_BUILD_TOOLS", "35.0.1")
 DEVICES = 3
+# Where avdmanager writes the emulators and the emulator finds them: newer
+# command-line tools default to somewhere else than the emulator looks.
+AVD_HOME = Path.home() / ".android" / "avd"
+os.environ["ANDROID_AVD_HOME"] = str(AVD_HOME)
 LIFETIME = 5 * 3600 + 45 * 60  # the Actions job's limit is six hours
 OUTPUT_LIMIT = 200_000
 
@@ -117,6 +121,7 @@ def package_of(apk):
 def boot(n):
     """Creates and boots n emulators; returns their serials once booted."""
     avdmanager = "avdmanager"
+    AVD_HOME.mkdir(parents=True, exist_ok=True)
     serials = []
     for i in range(n):
         name = f"xp3_{i}"
@@ -124,7 +129,7 @@ def boot(n):
                            input=b"no\n", capture_output=True)
         if p.returncode != 0:
             raise RuntimeError("avdmanager: " + (p.stdout + p.stderr).decode(errors="replace")[-2000:])
-        ini = Path.home() / ".android" / "avd" / f"{name}.avd" / "config.ini"
+        ini = AVD_HOME / f"{name}.avd" / "config.ini"
         lines = [l for l in ini.read_text().splitlines() if l.split("=", 1)[0].strip() not in AVD_CONFIG]
         lines += [f"{k}={v}" for k, v in AVD_CONFIG.items()]
         ini.write_text("\n".join(lines) + "\n")
