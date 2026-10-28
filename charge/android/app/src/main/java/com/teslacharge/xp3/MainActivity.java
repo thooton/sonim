@@ -93,6 +93,14 @@ public final class MainActivity extends BaseActivity {
     private String lastSearchQuery = "";
     private JSONObject searchOrigin;
     private int searchRequestGeneration;
+    private boolean searching;
+    private String searchError;
+    // The Discover screen on show. A search outlives the views it started
+    // from when the user changes tab and comes back, so its answer goes to
+    // whichever Discover is drawn when it lands.
+    private TextView discoverStatus;
+    private SiteAdapter discoverAdapter;
+    private ListView discoverList;
     private final List<JSONObject> favoriteSites = new ArrayList<>();
     private final List<JSONObject> searchResults = new ArrayList<>();
     private final List<JSONObject> historySessions = new ArrayList<>();
@@ -130,6 +138,10 @@ public final class MainActivity extends BaseActivity {
      *  so numbers that have stopped advancing say so. Cleared by the next
      *  reading that does arrive. */
     private String sessionError;
+    // Why the last lookup for a running session failed, while no session is
+    // known. Without it the Session tab would claim there is no session when
+    // the app simply never got to ask.
+    private String sessionLookupError;
     /** The card Tesla bills, as shown on the start-charging dialog. Null until
      *  {@link #loadPaymentMethod} answers, and after an answer of "no card". */
     private String paymentMethod;
@@ -153,7 +165,10 @@ public final class MainActivity extends BaseActivity {
             // it the watchOrRelease that starts and stops the service. Both
             // read the same session, and whichever applies second is
             // corrected by the next poll a moment later.
-            if (session != null) currentSession = session;
+            if (session != null) {
+                currentSession = session;
+                sessionLookupError = null;
+            }
             if (currentTab == SESSION && !detailVisible) renderSession();
             // The session just ended: an open charger detail is still
             // showing a disabled Start button, so redraw it to hand
@@ -195,6 +210,7 @@ public final class MainActivity extends BaseActivity {
         if (latest != null) {
             activeSessionRequestGeneration++;
             currentSession = latest;
+            sessionLookupError = null;
             sessionError = ChargingService.latestError();
             if (currentTab == SESSION && !detailVisible) renderSession();
         }
@@ -392,11 +408,7 @@ public final class MainActivity extends BaseActivity {
         // action and lands focus by default.
         final Button find = primaryAction("Find");
         root.addView(find);
-        final TextView status = small(
-            searchResults.isEmpty()
-                ? "Within " + displayRadius()
-                : resultSummary()
-        );
+        final TextView status = small(searchStatus());
         status.setMaxLines(1);
         root.addView(status);
         root.addView(divider());
@@ -404,7 +416,10 @@ public final class MainActivity extends BaseActivity {
         adapter.replace(searchResults);
         final ListView list = listView(adapter);
         root.addView(list, Ui.weighted());
-        find.setOnClickListener(view -> showSearchDialog(status, adapter, list));
+        discoverStatus = status;
+        discoverAdapter = adapter;
+        discoverList = list;
+        find.setOnClickListener(view -> showSearchDialog());
         find.setOnKeyListener(
             (view, keyCode, event) -> {
                 if (
@@ -421,19 +436,22 @@ public final class MainActivity extends BaseActivity {
         wireSiteList(list, adapter, find);
         Ui.fill(content, root);
         find.requestFocus();
-        if (research && lastSearchQuery.length() > 0) search(
-            lastSearchQuery,
-            status,
-            adapter,
-            list
-        );
+        if (research && lastSearchQuery.length() > 0) search(lastSearchQuery);
     }
 
-    private void showSearchDialog(
-        final TextView status,
-        final SiteAdapter adapter,
-        final ListView list
-    ) {
+    private String searchStatus() {
+        if (searching) return "Searching for chargers…";
+        if (searchError != null) return searchError;
+        return searchResults.isEmpty()
+            ? "Within " + displayRadius()
+            : resultSummary();
+    }
+
+    private boolean discoverVisible() {
+        return currentTab == DISCOVER && !detailVisible && discoverStatus != null;
+    }
+
+    private void showSearchDialog() {
         final AlertDialog.Builder builder = new AlertDialog.Builder(this).setTitle("Find Chargers")
             .setPositiveButton("Find", null)
             .setNegativeButton("Cancel", null);
@@ -442,6 +460,9 @@ public final class MainActivity extends BaseActivity {
         final EditText input = new EditText(themed);
         input.setSingleLine(true);
         input.setText(lastSearchQuery);
+        // The XP3 has no select-all key: with the cursor at the start, Clear
+        // had nothing to delete and new text landed in front of the old.
+        input.setSelection(input.length());
         input.setHint(R.string.search_hint);
         input.setInputType(
             InputType.TYPE_CLASS_TEXT |
@@ -483,7 +504,7 @@ public final class MainActivity extends BaseActivity {
                         lastSearchQuery = query;
                         dismissKeyboard();
                         dialog.dismiss();
-                        search(query, status, adapter, list);
+                        search(query);
                     }
                 );
                 input.setOnEditorActionListener((v, actionId, event) -> {
@@ -503,22 +524,20 @@ public final class MainActivity extends BaseActivity {
         dialog.show();
     }
 
-    private void search(
-        final String query,
-        final TextView status,
-        final SiteAdapter adapter,
-        final ListView list
-    ) {
+    private void search(final String query) {
         if (query.trim().length() == 0) {
             toast("Enter a ZIP code or address.");
             return;
         }
         final int generation = ++searchRequestGeneration;
-        status.setText("Searching for chargers…");
+        searching = true;
+        searchError = null;
+        if (discoverVisible()) discoverStatus.setText(searchStatus());
         async(
             () -> repository.search(query, radiusMiles),
             result -> {
                 if (generation != searchRequestGeneration) return;
+                searching = false;
                 searchOrigin = result.optJSONObject("origin");
                 searchResults.clear();
                 JSONArray sites = result.optJSONArray("sites");
@@ -527,12 +546,12 @@ public final class MainActivity extends BaseActivity {
                     i < sites.length();
                     i++
                 ) if (sites.optJSONObject(i) != null) searchResults.add(sites.optJSONObject(i));
+                if (searchResults.isEmpty()) searchError = "No chargers found";
+                if (!discoverVisible()) return;
+                final SiteAdapter adapter = discoverAdapter;
+                final ListView list = discoverList;
                 adapter.replace(searchResults);
-                status.setText(
-                    searchResults.isEmpty()
-                        ? "No chargers found"
-                        : resultSummary()
-                );
+                discoverStatus.setText(searchStatus());
                 if (!searchResults.isEmpty()) {
                     // A hardware-key-only device needs a concrete current row,
                     // not merely a scroll position. Move focus off Find and
@@ -544,7 +563,9 @@ public final class MainActivity extends BaseActivity {
             },
             error -> {
                 if (generation != searchRequestGeneration) return;
-                showError(status).accept(error);
+                searching = false;
+                searchError = error.getMessage();
+                if (discoverVisible()) discoverStatus.setText(searchStatus());
             }
         );
     }
@@ -921,6 +942,7 @@ public final class MainActivity extends BaseActivity {
                 chargingOperation = CHARGING_IDLE;
                 currentSession = session;
                 sessionError = null;
+                sessionLookupError = null;
                 showTab(SESSION, true);
                 watchOrRelease();
             },
@@ -944,7 +966,11 @@ public final class MainActivity extends BaseActivity {
             // that a scrolling parent's unbounded height would collapse.
             LinearLayout empty = vertical();
             empty.addView(
-                emptyMessage("No active charging session"),
+                emptyMessage(
+                    sessionLookupError == null
+                        ? "No active charging session"
+                        : "Could not check for a charging session.\n\n" + sessionLookupError
+                ),
                 Ui.weighted()
             );
             Button refresh = action("Check again");
@@ -1570,6 +1596,7 @@ public final class MainActivity extends BaseActivity {
                 if (generation != activeSessionRequestGeneration) return;
                 currentSession = session;
                 sessionError = null;
+                sessionLookupError = null;
                 if (currentTab == SESSION) renderSession();
                 else if (
                     detailVisible &&
@@ -1580,7 +1607,10 @@ public final class MainActivity extends BaseActivity {
             },
             error -> {
                 if (generation != activeSessionRequestGeneration) return;
-                if (currentTab == SESSION) showErrorDialog(error);
+                if (currentSession == null) {
+                    sessionLookupError = error.getMessage();
+                    if (currentTab == SESSION && !detailVisible) renderSession();
+                } else if (currentTab == SESSION) showErrorDialog(error);
             }
         );
     }
@@ -1921,13 +1951,6 @@ public final class MainActivity extends BaseActivity {
                 }
             }
         );
-    }
-
-    private Failure showError(final TextView inline) {
-        return error -> {
-            if (inline != null) inline.setText(error.getMessage());
-            else showErrorDialog(error);
-        };
     }
 
     private void showErrorDialog(Exception error) {

@@ -13,6 +13,7 @@ import java.util.Map;
 public final class TokenStore {
     private static final String AUTH_URL = "https://auth.tesla.com/oauth2/v3/token";
     private static final long ACCESS_SKEW_MS = 5 * 60_000L;
+    public static final String SIGN_IN_EXPIRED = "Tesla sign-in has expired.";
     private final SharedPreferences preferences;
 
     public TokenStore(Context context) {
@@ -89,6 +90,12 @@ public final class TokenStore {
             HttpJson.Response response = HttpJson.post(AUTH_URL, headers, body);
             JSONObject payload = response.object();
             if (response.status < 200 || response.status >= 300) {
+                // Tesla answers a spent or revoked refresh token with 400/401 and
+                // OAuth jargon ("The refresh_token is invalid"). It will not fix
+                // itself, unlike a dropped connection, so say so plainly.
+                if (response.status == 400 || response.status == 401) {
+                    throw new ApiException(SIGN_IN_EXPIRED, response.status);
+                }
                 String message = payload.optString("error_description", payload.optString("error", "Sign-in failed."));
                 throw new ApiException(message, response.status);
             }

@@ -90,11 +90,14 @@ content area. The open tab is marked. The app opens on Favorites.
 - Find opens a dialog "Find Chargers" with a single-line field (hint "ZIP
   code or address", prefilled with the last query), Find and Cancel. Find
   or the keyboard's Enter with an empty field shows "Enter a ZIP code or
-  address." on the field and keeps the dialog open. Cancel / Back closes it.
+  address." on the field and keeps the dialog open. The cursor starts at the
+  end of the prefilled query, so Clear erases it. Cancel / Back closes it.
   "lat, lng" (e.g. "33.4, -112.0") is accepted as a location.
 - After a successful search focus moves to the first result, nearest first.
   Down from Find also enters the list when it has rows.
-- Results persist while switching tabs during the run of the app.
+- Results persist while switching tabs during the run of the app. A search
+  still running when the user switches away keeps going; coming back shows
+  "Searching for chargers…" and then its outcome.
 - OK on a result opens the charger detail.
 
 ### Charger detail
@@ -144,7 +147,9 @@ Starting a charge (real money; never press Start in QA):
 ### Session
 
 - No session: "No active charging session" centred, and a focused "Check
-  again" button that asks Tesla again.
+  again" button that asks Tesla again. If the app could not ask (no
+  connection, sign-in expired), it says "Could not check for a charging
+  session." with the reason instead, whenever the tab is shown.
 - With a session, a scrolling page:
   - Banner: status in large bold text: "Authorizing at the stall…",
     "Ready, waiting for plug in", "Plugged in, starting up…", "Charging"
@@ -225,8 +230,12 @@ Starting a charge (real money; never press Start in QA):
   show as the normal error states above, never a crash or endless spinner.
 - Errors never replace data already on screen except where stated: a failed
   search sets the status line; a failed detail shows the dialog (Back then
-  returns to the list); a failed session lookup shows the dialog only on the
-  Session tab, and is silent elsewhere.
+  returns to the list); a failed session lookup with no session known shows
+  in place on the Session tab; with a session on screen it shows the dialog
+  only on the Session tab, and is silent elsewhere.
+- Error wording: a login Tesla rejects reads "Tesla sign-in has expired."
+  (it will not recover by itself); no signal reads "No connection." and a
+  stalled request "The connection timed out." (try again later).
 - Stored on the phone: favorites (identity and address only), the login,
   and the stall/site context of sessions this phone started. Survives a
   restart: favorites, login. Not kept: search results, radius, history,
