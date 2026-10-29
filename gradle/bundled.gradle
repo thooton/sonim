@@ -2,8 +2,9 @@ import groovy.json.JsonSlurper
 
 // Bakes a deployment's login into an app, for apps on one person's phone.
 //
-// Nobody wants to type a 49-character token on a T9 keypad, so Canvas, Charge,
-// Delta and Source ship already signed in. The values are read at build time
+// Nobody wants to type a 49-character token on a T9 keypad, so the apps that
+// sign in to something (see `bundled(...)` in their build.gradle) ship
+// already signed in. The values are read at build time
 // from files beside the app (all gitignored) and written as constants into a
 // generated class, <package>.Bundled, under build/. Nothing secret is ever
 // committed, and a checkout without those files (CI, any other machine) builds
@@ -62,7 +63,7 @@ static String sha256(String text) {
     return digest.collect { String.format("%02x", it & 0xff) }.join()
 }
 
-// The command center Delta and Source both sign in to, as [server, token,
+// The command center the apps sign in to, as [server, token,
 // revision]: all "" when there is none, or when it is not https, which is
 // refused. The revision identifies the login without exposing it, so an app
 // can adopt a bundled login once per build that carries a new one.
