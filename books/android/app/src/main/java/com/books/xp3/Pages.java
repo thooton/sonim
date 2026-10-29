@@ -1,5 +1,6 @@
 package com.books.xp3;
 
+import android.annotation.SuppressLint;
 import android.content.res.AssetManager;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -42,9 +43,7 @@ final class Pages {
     static final int BOTTOM = 17;
 
     final Section section;
-    final String key;
     final int left;
-    final int top;
     private final TextPaint paint;
     private final StaticLayout layout;
     /** The first line of each page. */
@@ -52,14 +51,12 @@ final class Pages {
     /** The colour scene breaks are drawn in; set with the text colour. */
     int dimColor;
 
-    private Pages(Section section, String key, TextPaint paint, StaticLayout layout, int[] starts, int left, int top) {
+    private Pages(Section section, TextPaint paint, StaticLayout layout, int[] starts, int left) {
         this.section = section;
-        this.key = key;
         this.paint = paint;
         this.layout = layout;
         this.starts = starts;
         this.left = left;
-        this.top = top;
     }
 
     int count() {
@@ -94,8 +91,8 @@ final class Pages {
         int to = layout.getLineTop(last);
         canvas.save();
         // The clip is the page's own lines, so the layout draws only those.
-        canvas.clipRect(0, top, canvas.getWidth(), top + (to - from));
-        canvas.translate(left, top - from);
+        canvas.clipRect(0, TOP, canvas.getWidth(), TOP + (to - from));
+        canvas.translate(left, TOP - from);
         layout.draw(canvas);
         canvas.restore();
     }
@@ -104,7 +101,10 @@ final class Pages {
     // Building
     // ------------------------------------------------------------------
 
-    static Pages build(AssetManager assets, Section section, String key, int font, int size, boolean justify,
+    // Layout's break and justification constants are LineBreaker's under
+    // other names, which lint (reading API 35's annotations) doesn't know.
+    @SuppressLint("WrongConstant")
+    static Pages build(AssetManager assets, Section section, int font, int size, boolean justify,
                        float spacing, int margin, int width, int height) {
         TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         paint.setTypeface(Fonts.face(assets, font, 0));
@@ -138,7 +138,7 @@ final class Pages {
         if (justify) builder.setJustificationMode(Layout.JUSTIFICATION_MODE_INTER_WORD);
         StaticLayout layout = builder.build();
 
-        Pages pages = new Pages(section, key, paint, layout, paginate(layout, section, textHeight), margin, TOP);
+        Pages pages = new Pages(section, paint, layout, paginate(layout, section, textHeight), margin);
         self[0] = pages;
         return pages;
     }

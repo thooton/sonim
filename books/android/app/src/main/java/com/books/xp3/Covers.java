@@ -8,6 +8,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 
 import com.books.xp3.shelf.Shelf;
+import com.xp3.common.ui.Ui;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -77,10 +78,9 @@ final class Covers {
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
-        int sample = 1;
-        while (bounds.outWidth / (sample * 2) >= width * 2 && bounds.outHeight / (sample * 2) >= height * 2) sample *= 2;
+        // Decoded at no less than twice the thumbnail's size either way.
         BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = sample;
+        options.inSampleSize = Math.min(Ui.sampleSize(bounds.outWidth, width * 2), Ui.sampleSize(bounds.outHeight, height * 2));
         Bitmap image = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
         if (image == null) return null;
 
@@ -99,10 +99,7 @@ final class Covers {
 
     /** A file name for the book that changes when the book does. */
     private static String key(Shelf.Entry entry) {
-        long hash = 1125899906842597L;
         // "2": markers from before 1.1.1 were also left for books that couldn't be read.
-        String id = "2|" + entry.path + "|" + entry.size + "|" + entry.modified;
-        for (int i = 0; i < id.length(); i++) hash = 31 * hash + id.charAt(i);
-        return Long.toHexString(hash);
+        return CardFiles.hash("2|" + entry.path + "|" + entry.size + "|" + entry.modified);
     }
 }

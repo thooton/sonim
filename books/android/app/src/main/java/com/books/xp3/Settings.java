@@ -44,14 +44,6 @@ final class Settings {
             .apply();
     }
 
-    /**
-     * Everything that changes where lines break. Night Shift is not in it: it
-     * only recolours the page, which needs no new layout.
-     */
-    String layoutKey() {
-        return font + "/" + size + "/" + justify + "/" + spacing + "/" + margins;
-    }
-
     static int clamp(int value, int low, int high) {
         return Math.max(low, Math.min(high, value));
     }

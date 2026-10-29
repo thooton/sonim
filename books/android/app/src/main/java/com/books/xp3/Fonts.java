@@ -17,16 +17,15 @@ import com.books.xp3.book.Run;
 final class Fonts {
 
     static final int CHARTER = 0;
-    static final int LITERATA = 1;
-    static final int BASKERVILLE = 2;
     static final int INTER = 3;
-    static final int ATKINSON = 4;
 
     /** In the order the settings list them: serif first, as Books does. */
     static final String[] NAMES = {"Charter", "Literata", "Baskerville", "Inter", "Atkinson Hyperlegible"};
     static final boolean[] SERIF = {true, true, true, false, false};
     private static final String[] FILES = {"charter", "literata", "baskerville", "inter", "atkinson"};
     private static final String[] STYLES = {"regular", "italic", "bold", "bold_italic"};
+    /** STYLES as the platform numbers them, for the fallback. */
+    private static final int[] PLATFORM = {Typeface.NORMAL, Typeface.ITALIC, Typeface.BOLD, Typeface.BOLD_ITALIC};
 
     private static Typeface[][] faces;
 
@@ -39,7 +38,7 @@ final class Fonts {
     /** The face for `font` in a Run style (0, ITALIC, BOLD or both). */
     static synchronized Typeface face(AssetManager assets, int font, int style) {
         if (faces == null) faces = new Typeface[NAMES.length][4];
-        int f = Math.max(0, Math.min(font, NAMES.length - 1));
+        int f = Settings.clamp(font, 0, NAMES.length - 1);
         int s = (style & Run.BOLD) != 0 ? ((style & Run.ITALIC) != 0 ? 3 : 2) : ((style & Run.ITALIC) != 0 ? 1 : 0);
         Typeface face = faces[f][s];
         if (face == null) {
@@ -47,7 +46,7 @@ final class Fonts {
                 face = Typeface.createFromAsset(assets, "fonts/" + FILES[f] + "_" + STYLES[s] + ".ttf");
             } catch (RuntimeException e) {
                 // A missing asset falls back to the platform's family of the same kind.
-                face = Typeface.create(SERIF[f] ? Typeface.SERIF : Typeface.SANS_SERIF, s);
+                face = Typeface.create(SERIF[f] ? Typeface.SERIF : Typeface.SANS_SERIF, PLATFORM[s]);
             }
             faces[f][s] = face;
         }

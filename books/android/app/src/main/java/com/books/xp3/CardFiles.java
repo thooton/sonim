@@ -213,8 +213,12 @@ final class CardFiles implements Shelf.Reader {
 
     /** One copy per book and version of it. */
     private static String key(File file) {
+        return hash(file.getAbsolutePath() + "|" + file.length() + "|" + file.lastModified());
+    }
+
+    /** A file name made from `id`, the same on every launch (unlike String.hashCode, it is 64 bits). */
+    static String hash(String id) {
         long hash = 1125899906842597L;
-        String id = file.getAbsolutePath() + "|" + file.length() + "|" + file.lastModified();
         for (int i = 0; i < id.length(); i++) hash = 31 * hash + id.charAt(i);
         return Long.toHexString(hash);
     }

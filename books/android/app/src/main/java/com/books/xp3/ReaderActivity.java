@@ -96,9 +96,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
 
     private final ExecutorService worker = Ui.worker("books-layout");
     private final Handler handler = new Handler();
-    private final Runnable sleep = () -> {
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-    };
+    private final Runnable sleep = () -> getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
     @Override
     protected void onCreate(Bundle state) {
@@ -140,7 +138,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
                 if (isFinishing()) return;
                 if (result == null) {
                     pageView.showMessage("This book can\u2019t be opened");
-                    if (error != null) flash(error);
+                    if (error != null) pageView.flash(error);
                     return;
                 }
                 opened(result);
@@ -267,7 +265,6 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
         building.put(job, waiters);
 
         final Section section = book.sections.get(index);
-        final String key = settings.layoutKey();
         final int font = settings.font;
         final int size = dp(settings.size);
         final boolean justify = settings.justify;
@@ -276,7 +273,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
         final int w = width;
         final int h = height;
         worker.execute(() -> {
-            final Pages pages = Pages.build(getAssets(), section, key, font, size, justify, spacing, margin, w, h);
+            final Pages pages = Pages.build(getAssets(), section, font, size, justify, spacing, margin, w, h);
             runOnUiThread(() -> {
                 List<Laid> waiting = building.remove(job);
                 if (gen != generation || isFinishing()) return;
@@ -370,23 +367,17 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
         if (book == null) return;
         long time = System.currentTimeMillis();
         shelf.progress(path, position, book.length, time);
+        handler.removeCallbacks(saveLater);
         if (now || time - lastSave > SAVE_EVERY) {
-            handler.removeCallbacks(saveLater);
             lastSave = time;
             Shared.save(shelf);
         } else {
             // A turn soon after a write is written once the interval is up, so resting on it keeps it.
-            handler.removeCallbacks(saveLater);
             handler.postDelayed(saveLater, lastSave + SAVE_EVERY - time + 50);
         }
     }
 
-    private final Runnable saveLater = new Runnable() {
-        @Override
-        public void run() {
-            record(true);
-        }
-    };
+    private final Runnable saveLater = () -> record(true);
 
     // ------------------------------------------------------------------
     // Keys
@@ -395,7 +386,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         stayAwake();
-        if (isOk(keyCode) || keyCode == KeyEvent.KEYCODE_MENU) {
+        if (Ui.isOk(keyCode) || keyCode == KeyEvent.KEYCODE_MENU) {
             if (event.getRepeatCount() == 0) event.startTracking();
             return true;
         }
@@ -448,7 +439,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
             case KeyEvent.KEYCODE_POUND:
                 if (event.getRepeatCount() == 0) {
                     setNightShift(!settings.nightShift);
-                    flash(settings.nightShift ? "Night Shift on" : "Night Shift off");
+                    pageView.flash(settings.nightShift ? "Night Shift on" : "Night Shift off");
                 }
                 return true;
             case KeyEvent.KEYCODE_STAR:
@@ -465,7 +456,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
      */
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if (isOk(keyCode) || keyCode == KeyEvent.KEYCODE_MENU) {
+        if (Ui.isOk(keyCode) || keyCode == KeyEvent.KEYCODE_MENU) {
             if (!event.isTracking() || event.isCanceled()) return true;
             if (keyCode == KeyEvent.KEYCODE_MENU) {
                 if (mode == READING) openSheet();
@@ -495,12 +486,6 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
         }
     }
 
-    private static boolean isOk(int keyCode) {
-        return keyCode == KeyEvent.KEYCODE_DPAD_CENTER
-            || keyCode == KeyEvent.KEYCODE_ENTER
-            || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER;
-    }
-
     /** Keeps the screen on while reading, until the keys have been left alone for a while. */
     private void stayAwake() {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -519,7 +504,6 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
         panel.show("Themes & Settings", true, sheetRows(), 0);
         FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) panel.getLayoutParams();
         params.height = panel.sheetHeight(Math.round(height * 0.66f));
-        params.gravity = Gravity.BOTTOM;
         panel.setLayoutParams(params);
         panel.setVisibility(View.VISIBLE);
     }
@@ -527,21 +511,11 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
     private List<ListPanel.Row> sheetRows() {
         List<ListPanel.Row> rows = new ArrayList<ListPanel.Row>();
         rows.add(new ListPanel.Row(ROW_CONTENTS, ListPanel.LINK, "Contents"));
-        ListPanel.Row size = new ListPanel.Row(ROW_SIZE, ListPanel.STEPPER, "Text Size");
-        size.value = String.valueOf(settings.size);
-        rows.add(size);
-        ListPanel.Row night = new ListPanel.Row(ROW_NIGHT, ListPanel.TOGGLE, "Night Shift");
-        night.on = settings.nightShift;
-        rows.add(night);
-        ListPanel.Row justify = new ListPanel.Row(ROW_JUSTIFY, ListPanel.TOGGLE, "Justify");
-        justify.on = settings.justify;
-        rows.add(justify);
-        ListPanel.Row spacing = new ListPanel.Row(ROW_SPACING, ListPanel.STEPPER, "Line Spacing");
-        spacing.value = Settings.SPACING_NAMES[settings.spacing];
-        rows.add(spacing);
-        ListPanel.Row margins = new ListPanel.Row(ROW_MARGINS, ListPanel.STEPPER, "Margins");
-        margins.value = Settings.MARGIN_NAMES[settings.margins];
-        rows.add(margins);
+        rows.add(stepper(ROW_SIZE, "Text Size", String.valueOf(settings.size)));
+        rows.add(toggle(ROW_NIGHT, "Night Shift", settings.nightShift));
+        rows.add(toggle(ROW_JUSTIFY, "Justify", settings.justify));
+        rows.add(stepper(ROW_SPACING, "Line Spacing", Settings.SPACING_NAMES[settings.spacing]));
+        rows.add(stepper(ROW_MARGINS, "Margins", Settings.MARGIN_NAMES[settings.margins]));
         rows.add(new ListPanel.Row(0, ListPanel.HEADER, "Font"));
         for (int i = 0; i < Fonts.count(); i++) {
             ListPanel.Row font = new ListPanel.Row(ROW_FONT + i, ListPanel.CHOICE, Fonts.NAMES[i]);
@@ -550,6 +524,18 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
             rows.add(font);
         }
         return rows;
+    }
+
+    private static ListPanel.Row stepper(int id, String title, String value) {
+        ListPanel.Row row = new ListPanel.Row(id, ListPanel.STEPPER, title);
+        row.value = value;
+        return row;
+    }
+
+    private static ListPanel.Row toggle(int id, String title, boolean on) {
+        ListPanel.Row row = new ListPanel.Row(id, ListPanel.TOGGLE, title);
+        row.on = on;
+        return row;
     }
 
     private void openContents() {
@@ -600,7 +586,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
             for (ListPanel.Row other : panel.rows()) {
                 if (other.id >= ROW_FONT) other.on = other.id == row.id;
             }
-            panel.refresh();
+            panel.invalidate();
             settingsChanged(true);
         }
     }
@@ -638,7 +624,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
             default:
                 return;
         }
-        panel.refresh();
+        panel.invalidate();
     }
 
     private void changeSize(int delta) {
@@ -661,15 +647,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
 
     /** The page's colours, with Night Shift warming the whole screen over them. */
     private void applyColors() {
-        pageView.setColors(getResources().getColor(R.color.text_day), getResources().getColor(R.color.text_day_dim));
+        pageView.setColors(color(R.color.text_day), color(R.color.text_day_dim));
         NightShift.apply(root, settings.nightShift);
-    }
-
-    /*
-     * Notices are drawn on the page rather than shown as toasts: a toast is
-     * a window of the system's, which Night Shift's filter cannot reach.
-     */
-    private void flash(String text) {
-        pageView.flash(text);
     }
 }

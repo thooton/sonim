@@ -71,6 +71,8 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
     private final Runnable clearNotice = () -> view.setNotice(converting ? "Converting\u2026" : null);
     private boolean scanning;
     private Shelf.Entry menuBook;
+    /** Android has stopped asking: only the app's settings page can turn storage back on. */
+    private boolean storageOff;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -88,9 +90,13 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         root.addView(menu, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, Gravity.BOTTOM));
         setContentView(root);
         if (!allowed()) {
-            view.setMessage("No storage access", null);
-            requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, ASK_STORAGE);
+            view.setMessage("No storage access");
+            askStorage();
         }
+    }
+
+    private void askStorage() {
+        requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, ASK_STORAGE);
     }
 
     @Override
@@ -101,12 +107,9 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         if (!allowed()) return;
         List<Shelf.Entry> known = shelf.books();
         if (!known.isEmpty()) show(known);
-        else if (!view.hasBooks()) view.setMessage("Looking for books\u2026", null);
+        else if (!view.hasBooks()) view.setMessage("Looking for books\u2026");
         scan();
     }
-
-    /** Android has stopped asking: only the app's settings page can turn storage back on. */
-    private boolean storageOff;
 
     private boolean allowed() {
         return checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
@@ -126,13 +129,13 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         }
         if (code != ASK_STORAGE) return;
         if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
-            view.setMessage("Looking for books\u2026", null);
+            view.setMessage("Looking for books\u2026");
             scan();
         } else if (!shouldShowRequestPermissionRationale(Manifest.permission.READ_EXTERNAL_STORAGE)) {
             storageOff = true;
-            view.setMessage("Storage is turned off", null);
+            view.setMessage("Storage is turned off");
         } else {
-            view.setMessage("No storage access", null);
+            view.setMessage("No storage access");
         }
     }
 
@@ -170,13 +173,9 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
     }
 
     private void show(List<Shelf.Entry> books) {
-        if (books.isEmpty()) {
-            view.setBooks(books);
-            view.setMessage("No books yet", null);
-            return;
-        }
         view.setBooks(books);
-        loadCovers(books);
+        if (books.isEmpty()) view.setMessage("No books yet");
+        else loadCovers(books);
     }
 
     /**
@@ -247,35 +246,30 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
             case KeyEvent.KEYCODE_DPAD_RIGHT:
                 view.move(5);
                 return true;
-            case KeyEvent.KEYCODE_DPAD_CENTER:
-            case KeyEvent.KEYCODE_ENTER:
-            case KeyEvent.KEYCODE_NUMPAD_ENTER:
             case KeyEvent.KEYCODE_MENU:
                 if (event.getRepeatCount() == 0) event.startTracking();
                 return true;
             default:
-                return super.onKeyDown(keyCode, event);
+                if (!Ui.isOk(keyCode)) return super.onKeyDown(keyCode, event);
+                if (event.getRepeatCount() == 0) event.startTracking();
+                return true;
         }
     }
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        switch (keyCode) {
-            case KeyEvent.KEYCODE_DPAD_CENTER:
-            case KeyEvent.KEYCODE_ENTER:
-            case KeyEvent.KEYCODE_NUMPAD_ENTER:
-                if (!event.isTracking() || event.isCanceled()) return true;
-                if (menuOpen) menu.activate();
-                else ok();
-                return true;
-            case KeyEvent.KEYCODE_MENU:
-                if (!event.isTracking() || event.isCanceled()) return true;
-                if (menuOpen) closeMenu();
-                else showMenu();
-                return true;
-            default:
-                return super.onKeyUp(keyCode, event);
+        boolean menuKey = keyCode == KeyEvent.KEYCODE_MENU;
+        if (!menuKey && !Ui.isOk(keyCode)) return super.onKeyUp(keyCode, event);
+        if (!event.isTracking() || event.isCanceled()) return true;
+        if (menuKey) {
+            if (menuOpen) closeMenu();
+            else showMenu();
+        } else if (menuOpen) {
+            menu.activate();
+        } else {
+            ok();
         }
+        return true;
     }
 
     private void ok() {
@@ -290,7 +284,7 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
                 }
                 return;
             }
-            requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, ASK_STORAGE);
+            askStorage();
             return;
         }
         Shelf.Entry book = view.hasBooks() ? view.focused() : null;
@@ -321,18 +315,12 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         menuBook = view.hasBooks() ? view.focused() : null;
         List<ListPanel.Row> rows = new ArrayList<ListPanel.Row>();
         if (menuBook != null) {
-            if (!menuBook.isNew()) rows.add(new ListPanel.Row(MENU_UNREAD, ListPanel.PLAIN, "Mark as Unread"));
-            if (!menuBook.finished() && menuBook.length > 0) {
-                rows.add(new ListPanel.Row(MENU_FINISHED, ListPanel.PLAIN, "Mark as Finished"));
-            }
-            if (isEpub(menuBook)) rows.add(new ListPanel.Row(MENU_CONVERT, ListPanel.PLAIN, "Convert to MOBI"));
+            if (!menuBook.isNew()) rows.add(action(MENU_UNREAD, "Mark as Unread", false));
+            if (!menuBook.finished() && menuBook.length > 0) rows.add(action(MENU_FINISHED, "Mark as Finished", false));
+            if (isEpub(menuBook)) rows.add(action(MENU_CONVERT, "Convert to MOBI", false));
         }
-        rows.add(new ListPanel.Row(MENU_REFRESH, ListPanel.PLAIN, "Look for New Books"));
-        if (menuBook != null) {
-            ListPanel.Row delete = new ListPanel.Row(MENU_DELETE, ListPanel.PLAIN, "Delete Book");
-            delete.destructive = true;
-            rows.add(delete);
-        }
+        rows.add(action(MENU_REFRESH, "Look for New Books", false));
+        if (menuBook != null) rows.add(action(MENU_DELETE, "Delete Book", true));
         openSheet(menuBook != null ? menuBook.displayTitle() : "Library", rows, 0);
     }
 
@@ -341,11 +329,16 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         menuBook = book;
         List<ListPanel.Row> rows = new ArrayList<ListPanel.Row>();
         rows.add(new ListPanel.Row(0, ListPanel.HEADER, "Erase it from the phone?"));
-        rows.add(new ListPanel.Row(MENU_KEEP, ListPanel.PLAIN, "Cancel"));
-        ListPanel.Row delete = new ListPanel.Row(MENU_DELETE_NOW, ListPanel.PLAIN, "Delete");
-        delete.destructive = true;
-        rows.add(delete);
+        rows.add(action(MENU_KEEP, "Cancel", false));
+        rows.add(action(MENU_DELETE_NOW, "Delete", true));
         openSheet(book.displayTitle(), rows, 1);
+    }
+
+    /** A row of the sheet; a destructive one is drawn in red. */
+    private static ListPanel.Row action(int id, String title, boolean destructive) {
+        ListPanel.Row row = new ListPanel.Row(id, ListPanel.PLAIN, title);
+        row.destructive = destructive;
+        return row;
     }
 
     private void openSheet(String title, List<ListPanel.Row> rows, int focus) {
@@ -481,9 +474,7 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
                 String message = e.getMessage();
                 said = message != null && message.startsWith("Can\u2019t read")
                     ? message : "Couldn\u2019t save it beside the book";
-            } catch (IOException e) {
-                said = "Couldn\u2019t convert it";
-            } catch (RuntimeException | OutOfMemoryError e) {
+            } catch (IOException | RuntimeException | OutOfMemoryError e) {
                 said = "Couldn\u2019t convert it";
             }
             final String done = said;
