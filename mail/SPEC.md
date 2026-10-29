@@ -219,7 +219,7 @@ with a pill and a comma; Back hides them. Leaving the field hides them.
   token; OK in the token saves. Save with either missing: "Both the address
   and the token are needed", and the dialog stays with what was typed.
   Saved: "Saved: <host>" and the list reloads.
-- In every dialog, Up/Down move between its fields and buttons.
+- In every dialog, Up/Down move between its fields and buttons; Down from the last field, or from Cancel, lands on the primary button (Save, Search).
 - Open email file…: asks for storage the first time ("Storage not allowed"
   if refused). Lists `.eml` files from Documents and Download on the SD
   card and the phone, newest first, without ".eml". None: "No email files

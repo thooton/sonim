@@ -2037,7 +2037,17 @@ public final class MainActivity extends BaseActivity {
             }
             if (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN) return false;
             if (!down) return true;
-            View next = at == null ? null : at.focusSearch(code == KeyEvent.KEYCODE_DPAD_UP ? View.FOCUS_UP : View.FOCUS_DOWN);
+            boolean up = code == KeyEvent.KEYCODE_DPAD_UP;
+            View save = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            View cancel = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+            // The buttons sit side by side: Down ends on Save, the primary
+            // action, whether from the last field or from Cancel.
+            if (!up && save != null && at == cancel) {
+                save.requestFocus();
+                return true;
+            }
+            View next = at == null ? null : at.focusSearch(up ? View.FOCUS_UP : View.FOCUS_DOWN);
+            if (!up && save != null && next == cancel) next = save;
             if (next != null) next.requestFocus();
             return true;
         });
