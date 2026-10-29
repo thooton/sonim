@@ -42,8 +42,8 @@ changed.
 Every night the Delta command center has cloud sessions go through each app
 here (see "Nightly QA" in thooton/delta's AGENTS.md): one explores it in an
 emulator and files findings, another fixes what should be fixed and pushes
-to master, and then one refactors the whole repository. The Tree app
-(`tree/`) shows what they found and did, and starts runs.
+to master, and then one refactors the whole repository. The Delta website's
+QA page shows what they found and did, and starts runs.
 
 - Each app has a `SPEC.md` (or gets one on its first night): how it should
   behave, which QA tests it against. When you change what an app does,
