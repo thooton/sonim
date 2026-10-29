@@ -13,6 +13,10 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.xp3.common.ui.Ui;
+
+import java.util.Locale;
+
 /**
  * The pieces every screen is built from, in the sizes of the type scale.
  *
@@ -31,7 +35,7 @@ final class Views {
     }
 
     int dp(float value) {
-        return Math.round(value * context.getResources().getDisplayMetrics().density);
+        return Ui.dp(context, value);
     }
 
     // ------------------------------------------------------------------
@@ -97,7 +101,7 @@ final class Views {
     TextView label(String value) {
         // Upper-cased here rather than with setAllCaps, which setSingleLine's
         // own transformation would silently replace.
-        TextView view = text(value.toUpperCase(java.util.Locale.US), 8.5f, look.bold, look.muted);
+        TextView view = text(value.toUpperCase(Locale.US), 8.5f, look.bold, look.muted);
         view.setLetterSpacing(0.09f);
         view.setSingleLine(true);
         return view;
@@ -128,6 +132,32 @@ final class Views {
 
     private float density() {
         return context.getResources().getDisplayMetrics().density;
+    }
+
+    /** A fill with only its top corners rounded: a sheet's top, a calendar page's tab. */
+    GradientDrawable topRounded(int fill, float radius) {
+        GradientDrawable shape = new GradientDrawable();
+        shape.setColor(fill);
+        float r = dp(radius);
+        shape.setCornerRadii(new float[] { r, r, r, r, 0, 0, 0, 0 });
+        return shape;
+    }
+
+    /** A speech bubble: rounded but for one small corner at the bottom, on the speaker's side. */
+    GradientDrawable bubble(int fill, boolean right) {
+        GradientDrawable shape = new GradientDrawable();
+        shape.setColor(fill);
+        float r = dp(12);
+        float small = dp(3);
+        shape.setCornerRadii(right
+            ? new float[] { r, r, r, r, small, small, r, r }
+            : new float[] { r, r, r, r, r, r, small, small });
+        return shape;
+    }
+
+    /** The height of every full-width button. */
+    LinearLayout.LayoutParams buttonRow() {
+        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(28));
     }
 
     View dot(int color, int size) {
@@ -231,10 +261,6 @@ final class Views {
 
     static LinearLayout.LayoutParams fill() {
         return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-    }
-
-    static LinearLayout.LayoutParams tall() {
-        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1);
     }
 
     LinearLayout.LayoutParams margins(LinearLayout.LayoutParams params, float left, float top, float right,

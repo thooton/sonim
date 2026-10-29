@@ -5,14 +5,13 @@ import android.graphics.drawable.Drawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.updater.xp3.core.Catalog;
 import com.updater.xp3.core.Notes;
 import com.updater.xp3.core.Status;
+import com.xp3.common.ui.SelectableAdapter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,11 +22,9 @@ import java.util.TimeZone;
  * and a capsule button, with what's new underneath, grouped under Available,
  * Not Installed and Installed (the order MainActivity sorts them in).
  *
- * As in List, the highlight is painted by the rows (their background is
- * opaque, so ListView's selector would be hidden), which means the adapter
- * mirrors ListView's selection. ListView owns all d-pad movement.
+ * As in List, the highlight is painted by the rows (SelectableAdapter).
  */
-final class AppAdapter extends BaseAdapter {
+final class AppAdapter extends SelectableAdapter {
 
     /** One app in the release, as it stands on this phone. */
     static final class Row {
@@ -80,6 +77,11 @@ final class AppAdapter extends BaseAdapter {
             }
         }
 
+        /** Whether Update All would queue it. */
+        boolean updatable() {
+            return status == Status.UPDATE && activity == null;
+        }
+
         /** Which heading it is under: 0 Available, 1 Not Installed, 2 Installed. */
         int group() {
             if (status == Status.UPDATE) return 0;
@@ -92,7 +94,6 @@ final class AppAdapter extends BaseAdapter {
 
     private final LayoutInflater inflater;
     private final List<Row> rows = new ArrayList<>();
-    private int selectedPosition = AdapterView.INVALID_POSITION;
 
     AppAdapter(Context context) {
         inflater = LayoutInflater.from(context);
@@ -104,18 +105,8 @@ final class AppAdapter extends BaseAdapter {
         notifyDataSetChanged();
     }
 
-    void setSelectedPosition(int position) {
-        selectedPosition = position;
-        notifyDataSetChanged();
-    }
-
-    /** Records ListView's native selection without causing a second layout. */
-    void trackSelectedPosition(int position) {
-        selectedPosition = position;
-    }
-
-    int getSelectedPosition() {
-        return selectedPosition;
+    List<Row> rows() {
+        return rows;
     }
 
     @Override public int getCount() { return rows.size(); }
@@ -127,7 +118,7 @@ final class AppAdapter extends BaseAdapter {
         View view = convertView;
         if (view == null) view = inflater.inflate(R.layout.row_app, parent, false);
         Row row = rows.get(position);
-        boolean selected = position == selectedPosition;
+        boolean selected = isSelected(position);
         view.findViewById(R.id.app_body).setSelected(selected);
 
         int group = row.group();

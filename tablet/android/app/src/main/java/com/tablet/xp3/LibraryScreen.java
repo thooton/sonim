@@ -8,6 +8,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.tablet.xp3.data.Doc;
+import com.xp3.common.ui.Ui;
 
 import java.util.List;
 
@@ -48,7 +49,6 @@ final class LibraryScreen extends FrameLayout {
     LibraryScreen(Context c) {
         super(c);
         setBackgroundColor(Look.PAPER);
-        float density = c.getResources().getDisplayMetrics().density;
         addView(Parts.header(c, "Library", R.drawable.ic_tablet, synced), Parts.headerAt(c));
 
         shelf = new Shelf(c);
@@ -61,7 +61,7 @@ final class LibraryScreen extends FrameLayout {
         title.setSingleLine();
         title.setEllipsize(TextUtils.TruncateAt.END);
         title.setPadding(Look.dp(c, 3), Look.dp(c, 1), Look.dp(c, 3), Look.dp(c, 1));
-        title.setMaxWidth(Math.round(224 * density));
+        title.setMaxWidth(Ui.dp(c, 224));
         caption.addView(title, Parts.line(Parts.WRAP, Parts.WRAP));
         meta = Look.text(c, "", Look.ui, 9.5f, Look.GRAPHITE);
         meta.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -72,9 +72,9 @@ final class LibraryScreen extends FrameLayout {
         lp.topMargin = Look.dp(c, 3);
         caption.addView(meta, lp);
         LayoutParams at = new LayoutParams(Parts.FILL, Parts.WRAP);
-        at.topMargin = Math.round(CAPTION_TOP * density);
-        at.leftMargin = Math.round(8 * density);
-        at.rightMargin = Math.round(8 * density);
+        at.topMargin = Ui.dp(c, CAPTION_TOP);
+        at.leftMargin = Ui.dp(c, 8);
+        at.rightMargin = Ui.dp(c, 8);
         addView(caption, at);
     }
 
@@ -96,7 +96,7 @@ final class LibraryScreen extends FrameLayout {
         meta.setSingleLine(marked);
         meta.setMaxLines(marked ? 1 : 6);
         LayoutParams at = (LayoutParams) caption.getLayoutParams();
-        int top = Math.round((marked ? CAPTION_TOP : EMPTY_TOP) * getResources().getDisplayMetrics().density);
+        int top = Ui.dp(getContext(), marked ? CAPTION_TOP : EMPTY_TOP);
         if (at.topMargin != top) {
             at.topMargin = top;
             caption.setLayoutParams(at);

@@ -132,7 +132,6 @@ public final class Instagram {
             Double taken = Json.number(node, "taken_at");
             if (taken != null) posted = taken.longValue() * 1000;
         }
-        boolean reel = "clips".equals(Json.text(node, "product_type"));
         String caption = Json.text(Json.child(node, "caption"), "text");
 
         List<String> images = new ArrayList<String>();
@@ -141,8 +140,7 @@ public final class Instagram {
             if (item instanceof Map) add(images, image(Json.object(item)));
         }
         Double count = Json.number(node, "carousel_media_count");
-        return new Post(code, "https://www.instagram.com/" + (reel ? "reel" : "p") + "/" + code + "/",
-            posted, caption, images, count == null ? 0 : count.intValue());
+        return new Post(code, link(node, code), posted, caption, images, count == null ? 0 : count.intValue());
     }
 
     /** `display_uri`, or failing that the first of `image_versions2`'s candidates. */
@@ -179,11 +177,16 @@ public final class Instagram {
             for (Object child : children) {
                 if (child instanceof Map) add(images, Json.text(Json.child(Json.object(child), "node"), "display_url"));
             }
-            boolean reel = "clips".equals(Json.text(node, "product_type"));
-            posts.add(new Post(code, "https://www.instagram.com/" + (reel ? "reel" : "p") + "/" + code + "/",
+            posts.add(new Post(code, link(node, code),
                 taken == null ? 0 : taken.longValue() * 1000, caption, images, children.size()));
         }
         return newestFirst(posts);
+    }
+
+    /** The post's own page: a reel's is under /reel/, any other's under /p/. */
+    private static String link(Map<String, Object> node, String code) {
+        boolean reel = "clips".equals(Json.text(node, "product_type"));
+        return "https://www.instagram.com/" + (reel ? "reel" : "p") + "/" + code + "/";
     }
 
     private static void add(List<String> images, String url) {

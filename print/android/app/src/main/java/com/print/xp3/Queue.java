@@ -24,6 +24,9 @@ final class Queue {
     static final int FAILED = 3;
     static final int CANCELED = 4;
 
+    /** A day's milliseconds, for "Yesterday" and "This week" from {@link #midnight}. */
+    static final long DAY = 24L * 60 * 60 * 1000;
+
     /** One job. */
     static final class Entry {
         final int id;
@@ -63,8 +66,8 @@ final class Queue {
         void changed(Entry entry);
     }
 
-    private static final List<Entry> entries = new ArrayList<Entry>();
-    private static final List<Listener> listeners = new ArrayList<Listener>();
+    private static final List<Entry> entries = new ArrayList<>();
+    private static final List<Listener> listeners = new ArrayList<>();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static int nextId = 1;
 
@@ -81,7 +84,7 @@ final class Queue {
             MAIN.post(() -> changed(entry));
             return;
         }
-        for (Listener listener : new ArrayList<Listener>(listeners)) listener.changed(entry);
+        for (Listener listener : new ArrayList<>(listeners)) listener.changed(entry);
     }
 
     /** Puts a job on the queue and starts the service if it isn't running. */
@@ -126,7 +129,7 @@ final class Queue {
     /** Jobs in progress, then those finished today (earlier ones are cleared at midnight). */
     static List<Entry> shown() {
         long midnight = midnight();
-        List<Entry> out = new ArrayList<Entry>();
+        List<Entry> out = new ArrayList<>();
         for (Entry entry : entries) if (entry.active()) out.add(entry);
         for (int i = entries.size() - 1; i >= 0; i--) {
             Entry entry = entries.get(i);

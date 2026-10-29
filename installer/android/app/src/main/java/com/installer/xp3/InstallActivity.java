@@ -13,13 +13,14 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
  * Installs the APK named by its data URI and returns the outcome to the caller.
  *
- * The caller (Delta or the Updater) starts this for a result, with the APK as
+ * The caller (the Updater) starts this for a result, with the APK as
  * a content URI and a read grant on it. Because this app is the device owner,
  * committing the session installs straight away, with no confirmation screen.
  * The result is RESULT_OK on success, or RESULT_CANCELED with
@@ -99,7 +100,7 @@ public final class InstallActivity extends Activity {
             try {
                 try (InputStream in = getContentResolver().openInputStream(uri);
                      OutputStream out = session.openWrite("base.apk", 0, -1)) {
-                    if (in == null) throw new java.io.IOException("Can't read the file.");
+                    if (in == null) throw new IOException("Can't read the file.");
                     byte[] buffer = new byte[64 * 1024];
                     int n;
                     while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
@@ -141,23 +142,21 @@ public final class InstallActivity extends Activity {
             return;
         }
         if (status == PackageInstaller.STATUS_SUCCESS) {
-            succeed();
+            answer(RESULT_OK, null);
         } else {
-            fail(message(intent));
+            fail(message(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)));
         }
     }
 
-    private void succeed() {
-        if (done) return;
-        done = true;
-        setResult(RESULT_OK);
-        finish();
+    private void fail(String why) {
+        answer(RESULT_CANCELED, new Intent().putExtra(EXTRA_MESSAGE, why));
     }
 
-    private void fail(String why) {
+    /** Answers the caller once; a late second outcome is dropped. */
+    private void answer(int result, Intent data) {
         if (done) return;
         done = true;
-        setResult(RESULT_CANCELED, new Intent().putExtra(EXTRA_MESSAGE, why));
+        setResult(result, data);
         finish();
     }
 
@@ -165,10 +164,7 @@ public final class InstallActivity extends Activity {
      * A short sentence for the caller to show, from the session's status.
      * Android's own text (constant names, temp paths) only when nothing fits.
      */
-    private static String message(Intent intent) {
-        int status = intent.getIntExtra(
-            PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
-        String why = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
+    private static String message(int status, String why) {
         String raw = why == null ? "" : why;
         if (raw.contains("DOWNGRADE")) return "A newer version is already installed.";
         if (raw.contains("inconsistent with")) return "The file is a different app.";
@@ -196,7 +192,7 @@ public final class InstallActivity extends Activity {
         if (why != null && (why.contains("ENOSPC") || why.contains("No space"))) {
             return "There isn't enough storage.";
         }
-        if (e instanceof java.io.IOException || e instanceof SecurityException) {
+        if (e instanceof IOException || e instanceof SecurityException) {
             return "Can't read the file.";
         }
         return why != null ? why : e.getClass().getSimpleName();

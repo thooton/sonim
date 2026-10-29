@@ -1,7 +1,7 @@
 package com.print.xp3;
 
 import android.content.Context;
-import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -9,6 +9,8 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.xp3.common.ui.Ui;
+import java.io.File;
 
 /**
  * Home (screen 01): the printer banner, six tiles that match keys 1 to 6,
@@ -33,11 +35,11 @@ final class HomeScreen extends Screen implements Queue.Listener {
         LinearLayout body = Parts.column(c);
 
         View banner = banner(c);
-        body.addView(banner, Parts.line(Parts.FILL, Look.dp(c, 42)));
+        body.addView(banner, Parts.line(Parts.FILL, Ui.dp(c, 42)));
 
         LinearLayout grid = Parts.column(c);
-        int gap = Look.dp(c, 2);
-        grid.setPadding(Look.dp(c, 8), Look.dp(c, 8), Look.dp(c, 8), 0);
+        int gap = Ui.dp(c, 2);
+        grid.setPadding(Ui.dp(c, 8), Ui.dp(c, 8), Ui.dp(c, 8), 0);
         String[] labels = {"Print PDF", "Recent", "Printers", "Print Queue", "Ink Levels", "Settings"};
         int[] icons = {R.drawable.ic_doc, R.drawable.ic_clock, R.drawable.ic_printer, R.drawable.ic_list,
             R.drawable.ic_drop, R.drawable.ic_gear};
@@ -46,7 +48,7 @@ final class HomeScreen extends Screen implements Queue.Listener {
             for (int i = 0; i < 3; i++) {
                 final int n = r * 3 + i + 1;
                 View tile = tile(c, n, labels[n - 1], icons[n - 1]);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, Look.dp(c, 78), 1);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, Ui.dp(c, 78), 1);
                 if (i > 0) lp.leftMargin = gap;
                 line.addView(tile, lp);
                 if (n == 1) tileFirst = tile;
@@ -58,8 +60,8 @@ final class HomeScreen extends Screen implements Queue.Listener {
         body.addView(grid);
 
         again = againRow(c);
-        LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Look.dp(c, 48));
-        lp.setMargins(Look.dp(c, 8), Look.dp(c, 8), Look.dp(c, 8), 0);
+        LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Ui.dp(c, 48));
+        lp.setMargins(Ui.dp(c, 8), Ui.dp(c, 8), Ui.dp(c, 8), 0);
         body.addView(again, lp);
 
         return Parts.page(c, Parts.nav(c, "Print", false, null), body);
@@ -73,7 +75,7 @@ final class HomeScreen extends Screen implements Queue.Listener {
     private View banner(Context c) {
         LinearLayout banner = Parts.row(c);
         banner.setBackground(new Look.BannerFace(c));
-        banner.setPadding(Look.dp(c, 9), 0, Look.dp(c, 9), 0);
+        banner.setPadding(Ui.dp(c, 9), 0, Ui.dp(c, 9), 0);
         banner.setFocusable(true);
         banner.setDefaultFocusHighlightEnabled(false);
         banner.setOnClickListener(v -> app.open(new PrintersScreen(null)));
@@ -83,26 +85,23 @@ final class HomeScreen extends Screen implements Queue.Listener {
         text.addView(printerName);
         LinearLayout state = Parts.row(c);
         dot = new View(c);
-        LinearLayout.LayoutParams dotAt = Parts.line(Look.dp(c, 6), Look.dp(c, 6));
-        dotAt.rightMargin = Look.dp(c, 3);
+        LinearLayout.LayoutParams dotAt = Parts.line(Ui.dp(c, 6), Ui.dp(c, 6));
+        dotAt.rightMargin = Ui.dp(c, 3);
         state.addView(dot, dotAt);
         printerState = Look.line(c, "", 9.5f, Look.REGULAR, 0xE6FFFFFF);
         state.addView(printerState);
         LinearLayout.LayoutParams under = Parts.line(Parts.WRAP, Parts.WRAP);
-        under.topMargin = Look.dp(c, 2);
+        under.topMargin = Ui.dp(c, 2);
         text.addView(state, under);
         LinearLayout.LayoutParams lp = Parts.weighted();
-        lp.leftMargin = Look.dp(c, 8);
+        lp.leftMargin = Ui.dp(c, 8);
         banner.addView(text, lp);
         banner.addView(Parts.image(c, R.drawable.ic_chev_right, Look.WHITE, 13));
         return banner;
     }
 
     private void dot(int color) {
-        GradientDrawable circle = new GradientDrawable();
-        circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(color);
-        dot.setBackground(circle);
+        dot.setBackground(Look.oval(color));
     }
 
     private View tile(Context c, final int n, String label, int icon) {
@@ -113,18 +112,18 @@ final class HomeScreen extends Screen implements Queue.Listener {
         tile.setOnClickListener(v -> act(n));
         TextView key = Look.text(c, String.valueOf(n), 9, Look.BOLD, 0xCCFFFFFF);
         FrameLayout.LayoutParams corner = new FrameLayout.LayoutParams(Parts.WRAP, Parts.WRAP, Gravity.LEFT | Gravity.TOP);
-        corner.leftMargin = Look.dp(c, 5);
-        corner.topMargin = Look.dp(c, 4);
+        corner.leftMargin = Ui.dp(c, 5);
+        corner.topMargin = Ui.dp(c, 4);
         tile.addView(key, corner);
         if (n == 4) {
             badge = Look.text(c, "", 9, Look.BOLD, Look.NAVY);
             badge.setGravity(Gravity.CENTER);
             badge.setBackground(Look.rounded(Look.WHITE, 7, c));
-            badge.setMinWidth(Look.dp(c, 14));
-            badge.setPadding(Look.dp(c, 3), 0, Look.dp(c, 3), 0);
-            FrameLayout.LayoutParams right = new FrameLayout.LayoutParams(Parts.WRAP, Look.dp(c, 14), Gravity.RIGHT | Gravity.TOP);
-            right.rightMargin = Look.dp(c, 5);
-            right.topMargin = Look.dp(c, 4);
+            badge.setMinWidth(Ui.dp(c, 14));
+            badge.setPadding(Ui.dp(c, 3), 0, Ui.dp(c, 3), 0);
+            FrameLayout.LayoutParams right = new FrameLayout.LayoutParams(Parts.WRAP, Ui.dp(c, 14), Gravity.RIGHT | Gravity.TOP);
+            right.rightMargin = Ui.dp(c, 5);
+            right.topMargin = Ui.dp(c, 4);
             tile.addView(badge, right);
         }
         LinearLayout middle = Parts.column(c);
@@ -133,7 +132,7 @@ final class HomeScreen extends Screen implements Queue.Listener {
         TextView name = Look.text(c, label, 11, Look.SEMIBOLD, Look.WHITE);
         name.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams under = Parts.line(Parts.WRAP, Parts.WRAP);
-        under.topMargin = Look.dp(c, 6);
+        under.topMargin = Ui.dp(c, 6);
         middle.addView(name, under);
         tile.addView(middle, new FrameLayout.LayoutParams(Parts.FILL, Parts.WRAP, Gravity.CENTER));
         return tile;
@@ -141,33 +140,30 @@ final class HomeScreen extends Screen implements Queue.Listener {
 
     private LinearLayout againRow(Context c) {
         LinearLayout row = Parts.row(c);
-        android.graphics.drawable.StateListDrawable face = new android.graphics.drawable.StateListDrawable();
+        StateListDrawable face = new StateListDrawable();
         face.addState(new int[] {android.R.attr.state_focused}, Look.outlined(Look.SEL, 6, 1.5f, Look.BLUE, c));
         face.addState(new int[] {}, Look.rounded(Look.GREY, 6, c));
         row.setBackground(face);
-        row.setPadding(Look.dp(c, 9), 0, Look.dp(c, 9), 0);
+        row.setPadding(Ui.dp(c, 9), 0, Ui.dp(c, 9), 0);
         row.setFocusable(true);
         row.setDefaultFocusHighlightEnabled(false);
         row.setOnClickListener(v -> act(0));
         TextView key = Look.text(c, "0", 10, Look.BOLD, Look.NAVY);
         key.setGravity(Gravity.CENTER);
         key.setBackground(Look.outlined(Look.WHITE, 4, 1, 0xFFD3D6DE, c));
-        row.addView(key, Parts.line(Look.dp(c, 18), Look.dp(c, 18)));
-        againThumb = new ImageView(c);
-        againThumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        againThumb.setBackgroundColor(0xFFDCDEE3);
-        againThumb.setPadding(1, 1, 1, 1);
-        LinearLayout.LayoutParams thumb = Parts.line(Look.dp(c, 22), Look.dp(c, 28));
-        thumb.leftMargin = Look.dp(c, 8);
+        row.addView(key, Parts.line(Ui.dp(c, 18), Ui.dp(c, 18)));
+        againThumb = Parts.thumb(c);
+        LinearLayout.LayoutParams thumb = Parts.line(Ui.dp(c, 22), Ui.dp(c, 28));
+        thumb.leftMargin = Ui.dp(c, 8);
         row.addView(againThumb, thumb);
         LinearLayout text = Parts.column(c);
         text.addView(Look.line(c, "Print again", 11.5f, Look.BOLD, Look.INK));
         againSub = Look.line(c, "", 9.5f, Look.REGULAR, Look.MUTE);
         LinearLayout.LayoutParams under = Parts.line(Parts.FILL, Parts.WRAP);
-        under.topMargin = Look.dp(c, 1);
+        under.topMargin = Ui.dp(c, 1);
         text.addView(againSub, under);
         LinearLayout.LayoutParams lp = Parts.weighted();
-        lp.leftMargin = Look.dp(c, 8);
+        lp.leftMargin = Ui.dp(c, 8);
         row.addView(text, lp);
         row.addView(Parts.image(c, R.drawable.ic_chev_right, Look.CHEVRON, 12));
         return row;
@@ -220,10 +216,10 @@ final class HomeScreen extends Screen implements Queue.Listener {
             return;
         }
         again.setVisibility(View.VISIBLE);
-        againSub.setText(last.title + " · " + last.pages + (last.pages == 1 ? " page" : " pages"));
+        againSub.setText(last.title + " · " + Parts.count(last.pages, "page", "pages"));
         againThumb.setImageDrawable(null);
         if (last.exists()) {
-            Pages.draw(new java.io.File(last.path), 0, Look.dp(app, 20), Look.dp(app, 26), bitmap -> {
+            Pages.draw(new File(last.path), 0, Ui.dp(app, 20), Ui.dp(app, 26), bitmap -> {
                 if (bitmap != null) againThumb.setImageBitmap(bitmap);
             });
         }
@@ -238,7 +234,7 @@ final class HomeScreen extends Screen implements Queue.Listener {
                     return;
                 }
                 final Store.Print print = last;
-                app.allowed(() -> app.open(new PreviewScreen(new java.io.File(print.path), print)));
+                app.allowed(() -> app.open(new PreviewScreen(new File(print.path), print)));
                 break;
             case 1:
                 app.allowed(() -> app.open(new LocationsScreen()));

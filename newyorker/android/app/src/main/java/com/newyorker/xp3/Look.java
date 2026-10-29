@@ -6,6 +6,8 @@ import android.text.TextUtils;
 import android.util.TypedValue;
 import android.widget.TextView;
 
+import com.xp3.common.ui.Ui;
+
 /**
  * The New Yorker's own type, as the site sets it.
  *
@@ -69,8 +71,20 @@ final class Look {
         }
     }
 
-    static int dp(Context context, float value) {
-        return Math.round(value * context.getResources().getDisplayMetrics().density);
+    /** Try again, in capitals on the outlined button, filled with the ink while focused. */
+    static TextView retry(Context context) {
+        TextView button = text(context, sans(context, true), 11, R.color.ink);
+        button.setText("Try again");
+        button.setAllCaps(true);
+        button.setLetterSpacing(0.08f);
+        button.setBackgroundResource(R.drawable.button);
+        int x = Ui.dp(context, 16);
+        int y = Ui.dp(context, 7);
+        button.setPadding(x, y, x, y);
+        button.setFocusable(true);
+        button.setOnFocusChangeListener((view, focused) ->
+            button.setTextColor(context.getColor(focused ? R.color.page : R.color.ink)));
+        return button;
     }
 
     static TextView text(Context context, Typeface face, float sp, int colorRes) {

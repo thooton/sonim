@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Environment;
 import com.xp3.common.ui.Card;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -77,7 +78,7 @@ final class Library {
     static List<Location> locations(Context context) {
         File phone = phone();
         File card = Card.root(context);
-        List<Location> out = new ArrayList<Location>();
+        List<Location> out = new ArrayList<>();
         out.add(new Location(DOWNLOADS, "Downloads", R.drawable.ic_download,
             existing(new File(phone, "Download"), card == null ? null : new File(card, "Download")), false));
         out.add(new Location(DOCUMENTS, "Documents", R.drawable.ic_folder,
@@ -90,7 +91,7 @@ final class Library {
     }
 
     private static List<File> existing(File... dirs) {
-        List<File> out = new ArrayList<File>();
+        List<File> out = new ArrayList<>();
         for (File dir : dirs) {
             if (dir == null || !dir.isDirectory()) continue;
             boolean seen = false;
@@ -103,16 +104,16 @@ final class Library {
     private static boolean same(File a, File b) {
         try {
             return a.getCanonicalPath().equals(b.getCanonicalPath());
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             return a.equals(b);
         }
     }
 
     /** Every PDF under the location's folders, newest first. */
     static List<Pdf> scan(Location location) {
-        List<Pdf> out = new ArrayList<Pdf>();
+        List<Pdf> out = new ArrayList<>();
         for (File root : location.roots) walk(root, 0, out);
-        sort(out, 0);
+        sort(out, NEWEST);
         return out;
     }
 
@@ -150,12 +151,12 @@ final class Library {
         Collections.sort(pdfs, by);
     }
 
-    /** One folder for browsing: its folders (that hold anything), then its PDFs, each by name. */
+    /** One folder for browsing: its folders, then its PDFs, each by name. */
     static List<File> folder(File dir) {
         File[] all = dir.listFiles();
         if (all == null) return Collections.emptyList();
         Arrays.sort(all, (a, b) -> T9.compare(a.getName(), b.getName()));
-        List<File> out = new ArrayList<File>();
+        List<File> out = new ArrayList<>();
         for (File each : all) if (each.isDirectory() && !each.getName().startsWith(".")) out.add(each);
         for (File each : all) if (isPdf(each)) out.add(each);
         return out;

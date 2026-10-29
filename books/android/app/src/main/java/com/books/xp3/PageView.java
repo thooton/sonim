@@ -11,6 +11,8 @@ import android.text.TextPaint;
 import android.text.TextUtils;
 import android.view.View;
 
+import com.xp3.common.ui.Ui;
+
 /**
  * The page: the book's text, edge to edge on black, with only how far
  * through the book it is, small and grey in the bottom corner.
@@ -42,9 +44,9 @@ final class PageView extends View {
     private String detail = "";
     private String percent = "";
     private float progress;
-    private int accent;
-    private int track;
-    private int noticeFill;
+    private final int accent;
+    private final int track;
+    private final int noticeFill;
     private String notice;
     private final Runnable clearNotice = () -> {
         notice = null;
@@ -55,10 +57,10 @@ final class PageView extends View {
         super(context);
         regular = Fonts.ui(context.getAssets(), false);
         bold = Fonts.ui(context.getAssets(), true);
-        accent = getResources().getColor(R.color.accent);
-        track = getResources().getColor(R.color.separator);
-        noticeFill = getResources().getColor(R.color.surface_raised);
-        setBackgroundColor(getResources().getColor(R.color.page));
+        accent = context.getColor(R.color.accent);
+        track = context.getColor(R.color.separator);
+        noticeFill = context.getColor(R.color.surface_raised);
+        setBackgroundColor(context.getColor(R.color.page));
     }
 
     void setSizeListener(SizeListener listener) {
@@ -102,7 +104,11 @@ final class PageView extends View {
         if (chrome) invalidate();
     }
 
-    /** A short notice over the page, gone after a moment: "Night Shift on". */
+    /**
+     * A short notice over the page, gone after a moment: "Night Shift on".
+     * Drawn here rather than as a toast, a system window that Night Shift's
+     * filter cannot reach.
+     */
     void flash(String text) {
         notice = text;
         removeCallbacks(clearNotice);
@@ -216,6 +222,6 @@ final class PageView extends View {
     }
 
     private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(getContext(), value);
     }
 }

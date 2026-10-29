@@ -38,9 +38,7 @@ public final class Vault {
 
     /** Adds the accounts; one whose secret is already there is left as it was. */
     public List<Account> add(List<Account> accounts) throws IOException, InterruptedException {
-        List<Object> body = new ArrayList<>();
-        for (Account account : accounts) body.add(account.toJson());
-        return send(request("/otp").post(Json.write(body)).header("Content-Type", "application/json"));
+        return send(request("/otp").post(write(accounts)).header("Content-Type", "application/json"));
     }
 
     /** Changes the account with `changed`'s id to what `changed` says. */

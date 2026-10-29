@@ -15,8 +15,8 @@ public final class Addresses {
     private Addresses() {}
 
     public static List<String> local() {
-        List<String> wifi = new ArrayList<String>();
-        List<String> other = new ArrayList<String>();
+        List<String> wifi = new ArrayList<>();
+        List<String> other = new ArrayList<>();
         try {
             Enumeration<NetworkInterface> all = NetworkInterface.getNetworkInterfaces();
             if (all == null) return wifi;

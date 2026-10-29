@@ -1,17 +1,23 @@
 package com.canvas.xp3;
 
+import android.graphics.Paint;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Course;
 import com.canvas.xp3.data.Dates;
 import com.canvas.xp3.data.Section;
+import com.xp3.common.ui.Ui;
 
+import java.text.DateFormatSymbols;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,11 +58,6 @@ final class HomeScreen extends Screen {
     }
 
     @Override
-    boolean globalOptions() {
-        return true;
-    }
-
-    @Override
     String firstFocus() {
         if (tab != Assignment.ASSIGNED) return null;
         List<Assignment> due = app.todos.dueOn(selected, System.currentTimeMillis());
@@ -67,7 +68,7 @@ final class HomeScreen extends Screen {
     private static final class Built {
         String key;
         View root;
-        android.widget.ScrollView scroll;
+        ScrollView scroll;
         WeekStrip strip;
         final List<View> headers = new ArrayList<>();
         final List<Long> headerDays = new ArrayList<>();
@@ -112,8 +113,8 @@ final class HomeScreen extends Screen {
     }
 
     private void use(Built b) {
-        if (b.root.getParent() instanceof android.view.ViewGroup) {
-            ((android.view.ViewGroup) b.root.getParent()).removeView(b.root);
+        if (b.root.getParent() instanceof ViewGroup) {
+            ((ViewGroup) b.root.getParent()).removeView(b.root);
         }
         scroll = b.scroll;
         strip = b.strip;
@@ -133,7 +134,7 @@ final class HomeScreen extends Screen {
             String key = key(t, now);
             if (built[t] != null && key.equals(built[t].key)) continue;
             int was = tab;
-            android.widget.ScrollView keepScroll = scroll;
+            ScrollView keepScroll = scroll;
             WeekStrip keepStrip = strip;
             List<View> keepHeaders = new ArrayList<>(headers);
             List<Long> keepDays = new ArrayList<>(headerDays);
@@ -165,35 +166,31 @@ final class HomeScreen extends Screen {
         b.root = root;
         root.addView(tabs(), Views.wide());
 
-        List<Assignment> assigned = app.todos.inState(Assignment.ASSIGNED, now);
         if (which == Assignment.ASSIGNED) {
-            Item holder = new Item(app, STRIP, "View day", this::enterDay);
+            Item holder = new Item(app, STRIP, this::enterDay);
             final WeekStrip days = new WeekStrip(app, look);
             strip = days;
             holder.addView(days, Views.wide());
             holder.painter = days::focus;
             int todayColumn = Dates.weekOf(now) == weekStart ? Dates.column(now) : -1;
             days.week(weekStart, Dates.column(selected), todayColumn);
-            boolean weekEmpty = true;
             for (int i = 0; i < 7; i++) {
                 List<Integer> colors = new ArrayList<>();
                 for (Assignment item : app.todos.dueOn(Dates.addDays(weekStart, i), now)) {
                     colors.add(Integer.valueOf(look.course(color(item))));
-                    weekEmpty = false;
                 }
                 days.dots(i, colors);
             }
-            if (weekEmpty && undatedHere(now).isEmpty()) holder.ok = "Today";
             root.addView(holder, Views.wide());
         }
         root.addView(v.hairline());
 
         if (!app.backend.canvasReady()) {
             root.addView(parts.empty(0, "Canvas isn't set up",
-                "Sign in under Settings, then Account."), Views.tall());
+                "Sign in under Settings, then Account."), Ui.weighted());
         } else if (app.snapshot == null && app.syncError != null) {
             root.addView(parts.empty(0, "Couldn't reach Canvas", app.syncError),
-                Views.tall());
+                Ui.weighted());
         } else {
             LinearLayout list = parts.page(this, root);
             if (which == Assignment.ASSIGNED) assigned(parts, list, now, root);
@@ -222,7 +219,7 @@ final class HomeScreen extends Screen {
     // ------------------------------------------------------------------
 
     private View tabs() {
-        Item row = new Item(app, TABS, "Select", () -> step(1));
+        Item row = new Item(app, TABS, () -> step(1));
         LinearLayout line = v.row();
         line.setGravity(Gravity.BOTTOM);
         v.pad(line, 12, 4, 10, 5);
@@ -247,8 +244,13 @@ final class HomeScreen extends Screen {
         tab = (tab + direction + 3) % 3;
         scrollToDay = true;
         app.redraw();
-        View tabs = Screen.find(app.findViewById(android.R.id.content), TABS);
-        if (tabs != null) tabs.requestFocus();
+        focus(TABS);
+    }
+
+    /** Puts the d-pad on the item with this key, if it is on screen. */
+    private boolean focus(String key) {
+        Item item = find(app.findViewById(android.R.id.content), key);
+        return item != null && item.requestFocus();
     }
 
     // ------------------------------------------------------------------
@@ -290,13 +292,13 @@ final class HomeScreen extends Screen {
             scroll = null;
             boolean thisWeek = Dates.weekOf(now) == weekStart;
             root.addView(parts.empty(R.drawable.art_plane, "Nothing due this week",
-                thisWeek ? null : "Press 0 for today."), Views.tall());
+                thisWeek ? null : "Press 0 for today."), Ui.weighted());
         }
     }
 
     /** One row of the timeline: due time, a dot on the day's line, the title and its class. */
     private Item timeline(final Assignment item, long day) {
-        final Item row = new Item(app, "w:" + item.id, "Open", () -> open(item));
+        final Item row = new Item(app, "w:" + item.id, () -> open(item));
         row.day = day;
         LinearLayout line = v.row();
         line.setGravity(Gravity.TOP);
@@ -354,17 +356,17 @@ final class HomeScreen extends Screen {
      */
     private int timeWidth() {
         if (timeWidthLook == look) return timeWidth;
-        android.graphics.Paint paint = new android.graphics.Paint();
+        Paint paint = new Paint();
         paint.setTypeface(look.bold);
         paint.setFontFeatureSettings("tnum");
-        paint.setTextSize(android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,
+        paint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,
             10.5f * look.scale, app.getResources().getDisplayMetrics()));
         float widest = paint.measureText("00:00");
         paint.setTypeface(look.semibold);
         paint.setFontFeatureSettings(null);
-        paint.setTextSize(android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,
+        paint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,
             8 * look.scale, app.getResources().getDisplayMetrics()));
-        for (String half : new java.text.DateFormatSymbols().getAmPmStrings()) {
+        for (String half : new DateFormatSymbols().getAmPmStrings()) {
             widest = Math.max(widest, paint.measureText(half));
         }
         timeWidthLook = look;
@@ -386,24 +388,18 @@ final class HomeScreen extends Screen {
             if (weekEmpty && undatedHere(now).isEmpty()) jump(now, true);
             return;
         }
-        Item first = find(app.findViewById(android.R.id.content), "w:" + due.get(0).id);
-        if (first != null) first.requestFocus();
+        focus("w:" + due.get(0).id);
     }
 
     /** Moves the day in view, crossing into another week if need be, and redraws. */
     private void jump(long day, boolean focusStrip) {
-        long midnight = Dates.dayOf(day);
-        selected = midnight;
+        selected = Dates.dayOf(day);
         // The student picked this day; a build must not re-pick the opening one.
         chosen = true;
-        long week = Dates.weekOf(midnight);
-        weekStart = week;
+        weekStart = Dates.weekOf(selected);
         scrollToDay = true;
         app.redraw();
-        if (focusStrip) {
-            View holder = find(app.findViewById(android.R.id.content), STRIP);
-            if (holder != null) holder.requestFocus();
-        }
+        if (focusStrip) focus(STRIP);
     }
 
     @Override
@@ -412,7 +408,7 @@ final class HomeScreen extends Screen {
         app.main.postDelayed(prebuilder, 300);
         if (tab != Assignment.ASSIGNED && scrollToDay && scroll != null) {
             scrollToDay = false;
-            final android.widget.ScrollView page = scroll;
+            final ScrollView page = scroll;
             page.post(() -> page.scrollTo(0, 0));
             return;
         }
@@ -554,8 +550,7 @@ final class HomeScreen extends Screen {
                 if (!row.key.startsWith("w:")) continue;
                 if (row == focus) {
                     if (down) {
-                        View holder = find(app.findViewById(android.R.id.content), STRIP);
-                        if (holder != null) holder.requestFocus();
+                        focus(STRIP);
                         if (scroll != null) scroll.smoothScrollTo(0, 0);
                     }
                     return true;
@@ -568,13 +563,6 @@ final class HomeScreen extends Screen {
 
     private void enterDayIfAny() {
         List<Assignment> due = app.todos.dueOn(selected, System.currentTimeMillis());
-        View root = app.findViewById(android.R.id.content);
-        if (!due.isEmpty()) {
-            Item first = find(root, "w:" + due.get(0).id);
-            if (first != null) first.requestFocus();
-        } else {
-            View holder = find(root, STRIP);
-            if (holder != null) holder.requestFocus();
-        }
+        focus(due.isEmpty() ? STRIP : "w:" + due.get(0).id);
     }
 }

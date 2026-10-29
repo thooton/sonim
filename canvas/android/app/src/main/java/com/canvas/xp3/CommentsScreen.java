@@ -9,6 +9,7 @@ import android.widget.TextView;
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Course;
 import com.canvas.xp3.data.Detail;
+import com.xp3.common.ui.Ui;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,16 +33,6 @@ final class CommentsScreen extends Screen {
     }
 
     @Override
-    String left() {
-        return "Options";
-    }
-
-    @Override
-    String center() {
-        return sending ? "" : "Send";
-    }
-
-    @Override
     boolean globalOptions() {
         return false;
     }
@@ -59,7 +50,7 @@ final class CommentsScreen extends Screen {
         Parts parts = new Parts(app);
         Course course = app.course(work.courseId);
         LinearLayout root = v.column();
-        root.addView(parts.nav(work.title, (String) null), Views.wide());
+        root.addView(parts.nav(work.title), Views.wide());
         TextView heading = v.text("Private comments", 14, look.heavy, look.ink);
         v.pad(heading, 12, 0, 12, 0);
         root.addView(heading, Views.wide());
@@ -90,15 +81,13 @@ final class CommentsScreen extends Screen {
 
     @Override
     void shown() {
-        field.requestFocus();
         if (scroll != null) scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
         field.requestFocus();
-        app.refreshKeys();
     }
 
     @Override
     boolean onKey(KeyEvent event) {
-        if (com.xp3.common.ui.Ui.isOk(event.getKeyCode()) && app.getCurrentFocus() == field) {
+        if (Ui.isOk(event.getKeyCode()) && app.getCurrentFocus() == field) {
             if (event.getAction() == KeyEvent.ACTION_UP) send();
             return true;
         }

@@ -35,7 +35,7 @@ public final class SelfTest {
             check.same("a truncated escape is refused", null, Paths.segments("/a%2"));
             check.same("a NUL is refused", null, Paths.segments("/a%00b"));
             check.same("join folder", "/a/b/", Paths.join(Arrays.asList("a", "b"), true));
-            check.same("join root", "/", Paths.join(new ArrayList<String>(), false));
+            check.same("join root", "/", Paths.join(new ArrayList<>(), false));
             check.same("href", "/My%20Music/caf%C3%A9%23%3F/", Paths.href("/My Music/café#?/"));
         });
 
@@ -73,7 +73,7 @@ public final class SelfTest {
             int alpha = html.indexOf(">alpha.png</a>");
             int zeta = html.indexOf(">zeta.txt</a>");
             check.ok("order", parent < folder && folder < alpha && alpha < zeta);
-            check.ok("no parent at the root", !Listing.render("/", new ArrayList<Listing.Entry>()).contains(">..</a>"));
+            check.ok("no parent at the root", !Listing.render("/", new ArrayList<>()).contains(">..</a>"));
         });
 
         File root = new File(System.getProperty("java.io.tmpdir"), "serve-selftest-" + System.nanoTime());
@@ -205,7 +205,7 @@ public final class SelfTest {
 
     private static final class Response {
         int status;
-        final Map<String, String> headers = new HashMap<String, String>();
+        final Map<String, String> headers = new HashMap<>();
         String body = "";
 
         static Response read(InputStream in) throws IOException {

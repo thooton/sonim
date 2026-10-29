@@ -1,9 +1,10 @@
 package com.source.xp3;
 
+import android.content.Intent;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.text.TextUtils;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -16,8 +17,10 @@ import com.source.xp3.net.Books;
 import com.source.xp3.net.Music;
 import com.source.xp3.net.Names;
 import com.xp3.common.ui.Ui;
+import java.io.File;
 import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -68,8 +71,8 @@ public final class DetailActivity extends Tonal {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_page);
-        body = (ScrollView) findViewById(R.id.body);
-        page = (LinearLayout) findViewById(R.id.page);
+        body = findViewById(R.id.body);
+        page = findViewById(R.id.page);
         key = getIntent().getStringExtra(KEY);
         if (key == null || !resolve()) {
             finish();
@@ -128,12 +131,9 @@ public final class DetailActivity extends Tonal {
         else if (Music.ALBUM.equals(kind())) buildAlbum();
         else buildSong();
 
-        card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
+        card = vertical();
         card.setPadding(dp(12), dp(8), dp(12), dp(8));
-        LinearLayout top = new LinearLayout(this);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout top = row(Gravity.CENTER_VERTICAL);
         cardTitle = text("", 12, getColor(R.color.text));
         cardTitle.setTypeface(BOLD);
         cardTitle.setCompoundDrawablePadding(dp(5));
@@ -151,7 +151,7 @@ public final class DetailActivity extends Tonal {
         cardLine = text("", 11, getColor(R.color.text_muted));
         cardLine.setPadding(0, dp(5), 0, 0);
         card.addView(cardLine);
-        page.addView(card, margins(ViewGroup.LayoutParams.MATCH_PARENT, 8, 8));
+        page.addView(card, margins(8, 8));
 
         action = new LinearLayout(this);
         action.setGravity(Gravity.CENTER);
@@ -162,28 +162,28 @@ public final class DetailActivity extends Tonal {
         actionLabel.setSingleLine(true);
         actionLabel.setCompoundDrawablePadding(dp(6));
         action.addView(actionLabel);
-        page.addView(action, margins(ViewGroup.LayoutParams.MATCH_PARENT, 10, 12));
+        page.addView(action, margins(10, 12));
 
         if (hit != null && hit.album()) buildTracks();
         if (entry != null && hit == null && book == null && entry.files.size() > 1) buildFiles();
 
         logView = text("", 10, getColor(R.color.text_muted));
-        logView.setTypeface(android.graphics.Typeface.MONOSPACE);
+        logView.setTypeface(Typeface.MONOSPACE);
         logView.setLineSpacing(dp(2), 1f);
         logView.setBackgroundResource(R.drawable.log_card);
         logView.setPadding(dp(8), dp(6), dp(8), dp(6));
-        page.addView(logView, margins(ViewGroup.LayoutParams.MATCH_PARENT, 8, 8));
+        page.addView(logView, margins(8, 8));
     }
 
-    private LinearLayout.LayoutParams margins(int width, int top, int sides) {
-        LinearLayout.LayoutParams size = new LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+    /** Full width, `top` dp below what is over it and `sides` dp in from each side. */
+    private LinearLayout.LayoutParams margins(int top, int sides) {
+        LinearLayout.LayoutParams size = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         size.setMargins(dp(sides), dp(top), dp(sides), 0);
         return size;
     }
 
     private TextView centred(CharSequence value, float sp, int color) {
-        TextView view = text(value, 11, color);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        TextView view = line(value, sp, color);
         view.setGravity(Gravity.CENTER);
         view.setPadding(dp(12), 0, dp(12), 0);
         return view;
@@ -213,11 +213,9 @@ public final class DetailActivity extends Tonal {
 
     /** "MP3 · 320 kbps", "4:41", "10.8 MB": a song's facts as outlined chips, centred. */
     private View chips() {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_HORIZONTAL);
+        LinearLayout row = row(Gravity.CENTER_HORIZONTAL);
         row.setPadding(dp(8), dp(8), dp(8), 0);
-        List<String> parts = new ArrayList<String>(java.util.Arrays.asList(hit.specs().split(" · ")));
+        List<String> parts = new ArrayList<String>(Arrays.asList(hit.specs().split(" · ")));
         parts.remove("");
         if (hit.formats().length() > 0) {
             if (parts.isEmpty()) parts.add(hit.formats());
@@ -225,7 +223,6 @@ public final class DetailActivity extends Tonal {
         }
         for (String part : parts) {
             TextView chip = text(part, 10, getColor(R.color.text_muted));
-            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
             chip.setSingleLine(true);
             chip.setBackgroundResource(R.drawable.chip);
             chip.setPadding(dp(7), dp(2), dp(7), dp(2));
@@ -238,13 +235,7 @@ public final class DetailActivity extends Tonal {
 
     /** An album: its cover beside its folder, the folders above it, and its files. */
     private void buildAlbum() {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(dp(10), dp(4), dp(10), 0);
-        row.addView(cover, new LinearLayout.LayoutParams(dp(54), dp(54)));
-        LinearLayout lines = new LinearLayout(this);
-        lines.setOrientation(LinearLayout.VERTICAL);
-        lines.setPadding(dp(10), 0, 0, 0);
+        LinearLayout lines = beside(dp(54), dp(54));
         TextView title = text(name(), 15, getColor(R.color.text));
         title.setTypeface(BOLD);
         lines.addView(title);
@@ -256,11 +247,8 @@ public final class DetailActivity extends Tonal {
             where.setCompoundDrawablesRelative(icon(R.drawable.ic_folder, R.color.text_muted, 10), null, null, null);
             lines.addView(where);
         }
-        row.addView(lines, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        page.addView(row);
         if (hit != null) {
-            View tags = tagLine(hit.formats(), hit.specs(), false);
-            page.addView(tags);
+            page.addView(tagLine(hit.formats(), hit.specs()));
             LinearLayout who = (LinearLayout) sharer();
             who.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             who.setPadding(dp(10), dp(5), dp(12), 0);
@@ -270,13 +258,7 @@ public final class DetailActivity extends Tonal {
 
     /** A book: its cover beside title, author, year and language; then its formats. */
     private void buildBook() {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(dp(10), dp(4), dp(10), 0);
-        row.addView(cover, new LinearLayout.LayoutParams(dp(48), dp(72)));
-        LinearLayout lines = new LinearLayout(this);
-        lines.setOrientation(LinearLayout.VERTICAL);
-        lines.setPadding(dp(10), 0, 0, 0);
+        LinearLayout lines = beside(dp(48), dp(72));
         TextView title = text(name(), 15, getColor(R.color.text));
         title.setTypeface(BOLD);
         lines.addView(title);
@@ -294,18 +276,15 @@ public final class DetailActivity extends Tonal {
                 lines.addView(facts);
             }
         }
-        row.addView(lines, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        page.addView(row);
         if (book == null) return;
         if (formats.size() < 2) {
-            page.addView(tagLine(book.extension.toUpperCase(Locale.US), book.size, false));
+            page.addView(tagLine(book.extension.toUpperCase(Locale.US), book.size));
             return;
         }
         TextView label = text("Format", 11, getColor(R.color.text_muted));
         label.setPadding(dp(12), dp(10), dp(12), dp(4));
         page.addView(label);
-        LinearLayout chips = new LinearLayout(this);
-        chips.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout chips = row(Gravity.NO_GRAVITY);
         chips.setPadding(dp(8), 0, dp(8), 0);
         for (Books.Book one : formats) {
             TextView chip = text(one.extension.toUpperCase(Locale.US) + (one.size.length() > 0 ? "\n" + one.size : ""), 11, getColor(R.color.text));
@@ -322,12 +301,25 @@ public final class DetailActivity extends Tonal {
         page.addView(chips);
     }
 
+    /**
+     * The page's top for an album or a book: the cover, `width` by `height`,
+     * beside a column for its lines, which is returned to be filled.
+     */
+    private LinearLayout beside(int width, int height) {
+        LinearLayout row = row(Gravity.NO_GRAVITY);
+        row.setPadding(dp(10), dp(4), dp(10), 0);
+        row.addView(cover, new LinearLayout.LayoutParams(width, height));
+        LinearLayout lines = vertical();
+        lines.setPadding(dp(10), 0, 0, 0);
+        row.addView(lines, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        page.addView(row);
+        return lines;
+    }
+
     /** A format tag and what follows it: "[FLAC] 16/44.1 kHz · 4:12 · 30 MB". */
-    private View tagLine(String format, String rest, boolean centre) {
-        LinearLayout line = new LinearLayout(this);
-        line.setOrientation(LinearLayout.HORIZONTAL);
-        line.setGravity(Gravity.CENTER_VERTICAL | (centre ? Gravity.CENTER_HORIZONTAL : Gravity.START));
-        line.setPadding(dp(centre ? 12 : 10), dp(8), dp(12), 0);
+    private View tagLine(String format, String rest) {
+        LinearLayout line = row(Gravity.CENTER_VERTICAL | Gravity.START);
+        line.setPadding(dp(10), dp(8), dp(12), 0);
         if (format.length() > 0) {
             TextView tag = text(format, 9, getColor(R.color.on_tag));
             tag.setTypeface(BOLD);
@@ -347,12 +339,9 @@ public final class DetailActivity extends Tonal {
 
     /** Who shares it, how fast, and whether they have a slot free: Soulseek, undisguised. */
     private View sharer() {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
+        LinearLayout row = row(Gravity.CENTER);
         row.setPadding(dp(12), dp(6), dp(12), 0);
-        TextView who = text(hit.source(), 11, getColor(R.color.text_muted));
-        who.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f);
+        TextView who = line(hit.source(), 10.5f, getColor(R.color.text_muted));
         who.setCompoundDrawablePadding(dp(3));
         who.setCompoundDrawablesRelative(icon(R.drawable.ic_person, R.color.text_muted, 11), null, null, null);
         row.addView(who);
@@ -361,14 +350,11 @@ public final class DetailActivity extends Tonal {
 
     /** An album's files, numbered, with their lengths and each one's state. */
     private void buildTracks() {
-        LinearLayout list = new LinearLayout(this);
-        list.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout list = vertical();
         list.setPadding(0, dp(4), 0, 0);
         for (int i = 0; i < hit.tracks.size(); i++) {
             Music.Track track = hit.tracks.get(i);
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout row = row(Gravity.CENTER_VERTICAL);
             row.setPadding(dp(12), dp(3), dp(12), dp(3));
             row.setMinimumHeight(dp(26));
             TextView number = text(String.valueOf(i + 1), 11, getColor(R.color.text_muted));
@@ -397,7 +383,7 @@ public final class DetailActivity extends Tonal {
         StringBuilder names = new StringBuilder();
         for (String path : files) {
             if (names.length() > 0) names.append('\n');
-            names.append(new java.io.File(path).getName());
+            names.append(new File(path).getName());
         }
         TextView view = text(names, 11, getColor(R.color.text));
         view.setLineSpacing(dp(4), 1f);
@@ -609,7 +595,7 @@ public final class DetailActivity extends Tonal {
             sheet.add(R.drawable.ic_download, "Get it again", null, () -> get());
         }
         sheet.add(R.drawable.ic_history, "Downloads", null,
-            () -> startActivity(new android.content.Intent(this, DownloadsActivity.class)));
+            () -> startActivity(new Intent(this, DownloadsActivity.class)));
         sheet.show();
     }
 

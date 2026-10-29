@@ -3,6 +3,7 @@ package com.print.xp3;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
@@ -14,6 +15,8 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
+import com.xp3.common.ui.Ui;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -21,6 +24,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The one activity: a stack of {@link Screen}s, Home at the bottom, and a
@@ -35,9 +39,9 @@ public final class MainActivity extends Activity {
     private static final int ASK_LOCATION = 2;
 
     private FrameLayout root;
-    private final List<Screen> stack = new ArrayList<Screen>();
+    private final List<Screen> stack = new ArrayList<>();
     private View overlay;
-    private Runnable overlayClosed;
+    private boolean menuOpen;
     private Runnable whenAllowed;
     private Runnable whenAsked;
 
@@ -106,7 +110,7 @@ public final class MainActivity extends Activity {
         String name = uri.getLastPathSegment();
         if (name == null || name.isEmpty()) name = "Document";
         name = name.replaceAll(".*[/:]", "").replaceAll("[^A-Za-z0-9 ._()-]", "_");
-        if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")) name += ".pdf";
+        if (!name.toLowerCase(Locale.ROOT).endsWith(".pdf")) name += ".pdf";
         File dir = new File(getCacheDir(), "opened");
         dir.mkdirs();
         File out = new File(dir, name);
@@ -147,34 +151,24 @@ public final class MainActivity extends Activity {
             finish();
             return;
         }
-        Screen gone = stack.remove(stack.size() - 1);
-        gone.hidden();
-        gone.closed();
+        pop();
         Screen back = top();
         show(back, back.restore());
-    }
-
-    /** Closes the top screen and opens `screen` in its place. */
-    void replace(Screen screen) {
-        closeOverlay();
-        if (stack.size() > 1) {
-            Screen gone = stack.remove(stack.size() - 1);
-            gone.hidden();
-            gone.closed();
-        }
-        open(screen);
     }
 
     /** Back to Home. */
     void home() {
         closeOverlay();
-        while (stack.size() > 1) {
-            Screen gone = stack.remove(stack.size() - 1);
-            gone.hidden();
-            gone.closed();
-        }
+        while (stack.size() > 1) pop();
         Screen home = top();
         show(home, home.restore());
+    }
+
+    /** Closes the top screen for good. */
+    private void pop() {
+        Screen gone = stack.remove(stack.size() - 1);
+        gone.hidden();
+        gone.closed();
     }
 
     private void show(Screen screen, View focus) {
@@ -206,8 +200,6 @@ public final class MainActivity extends Activity {
         return super.dispatchKeyEvent(event);
     }
 
-    private boolean menuOpen;
-
     /** Menu: the top screen's options in a list, or nothing when it has none; Menu again closes it. */
     private void menu() {
         if (overlay != null) {
@@ -216,12 +208,12 @@ public final class MainActivity extends Activity {
         }
         Screen top = top();
         if (top == null) return;
-        final List<Screen.Option> options = new ArrayList<Screen.Option>();
+        final List<Screen.Option> options = new ArrayList<>();
         top.options(options);
         if (options.isEmpty()) return;
-        List<Choice> choices = new ArrayList<Choice>();
-        for (Screen.Option option : options) choices.add(new Choice(option.title, null));
-        choose("Options", choices, -1, null, which -> options.get(which).action.run());
+        List<String> titles = new ArrayList<>();
+        for (Screen.Option option : options) titles.add(option.title);
+        choose("Options", Choice.plain(titles), -1, null, which -> options.get(which).action.run());
         menuOpen = true;
     }
 
@@ -246,6 +238,20 @@ public final class MainActivity extends Activity {
             this.title = title;
             this.sub = sub;
         }
+
+        /** Choices that are a title each. */
+        static List<Choice> plain(Iterable<String> titles) {
+            List<Choice> out = new ArrayList<>();
+            for (String title : titles) out.add(new Choice(title, null));
+            return out;
+        }
+
+        /** Paper sizes: the name, and the measurements under it. */
+        static List<Choice> papers(List<String> media) {
+            List<Choice> out = new ArrayList<>();
+            for (String each : media) out.add(new Choice(Media.shown(each), Media.dimensions(each)));
+            return out;
+        }
     }
 
     interface Chosen {
@@ -260,10 +266,10 @@ public final class MainActivity extends Activity {
     void choose(String title, List<Choice> choices, int selected, String hint, final Chosen chosen) {
         final LinearLayout card = Parts.column(this);
         card.setBackground(Look.rounded(Look.WHITE, 8, this));
-        card.setElevation(Look.dp(this, 10));
+        card.setElevation(Ui.dp(this, 10));
         card.setClipToOutline(true);
         TextView heading = Look.line(this, title, 13, Look.BOLD, Look.INK);
-        heading.setPadding(Look.dp(this, 12), Look.dp(this, 10), Look.dp(this, 12), Look.dp(this, 6));
+        heading.setPadding(Ui.dp(this, 12), Ui.dp(this, 10), Ui.dp(this, 12), Ui.dp(this, 6));
         card.addView(heading);
         LinearLayout list = Parts.column(this);
         View focus = null;
@@ -274,7 +280,7 @@ public final class MainActivity extends Activity {
             Parts.Row row = new Parts.Row(this, 34);
             row.noDivider();
             // A list of actions (selected -1) has no radios: nothing is chosen.
-            if (selected >= 0) row.lead(new Parts.Radio(this, i == selected), Look.dp(this, 14), Look.dp(this, 14));
+            if (selected >= 0) row.lead(new Parts.Radio(this, i == selected), Ui.dp(this, 14), Ui.dp(this, 14));
             row.titled(choice.title, choice.sub);
             row.setOnClickListener(v -> {
                 closeOverlay();
@@ -290,24 +296,24 @@ public final class MainActivity extends Activity {
         if (hint != null) {
             card.addView(Parts.rule(this), Parts.line(Parts.FILL, 1));
             TextView help = Look.text(this, hint, 9, Look.REGULAR, Look.MUTE);
-            help.setPadding(Look.dp(this, 12), Look.dp(this, 6), Look.dp(this, 12), Look.dp(this, 8));
+            help.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 8));
             card.addView(help);
         }
-        showOverlay(card, focus, null);
+        showOverlay(card, focus);
     }
 
     /** A question with its answer as a button, and a way out ("Cancel this print job?"). */
     void ask(String title, String message, String yes, int kind, final Runnable then, String no) {
         LinearLayout card = Parts.column(this);
         card.setBackground(Look.rounded(Look.WHITE, 8, this));
-        card.setElevation(Look.dp(this, 10));
-        card.setPadding(0, Look.dp(this, 12), 0, Look.dp(this, 8));
+        card.setElevation(Ui.dp(this, 10));
+        card.setPadding(0, Ui.dp(this, 12), 0, Ui.dp(this, 8));
         TextView heading = Look.text(this, title, 13, Look.BOLD, Look.INK);
-        heading.setPadding(Look.dp(this, 12), 0, Look.dp(this, 12), 0);
+        heading.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 12), 0);
         card.addView(heading);
         if (message != null) {
             TextView body = Look.text(this, message, 10.5f, Look.REGULAR, Look.MUTE);
-            body.setPadding(Look.dp(this, 12), Look.dp(this, 4), Look.dp(this, 12), 0);
+            body.setPadding(Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12), 0);
             card.addView(body);
         }
         TextView keep = Parts.button(this, no, Parts.SECONDARY, this::closeOverlay);
@@ -317,13 +323,13 @@ public final class MainActivity extends Activity {
         });
         LinearLayout pair = Parts.pair(this, keep, act);
         LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Parts.WRAP);
-        lp.topMargin = Look.dp(this, 10);
+        lp.topMargin = Ui.dp(this, 10);
         card.addView(pair, lp);
         // The safe answer is focused, so OK by accident changes nothing.
-        showOverlay(card, keep, null);
+        showOverlay(card, keep);
     }
 
-    private void showOverlay(View card, View focus, Runnable closed) {
+    private void showOverlay(View card, View focus) {
         closeOverlay();
         Screen top = top();
         if (top != null) {
@@ -335,13 +341,12 @@ public final class MainActivity extends Activity {
         FrameLayout layer = new FrameLayout(this);
         layer.setBackgroundColor(0x8C0C1020);
         FrameLayout.LayoutParams at = new FrameLayout.LayoutParams(Parts.FILL, Parts.WRAP, Gravity.TOP);
-        at.leftMargin = at.rightMargin = Look.dp(this, 14);
-        at.topMargin = Look.dp(this, 50);
-        at.bottomMargin = Look.dp(this, 14);
+        at.leftMargin = at.rightMargin = Ui.dp(this, 14);
+        at.topMargin = Ui.dp(this, 50);
+        at.bottomMargin = Ui.dp(this, 14);
         layer.addView(card, at);
         root.addView(layer, new FrameLayout.LayoutParams(Parts.FILL, Parts.FILL));
         overlay = layer;
-        overlayClosed = closed;
         if (focus != null) focus.post(focus::requestFocus);
     }
 
@@ -358,9 +363,6 @@ public final class MainActivity extends Activity {
             View back = top.restore();
             if (back != null) back.requestFocus();
         }
-        Runnable closed = overlayClosed;
-        overlayClosed = null;
-        if (closed != null) closed.run();
     }
 
     // Permissions.
@@ -380,12 +382,13 @@ public final class MainActivity extends Activity {
      * won't tell an app the Wi-Fi network's name; `then` runs either way.
      */
     void askLocation(Runnable then) {
+        SharedPreferences prefs = getSharedPreferences("print", MODE_PRIVATE);
         if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            || getSharedPreferences("print", MODE_PRIVATE).getBoolean("askedLocation", false)) {
+            || prefs.getBoolean("askedLocation", false)) {
             then.run();
             return;
         }
-        getSharedPreferences("print", MODE_PRIVATE).edit().putBoolean("askedLocation", true).apply();
+        prefs.edit().putBoolean("askedLocation", true).apply();
         whenAsked = then;
         requestPermissions(new String[] {Manifest.permission.ACCESS_COARSE_LOCATION}, ASK_LOCATION);
     }
@@ -409,6 +412,6 @@ public final class MainActivity extends Activity {
     }
 
     void toast(String text) {
-        android.widget.Toast.makeText(this, text, android.widget.Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
     }
 }

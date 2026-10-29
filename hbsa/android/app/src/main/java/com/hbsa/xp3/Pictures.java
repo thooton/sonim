@@ -17,6 +17,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -89,8 +92,7 @@ final class Pictures {
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
         BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = 1;
-        while (bounds.outWidth / (options.inSampleSize * 2) >= WIDTH) options.inSampleSize *= 2;
+        options.inSampleSize = Ui.sampleSize(bounds.outWidth, WIDTH);
         Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
         if (bitmap == null) throw new IOException("Not a picture");
         if (bitmap.getWidth() > WIDTH) {
@@ -112,8 +114,7 @@ final class Pictures {
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(file.getPath(), bounds);
         BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = 1;
-        while (bounds.outWidth / (options.inSampleSize * 2) >= width) options.inSampleSize *= 2;
+        options.inSampleSize = Ui.sampleSize(bounds.outWidth, width);
         return BitmapFactory.decodeFile(file.getPath(), options);
     }
 
@@ -129,10 +130,10 @@ final class Pictures {
     }
 
     /** Drops pictures of posts no longer among the latest. */
-    static void prune(Context context, java.util.List<Post> posts) {
+    static void prune(Context context, List<Post> posts) {
         File[] files = new File(context.getCacheDir(), "pictures").listFiles();
         if (files == null) return;
-        java.util.Set<String> keep = new java.util.HashSet<String>();
+        Set<String> keep = new HashSet<String>();
         for (Post post : posts) keep.add(post.shortcode);
         for (File file : files) {
             String name = file.getName();

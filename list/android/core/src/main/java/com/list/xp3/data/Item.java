@@ -25,8 +25,8 @@ public final class Item {
     /**
      * The text as a row can show it: one line, trimmed, bounded.
      *
-     * The model and the T9 keyboard can both produce a newline, and a row is a
-     * single entry in an ordered list, so line breaks fold into spaces rather
+     * The T9 keyboard can produce a newline, and a row is a single entry in
+     * an ordered list, so line breaks fold into spaces rather
      * than turning one item into what looks like two.
      */
     public static String clean(String text) {

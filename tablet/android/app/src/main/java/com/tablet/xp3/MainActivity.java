@@ -16,15 +16,14 @@ import android.os.Looper;
 import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
-import android.text.TextPaint;
 import android.text.format.DateFormat;
 import android.text.style.ForegroundColorSpan;
-import android.text.style.MetricAffectingSpan;
-import android.view.Gravity;
 import android.graphics.drawable.ColorDrawable;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -37,17 +36,21 @@ import com.tablet.xp3.data.Formats;
 import com.tablet.xp3.data.Job;
 import com.tablet.xp3.data.Jobs;
 import com.tablet.xp3.data.Library;
+import com.tablet.xp3.data.Viewport;
 import com.tablet.xp3.data.When;
 import com.tablet.xp3.net.Center;
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
+import com.xp3.common.ui.FaceSpan;
 import com.xp3.common.ui.Card;
 import com.xp3.common.ui.CardGrant;
 import com.xp3.common.ui.Ui;
+import com.xp3.common.ui.Logins;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.TimeZone;
@@ -154,7 +157,7 @@ public final class MainActivity extends Activity {
         worker = Ui.worker("tablet");
         pages = new Pages(this);
         pages.onChange(() -> library.shelf.invalidate());
-        login = loadLogin(prefs());
+        login = Logins.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         signIn();
         String saved = Disk.read(listingFile(), 8000000);
         if (saved != null) {
@@ -239,22 +242,6 @@ public final class MainActivity extends Activity {
      * The bundled login is adopted once per build that carries a new one;
      * otherwise whatever was saved (perhaps typed in from Settings) is kept.
      */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     private void signIn() {
         tablet = login.ready() ? new Center(login) : null;
@@ -263,8 +250,7 @@ public final class MainActivity extends Activity {
 
     /** The fallback for a build without a bundled login, and for moving to another command center. */
     private void askLogin() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout box = Parts.column(this);
         int pad = Look.dp(this, 12);
         box.setPadding(pad, pad / 2, pad, 0);
         final EditText server = new EditText(this);
@@ -308,7 +294,7 @@ public final class MainActivity extends Activity {
             sign.getButton(AlertDialog.BUTTON_POSITIVE)};
         View.OnKeyListener walk = (v, code, event) -> {
             if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
-            int at = java.util.Arrays.asList(order).indexOf(v);
+            int at = Arrays.asList(order).indexOf(v);
             if (code == KeyEvent.KEYCODE_DPAD_DOWN && at < order.length - 1) order[at + 1].requestFocus();
             else if (code == KeyEvent.KEYCODE_DPAD_UP && at > 0) order[at - 1].requestFocus();
             else return false;
@@ -316,7 +302,7 @@ public final class MainActivity extends Activity {
         };
         for (View v : order) {
             v.setOnKeyListener(walk);
-            if (v instanceof android.widget.Button) ((android.widget.Button) v).setTextColor(Look.INK);
+            if (v instanceof Button) ((Button) v).setTextColor(Look.INK);
         }
     }
 
@@ -470,32 +456,13 @@ public final class MainActivity extends Activity {
         if (lead.length() > 0) {
             text.append(lead);
             text.setSpan(new ForegroundColorSpan(Look.MARK), 0, lead.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            text.setSpan(new Face(Look.uiBold), 0, lead.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(new FaceSpan(Look.uiBold), 0, lead.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         text.append(rest);
         toast.setText(text);
         toast.setVisibility(View.VISIBLE);
         handler.removeCallbacks(hideToast);
         handler.postDelayed(hideToast, Math.max(2600, 45L * text.length()));
-    }
-
-    /** A run of text in another face (TypefaceSpan only takes a Typeface from API 28). */
-    private static final class Face extends MetricAffectingSpan {
-        private final Typeface face;
-
-        Face(Typeface face) {
-            this.face = face;
-        }
-
-        @Override
-        public void updateDrawState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
-
-        @Override
-        public void updateMeasureState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
     }
 
     // ---- Drawing.
@@ -561,18 +528,18 @@ public final class MainActivity extends Activity {
             sheet.field.requestFocus();
             sheet.field.selectAll();
             sheet.field.post(() -> {
-                InputMethodManager ime = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                if (ime != null) ime.showSoftInput(sheet.field, 0);
+                ime().showSoftInput(sheet.field, 0);
             });
         }
     }
 
+    private InputMethodManager ime() {
+        return (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+    }
+
     private void closeSheet() {
         if (sheet == null) return;
-        if (sheet.field != null) {
-            InputMethodManager ime = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-            if (ime != null) ime.hideSoftInputFromWindow(sheet.field.getWindowToken(), 0);
-        }
+        if (sheet.field != null) ime().hideSoftInputFromWindow(sheet.field.getWindowToken(), 0);
         root.removeView(sheet);
         sheet = null;
         sheetDoc = null;
@@ -624,14 +591,12 @@ public final class MainActivity extends Activity {
         PREV = 8, NEXT = 9, ZOOM_OUT = 10, ZOOM_IN = 11, FIT = 12;
 
     private static int key(int code) {
+        if (Ui.isOk(code)) return OK;
         switch (code) {
             case KeyEvent.KEYCODE_DPAD_UP: return UP;
             case KeyEvent.KEYCODE_DPAD_DOWN: return DOWN;
             case KeyEvent.KEYCODE_DPAD_LEFT: return LEFT;
             case KeyEvent.KEYCODE_DPAD_RIGHT: return RIGHT;
-            case KeyEvent.KEYCODE_DPAD_CENTER:
-            case KeyEvent.KEYCODE_ENTER:
-            case KeyEvent.KEYCODE_NUMPAD_ENTER: return OK;
             case KeyEvent.KEYCODE_MENU:
             case KeyEvent.KEYCODE_SOFT_LEFT: return MENU;
             case KeyEvent.KEYCODE_BACK:
@@ -1114,32 +1079,32 @@ public final class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(request, permissions, results);
-        if (request == STORAGE_UPLOAD) {
-            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
-                openUpload();
-                render();
-            } else {
-                say("", "Storage permission denied");
-            }
-            return;
+        boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+        if (request == STORAGE_UPLOAD && granted) {
+            openUpload();
+            render();
+        } else if (request == STORAGE_UPLOAD) {
+            say("", "Storage permission denied");
+        } else if (request == STORAGE) {
+            resume(granted, "Storage permission denied");
         }
-        if (request != STORAGE) return;
-        Runnable pending = pendingDownload;
-        pendingDownload = null;
-        if (pending == null) return;
-        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) pending.run();
-        else say("", "Storage permission denied");
     }
 
     @Override
     protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
-        if (request != ASK_CARD) return;
+        if (request == ASK_CARD && pendingDownload != null) {
+            resume(CardGrant.answered(this, result, data), "SD card access denied");
+        }
+    }
+
+    /** Goes on with the download that was waiting on an answer, or says why it can't. */
+    private void resume(boolean granted, String denied) {
         Runnable pending = pendingDownload;
         pendingDownload = null;
         if (pending == null) return;
-        if (CardGrant.answered(this, result, data)) pending.run();
-        else say("", "SD card access denied");
+        if (granted) pending.run();
+        else say("", denied);
     }
 
     /** Takes a job off the list, which for a running one also ends it. */
@@ -1149,7 +1114,7 @@ public final class MainActivity extends Activity {
     }
 
     private void previewKey(int k) {
-        com.tablet.xp3.data.Viewport v = preview.viewport;
+        Viewport v = preview.viewport;
         switch (k) {
             case LEFT: v.pan(-1, 0); break;
             case RIGHT: v.pan(1, 0); break;

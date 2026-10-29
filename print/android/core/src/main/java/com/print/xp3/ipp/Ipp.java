@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -19,7 +20,7 @@ public final class Ipp {
 
     private Ipp() {}
 
-    private static final Charset UTF8 = Charset.forName("UTF-8");
+    private static final Charset UTF8 = StandardCharsets.UTF_8;
 
     // Group delimiters.
     public static final int OPERATION = 0x01;
@@ -72,7 +73,7 @@ public final class Ipp {
     public static final class Attribute {
         public final String name;
         public final int tag;
-        public final List<Object> values = new ArrayList<Object>();
+        public final List<Object> values = new ArrayList<>();
 
         public Attribute(String name, int tag, Object... values) {
             this.name = name;
@@ -87,7 +88,7 @@ public final class Ipp {
 
         /** Every value that is a string. */
         public List<String> strings() {
-            List<String> out = new ArrayList<String>();
+            List<String> out = new ArrayList<>();
             for (Object value : values) if (value instanceof String) out.add((String) value);
             return out;
         }
@@ -116,7 +117,7 @@ public final class Ipp {
     /** A group: its delimiter tag and its attributes, in order. */
     public static final class Group {
         public final int tag;
-        public final List<Attribute> attributes = new ArrayList<Attribute>();
+        public final List<Attribute> attributes = new ArrayList<>();
 
         public Group(int tag) {
             this.tag = tag;
@@ -147,7 +148,7 @@ public final class Ipp {
         public int minor = 0;
         public int code;
         public int id;
-        public final List<Group> groups = new ArrayList<Group>();
+        public final List<Group> groups = new ArrayList<>();
 
         public Message(int code, int id) {
             this.code = code;
@@ -161,7 +162,7 @@ public final class Ipp {
 
         /** Every group of this tag: CUPS-Get-Printers answers one per printer. */
         public List<Group> all(int tag) {
-            List<Group> out = new ArrayList<Group>();
+            List<Group> out = new ArrayList<>();
             for (Group group : groups) if (group.tag == tag) out.add(group);
             return out;
         }
@@ -334,7 +335,7 @@ public final class Ipp {
     }
 
     private static List<Attribute> collection(Reader in) throws IOException {
-        List<Attribute> members = new ArrayList<Attribute>();
+        List<Attribute> members = new ArrayList<>();
         Attribute member = null;
         while (true) {
             int tag = in.u8();

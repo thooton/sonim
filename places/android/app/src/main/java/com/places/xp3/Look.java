@@ -115,10 +115,7 @@ final class Look {
         view.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         int pad = (dp(size) - dp(iconSize)) / 2;
         view.setPadding(pad, pad, pad, pad);
-        GradientDrawable circle = new GradientDrawable();
-        circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(color(fill));
-        view.setBackground(circle);
+        view.setBackground(circle(color(fill)));
         view.setLayoutParams(new LinearLayout.LayoutParams(dp(size), dp(size)));
         return view;
     }
@@ -148,10 +145,11 @@ final class Look {
         return view;
     }
 
-    GradientDrawable pill(int fill, int stroke, int strokeColor) {
-        GradientDrawable pill = rounded(fill, dp(100));
-        if (stroke > 0) pill.setStroke(stroke, strokeColor);
-        return pill;
+    static GradientDrawable circle(int fill) {
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(fill);
+        return circle;
     }
 
     static GradientDrawable rounded(int fill, int radius) {

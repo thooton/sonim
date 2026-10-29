@@ -3,6 +3,7 @@ package com.source.xp3;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 import android.os.Handler;
 import android.os.Looper;
@@ -10,11 +11,12 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.xp3.common.ui.FaceSpan;
+import com.xp3.common.ui.Card;
 import com.xp3.common.ui.Ui;
 import java.io.File;
 
@@ -60,10 +62,7 @@ final class StorageCard extends LinearLayout {
         barSize.topMargin = Ui.dp(context, compact ? 5 : 7);
         addView(bar, barSize);
 
-        legend = new TextView(context);
-        legend.setTextColor(context.getColor(R.color.text_muted));
-        legend.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.text_meta));
-        legend.setIncludeFontPadding(false);
+        legend = Tonal.sized(context, R.dimen.text_meta, R.color.text_muted);
         legend.setPadding(0, Ui.dp(context, 6), 0, 0);
         legend.setGravity(Gravity.START);
         if (!compact) addView(legend);
@@ -93,7 +92,7 @@ final class StorageCard extends LinearLayout {
         }
         SpannableStringBuilder line = new SpannableStringBuilder(Download.human(space[0]));
         line.setSpan(new AbsoluteSizeSpan(18, true), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        line.setSpan(new Tonal.Face(Tonal.BOLD), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        line.setSpan(new FaceSpan(Tonal.BOLD), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         int start = line.length();
         line.append(" free of ").append(Download.human(space[1]));
         line.setSpan(new AbsoluteSizeSpan(11, true), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -117,7 +116,7 @@ final class StorageCard extends LinearLayout {
         measuring = true;
         final Handler main = new Handler(Looper.getMainLooper());
         new Thread(() -> {
-            File card = Files.card(context);
+            File card = Card.root(context);
             final long m = card == null ? -1 : Files.size(new File(card, Download.MUSIC_FOLDER));
             final long b = card == null ? -1 : Files.size(new File(card, Download.BOOKS_FOLDER));
             main.post(() -> {
@@ -144,7 +143,7 @@ final class StorageCard extends LinearLayout {
         private long books;
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF rect = new RectF();
-        private final android.graphics.Path clip = new android.graphics.Path();
+        private final Path clip = new Path();
 
         Bar(Context context) {
             super(context);
@@ -172,7 +171,7 @@ final class StorageCard extends LinearLayout {
             int[] colors = {R.color.accent, R.color.tertiary, R.color.outline};
             canvas.save();
             clip.reset();
-            clip.addRoundRect(rect, radius, radius, android.graphics.Path.Direction.CW);
+            clip.addRoundRect(rect, radius, radius, Path.Direction.CW);
             canvas.clipPath(clip);
             float x = 0;
             float gap = Math.max(1, getResources().getDisplayMetrics().density);

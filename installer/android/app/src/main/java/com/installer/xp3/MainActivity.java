@@ -18,7 +18,7 @@ import android.widget.TextView;
  * A one-screen status page: whether this app is the device owner and, if not,
  * the one command that makes it so. If it is, one button gives the role up
  * again, which is the only way to undo it short of a factory reset. The real
- * work is done by {@link InstallActivity} when Delta or the Updater calls it.
+ * work is done by {@link InstallActivity} when the Updater calls it.
  */
 public final class MainActivity extends Activity {
 

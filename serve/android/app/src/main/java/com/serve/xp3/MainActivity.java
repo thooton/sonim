@@ -13,7 +13,7 @@ import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.view.KeyEvent;
 import android.view.View;
-import android.widget.ListView;
+
 import android.widget.TextView;
 import com.serve.xp3.net.Addresses;
 import com.serve.xp3.net.Server;
@@ -54,12 +54,12 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
-        stateView = (TextView) findViewById(R.id.state);
-        folderView = (TextView) findViewById(R.id.folder);
-        addressView = (TextView) findViewById(R.id.address);
-        othersView = (TextView) findViewById(R.id.others);
-        statusView = (TextView) findViewById(R.id.status);
-        actionView = (TextView) findViewById(R.id.action);
+        stateView = findViewById(R.id.state);
+        folderView = findViewById(R.id.folder);
+        addressView = findViewById(R.id.address);
+        othersView = findViewById(R.id.others);
+        statusView = findViewById(R.id.status);
+        actionView = findViewById(R.id.action);
         // Drawn as focused: it is what OK does, whatever has the focus.
         actionView.setSelected(true);
         String saved = prefs().getString("folder", "");
@@ -87,7 +87,7 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     public void changed() {
         boolean running = ServeService.running();
         stateView.setText(running ? "Serving" : "Not serving");
-        stateView.setTextColor(getColor(running ? R.color.live_text : R.color.text_muted));
+        stateView.setTextColor(color(running ? R.color.live_text : R.color.text_muted));
         stateView.setTypeface(running ? Family.MEDIUM : Typeface.DEFAULT);
         stateView.getCompoundDrawablesRelative()[0].setLevel(running ? 1 : 0);
         cutStart(folderView, folder == null ? "None chosen" : shown(folder));
@@ -117,7 +117,7 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     private CharSequence address(String host) {
         SpannableStringBuilder out = new SpannableStringBuilder(url(host));
         int scheme = "http://".length();
-        out.setSpan(new ForegroundColorSpan(getColor(R.color.text_muted)), 0, scheme, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        out.setSpan(new ForegroundColorSpan(color(R.color.text_muted)), 0, scheme, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         out.setSpan(new RelativeSizeSpan(0.75f), 0, scheme, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return out;
     }
@@ -194,7 +194,7 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
 
     /** The shared storage roots: the phone's own first, then any card. */
     private List<File> volumes() {
-        List<File> roots = new ArrayList<File>();
+        List<File> roots = new ArrayList<>();
         for (File dir : getExternalFilesDirs(null)) {
             if (dir == null) continue;
             String path = dir.getPath();
@@ -215,7 +215,7 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     }
 
     private void begin() {
-        if (!allowed(() -> begin())) return;
+        if (!allowed(this::begin)) return;
         if (!folder.isDirectory()) {
             problem("That folder is gone");
             return;
@@ -224,7 +224,7 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     }
 
     private void choose() {
-        if (!allowed(() -> choose())) return;
+        if (!allowed(this::choose)) return;
         List<File> roots = volumes();
         if (roots.size() == 1) pick(roots.get(0), roots.get(0), null);
         else pickVolume(roots);
@@ -254,13 +254,9 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     }
 
     private void pickVolume(final List<File> roots) {
-        String[] labels = new String[roots.size()];
-        for (int i = 0; i < labels.length; i++) labels[i] = volumeLabel(i);
-        new AlertDialog.Builder(this)
-            .setTitle("Choose folder")
-            .setItems(labels, (dialog, which) -> pick(roots.get(which), roots.get(which), null))
-            .setNegativeButton("Cancel", null)
-            .show();
+        List<String> labels = new ArrayList<>();
+        for (int i = 0; i < roots.size(); i++) labels.add(volumeLabel(i));
+        listDialog("Choose folder", labels, which -> pick(roots.get(which), roots.get(which), null), null);
     }
 
     /**
@@ -270,7 +266,7 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
      * just left is the selected row.
      */
     private void pick(final File root, final File at, String from) {
-        final List<String> inside = new ArrayList<String>();
+        final List<String> inside = new ArrayList<>();
         String[] names = at.list();
         if (names != null) {
             for (String name : names) {
@@ -278,7 +274,7 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
             }
         }
         Collections.sort(inside, String.CASE_INSENSITIVE_ORDER);
-        List<String> items = new ArrayList<String>();
+        List<String> items = new ArrayList<>();
         items.add("✓ Serve this folder");
         for (String name : inside) items.add(name + "/");
 
@@ -300,13 +296,10 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
         });
         dialog.show();
         // Deep paths would all read alike if the title kept their start.
-        TextView title = (TextView) dialog.findViewById(getResources().getIdentifier("alertTitle", "id", "android"));
+        TextView title = dialog.findViewById(getResources().getIdentifier("alertTitle", "id", "android"));
         if (title != null) cutStart(title, shown(at));
         int row = from == null ? -1 : inside.indexOf(from);
-        if (row >= 0) {
-            ListView list = dialog.getListView();
-            list.setSelection(row + 1);
-        }
+        if (row >= 0) dialog.getListView().setSelection(row + 1);
     }
 
     /** Back in the folder list: up a level, or off the top of the storage. */
@@ -345,18 +338,15 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
     }
 
     private void menu() {
-        final boolean running = ServeService.running();
+        boolean running = ServeService.running();
         // With no folder yet there is nothing to start: OK would choose one too.
-        if (!running && folder == null) {
-            new AlertDialog.Builder(this)
-                .setItems(new String[] {"Choose folder…"}, (dialog, which) -> choose())
-                .show();
-            return;
-        }
-        String[] labels = {running ? "Stop serving" : "Start serving", "Choose folder…"};
+        final boolean toggles = running || folder != null;
+        String[] labels = toggles
+            ? new String[] {running ? "Stop serving" : "Start serving", "Choose folder…"}
+            : new String[] {"Choose folder…"};
         new AlertDialog.Builder(this)
             .setItems(labels, (dialog, which) -> {
-                if (which == 0) toggle();
+                if (toggles && which == 0) toggle();
                 else choose();
             })
             .show();

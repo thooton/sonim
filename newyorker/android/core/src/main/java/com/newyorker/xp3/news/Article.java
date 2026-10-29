@@ -52,8 +52,13 @@ public final class Article {
 
     /** Whether the page held an article at all; a page that changed shape holds none. */
     public boolean hasBody() {
-        for (Block block : blocks) if (block.kind == Block.PARAGRAPH) return true;
-        return false;
+        return lastParagraph() >= 0;
+    }
+
+    /** Where the last paragraph is among the blocks, which the end mark follows; -1 for none. */
+    public int lastParagraph() {
+        for (int i = blocks.size() - 1; i >= 0; i--) if (blocks.get(i).kind == Block.PARAGRAPH) return i;
+        return -1;
     }
 
     public static Article parse(String url, String html, int imageWidth) {

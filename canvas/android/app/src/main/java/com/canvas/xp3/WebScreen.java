@@ -7,11 +7,13 @@ import android.widget.TextView;
 
 import com.canvas.xp3.data.Html;
 import com.canvas.xp3.data.Link;
-import com.canvas.xp3.net.Web;
 import com.xp3.common.Disk;
 
 import java.io.File;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * A link from outside Canvas, fetched. A file (a PDF, a picture) goes on to
@@ -47,12 +49,12 @@ final class WebScreen extends Screen {
     private static String page(File file) {
         String text = Disk.read(file, (int) Backend.MAX_DOWNLOAD);
         if (text == null) return "";
-        java.util.regex.Matcher declared = java.util.regex.Pattern
+        Matcher declared = Pattern
             .compile("(?i)<meta[^>]+charset=[\"']?([A-Za-z0-9._-]+)").matcher(text.length() > 4096
                 ? text.substring(0, 4096) : text);
         if (declared.find() && !declared.group(1).equalsIgnoreCase("utf-8")) {
             try {
-                byte[] bytes = java.nio.file.Files.readAllBytes(file.toPath());
+                byte[] bytes = Files.readAllBytes(file.toPath());
                 text = new String(bytes, Charset.forName(declared.group(1)));
             } catch (Exception e) {
                 // An unknown or unreadable charset: the UTF-8 reading stands.

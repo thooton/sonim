@@ -2,12 +2,10 @@ package com.print.xp3;
 
 import android.content.Context;
 import android.view.View;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
+import com.xp3.common.ui.Ui;
 import java.io.File;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -27,12 +25,8 @@ final class RecentScreen extends Screen {
     View build() {
         Context c = app;
         list = Parts.column(c);
-        ScrollView scroll = new ScrollView(c);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setDefaultFocusHighlightEnabled(false);
-        scroll.addView(list);
         fill(c);
-        return Parts.page(c, Parts.nav(c, "Recent", true, null), scroll);
+        return Parts.page(c, Parts.nav(c, "Recent", true, null), Parts.scroll(c, list));
     }
 
     @Override
@@ -48,12 +42,11 @@ final class RecentScreen extends Screen {
             return;
         }
         long midnight = Queue.midnight();
-        long day = 24L * 60 * 60 * 1000;
         String group = null;
         Parts.Row last = null;
         for (final Store.Print print : history) {
-            String heading = print.when >= midnight ? "Today" : print.when >= midnight - day ? "Yesterday"
-                : print.when >= midnight - 6 * day ? "This week" : "Earlier";
+            String heading = print.when >= midnight ? "Today" : print.when >= midnight - Queue.DAY ? "Yesterday"
+                : print.when >= midnight - 6 * Queue.DAY ? "This week" : "Earlier";
             if (!heading.equals(group)) {
                 if (last != null) last.noDivider();
                 list.addView(Parts.header(c, heading));
@@ -62,19 +55,16 @@ final class RecentScreen extends Screen {
             boolean there = print.exists();
             Parts.Row row = new Parts.Row(c, 42);
             row.setTag(print.path);
-            final ImageView thumb = new ImageView(c);
-            thumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            thumb.setBackgroundColor(0xFFDCDEE3);
-            thumb.setPadding(1, 1, 1, 1);
-            row.lead(thumb, Look.dp(c, 24), Look.dp(c, 31));
+            if (there) {
+                Parts.thumbOf(row, new File(print.path));
+            } else {
+                row.lead(Parts.thumb(c), Ui.dp(c, 24), Ui.dp(c, 31));
+            }
             row.titled(print.title, there ? "Printed " + time(print.when, midnight) + " · " + shortName(print.printerName)
                 : "Moved or deleted");
             if (there) {
                 row.chevron();
                 row.setOnClickListener(v -> app.open(new PreviewScreen(new File(print.path), print)));
-                Pages.draw(new File(print.path), 0, Look.dp(c, 22), Look.dp(c, 29), bitmap -> {
-                    if (bitmap != null) thumb.setImageBitmap(bitmap);
-                });
             } else {
                 // Still focusable, so it can be taken off the list.
                 row.title.setTextColor(Look.MUTE);
@@ -88,12 +78,9 @@ final class RecentScreen extends Screen {
 
     /** "2:48 PM" today, "7:05 AM" yesterday, "Tue" this week, else "Oct 3". */
     private static String time(long when, long midnight) {
-        long day = 24L * 60 * 60 * 1000;
         Date date = new Date(when);
-        if (when >= midnight - day) return new SimpleDateFormat("h:mm a", Locale.US).format(date);
-        if (when >= midnight - 6 * day) return new SimpleDateFormat("EEE", Locale.US).format(date);
-        Calendar then = Calendar.getInstance();
-        then.setTime(date);
+        if (when >= midnight - Queue.DAY) return new SimpleDateFormat("h:mm a", Locale.US).format(date);
+        if (when >= midnight - 6 * Queue.DAY) return new SimpleDateFormat("EEE", Locale.US).format(date);
         return new SimpleDateFormat("MMM d", Locale.US).format(date);
     }
 

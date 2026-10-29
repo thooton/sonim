@@ -11,7 +11,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.util.LruCache;
+import com.xp3.common.ui.Ui;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -42,9 +44,9 @@ final class Pages {
     static final int LOCKED = -2;
     static final int BROKEN = -3;
 
-    private static final ExecutorService WORKER = com.xp3.common.ui.Ui.worker("pages");
+    private static final ExecutorService WORKER = Ui.worker("pages");
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
-    private static final Map<String, Integer> COUNTS = new HashMap<String, Integer>();
+    private static final Map<String, Integer> COUNTS = new HashMap<>();
     private static final LruCache<String, Bitmap> SMALL = new LruCache<String, Bitmap>(4 << 20) {
         @Override
         protected int sizeOf(String key, Bitmap value) {
@@ -97,7 +99,7 @@ final class Pages {
     /** Asks {@link PdfCheck}, starting it afresh when it ended after a bad file. */
     private static int check(File file) {
         for (int attempt = 0; attempt < 5; attempt++) {
-            if (attempt > 0) android.os.SystemClock.sleep(50);
+            if (attempt > 0) SystemClock.sleep(50);
             ContentProviderClient client = context.getContentResolver().acquireUnstableContentProviderClient(PdfCheck.URI);
             if (client == null) break;
             try {

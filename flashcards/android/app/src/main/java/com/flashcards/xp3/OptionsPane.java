@@ -55,39 +55,34 @@ final class OptionsPane extends LinearLayout {
         card.setBackground(face);
         addView(card, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        TextView section = text("Daily Limits", 15, R.color.text);
-        section.setTypeface(Anki.MEDIUM);
-        section.setPadding(0, 0, 0, dp(8));
-        card.addView(section);
-
-        LinearLayout row = new LinearLayout(context);
-        row.setOrientation(HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        card.addView(row, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        row.addView(text("New cards/day", 13, R.color.text), new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        box = Anki.button(context, "");
-        box.setTextSize(13);
-        box.setPadding(dp(4), 0, dp(4), 0);
-        box.setFocusable(false);
-        Anki.ring(box);
-        row.addView(box, new LayoutParams(dp(84), dp(28)));
-
+        section(card, "Daily Limits", 0);
+        box = setting(card, "New cards/day");
         // Not part of the deck: kept on this device, for every deck.
-        TextView display = text("Display", 15, R.color.text);
-        display.setTypeface(Anki.MEDIUM);
-        display.setPadding(0, dp(12), 0, dp(8));
-        card.addView(display);
-        LinearLayout shown = new LinearLayout(context);
-        shown.setOrientation(HORIZONTAL);
-        shown.setGravity(Gravity.CENTER_VERTICAL);
-        card.addView(shown, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        shown.addView(text("Show progress", 13, R.color.text), new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        progressBox = Anki.button(context, "");
-        progressBox.setTextSize(13);
-        progressBox.setPadding(dp(4), 0, dp(4), 0);
-        progressBox.setFocusable(false);
-        shown.addView(progressBox, new LayoutParams(dp(84), dp(28)));
+        section(card, "Display", dp(12));
+        progressBox = setting(card, "Show progress");
         show();
+    }
+
+    private void section(LinearLayout card, String name, int above) {
+        TextView section = text(name, 15, R.color.text);
+        section.setTypeface(Anki.MEDIUM);
+        section.setPadding(0, above, 0, dp(8));
+        card.addView(section);
+    }
+
+    /** A setting's line: its name, and the spin box that shows its value. */
+    private TextView setting(LinearLayout card, String name) {
+        LinearLayout line = new LinearLayout(getContext());
+        line.setOrientation(HORIZONTAL);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(line, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        line.addView(text(name, 13, R.color.text), new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        TextView spin = Anki.button(getContext(), "");
+        spin.setTextSize(13);
+        spin.setPadding(dp(4), 0, dp(4), 0);
+        spin.setFocusable(false);
+        line.addView(spin, new LayoutParams(dp(84), dp(28)));
+        return spin;
     }
 
     boolean showProgress() {
@@ -102,8 +97,11 @@ final class OptionsPane extends LinearLayout {
     private void show() {
         box.setText("‹  " + (value < 0 ? "Auto" : Integer.toString(value)) + "  ›");
         progressBox.setText("‹  " + (showProgress ? "On" : "Off") + "  ›");
-        if (row == 0) { Anki.ring(box); progressBox.setBackground(Anki.buttonFace(getContext())); }
-        else { Anki.ring(progressBox); box.setBackground(Anki.buttonFace(getContext())); }
+        // The row with the keys wears Anki's blue ring.
+        TextView on = row == 0 ? box : progressBox;
+        TextView off = row == 0 ? progressBox : box;
+        Anki.ring(on);
+        off.setBackground(Anki.buttonFace(getContext()));
     }
 
     @Override

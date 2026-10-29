@@ -5,7 +5,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.pdf.PdfRenderer;
 import android.os.ParcelFileDescriptor;
-import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -17,6 +16,7 @@ import android.widget.TextView;
 
 import com.canvas.xp3.data.Detail;
 import com.xp3.common.Disk;
+import com.xp3.common.ui.Ui;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,7 +67,7 @@ final class ViewerScreen extends Screen {
     }
 
     private void download() {
-        app.background(() -> app.backend.download(ref.id, null), (got, failure) -> {
+        app.background(() -> app.backend.download(ref.id), (got, failure) -> {
             if (got != null) file = got;
             else problem = failure;
             refresh();
@@ -95,15 +95,10 @@ final class ViewerScreen extends Screen {
     }
 
     @Override
-    String center() {
-        return pdf != null && pdf.getPageCount() > 1 ? "Next page" : "";
-    }
-
-    @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
         boolean up = event.getAction() == KeyEvent.ACTION_UP;
-        if (com.xp3.common.ui.Ui.isOk(code)) {
+        if (Ui.isOk(code)) {
             if (up && pdf != null && pdf.getPageCount() > 1) turn(1);
             return true;
         }
@@ -145,7 +140,7 @@ final class ViewerScreen extends Screen {
         root.addView(parts.nav(name, where), Views.wide());
         FrameLayout area = new FrameLayout(app);
         area.setBackgroundColor(look.paper);
-        root.addView(area, Views.tall());
+        root.addView(area, Ui.weighted());
         pane = null;
         wide = null;
 
@@ -201,7 +196,6 @@ final class ViewerScreen extends Screen {
     @Override
     void shown() {
         if (pane != null) pane.requestFocus();
-        app.refreshKeys();
     }
 
     private Bitmap render(int width) {

@@ -1,12 +1,9 @@
 package com.canvas.xp3.net;
 
 import com.xp3.common.Check;
-import com.xp3.common.Http;
-import com.xp3.common.Json;
 import com.xp3.common.TestServer;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;

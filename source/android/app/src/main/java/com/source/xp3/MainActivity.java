@@ -2,12 +2,17 @@ package com.source.xp3;
 
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.res.ColorStateList;
+import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.TextWatcher;
-import android.util.TypedValue;
+import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -27,6 +32,7 @@ import com.source.xp3.data.Recents;
 import com.source.xp3.net.Books;
 import com.source.xp3.net.Music;
 import com.xp3.common.Login;
+import com.xp3.common.ui.FaceSpan;
 import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -98,8 +104,6 @@ public final class MainActivity extends Tonal {
     /** The home screen's or empty state's rows that can be picked, with what OK does on each. */
     private final List<View> pickable = new ArrayList<View>();
     private final List<Runnable> actions = new ArrayList<Runnable>();
-    private final List<String> verbs = new ArrayList<String>();
-    private final List<Integer> verbIcons = new ArrayList<Integer>();
     /** The music results in the order they are shown, by the sort chosen in Options. */
     private List<Music.Hit> sorted = new ArrayList<Music.Hit>();
     private Music.Found sortedFrom;
@@ -109,24 +113,24 @@ public final class MainActivity extends Tonal {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
-        query = (EditText) findViewById(R.id.query);
+        query = findViewById(R.id.query);
         searchBox = findViewById(R.id.search);
-        searchIcon = (ImageView) findViewById(R.id.search_icon);
+        searchIcon = findViewById(R.id.search_icon);
         searchClear = findViewById(R.id.search_clear);
         buildTabs((LinearLayout) findViewById(R.id.tabs));
         header = findViewById(R.id.header);
-        spinner = (ProgressBar) findViewById(R.id.spinner);
-        statusView = (TextView) findViewById(R.id.status);
-        chip = (TextView) findViewById(R.id.chip);
-        home = (ScrollView) findViewById(R.id.home);
-        homeList = (LinearLayout) findViewById(R.id.home_list);
-        scroll = (ScrollView) findViewById(R.id.scroll);
-        logView = (TextView) findViewById(R.id.log);
-        resultList = (ListView) findViewById(R.id.results);
-        empty = (LinearLayout) findViewById(R.id.empty);
-        skeleton = (LinearLayout) findViewById(R.id.skeleton);
+        spinner = findViewById(R.id.spinner);
+        statusView = findViewById(R.id.status);
+        chip = findViewById(R.id.chip);
+        home = findViewById(R.id.home);
+        homeList = findViewById(R.id.home_list);
+        scroll = findViewById(R.id.scroll);
+        logView = findViewById(R.id.log);
+        resultList = findViewById(R.id.results);
+        empty = findViewById(R.id.empty);
+        skeleton = findViewById(R.id.skeleton);
         resultList.setAdapter(adapter);
-        resultList.setSelector(new android.graphics.drawable.ColorDrawable(0));
+        resultList.setSelector(new ColorDrawable(0));
         resultList.setCacheColorHint(0);
         storage = new StorageCard(this, true);
         buildSkeleton();
@@ -269,8 +273,6 @@ public final class MainActivity extends Tonal {
         skeleton.setVisibility(screen == LOADING ? View.VISIBLE : View.GONE);
         pickable.clear();
         actions.clear();
-        verbs.clear();
-        verbIcons.clear();
         if (screen == HOME) showHome();
         else if (screen == EMPTY) showEmpty();
         else if (screen == LOG) showLog();
@@ -288,7 +290,7 @@ public final class MainActivity extends Tonal {
         for (int i = 0; i < pickable.size(); i++) {
             View view = pickable.get(i);
             view.setActivated(i == picked);
-            TextView label = (TextView) view.findViewById(android.R.id.text1);
+            TextView label = view.findViewById(android.R.id.text1);
             if (label != null) label.setTextColor(getColor(i == picked ? R.color.on_accent_container : R.color.text));
             if (i == picked && screen == HOME) {
                 final View row = view;
@@ -303,7 +305,7 @@ public final class MainActivity extends Tonal {
         if (screen == HOME && picked < 0) home.post(() -> home.smoothScrollTo(0, 0));
         boolean typing = picked < 0 && !Download.searching();
         searchBox.setActivated(typing);
-        searchIcon.setImageTintList(android.content.res.ColorStateList.valueOf(getColor(typing ? R.color.accent : R.color.text_muted)));
+        searchIcon.setImageTintList(ColorStateList.valueOf(getColor(typing ? R.color.accent : R.color.text_muted)));
     }
 
     /** The status line, the spinner and the options chip. */
@@ -347,7 +349,7 @@ public final class MainActivity extends Tonal {
                 final Download.Job job = active.get(i);
                 ResultRow row = new ResultRow(this);
                 row.job(job, i == picked);
-                pick(row, () -> openDetail(job.key), "Open", 0);
+                pick(row, () -> openDetail(job.key));
                 homeList.addView(row);
             }
         }
@@ -362,7 +364,7 @@ public final class MainActivity extends Tonal {
         LinearLayout.LayoutParams card = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         card.setMargins(dp(10), dp(10), dp(10), 0);
         homeList.addView(storage, card);
-        pick(storage, () -> startActivity(new Intent(this, DownloadsActivity.class)), "Downloads", R.drawable.ic_download);
+        pick(storage, () -> startActivity(new Intent(this, DownloadsActivity.class)));
     }
 
     private void section(String title) {
@@ -373,9 +375,7 @@ public final class MainActivity extends Tonal {
     }
 
     private View recentRow(final Recents.Search search) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout row = row(Gravity.CENTER_VERTICAL);
         row.setBackgroundResource(R.drawable.row_pick);
         row.setPadding(dp(12), 0, dp(14), 0);
         row.setMinimumHeight(dp(34));
@@ -395,20 +395,21 @@ public final class MainActivity extends Tonal {
         ImageView back = new ImageView(this);
         back.setImageDrawable(icon(R.drawable.ic_north_west, R.color.text_muted, 12));
         row.addView(back, new LinearLayout.LayoutParams(dp(12), dp(12)));
-        pick(row, () -> {
-            setMode(search.mode);
-            query.setText(search.query);
-            query.setSelection(query.length());
-            begin();
-        }, "Search", R.drawable.ic_search);
+        pick(row, () -> searchAgain(search.mode, search.query));
         return row;
     }
 
-    private void pick(View view, Runnable action, String verb, int icon) {
+    private void pick(View view, Runnable action) {
         pickable.add(view);
         actions.add(action);
-        verbs.add(verb);
-        verbIcons.add(icon);
+    }
+
+    /** Searches `mode` (null: this tab) for `text` again, as if it were typed in. */
+    private void searchAgain(String in, String text) {
+        if (in != null) setMode(in);
+        query.setText(text);
+        query.setSelection(query.length());
+        begin();
     }
 
     /** Nothing found, or the search failed: what is so, the next steps, and the log's last lines. */
@@ -451,19 +452,12 @@ public final class MainActivity extends Tonal {
         }
         if (failed == null && !books() && again.length() > 0) {
             final String other = Music.ALBUM.equals(mode) ? Music.SONG : Music.ALBUM;
-            empty.addView(button("Search " + (Music.ALBUM.equals(other) ? "albums" : "songs"), R.drawable.ic_search, () -> {
-                setMode(other);
-                query.setText(again);
-                query.setSelection(query.length());
-                begin();
-            }, "Search"));
+            empty.addView(button("Search " + (Music.ALBUM.equals(other) ? "albums" : "songs"), R.drawable.ic_search,
+                () -> searchAgain(other, again)));
         }
         if (again.length() > 0) {
-            empty.addView(button(failed != null ? "Try again" : "Search again", R.drawable.ic_refresh, () -> {
-                query.setText(again);
-                query.setSelection(query.length());
-                begin();
-            }, failed != null ? "Retry" : "Search"));
+            empty.addView(button(failed != null ? "Try again" : "Search again", R.drawable.ic_refresh,
+                () -> searchAgain(null, again)));
         }
         // The engine's last words say why.
         List<String> log = Download.log();
@@ -474,7 +468,7 @@ public final class MainActivity extends Tonal {
                 tail.append(log.get(i));
             }
             TextView view = line(tail, 10, getColor(R.color.text_muted));
-            view.setTypeface(android.graphics.Typeface.MONOSPACE);
+            view.setTypeface(Typeface.MONOSPACE);
             view.setBackgroundResource(R.drawable.log_card);
             view.setPadding(dp(8), dp(6), dp(8), dp(6));
             LinearLayout.LayoutParams size = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -495,7 +489,7 @@ public final class MainActivity extends Tonal {
         return query.getText().toString().trim();
     }
 
-    private View button(String label, int icon, Runnable action, String verb) {
+    private View button(String label, int icon, Runnable action) {
         TextView view = line(label, 12.5f, getColor(R.color.text));
         view.setId(android.R.id.text1);
         view.setTypeface(BOLD);
@@ -507,16 +501,7 @@ public final class MainActivity extends Tonal {
         LinearLayout.LayoutParams size = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         size.topMargin = dp(8);
         view.setLayoutParams(size);
-        pick(view, action, verb, icon);
-        return view;
-    }
-
-    private TextView line(CharSequence value, float sp, int color) {
-        TextView view = new TextView(this);
-        view.setText(value);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
-        view.setTextColor(color);
-        view.setIncludeFontPadding(false);
+        pick(view, action);
         return view;
     }
 
@@ -535,15 +520,12 @@ public final class MainActivity extends Tonal {
     /** Book results on their way: four rows the shape of results, which never change. */
     private void buildSkeleton() {
         for (int i = 0; i < 4; i++) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout row = row(Gravity.CENTER_VERTICAL);
             row.setPadding(dp(12), dp(7), dp(12), dp(7));
             View cover = new View(this);
             cover.setBackgroundResource(R.drawable.skeleton);
             row.addView(cover, new LinearLayout.LayoutParams(dp(22), dp(32)));
-            LinearLayout lines = new LinearLayout(this);
-            lines.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout lines = vertical();
             LinearLayout.LayoutParams linesSize = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
             linesSize.leftMargin = dp(10);
             linesSize.rightMargin = dp(10);
@@ -571,9 +553,7 @@ public final class MainActivity extends Tonal {
         tabIcons = new ImageView[MODES.length];
         tabLabels = new TextView[MODES.length];
         for (int i = 0; i < MODES.length; i++) {
-            LinearLayout tab = new LinearLayout(this);
-            tab.setOrientation(LinearLayout.HORIZONTAL);
-            tab.setGravity(Gravity.CENTER);
+            LinearLayout tab = row(Gravity.CENTER);
             tab.setBackgroundResource(R.drawable.tab_pill);
             ImageView icon = new ImageView(this);
             tab.addView(icon, new LinearLayout.LayoutParams(dp(12), dp(12)));
@@ -600,11 +580,11 @@ public final class MainActivity extends Tonal {
         } else {
             count = hitList().size() + " found";
         }
-        android.text.SpannableStringBuilder out = new android.text.SpannableStringBuilder(what + " · ");
+        SpannableStringBuilder out = new SpannableStringBuilder(what + " · ");
         int start = out.length();
         out.append(count);
-        out.setSpan(new android.text.style.ForegroundColorSpan(getColor(R.color.text)), start, out.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        out.setSpan(new Face(BOLD), start, out.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        out.setSpan(new ForegroundColorSpan(getColor(R.color.text)), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        out.setSpan(new FaceSpan(BOLD), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return out;
     }
 
@@ -914,8 +894,7 @@ public final class MainActivity extends Tonal {
 
     /** The fallback for a build without a bundled login. */
     private void askLogin() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout box = vertical();
         int pad = dp(12);
         box.setPadding(pad, pad / 2, pad, 0);
         final EditText server = new EditText(this);

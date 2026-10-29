@@ -1,6 +1,5 @@
 package com.source.xp3;
 
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -48,7 +47,7 @@ final class Files {
 
     /** Where a saved file is, from the top of the SD card: "Music/Artist/Song.mp3". */
     static String shown(Context context, String path) {
-        File card = card(context);
+        File card = Card.root(context);
         String root = (card != null ? card : Environment.getExternalStorageDirectory()).getAbsolutePath() + "/";
         return path.startsWith(root) ? path.substring(root.length()) : path;
     }
@@ -94,26 +93,22 @@ final class Files {
         }));
     }
 
-    private static void view(Activity activity, Uri uri, String type) {
+    private static void view(Tonal activity, Uri uri, String type) {
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setDataAndType(uri, type);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         try {
             activity.startActivity(intent);
         } catch (ActivityNotFoundException e) {
-            ((Tonal) activity).note("No app here opens it");
+            activity.note("No app here opens it");
         }
     }
 
-    /** The SD card, where downloads are saved; null when there is none. */
-    static File card(Context context) {
-        return Card.root(context);
-    }
 
     /** How full the SD card is: how much is free, of how much. No card, all used. */
     static long[] space(Context context) {
         try {
-            File card = card(context);
+            File card = Card.root(context);
             if (card == null) return new long[] {0, 0};
             StatFs stat = new StatFs(card.getAbsolutePath());
             return new long[] {stat.getAvailableBytes(), stat.getTotalBytes()};

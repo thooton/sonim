@@ -154,9 +154,8 @@ public final class SelfTest {
                 message("d", "t1", Arrays.asList("DRAFT"), "me@gmail.com", "jane@x.com", "Re: Lunch", TUESDAY + 180000, part("text/plain", "Can")));
             check.same("subject is the first", "Lunch", c.subject());
             check.same("latest skips drafts", "c", c.latest().id);
-            check.same("people", "Jane, me, Draft (4)", c.people(ME, false));
-            check.same("sent shows whom", "To: jane@x.com", c.people(ME, true));
-            check.same("names alone", "Jane, me, Draft", c.names(ME, false));
+            check.same("names", "Jane, me, Draft", c.names(ME, false));
+            check.same("sent shows whom", "To: jane@x.com", c.names(ME, true));
             check.same("counted", "INBOX", Folder.INBOX.countedLabel());
             check.same("not counted", null, Folder.SENT.countedLabel());
             check.ok("drafts counted whole", Folder.DRAFTS.countsAll() && !Folder.SPAM.countsAll());

@@ -7,7 +7,7 @@ import java.util.Map;
 /** Content types by extension, for what is likely to be on a phone. */
 public final class Mime {
 
-    private static final Map<String, String> TYPES = new HashMap<String, String>();
+    private static final Map<String, String> TYPES = new HashMap<>();
     static {
         String[][] pairs = {
             {"html", "text/html"}, {"htm", "text/html"}, {"css", "text/css"},

@@ -10,6 +10,8 @@ import android.text.TextPaint;
 import android.text.TextUtils;
 import android.view.View;
 
+import com.xp3.common.ui.Ui;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -178,10 +180,6 @@ final class ListPanel extends View {
         }
     }
 
-    void refresh() {
-        invalidate();
-    }
-
     private void moveTo(int target, int direction) {
         int at = Math.max(0, Math.min(rows.size() - 1, target));
         while (at >= 0 && at < rows.size() && rows.get(at).kind == HEADER) at += direction >= 0 ? 1 : -1;
@@ -309,7 +307,7 @@ final class ListPanel extends View {
                 right -= dp(16);
                 break;
             case LINK:
-                drawChevron(canvas, right - dp(3), y + h / 2f, focused ? colorLabel : colorTertiary);
+                drawChevron(canvas, right - dp(3), y + h / 2f, focused ? colorLabel : colorTertiary, false);
                 right -= dp(12);
                 if (row.value != null) right = drawValue(canvas, row.value, right, baseline);
                 break;
@@ -355,34 +353,26 @@ final class ListPanel extends View {
         float w = Math.max(text.measureText(value), dp(14));
         float middle = baseline - dp(4);
         int chevron = focused ? colorLabel : colorTertiary;
-        drawChevron(canvas, right - dp(3), middle, chevron);
+        drawChevron(canvas, right - dp(3), middle, chevron, false);
         float textRight = right - dp(12);
         text.setColor(focused ? colorLabel : colorSecondary);
         text.setTextAlign(Paint.Align.CENTER);
         canvas.drawText(value, textRight - w / 2, baseline, text);
         text.setTextAlign(Paint.Align.LEFT);
         float leftEdge = textRight - w - dp(12);
-        drawChevronLeft(canvas, leftEdge + dp(3), middle, chevron);
+        drawChevron(canvas, leftEdge + dp(3), middle, chevron, true);
         return leftEdge - dp(4);
     }
 
-    private void drawChevron(Canvas canvas, float x, float y, int color) {
+    /** A chevron with its point at `x`, pointing right, or left with `left`. */
+    private void drawChevron(Canvas canvas, float x, float y, int color, boolean left) {
+        int arm = left ? dp(4) : -dp(4);
         stroke.setColor(color);
         stroke.setStrokeWidth(dp(2) * 0.8f);
         path.reset();
-        path.moveTo(x - dp(4), y - dp(5));
+        path.moveTo(x + arm, y - dp(5));
         path.lineTo(x, y);
-        path.lineTo(x - dp(4), y + dp(5));
-        canvas.drawPath(path, stroke);
-    }
-
-    private void drawChevronLeft(Canvas canvas, float x, float y, int color) {
-        stroke.setColor(color);
-        stroke.setStrokeWidth(dp(2) * 0.8f);
-        path.reset();
-        path.moveTo(x + dp(4), y - dp(5));
-        path.lineTo(x, y);
-        path.lineTo(x + dp(4), y + dp(5));
+        path.lineTo(x + arm, y + dp(5));
         canvas.drawPath(path, stroke);
     }
 
@@ -402,10 +392,10 @@ final class ListPanel extends View {
     }
 
     private int color(int id) {
-        return getResources().getColor(id);
+        return getContext().getColor(id);
     }
 
     private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(getContext(), value);
     }
 }

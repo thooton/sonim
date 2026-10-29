@@ -6,8 +6,8 @@ screen refuses anything not signed by Sonim. Read `../AGENTS.md` first.
 - `MainActivity`: a status page. It says whether the app is the device owner
   and, if not, gives the one `adb shell dpm set-device-owner` command that
   makes it one; if it is, one button gives the role up again.
-- `InstallActivity`: started for a result (by the Updater, and formerly the retired Delta app) with an
-  APK's content URI. As device owner it commits a `PackageInstaller` session
+- `InstallActivity`: started for a result (by the Updater) with an APK's
+  content URI. As device owner it commits a `PackageInstaller` session
   with no confirmation screen, and returns RESULT_OK, or RESULT_CANCELED with
   `EXTRA_MESSAGE`. `EXTRA_PACKAGE` makes Android refuse an APK for any other
   package. It draws no window.

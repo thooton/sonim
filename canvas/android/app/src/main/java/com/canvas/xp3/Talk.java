@@ -1,6 +1,5 @@
 package com.canvas.xp3;
 
-import android.graphics.drawable.GradientDrawable;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -24,14 +23,7 @@ final class Talk {
     static View bubble(Views v, Detail.Comment said, long now) {
         Look look = v.look;
         LinearLayout box = v.column();
-        GradientDrawable shape = new GradientDrawable();
-        shape.setColor(said.mine ? look.ink : look.paper);
-        float r = v.dp(12);
-        float small = v.dp(3);
-        shape.setCornerRadii(said.mine
-            ? new float[] { r, r, r, r, small, small, r, r }
-            : new float[] { r, r, r, r, r, r, small, small });
-        box.setBackground(shape);
+        box.setBackground(v.bubble(said.mine ? look.ink : look.paper, said.mine));
         v.pad(box, 8, 5, 8, 5);
         int text = said.mine ? look.bg : look.ink;
         TextView who = v.text((said.mine ? "You" : Course.shortName(said.author)) + " · " + when(said.at, now), 8,
@@ -42,8 +34,7 @@ final class Talk {
         box.addView(body, v.margins(Views.wrap(), 0, 1, 0, 0));
         LinearLayout row = v.row();
         row.setGravity(said.mine ? Gravity.END : Gravity.START);
-        LinearLayout.LayoutParams at = Views.wrap();
-        row.addView(box, at);
+        row.addView(box, Views.wrap());
         box.post(() -> {
             // At most four fifths of the width, as a text thread looks.
             int limit = Math.round(row.getWidth() * 0.82f);

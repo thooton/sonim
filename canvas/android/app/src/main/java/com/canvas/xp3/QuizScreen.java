@@ -1,8 +1,7 @@
 package com.canvas.xp3;
 
-import android.text.Editable;
 import android.text.InputType;
-import android.text.TextWatcher;
+import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.EditText;
@@ -12,8 +11,8 @@ import android.widget.TextView;
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Quiz;
 import com.xp3.common.Json;
+import com.xp3.common.ui.Ui;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -34,7 +33,6 @@ final class QuizScreen extends Screen {
     private List<Quiz.Question> questions;
     private int index;
     private String problem;
-    private boolean saving;
     private EditText typed;
 
     QuizScreen(MainActivity app, Assignment work) {
@@ -44,11 +42,10 @@ final class QuizScreen extends Screen {
     }
 
     private void load() {
-        app.background(() -> {
+        app.send(() -> {
             info = app.backend.quiz(work);
             attempt = app.backend.openAttempt(work);
             if (attempt != null) questions = app.backend.questions(attempt);
-            return Boolean.TRUE;
         }, (ok, failure) -> {
             problem = failure;
             refresh();
@@ -74,10 +71,9 @@ final class QuizScreen extends Screen {
                 "Close", app::pop);
             return;
         }
-        Sheet.ask(app, "Start the quiz?", said.toString().trim(), "Start", "Not now", () -> app.background(() -> {
+        Sheet.ask(app, "Start the quiz?", said.toString().trim(), "Start", "Not now", () -> app.send(() -> {
             attempt = app.backend.startQuiz(work);
             questions = app.backend.questions(attempt);
-            return Boolean.TRUE;
         }, (ok, failure) -> {
             problem = failure;
             refresh();
@@ -87,13 +83,8 @@ final class QuizScreen extends Screen {
     // A quiz is taken with the d-pad and OK alone: Menu does nothing here,
     // and Previous, Next and Turn in are buttons on the page.
     @Override
-    String left() {
-        return null;
-    }
-
-    @Override
-    String center() {
-        return "Select";
+    boolean menu() {
+        return false;
     }
 
     private void next() {
@@ -122,7 +113,7 @@ final class QuizScreen extends Screen {
     @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
-        if (typed != null && app.getCurrentFocus() == typed && com.xp3.common.ui.Ui.isOk(code)) {
+        if (typed != null && app.getCurrentFocus() == typed && Ui.isOk(code)) {
             if (event.getAction() == KeyEvent.ACTION_UP) next();
             return true;
         }
@@ -139,12 +130,12 @@ final class QuizScreen extends Screen {
             Views.wide());
         if (questions == null) {
             if (problem == null) return parts.spinner();
-            root.addView(parts.empty(0, "Couldn't open the quiz", problem), Views.tall());
+            root.addView(parts.empty(0, "Couldn't open the quiz", problem), Ui.weighted());
             return root;
         }
         if (questions.isEmpty()) {
             root.addView(parts.empty(0, "No questions to answer here", null),
-                Views.tall());
+                Ui.weighted());
             return root;
         }
         LinearLayout steps = v.row();
@@ -158,7 +149,7 @@ final class QuizScreen extends Screen {
         LinearLayout page = parts.page(this, root);
         final Quiz.Question question = questions.get(index);
         MarkText text = v.pageTitle(question.text);
-        text.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14 * look.scale);
+        text.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14 * look.scale);
         v.pad(text, 12, 8, 12, 0);
         page.addView(text, Views.wide());
 
@@ -208,7 +199,6 @@ final class QuizScreen extends Screen {
     @Override
     void shown() {
         if (typed != null) typed.requestFocus();
-        app.refreshKeys();
     }
 
     private void choose(Quiz.Question question, Quiz.Option option) {
@@ -229,12 +219,7 @@ final class QuizScreen extends Screen {
     }
 
     private void save(final Quiz.Question question) {
-        saving = true;
-        app.background(() -> {
-            app.backend.answer(attempt, question);
-            return Boolean.TRUE;
-        }, (ok, failure) -> {
-            saving = false;
+        app.send(() -> app.backend.answer(attempt, question), (ok, failure) -> {
             if (ok == null) app.say("Not saved yet: " + failure);
         });
     }
@@ -247,10 +232,7 @@ final class QuizScreen extends Screen {
         String said = blank == 0 ? "All " + questions.size() + " questions are answered."
             : blank + (blank == 1 ? " question is" : " questions are") + " still blank.";
         Sheet.ask(app, "Turn in the quiz?", said + " You can't change answers afterwards.", "Turn in", "Keep working",
-            () -> app.background(() -> {
-                app.backend.finishQuiz(work, attempt);
-                return Boolean.TRUE;
-            }, (ok, failure) -> {
+            () -> app.send(() -> app.backend.finishQuiz(work, attempt), (ok, failure) -> {
                 if (ok == null) {
                     app.tell("Couldn't turn in", failure);
                     return;

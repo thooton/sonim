@@ -207,13 +207,9 @@ public final class Gmail {
         List<Conversation> conversations = new ArrayList<Conversation>();
         try {
             for (Future<Conversation> future : pending) {
-                Conversation conversation = future.get();
+                Conversation conversation = await(future, "Gmail failed.");
                 if (conversation != null && !conversation.messages.isEmpty()) conversations.add(conversation);
             }
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof IOException) throw (IOException) cause;
-            throw new IOException(cause == null ? "Gmail failed." : String.valueOf(cause.getMessage()));
         } finally {
             for (Future<Conversation> future : pending) future.cancel(true);
         }
@@ -254,13 +250,9 @@ public final class Gmail {
         Map<String, Integer> out = new HashMap<String, Integer>();
         try {
             for (Map.Entry<String, Future<Integer>> entry : pending.entrySet()) {
-                Integer count = entry.getValue().get();
+                Integer count = await(entry.getValue(), "Gmail failed.");
                 if (count != null) out.put(entry.getKey(), count);
             }
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof IOException) throw (IOException) cause;
-            throw new IOException(cause == null ? "Gmail failed." : String.valueOf(cause.getMessage()));
         } finally {
             for (Future<Integer> future : pending.values()) future.cancel(true);
         }
@@ -339,12 +331,8 @@ public final class Gmail {
         }
         if (directory != null) {
             try {
-                List<Address> found = directory.get();
+                List<Address> found = await(directory, "Google failed.");
                 if (found != null) out.addAll(found);
-            } catch (ExecutionException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof IOException) throw (IOException) cause;
-                throw new IOException(cause == null ? "Google failed." : String.valueOf(cause.getMessage()));
             } finally {
                 directory.cancel(true);
             }
@@ -464,6 +452,17 @@ public final class Gmail {
     }
 
     // ---- The API ----
+
+    /** What a lookup on the pool came to, its failure thrown as it was; `failed` when it says nothing. */
+    private static <T> T await(Future<T> future, String failed) throws IOException, InterruptedException {
+        try {
+            return future.get();
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException) throw (IOException) cause;
+            throw new IOException(cause == null ? failed : String.valueOf(cause.getMessage()));
+        }
+    }
 
     /** A 404 from Gmail: what was asked for is gone. */
     static final class Gone extends IOException {

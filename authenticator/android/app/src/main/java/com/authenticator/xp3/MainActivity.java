@@ -19,8 +19,6 @@ import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
-import android.text.style.MetricAffectingSpan;
-import android.text.TextPaint;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -38,8 +36,10 @@ import android.widget.TextView;
 
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
+import com.xp3.common.ui.FaceSpan;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
+import com.xp3.common.ui.Logins;
 
 import java.io.File;
 import java.io.IOException;
@@ -139,7 +139,7 @@ public final class MainActivity extends BaseActivity {
         setContentView(root);
 
         accounts = readCache();
-        login = loadLogin(prefs());
+        login = Logins.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         show();
         if (login.ready()) sync();
         else askLogin();
@@ -299,7 +299,7 @@ public final class MainActivity extends BaseActivity {
                 line.append('(').append(detail).append(')');
                 line.setSpan(new ForegroundColorSpan(color(R.color.ink_muted)), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 line.setSpan(new AbsoluteSizeSpan(10, true), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                line.setSpan(new Face(Look.regular(MainActivity.this)), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                line.setSpan(new FaceSpan(Look.regular(MainActivity.this)), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
             name.setText(line);
             focused = !focus;
@@ -321,25 +321,6 @@ public final class MainActivity extends BaseActivity {
             if (on == focused) return;
             focused = on;
             card.setBackground(Look.card(MainActivity.this, on));
-        }
-    }
-
-    /** A typeface for part of a line. */
-    private static final class Face extends MetricAffectingSpan {
-        private final Typeface face;
-
-        Face(Typeface face) {
-            this.face = face;
-        }
-
-        @Override
-        public void updateDrawState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
-
-        @Override
-        public void updateMeasureState(TextPaint paint) {
-            paint.setTypeface(face);
         }
     }
 
@@ -603,34 +584,18 @@ public final class MainActivity extends BaseActivity {
 
     private void sync() {
         if (!login.ready()) return;
-        busy++;
-        show();
-        final Login using = login;
-        worker.execute(() -> {
-            List<Account> fresh = null;
-            String failure = null;
-            try {
-                fresh = new Vault(using).list();
-                writeCache(fresh);
-            } catch (Exception e) {
-                failure = message(e);
+        vault(Vault::list, (got, failed) -> {
+            error = failed;
+            if (got != null) {
+                String keep = selected() == null ? null : selected().secret;
+                accounts = got;
+                synced = System.currentTimeMillis();
+                show();
+                logos.keep(accounts);
+                if (keep != null) select(keep);
+            } else {
+                show();
             }
-            final List<Account> got = fresh;
-            final String failed = failure;
-            runOnUiThread(() -> {
-                busy--;
-                error = failed;
-                if (got != null) {
-                    String keep = selected() == null ? null : selected().secret;
-                    accounts = got;
-                    synced = System.currentTimeMillis();
-                    show();
-                    logos.keep(accounts);
-                    if (keep != null) select(keep);
-                } else {
-                    show();
-                }
-            });
         });
     }
 
@@ -641,40 +606,14 @@ public final class MainActivity extends BaseActivity {
         }
         final Set<String> had = new HashSet<>();
         for (Account account : accounts) had.add(account.secret);
-        busy++;
-        show();
-        final Login using = login;
-        worker.execute(() -> {
-            List<Account> fresh = null;
-            String failure = null;
-            try {
-                fresh = new Vault(using).add(found);
-                writeCache(fresh);
-            } catch (Exception e) {
-                failure = message(e);
-            }
-            final List<Account> got = fresh;
-            final String failed = failure;
-            runOnUiThread(() -> {
-                busy--;
-                if (got == null) {
-                    show();
-                    toast(failed);
-                    reopen();
-                    return;
-                }
-                unsaved = null;
-                accounts = got;
-                error = null;
-                synced = System.currentTimeMillis();
-                show();
-                int added = 0;
-                for (Account account : found) if (!had.contains(account.secret)) added++;
-                Account first = found.get(0);
-                if (added == 0) toast(found.size() == 1 ? first.title() + " is already here" : "These are already here");
-                else toast(added == 1 ? "Added " + first.title() : "Added " + added + " accounts");
-                select(first.secret);
-            });
+        vault(vault -> vault.add(found), (got, failed) -> {
+            if (!saved(got, failed)) return;
+            int added = 0;
+            for (Account account : found) if (!had.contains(account.secret)) added++;
+            Account first = found.get(0);
+            if (added == 0) toast(found.size() == 1 ? first.title() + " is already here" : "These are already here");
+            else toast(added == 1 ? "Added " + first.title() : "Added " + added + " accounts");
+            select(first.secret);
         });
     }
 
@@ -683,38 +622,31 @@ public final class MainActivity extends BaseActivity {
             askLogin();
             return;
         }
-        busy++;
-        show();
-        final Login using = login;
-        worker.execute(() -> {
-            List<Account> fresh = null;
-            String failure = null;
-            try {
-                fresh = new Vault(using).update(changed);
-                writeCache(fresh);
-            } catch (Exception e) {
-                failure = message(e);
-            }
-            final List<Account> got = fresh;
-            final String failed = failure;
-            runOnUiThread(() -> {
-                busy--;
-                if (got == null) {
-                    show();
-                    toast(failed);
-                    reopen();
-                    return;
-                }
-                unsaved = null;
-                accounts = got;
-                error = null;
-                synced = System.currentTimeMillis();
-                show();
-                logos.keep(accounts);
-                toast("Saved " + changed.title());
-                select(changed.secret);
-            });
+        vault(vault -> vault.update(changed), (got, failed) -> {
+            if (!saved(got, failed)) return;
+            logos.keep(accounts);
+            toast("Saved " + changed.title());
+            select(changed.secret);
         });
+    }
+
+    /**
+     * Whether the command center took what the entry form gave back; when
+     * it didn't, the form opens again with what was typed.
+     */
+    private boolean saved(List<Account> got, String failed) {
+        if (got == null) {
+            show();
+            toast(failed);
+            reopen();
+            return false;
+        }
+        unsaved = null;
+        accounts = got;
+        error = null;
+        synced = System.currentTimeMillis();
+        show();
+        return true;
     }
 
     private void confirmDelete(final Account account) {
@@ -730,6 +662,34 @@ public final class MainActivity extends BaseActivity {
     private void delete(final Account account) {
         if (account.id == null) return;
         final int at = list.getSelectedItemPosition();
+        vault(vault -> vault.remove(account.id), (got, failed) -> {
+            if (got == null) {
+                show();
+                toast(failed);
+                return;
+            }
+            accounts = got;
+            show();
+            logos.keep(accounts);
+            if (!accounts.isEmpty()) list.setSelection(Math.max(0, Math.min(at, accounts.size() - 1)));
+            toast("Deleted " + account.title());
+        });
+    }
+
+    private interface Call {
+        List<Account> on(Vault vault) throws Exception;
+    }
+
+    private interface Answer {
+        /** `got` is the list the command center answered with, or null; `failed` why not. */
+        void with(List<Account> got, String failed);
+    }
+
+    /**
+     * Asks the command center off the main thread, keeps the list it answers
+     * with on the phone, and gives the answer back on the main thread.
+     */
+    private void vault(Call call, Answer answer) {
         busy++;
         show();
         final Login using = login;
@@ -737,7 +697,7 @@ public final class MainActivity extends BaseActivity {
             List<Account> fresh = null;
             String failure = null;
             try {
-                fresh = new Vault(using).remove(account.id);
+                fresh = call.on(new Vault(using));
                 writeCache(fresh);
             } catch (Exception e) {
                 failure = message(e);
@@ -746,16 +706,7 @@ public final class MainActivity extends BaseActivity {
             final String failed = failure;
             runOnUiThread(() -> {
                 busy--;
-                if (got == null) {
-                    show();
-                    toast(failed);
-                    return;
-                }
-                accounts = got;
-                show();
-                logos.keep(accounts);
-                if (!accounts.isEmpty()) list.setSelection(Math.max(0, Math.min(at, accounts.size() - 1)));
-                toast("Deleted " + account.title());
+                answer.with(got, failed);
             });
         });
     }
@@ -793,22 +744,6 @@ public final class MainActivity extends BaseActivity {
      * The bundled login is adopted once per build that carries a new one;
      * otherwise whatever was saved (typed in from the menu) is kept.
      */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     /** The fallback for a build without a bundled login. */
     private void askLogin() {

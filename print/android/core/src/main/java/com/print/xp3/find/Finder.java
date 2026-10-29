@@ -11,7 +11,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Finds the printers on the network: what announces itself over mDNS, and
@@ -34,7 +33,7 @@ public final class Finder {
     public static final int HTTP_PORT = 80;
 
     private final Listener listener;
-    private final Map<String, Printer> printers = new LinkedHashMap<String, Printer>();
+    private final Map<String, Printer> printers = new LinkedHashMap<>();
     private final ExecutorService probes = Executors.newFixedThreadPool(4, runnable -> {
         Thread thread = new Thread(runnable, "probe");
         thread.setDaemon(true);
@@ -48,7 +47,7 @@ public final class Finder {
 
     /** Every printer found so far, in the order found. */
     public synchronized List<Printer> printers() {
-        return new ArrayList<Printer>(printers.values());
+        return new ArrayList<>(printers.values());
     }
 
     public void stop() {
@@ -80,8 +79,8 @@ public final class Finder {
      * printers that have 631 turned off still take it.
      */
     public List<Printer> at(String address) throws IOException {
-        List<Printer> found = new ArrayList<Printer>();
-        List<Integer> open = new ArrayList<Integer>();
+        List<Printer> found = new ArrayList<>();
+        List<Integer> open = new ArrayList<>();
         int[][] ipp = {{IPP_PORT, 0}, {IPPS_PORT, 1}, {HTTP_PORT, 0}};
         for (int[] each : ipp) {
             if (!found.isEmpty() || stopped) break;
@@ -251,11 +250,5 @@ public final class Finder {
         } catch (java.util.concurrent.RejectedExecutionException e) {
             // Stopped meanwhile.
         }
-    }
-
-    /** Waits for the probes under way, for the tests. */
-    void settle(long millis) throws InterruptedException {
-        probes.shutdown();
-        probes.awaitTermination(millis, TimeUnit.MILLISECONDS);
     }
 }

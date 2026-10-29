@@ -8,6 +8,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 
 import com.books.xp3.book.Mobi;
+import com.xp3.common.ui.Ui;
 
 import java.io.ByteArrayOutputStream;
 
@@ -36,10 +37,8 @@ final class KindleImages implements Mobi.Images {
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
             // Decoded at no more than twice the size wanted, so a huge image
             // never has to fit in memory whole.
-            int sample = 1;
-            while (Math.max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_SIDE * 2) sample *= 2;
             BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inSampleSize = sample;
+            options.inSampleSize = Ui.sampleSize(Math.max(bounds.outWidth, bounds.outHeight), MAX_SIDE * 2);
             image = BitmapFactory.decodeByteArray(data, 0, data.length, options);
             if (image == null) return null;
 

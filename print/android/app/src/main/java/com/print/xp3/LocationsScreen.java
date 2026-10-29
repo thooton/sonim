@@ -5,8 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import java.io.File;
+import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,9 +19,9 @@ import java.util.concurrent.ExecutorService;
  */
 final class LocationsScreen extends Screen {
 
-    private static final ExecutorService WORKER = com.xp3.common.ui.Ui.worker("scan");
+    private static final ExecutorService WORKER = Ui.worker("scan");
     /** What each place held when last looked, so going back and forth is instant. */
-    static final Map<String, List<Library.Pdf>> found = new HashMap<String, List<Library.Pdf>>();
+    static final Map<String, List<Library.Pdf>> found = new HashMap<>();
 
     private LinearLayout list;
     private View focus;
@@ -32,13 +31,9 @@ final class LocationsScreen extends Screen {
     View build() {
         Context c = app;
         list = Parts.column(c);
-        ScrollView scroll = new ScrollView(c);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setDefaultFocusHighlightEnabled(false);
-        scroll.addView(list);
         list.addView(Parts.header(c, "Locations"));
         list.addView(Parts.foot(c, "Looking for PDFs…"));
-        return Parts.page(c, Parts.nav(c, "Choose a PDF", true, null), scroll);
+        return Parts.page(c, Parts.nav(c, "Choose a PDF", true, null), Parts.scroll(c, list));
     }
 
     @Override
@@ -55,7 +50,7 @@ final class LocationsScreen extends Screen {
         final Context context = app.getApplicationContext();
         final Handler main = new Handler(Looper.getMainLooper());
         WORKER.execute(() -> {
-            final Map<String, List<Library.Pdf>> all = new HashMap<String, List<Library.Pdf>>();
+            final Map<String, List<Library.Pdf>> all = new HashMap<>();
             for (Library.Location location : Library.locations(context)) {
                 if (!location.browse) all.put(location.id, Library.scan(location));
             }
@@ -79,12 +74,12 @@ final class LocationsScreen extends Screen {
         list.addView(Parts.header(c, "Locations"));
         String last = Store.get(app).lastLocation();
         focus = null;
-        List<Parts.Row> rows = new ArrayList<Parts.Row>();
+        List<Parts.Row> rows = new ArrayList<>();
 
         int recent = recentCount();
         if (recent > 0) {
             Parts.Row row = row(c, Library.RECENT, R.drawable.ic_clock, "Recent",
-                recent + (recent == 1 ? " PDF" : " PDFs") + " printed recently");
+                Parts.count(recent, "PDF", "PDFs") + " printed recently");
             row.setOnClickListener(v -> {
                 Store.get(app).setLastLocation(Library.RECENT);
                 app.open(new RecentScreen());
@@ -103,7 +98,7 @@ final class LocationsScreen extends Screen {
                 List<Library.Pdf> pdfs = found.get(location.id);
                 int count = pdfs == null ? 0 : pdfs.size();
                 if (count == 0) continue;
-                String what = count + (count == 1 ? " PDF" : " PDFs") + (location.id.equals(Library.BLUETOOTH) ? " received" : "");
+                String what = Parts.count(count, "PDF", "PDFs") + (location.id.equals(Library.BLUETOOTH) ? " received" : "");
                 row = row(c, location.id, location.icon, location.name, what);
                 row.setOnClickListener(v -> {
                     Store.get(app).setLastLocation(location.id);
@@ -135,7 +130,7 @@ final class LocationsScreen extends Screen {
     private static Parts.Row row(Context c, String id, int icon, String name, String sub) {
         Parts.Row row = new Parts.Row(c, 40);
         row.setTag(id);
-        row.lead(Parts.square(c, icon), Look.dp(c, 26), Look.dp(c, 26));
+        row.lead(Parts.square(c, icon), Ui.dp(c, 26), Ui.dp(c, 26));
         row.titled(name, sub);
         row.chevron();
         return row;

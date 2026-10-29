@@ -27,7 +27,7 @@ public final class Printer {
     public int rawPort;
     public String lpdQueue = "";
     /** Formats the raw port takes, lower case, from its announcement (`pdl`). */
-    public final List<String> pdl = new ArrayList<String>();
+    public final List<String> pdl = new ArrayList<>();
     /** From Get-Printer-Attributes, once asked; null until then. */
     public Capabilities ipp;
     /** From PJL over the raw port, once asked; null until then or if it said nothing. */
@@ -85,7 +85,7 @@ public final class Printer {
             "address", address, "name", name, "model", model, "location", location,
             "ippPort", (double) ippPort, "ippPath", ippPath, "ippTls", ippTls,
             "rawPort", (double) rawPort, "lpdQueue", lpdQueue,
-            "pdl", new ArrayList<Object>(pdl));
+            "pdl", new ArrayList<>(pdl));
     }
 
     /** A printer as {@link #save} kept it; null if it isn't one. */

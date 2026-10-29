@@ -34,10 +34,6 @@ class Mark extends TextView {
         invalidate();
     }
 
-    boolean marked() {
-        return marked;
-    }
-
     @Override
     protected void onDraw(Canvas canvas) {
         if (marked) {

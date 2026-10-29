@@ -169,62 +169,50 @@ public final class Music {
          * the result's own page.
          */
         public String brief() {
-            int low = Integer.MAX_VALUE;
-            int high = 0;
-            int depth = 0;
-            int rate = 0;
-            for (Track t : tracks) {
-                if (t.bitrate > 0) {
-                    low = Math.min(low, t.bitrate);
-                    high = Math.max(high, t.bitrate);
-                }
-                depth = Math.max(depth, t.bitDepth);
-                rate = Math.max(rate, t.sampleRate);
-            }
-            List<String> parts = new ArrayList<String>();
-            if (album()) parts.add(tracks.size() + (tracks.size() == 1 ? " file" : " files"));
-            if (high > 0) parts.add((low == high ? "" : low + "-") + high);
-            else if (depth > 0 && rate > 0) parts.add(depth + "/" + trim(rate / 1000.0));
-            if (bytes() > 0) parts.add(human(bytes()));
-            return join(parts, " · ");
+            return describe(BRIEF);
         }
 
         /** As meta(), without the formats, which a tag beside it shows. */
         public String specs() {
-            return describe(false);
+            return describe(SPECS);
         }
 
         /** "MP3 · 320 kbps · 4:12 · 8.1 MB"; an album leads with its file count. Unknowns are left out. */
         public String meta() {
-            return describe(true);
+            return describe(META);
         }
 
-        private String describe(boolean withFormats) {
-            Set<String> formats = new LinkedHashSet<String>();
+        private static final int BRIEF = 0;
+        private static final int SPECS = 1;
+        private static final int META = 2;
+
+        /**
+         * What brief(), specs() and meta() say. Brief is bare numbers, the
+         * bitrate or else the sample format, and leaves out the length.
+         */
+        private String describe(int how) {
             int low = Integer.MAX_VALUE;
             int high = 0;
             long seconds = 0;
-            long bytes = 0;
             int depth = 0;
             int rate = 0;
             for (Track t : tracks) {
-                if (t.format().length() > 0) formats.add(t.format());
                 if (t.bitrate > 0) {
                     low = Math.min(low, t.bitrate);
                     high = Math.max(high, t.bitrate);
                 }
                 seconds += t.seconds;
-                bytes += t.size;
                 depth = Math.max(depth, t.bitDepth);
                 rate = Math.max(rate, t.sampleRate);
             }
+            boolean brief = how == BRIEF;
             List<String> parts = new ArrayList<String>();
             if (album()) parts.add(tracks.size() + (tracks.size() == 1 ? " file" : " files"));
-            if (withFormats && !formats.isEmpty()) parts.add(join(formats, "/"));
-            if (high > 0) parts.add((low == high ? "" : low + "-") + high + " kbps");
-            if (depth > 0 && rate > 0) parts.add(depth + "/" + trim(rate / 1000.0) + " kHz");
-            if (seconds > 0) parts.add(clock(seconds));
-            if (bytes > 0) parts.add(human(bytes));
+            if (how == META && formats().length() > 0) parts.add(formats());
+            if (high > 0) parts.add((low == high ? "" : low + "-") + high + (brief ? "" : " kbps"));
+            if (depth > 0 && rate > 0 && !(brief && high > 0)) parts.add(depth + "/" + trim(rate / 1000.0) + (brief ? "" : " kHz"));
+            if (!brief && seconds > 0) parts.add(clock(seconds));
+            if (bytes() > 0) parts.add(human(bytes()));
             return join(parts, " · ");
         }
 

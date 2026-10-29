@@ -1,9 +1,10 @@
 package com.video.xp3;
 
 import android.Manifest;
-import android.app.Activity;
+
 import android.content.ContentUris;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -21,11 +22,12 @@ import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 import android.widget.VideoView;
+
+import com.xp3.common.ui.BaseActivity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,8 +37,9 @@ import java.util.Locale;
  *  Playback is Android's own MediaPlayer, as VLC's fallback player is: no
  *  libraries. Keys follow VLC's: centre pauses, left/right seek 10 s,
  *  up/down seek a minute, back leaves. */
-public class MainActivity extends Activity {
+public class MainActivity extends BaseActivity {
     private static final int SEEK = 10000;
+    private static final int SEEK_FAR = 60000;
 
     private final List<Uri> uris = new ArrayList<>();
     private final List<String> names = new ArrayList<>();
@@ -49,7 +52,6 @@ public class MainActivity extends Activity {
     private VideoView video;
     private TextView bar;
     private ProgressBar progress;
-    private LinearLayout controls;
     private boolean playing;
     private Uri current;
     private int resumeAt = -1;
@@ -94,12 +96,11 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams vp = new FrameLayout.LayoutParams(-1, -1);
         vp.gravity = Gravity.CENTER;
         player.addView(video, vp);
-        controls = new LinearLayout(this);
-        controls.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout controls = vertical();
         controls.setBackgroundColor(0xB3000000);
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(0xFF4FA3FF));
-        progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF555555));
+        progress.setProgressTintList(ColorStateList.valueOf(0xFF4FA3FF));
+        progress.setProgressBackgroundTintList(ColorStateList.valueOf(0xFF555555));
         controls.addView(progress, new LinearLayout.LayoutParams(-1, dp(6)));
         bar = new TextView(this);
         bar.setTextColor(Color.WHITE);
@@ -112,7 +113,7 @@ public class MainActivity extends Activity {
 
         video.setOnCompletionListener(m -> stop());
         video.setOnErrorListener((m, w, e) -> {
-            Toast.makeText(this, "Can't play this video", Toast.LENGTH_SHORT).show();
+            toast("Can't play this video");
             stop();
             return true;
         });
@@ -168,9 +169,6 @@ public class MainActivity extends Activity {
         return g;
     }
 
-    private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
-    }
 
     private void immersive(boolean on) {
         getWindow().getDecorView().setSystemUiVisibility(on
@@ -212,8 +210,7 @@ public class MainActivity extends Activity {
     }
 
     private void seek(int by) {
-        int to = Math.max(0, Math.min(video.getDuration(), video.getCurrentPosition() + by));
-        video.seekTo(to);
+        video.seekTo(Math.max(0, Math.min(video.getDuration(), video.getCurrentPosition() + by)));
     }
 
     @Override public boolean onKeyDown(int key, KeyEvent e) {
@@ -226,8 +223,8 @@ public class MainActivity extends Activity {
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT: seek(-SEEK); return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT: seek(SEEK); return true;
-            case KeyEvent.KEYCODE_DPAD_UP: seek(60000); return true;
-            case KeyEvent.KEYCODE_DPAD_DOWN: seek(-60000); return true;
+            case KeyEvent.KEYCODE_DPAD_UP: seek(SEEK_FAR); return true;
+            case KeyEvent.KEYCODE_DPAD_DOWN: seek(-SEEK_FAR); return true;
             case KeyEvent.KEYCODE_BACK: stop(); return true;
             default: return super.onKeyDown(key, e);
         }

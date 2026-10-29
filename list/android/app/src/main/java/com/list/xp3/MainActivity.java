@@ -92,7 +92,7 @@ public final class MainActivity extends BaseActivity {
         listAdapter = new ItemAdapter(this);
         listView.setAdapter(listAdapter);
         listView.setItemsCanFocus(false);
-        wireList(listView, listAdapter);
+        wireList();
         // Every context menu is answered here; see showMenu. The list's
         // parent is registered, not the list, so ListView's own long press
         // never opens one.
@@ -100,6 +100,13 @@ public final class MainActivity extends BaseActivity {
 
         showRows(0);
         listView.requestFocus();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Let a pending list save finish.
+        saves.shutdown();
     }
 
     // ------------------------------------------------------------------
@@ -142,21 +149,20 @@ public final class MainActivity extends BaseActivity {
         }
     }
 
-    private void wireList(final ListView list, final ItemAdapter adapter) {
-        list.setFocusable(true);
-        list.setFocusableInTouchMode(true);
-        Ui.onSelect(list, adapter::trackSelectedPosition);
-        list.setOnItemClickListener((parent, view, position, id) -> activate(position));
-        // Sonim firmware variants report the physical OK key as either
-        // DPAD_CENTER or ENTER. Handle activation only; arrows stay with
-        // ListView's native selection and scrolling implementation.
-        list.setOnKeyListener((view, keyCode, event) -> {
+    private void wireList() {
+        listView.setFocusable(true);
+        listView.setFocusableInTouchMode(true);
+        Ui.onSelect(listView, listAdapter::trackSelectedPosition);
+        listView.setOnItemClickListener((parent, view, position, id) -> activate(position));
+        // Only OK is handled here; the arrows stay with ListView's own
+        // selection and scrolling.
+        listView.setOnKeyListener((view, keyCode, event) -> {
             if (!Ui.isOk(keyCode)) return false;
             if (heldForMenu(event)) return true;
             if (event.getAction() != KeyEvent.ACTION_UP) return true;
             if (event.getDownTime() == consumedOkDownTime) return true;
-            int position = adapter.getSelectedPosition();
-            if (position < 0 || position >= adapter.getCount()) return true;
+            int position = listAdapter.getSelectedPosition();
+            if (position < 0 || position >= listAdapter.getCount()) return true;
             activate(position);
             return true;
         });
@@ -168,6 +174,8 @@ public final class MainActivity extends BaseActivity {
      * which would open the same menu as a centred dialog, never runs; and the
      * release that ends a hold is swallowed so it does not also tick the item.
      */
+    private boolean okHeld;
+
     private boolean heldForMenu(KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             if (event.getRepeatCount() == 0) okHeld = false;
@@ -183,8 +191,6 @@ public final class MainActivity extends BaseActivity {
         }
         return false;
     }
-
-    private boolean okHeld;
 
     /**
      * OK on a task ticks or unticks it, and it moves to the other card, as in
@@ -408,17 +414,6 @@ public final class MainActivity extends BaseActivity {
     }
 
     // ------------------------------------------------------------------
-    // Keys and the menus
-    // ------------------------------------------------------------------
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        // Let a pending list save finish.
-        saves.shutdown();
-    }
-
-    // ------------------------------------------------------------------
     // The Menu key
     // ------------------------------------------------------------------
 
@@ -470,7 +465,7 @@ public final class MainActivity extends BaseActivity {
         menuItem = null;
         menuIds.clear();
         menuTitles.clear();
-        View row = listMenu(menuIds, menuTitles);
+        View row = listMenu();
         if (menuIds.isEmpty()) return;
 
         // The menu is opened from the list, at the row's place in it: the
@@ -495,7 +490,7 @@ public final class MainActivity extends BaseActivity {
     @Override
     public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo info) {
         for (int i = 0; i < menuIds.size(); i++) {
-            menu.add(Menu.NONE, menuIds.get(i).intValue(), i, menuTitles.get(i));
+            menu.add(Menu.NONE, menuIds.get(i), i, menuTitles.get(i));
         }
     }
 
@@ -518,8 +513,8 @@ public final class MainActivity extends BaseActivity {
      * Fills the menu for the highlighted row and returns that row's view (or,
      * with nothing selectable, the empty note's), if it is on screen.
      */
-    private View listMenu(List<Integer> ids, List<String> titles) {
-        add(ids, titles, MENU_ADD, "Add a task");
+    private View listMenu() {
+        add(MENU_ADD, "Add a task");
         int position = listAdapter.getSelectedPosition();
         if (position < 0 || position >= listAdapter.getCount() || !listAdapter.isEnabled(position)) {
             // Only the list's heading and its empty note: the note is row 1.
@@ -530,27 +525,27 @@ public final class MainActivity extends BaseActivity {
         if (row.type == ItemAdapter.TASK) {
             menuIndex = row.index;
             menuItem = row.item;
-            add(ids, titles, MENU_INSERT_ABOVE, "Insert above");
-            add(ids, titles, MENU_INSERT_BELOW, "Insert below");
-            add(ids, titles, MENU_EDIT, "Edit");
-            if (listAdapter.neighbour(position, -1) >= 0) add(ids, titles, MENU_MOVE_UP, "Move up");
-            if (listAdapter.neighbour(position, 1) >= 0) add(ids, titles, MENU_MOVE_DOWN, "Move down");
-            add(ids, titles, MENU_DELETE, "Delete");
+            add(MENU_INSERT_ABOVE, "Insert above");
+            add(MENU_INSERT_BELOW, "Insert below");
+            add(MENU_EDIT, "Edit");
+            if (listAdapter.neighbour(position, -1) >= 0) add(MENU_MOVE_UP, "Move up");
+            if (listAdapter.neighbour(position, 1) >= 0) add(MENU_MOVE_DOWN, "Move down");
+            add(MENU_DELETE, "Delete");
         } else if (row.type == ItemAdapter.DONE) {
             menuIndex = row.index;
             menuItem = row.item;
-            add(ids, titles, MENU_EDIT, "Edit");
-            add(ids, titles, MENU_DELETE, "Delete");
-            add(ids, titles, MENU_DELETE_COMPLETED, "Delete all completed");
+            add(MENU_EDIT, "Edit");
+            add(MENU_DELETE, "Delete");
+            add(MENU_DELETE_COMPLETED, "Delete all completed");
         } else {
-            add(ids, titles, MENU_DELETE_COMPLETED, "Delete all completed");
+            add(MENU_DELETE_COMPLETED, "Delete all completed");
         }
         return rowView(position);
     }
 
-    private static void add(List<Integer> ids, List<String> titles, int id, String title) {
-        ids.add(Integer.valueOf(id));
-        titles.add(title);
+    private void add(int id, String title) {
+        menuIds.add(id);
+        menuTitles.add(title);
     }
 
     /** The height of row `position`, measured if it is not laid out yet (below the screen). */

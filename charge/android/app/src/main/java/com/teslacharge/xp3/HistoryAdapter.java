@@ -69,16 +69,15 @@ final class HistoryAdapter extends RowAdapter {
         View row = convertView != null
             ? convertView
             : inflater().inflate(R.layout.row_history_footer, parent, false);
-        row.setSelected(position == getSelectedPosition());
+        row.setSelected(isSelected(position));
         ((TextView) row.findViewById(R.id.footer_text)).setText(footer);
         row.findViewById(R.id.footer_progress).setVisibility(footerBusy ? View.VISIBLE : View.GONE);
         return row;
     }
 
     @Override void bind(View row, JSONObject session) {
-        // Lead with the street address, exactly as the site lists do, once one
-        // has been resolved for this place. Tesla's history payload has no
-        // address of its own, so until then the row leads with its label.
+        // Lead with the street address, exactly as the site lists do; a
+        // session Tesla gave no address leads with its label.
         String street = Normalizer.addressStreet(session);
         ((TextView) row.findViewById(R.id.site_name))
             .setText(street.length() > 0 ? street : session.optString("siteName", "Charging session"));
@@ -116,7 +115,7 @@ final class HistoryAdapter extends RowAdapter {
         return result.toString();
     }
 
-    static String when(JSONObject session) {
+    private static String when(JSONObject session) {
         long at = session.optLong("startedAt", session.optLong("endedAt", 0));
         return at > 0 ? at(at) : "";
     }

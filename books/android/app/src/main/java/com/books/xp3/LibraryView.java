@@ -13,6 +13,7 @@ import android.view.View;
 
 import com.books.xp3.book.Run;
 import com.books.xp3.shelf.Shelf;
+import com.xp3.common.ui.Ui;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,7 +47,6 @@ final class LibraryView extends View {
     private int focus;
     private int scroll;
     private String message;
-    private String detail;
     /** A line in the header, in place of the book count: what the last action did. */
     private String notice;
 
@@ -100,9 +100,8 @@ final class LibraryView extends View {
     }
 
     /** A message in place of the list, when there is no list to show. */
-    void setMessage(String message, String detail) {
+    void setMessage(String message) {
         this.message = message;
-        this.detail = detail;
         invalidate();
     }
 
@@ -112,16 +111,8 @@ final class LibraryView extends View {
         invalidate();
     }
 
-    String notice() {
-        return notice;
-    }
-
     boolean hasBooks() {
         return !books.isEmpty() && message == null;
-    }
-
-    List<Shelf.Entry> books() {
-        return books;
     }
 
     void setCover(String path, Bitmap bitmap) {
@@ -173,19 +164,15 @@ final class LibraryView extends View {
         text.setTextSize(dp(22));
         text.setColor(colorLabel);
         canvas.drawText("Library", pad, dp(30), text);
-        if (notice != null) {
+        // On the right: what the last action did, else how many books there are.
+        String line = notice != null ? notice : !hasBooks() ? null : books.size() == 1 ? "1 book" : books.size() + " books";
+        if (line != null) {
             float left = pad + text.measureText("Library") + dp(12);
             text.setTypeface(regular);
             text.setTextSize(dp(11));
-            text.setColor(colorAccent);
-            String line = TextUtils.ellipsize(notice, text, width - pad - left, TextUtils.TruncateAt.END).toString();
+            text.setColor(notice != null ? colorAccent : colorSecondary);
+            line = ellipsize(line, width - pad - left);
             canvas.drawText(line, width - pad - text.measureText(line), dp(29), text);
-        } else if (hasBooks()) {
-            text.setTypeface(regular);
-            text.setTextSize(dp(11));
-            text.setColor(colorSecondary);
-            String count = books.size() == 1 ? "1 book" : books.size() + " books";
-            canvas.drawText(count, width - pad - text.measureText(count), dp(29), text);
         }
 
         if (!hasBooks()) {
@@ -308,39 +295,8 @@ final class LibraryView extends View {
         text.setTextSize(dp(15));
         text.setColor(colorLabel);
         text.setTextAlign(Paint.Align.CENTER);
-        float y = height * 0.42f;
-        canvas.drawText(ellipsize(message, width - 2 * pad), width / 2f, y, text);
-        if (detail != null) {
-            text.setTypeface(regular);
-            text.setTextSize(dp(12));
-            text.setColor(colorSecondary);
-            y += dp(22);
-            for (String line : wrap(detail, width - 2 * pad)) {
-                canvas.drawText(line, width / 2f, y, text);
-                y += dp(16);
-            }
-        }
+        canvas.drawText(ellipsize(message, width - 2 * pad), width / 2f, height * 0.42f, text);
         text.setTextAlign(Paint.Align.LEFT);
-    }
-
-    /** Breaks `value` into lines at spaces (and at its own newlines) to fit `width`. */
-    private List<String> wrap(String value, int width) {
-        List<String> lines = new ArrayList<String>();
-        for (String paragraph : value.split("\n")) {
-            String rest = paragraph.trim();
-            while (rest.length() > 0) {
-                int fits = text.breakText(rest, true, width, null);
-                if (fits >= rest.length()) {
-                    lines.add(rest);
-                    break;
-                }
-                int cut = rest.lastIndexOf(' ', fits);
-                if (cut <= 0) cut = Math.max(1, fits);
-                lines.add(rest.substring(0, cut));
-                rest = rest.substring(cut).trim();
-            }
-        }
-        return lines;
     }
 
     private String ellipsize(String value, float width) {
@@ -348,10 +304,10 @@ final class LibraryView extends View {
     }
 
     private int color(int id) {
-        return getResources().getColor(id);
+        return getContext().getColor(id);
     }
 
     private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(getContext(), value);
     }
 }

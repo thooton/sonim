@@ -2,6 +2,7 @@ package com.canvas.xp3;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.ClassData;
+import com.canvas.xp3.data.Course;
 import com.canvas.xp3.data.Detail;
 import com.canvas.xp3.data.Draft;
 import com.canvas.xp3.data.Link;
@@ -18,14 +19,19 @@ import com.canvas.xp3.net.Web;
 import com.xp3.common.Http;
 import com.xp3.common.Json;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -67,13 +73,11 @@ final class Backend {
         // stays signed out.
         if (hasBundledSetup() && !store.hasSettings()) {
             try {
-                Config bundled = Config.parse(Bundled.SETTINGS);
-                store.saveSettings(bundled);
-                config = bundled;
+                config = Config.parse(Bundled.SETTINGS);
+                store.saveSettings(config);
             } catch (IOException e) {
                 // Could not write it down; the values are still good for this
                 // run, and the next launch will simply try again.
-                config = safeDefaults();
             } catch (RuntimeException e) {
                 // A bundled setup this version cannot read is not a reason to
                 // refuse to start.
@@ -81,14 +85,6 @@ final class Backend {
             }
         }
         build();
-    }
-
-    private static Config safeDefaults() {
-        try {
-            return Config.parse(Bundled.SETTINGS);
-        } catch (RuntimeException e) {
-            return Config.blank();
-        }
     }
 
     boolean hasBundledSetup() {
@@ -146,6 +142,12 @@ final class Backend {
         return current;
     }
 
+    private Sync syncer() throws IOException {
+        Sync current = sync;
+        if (current == null) throw new IOException("Canvas is not set up yet");
+        return current;
+    }
+
     // ------------------------------------------------------------------
     // Preferences
     // ------------------------------------------------------------------
@@ -171,9 +173,7 @@ final class Backend {
     }
 
     Sync.Result refresh() throws IOException, InterruptedException {
-        Sync current = sync;
-        if (current == null) throw new IOException("Canvas is not set up yet");
-        Sync.Result result = current.run();
+        Sync.Result result = syncer().run();
         save(result);
         return result;
     }
@@ -195,9 +195,7 @@ final class Backend {
     }
 
     Detail detail(Assignment item) throws IOException, InterruptedException {
-        Sync current = sync;
-        if (current == null) throw new IOException("Canvas is not set up yet");
-        Detail detail = current.details(item);
+        Detail detail = syncer().details(item);
         store.saveDetail(item, detail);
         return detail;
     }
@@ -212,7 +210,6 @@ final class Backend {
      */
     ClassData classData(final String courseId) throws IOException, InterruptedException {
         final Canvas client = client();
-        // The three parts are fetched at once; each fails on its own.
         List<Parallel.Task<List<Object>>> parts = new ArrayList<>();
         parts.add(() -> client.announcements(courseId));
         parts.add(() -> client.modules(courseId));
@@ -236,12 +233,11 @@ final class Backend {
     }
 
     List<Detail.Comment> replies(String courseId, String topicId) throws IOException, InterruptedException {
-        Object entries = client().entries(courseId, topicId);
-        return ClassData.replies(Json.array(entries));
+        return ClassData.replies(client().entries(courseId, topicId));
     }
 
     Map<String, Object> page(String courseId, String pageId) throws IOException, InterruptedException {
-        return client().pageById(courseId, pageId);
+        return client().page(courseId, pageId);
     }
 
     List<Notice> cachedNotices() {
@@ -250,7 +246,7 @@ final class Backend {
 
     List<Notice> notices(Sync.Result known) throws IOException, InterruptedException {
         List<Notice> notices = Notice.from(client().activity(),
-            known == null ? new ArrayList<com.canvas.xp3.data.Course>() : known.courses);
+            known == null ? new ArrayList<Course>() : known.courses);
         store.saveNotices(notices);
         return notices;
     }
@@ -259,17 +255,13 @@ final class Backend {
     // Files
     // ------------------------------------------------------------------
 
-    Map<String, Object> fileInfo(String fileId) throws IOException, InterruptedException {
-        return client().file(fileId);
-    }
-
     /** Where a teacher's file is or will be kept on the phone. */
     File fileOnPhone(String fileId, String name) {
         return store.download(fileId, name);
     }
 
     /** Downloads a teacher's file to the phone, keeping it for reading offline. */
-    File download(String fileId, Http.Sending progress) throws IOException, InterruptedException {
+    File download(String fileId) throws IOException, InterruptedException {
         Canvas client = client();
         Map<String, Object> info = client.file(fileId);
         String name = Json.text(info, "display_name");
@@ -279,7 +271,7 @@ final class Backend {
         File partial = new File(target.getPath() + ".part");
         OutputStream out = new FileOutputStream(partial);
         try {
-            client.download(info, out, MAX_DOWNLOAD, progress);
+            client.download(info, out, MAX_DOWNLOAD, null);
         } finally {
             out.close();
         }
@@ -317,12 +309,12 @@ final class Backend {
 
     private static String digest(String text) {
         try {
-            byte[] sum = java.security.MessageDigest.getInstance("SHA-256")
-                .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            byte[] sum = MessageDigest.getInstance("SHA-256")
+                .digest(text.getBytes(StandardCharsets.UTF_8));
             StringBuilder hex = new StringBuilder();
-            for (int i = 0; i < 8; i++) hex.append(String.format(java.util.Locale.US, "%02x", sum[i] & 0xff));
+            for (int i = 0; i < 8; i++) hex.append(String.format(Locale.US, "%02x", sum[i] & 0xff));
             return hex.toString();
-        } catch (java.security.NoSuchAlgorithmException e) {
+        } catch (NoSuchAlgorithmException e) {
             return Integer.toHexString(text.hashCode());
         }
     }
@@ -417,7 +409,7 @@ final class Backend {
                 if (Draft.TEXT.equals(piece.kind)) {
                     byte[] bytes = piece.plain().getBytes("UTF-8");
                     uploaded = client.upload(item.courseId, item.assignmentId, safeName(piece.name) + ".txt",
-                        bytes.length, "text/plain", new java.io.ByteArrayInputStream(bytes),
+                        bytes.length, "text/plain", new ByteArrayInputStream(bytes),
                         (done, total) -> progress.at(pieceId, done, total));
                 } else {
                     File file = new File(folder, piece.file);
@@ -442,7 +434,7 @@ final class Backend {
     private static String uploadName(Draft.Piece piece) {
         String extension = piece.file == null ? "" : piece.file.substring(piece.file.lastIndexOf('.') + 1);
         String name = safeName(piece.name);
-        return name.toLowerCase(java.util.Locale.US).endsWith("." + extension.toLowerCase(java.util.Locale.US))
+        return name.toLowerCase(Locale.US).endsWith("." + extension.toLowerCase(Locale.US))
             ? name : name + "." + extension;
     }
 

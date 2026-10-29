@@ -73,7 +73,7 @@ Source's downloads), while still listing them. So:
   lands on every line.
 - Night Shift is a colour-matrix filter on each activity's root view
   (`NightShift`), so everything the app draws is warmed, covers included. It
-  never relayouts (`Settings.layoutKey` leaves it out). Because system
+  never relayouts (`ReaderActivity.setNightShift` recolours only). Because system
   windows escape the filter, the app shows no toasts (`PageView.flash`) and
   no platform popups.
 

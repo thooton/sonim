@@ -3,14 +3,17 @@ package com.canvas.xp3.data;
 import com.canvas.xp3.net.Canvas;
 import com.canvas.xp3.net.Parallel;
 import com.xp3.common.Json;
-import com.canvas.xp3.net.Submissions;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * One pass over Canvas, turned into the list the three tabs are drawn from.
@@ -52,16 +55,16 @@ public final class Sync {
          * that records it, and which of them are ticked. The override id is
          * kept so unticking updates that record instead of adding another.
          */
-        public final java.util.Map<String, String> overrides;
-        public final java.util.Set<String> checked;
+        public final Map<String, String> overrides;
+        public final Set<String> checked;
 
         public Result(List<Assignment> work, List<Course> courses, List<String> unavailable, long fetchedAt) {
-            this(work, courses, unavailable, fetchedAt, new java.util.HashMap<String, String>(),
-                new java.util.HashSet<String>());
+            this(work, courses, unavailable, fetchedAt, new HashMap<String, String>(),
+                new HashSet<String>());
         }
 
         public Result(List<Assignment> work, List<Course> courses, List<String> unavailable, long fetchedAt,
-                      java.util.Map<String, String> overrides, java.util.Set<String> checked) {
+                      Map<String, String> overrides, Set<String> checked) {
             this.work = work;
             this.courses = courses;
             this.unavailable = unavailable;
@@ -94,7 +97,7 @@ public final class Sync {
         List<Assignment> work = new ArrayList<>();
         List<String> unavailable = new ArrayList<>();
         List<Map<String, Object>> all = new ArrayList<>();
-        for (Object entry : canvas.courses(true)) all.add(Json.object(entry));
+        for (Object entry : canvas.courses()) all.add(Json.object(entry));
         List<Map<String, Object>> records = Terms.current(all, now);
         List<Course> courses = courses(records);
 
@@ -136,8 +139,8 @@ public final class Sync {
                 unavailable.add(names.get(i));
             }
         }
-        java.util.Map<String, String> overrides = new java.util.HashMap<>();
-        java.util.Set<String> checked = new java.util.HashSet<>();
+        Map<String, String> overrides = new HashMap<>();
+        Set<String> checked = new HashSet<>();
         // Check marks are a convenience; the work itself is what this sync
         // is for, and it is complete without them.
         Parallel.Outcome<List<Object>> marks = results.get(results.size() - 1);
@@ -162,7 +165,7 @@ public final class Sync {
      */
     static List<Course> courses(List<Map<String, Object>> records) {
         List<Map<String, Object>> sorted = new ArrayList<>(records);
-        java.util.Collections.sort(sorted, (left, right) -> {
+        Collections.sort(sorted, (left, right) -> {
             String a = Course.split(Json.text(left, "name"), Json.text(left, "course_code"))[0];
             String b = Course.split(Json.text(right, "name"), Json.text(right, "course_code"))[0];
             return a.compareToIgnoreCase(b);
@@ -225,8 +228,9 @@ public final class Sync {
         if (submission.containsKey("cached_due_date")) due = time(Json.text(submission, "cached_due_date"));
         if (due == null) due = time(Json.text(record, "due_at"));
 
-        boolean missing = Submissions.missing(submission);
-        boolean done = !missing && Submissions.turnedIn(submission);
+        // Canvas's own missing flag, teacher overrides included, outranks a score.
+        boolean missing = Json.flag(submission, "missing");
+        boolean done = !missing && turnedIn(submission);
         boolean excused = Json.flag(submission, "excused");
         Double points = Json.number(record, "points_possible");
         Double score = Json.number(submission, "score");
@@ -254,6 +258,21 @@ public final class Sync {
             allowed == null || allowed.doubleValue() <= 0 ? -1 : (int) allowed.doubleValue(),
             attempt == null ? 0 : (int) attempt.doubleValue(),
             Json.flag(record, "locked_for_user"));
+    }
+
+    /**
+     * The Done tab's sense of a submission: excused, actually submitted, or
+     * graded with a score on it. The last case is for work marked off outside
+     * Canvas, like an exam sat on paper, which never gets a submitted_at but
+     * is certainly done. A graded record alone is not enough: a zero entered
+     * against work nobody submitted is graded too, and filing that under Done
+     * would tell somebody they had done a thing they had not.
+     */
+    private static boolean turnedIn(Map<String, Object> submission) {
+        if (Json.flag(submission, "excused")) return true;
+        if (submission.get("submitted_at") instanceof String) return true;
+        return "graded".equals(Json.text(submission, "workflow_state"))
+            && Json.number(submission, "score") != null;
     }
 
     private static String optionalId(Map<String, Object> record, String key) {

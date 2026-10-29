@@ -21,6 +21,17 @@ public final class Ui {
         return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 
+    /**
+     * The BitmapFactory inSampleSize that decodes a picture `size` pixels
+     * along a side to no less than `target`: the largest power of two that
+     * keeps it at least that big.
+     */
+    public static int sampleSize(int size, int target) {
+        int sample = 1;
+        while (size / (sample * 2) >= target) sample *= 2;
+        return sample;
+    }
+
     /** Fills the rest of a vertical LinearLayout. */
     public static LinearLayout.LayoutParams weighted() {
         return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1);

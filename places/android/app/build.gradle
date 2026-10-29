@@ -18,8 +18,8 @@ android {
 
     defaultConfig {
         applicationId "com.places.xp3"
-        versionCode 17
-        versionName "1.5.3"
+        versionCode 19
+        versionName "1.5.5"
     }
 }
 

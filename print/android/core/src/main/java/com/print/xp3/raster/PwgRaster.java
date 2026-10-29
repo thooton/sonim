@@ -2,7 +2,7 @@ package com.print.xp3.raster;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * PWG Raster (PWG 5102.4), what IPP Everywhere printers all take: "RaS2",
@@ -63,7 +63,7 @@ public final class PwgRaster extends Format {
     }
 
     private static void put(ByteBuffer buffer, int at, String text) {
-        byte[] raw = text.getBytes(Charset.forName("US-ASCII"));
+        byte[] raw = text.getBytes(StandardCharsets.US_ASCII);
         int length = Math.min(raw.length, 63);
         for (int i = 0; i < length; i++) buffer.put(at + i, raw[i]);
     }

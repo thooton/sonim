@@ -140,10 +140,7 @@ final class Logos {
         workers.execute(() -> {
             Services read;
             try (InputStream in = context.getAssets().open("services.tsv")) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buffer = new byte[16384];
-                for (int n; (n = in.read(buffer)) > 0; ) out.write(buffer, 0, n);
-                read = Services.parse(new String(out.toByteArray(), StandardCharsets.UTF_8));
+                read = Services.parse(new String(read(in, Integer.MAX_VALUE), StandardCharsets.UTF_8));
             } catch (IOException | RuntimeException e) {
                 read = Services.parse("");
             }
@@ -190,7 +187,7 @@ final class Logos {
     /** A logo the app carries itself, from its assets under logos/. */
     private Bitmap bundled(String name) {
         try (InputStream in = context.getAssets().open("logos/" + name)) {
-            byte[] bytes = read(in);
+            byte[] bytes = read(in, MAX_BYTES);
             return bytes == null ? null : decode(bytes);
         } catch (IOException | RuntimeException e) {
             return null;
@@ -216,7 +213,7 @@ final class Logos {
                         continue;
                     }
                     if (status != 200) return null;
-                    byte[] bytes = read(stream.stream());
+                    byte[] bytes = read(stream.stream(), MAX_BYTES);
                     return bytes == null ? null : decode(bytes);
                 }
             }
@@ -226,12 +223,13 @@ final class Logos {
         return null;
     }
 
-    private static byte[] read(InputStream in) throws IOException {
+    /** All of `in`, or null when it is more than `limit` bytes. */
+    private static byte[] read(InputStream in, int limit) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buffer = new byte[16384];
         for (int n; (n = in.read(buffer)) > 0; ) {
             out.write(buffer, 0, n);
-            if (out.size() > MAX_BYTES) return null;
+            if (out.size() > limit) return null;
         }
         return out.toByteArray();
     }
@@ -242,8 +240,7 @@ final class Logos {
         BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
         BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = 1;
-        while (Math.min(bounds.outWidth, bounds.outHeight) / (options.inSampleSize * 2) >= SIZE) options.inSampleSize *= 2;
+        options.inSampleSize = Ui.sampleSize(Math.min(bounds.outWidth, bounds.outHeight), SIZE);
         Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
         if (bitmap == null) return null;
         int longer = Math.max(bitmap.getWidth(), bitmap.getHeight());

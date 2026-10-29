@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory;
 
 import com.newyorker.xp3.news.Site;
 import com.xp3.common.Http;
+import com.xp3.common.ui.Ui;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -54,22 +55,18 @@ final class Net {
 
     /** A picture, scaled down on decoding so it is no wider than `width` pixels. */
     static Bitmap picture(String url, int width) throws IOException, InterruptedException {
-        Http.Stream stream = HTTP.stream(Http.Request.to(URI.create(url))
-            .header("User-Agent", AGENT)
-            .timeout(30000));
         byte[] bytes;
-        try {
+        try (Http.Stream stream = HTTP.stream(Http.Request.to(URI.create(url))
+            .header("User-Agent", AGENT)
+            .timeout(30000))) {
             if (stream.status() != 200) throw new IOException("Picture " + stream.status());
             bytes = read(stream.stream());
-        } finally {
-            stream.close();
         }
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
         BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = 1;
-        while (bounds.outWidth / (options.inSampleSize * 2) >= width) options.inSampleSize *= 2;
+        options.inSampleSize = Ui.sampleSize(bounds.outWidth, width);
         options.inPreferredConfig = Bitmap.Config.RGB_565;
         Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
         if (bitmap == null) throw new IOException("Not a picture");

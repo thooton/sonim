@@ -1,12 +1,23 @@
 package com.canvas.xp3;
 
+import android.content.res.ColorStateList;
+import android.graphics.LightingColorFilter;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.TextPaint;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.MetricAffectingSpan;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -15,15 +26,16 @@ import com.canvas.xp3.data.Course;
 import com.canvas.xp3.data.Detail;
 import com.canvas.xp3.data.Link;
 import com.xp3.common.ui.Markdown;
+import com.xp3.common.ui.Ui;
 
 import java.net.URI;
 import java.util.Arrays;
-import java.util.Comparator;
+import java.util.Locale;
 
 /**
  * The row shapes the screens share: a work row with its course dot, a row
  * led by an icon tile, a file box, a section label, the back line at the top
- * of a page, an empty state and the grey shapes that stand in while loading.
+ * of a page, an empty state and the spinner that stands in while loading.
  */
 final class Parts {
 
@@ -49,19 +61,14 @@ final class Parts {
         LinearLayout column = v.column();
         v.pad(column, 0, 0, 0, 10);
         scroll.addView(column, new FrameLayout.LayoutParams(-1, -2));
-        into.addView(scroll, Views.tall());
+        into.addView(scroll, Ui.weighted());
         screen.scroll = scroll;
         return column;
     }
 
     /** "‹ Assigned" on the left, the class's dot and code on the right. */
     View nav(String back, Course course) {
-        LinearLayout row = v.row();
-        v.pad(row, 12, 4, 12, 4);
-        TextView name = v.text("‹ " + back, 10, look.semibold, look.muted);
-        name.setSingleLine(true);
-        name.setEllipsize(TextUtils.TruncateAt.END);
-        row.addView(name, Views.fill());
+        LinearLayout row = nav(back);
         if (course != null) {
             row.addView(v.dot(look.course(course.color), 7));
             TextView code = v.text(course.code, 10, look.semibold, look.ink);
@@ -71,14 +78,21 @@ final class Parts {
         return row;
     }
 
+    /** "‹ Back" on the left, and a quiet note such as "2 of 5" on the right. */
     View nav(String back, String right) {
+        LinearLayout row = nav(back);
+        if (right != null) row.addView(v.text(right, 10, look.semibold, look.muted));
+        return row;
+    }
+
+    /** "‹ Back" alone. */
+    LinearLayout nav(String back) {
         LinearLayout row = v.row();
         v.pad(row, 12, 4, 12, 4);
         TextView name = v.text("‹ " + back, 10, look.semibold, look.muted);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
         row.addView(name, Views.fill());
-        if (right != null) row.addView(v.text(right, 10, look.semibold, look.muted));
         return row;
     }
 
@@ -102,7 +116,7 @@ final class Parts {
 
     /** A piece of work in a list: course dot, title, one line of detail, and a chip or note on the right. */
     Item work(String key, Assignment item, String meta, View right, Runnable open) {
-        Item row = new Item(app, key, "Open", open);
+        Item row = new Item(app, key, open);
         LinearLayout line = v.row();
         line.setGravity(Gravity.TOP);
         v.pad(line, 12, 6, 12, 6);
@@ -111,7 +125,7 @@ final class Parts {
         line.addView(dot, v.margins(new LinearLayout.LayoutParams(v.dp(8), v.dp(8)), 0, 3, 9, 0));
         LinearLayout text = v.column();
         MarkText title = v.itemTitle(item.title);
-        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11.5f * look.scale);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f * look.scale);
         text.addView(title, Views.wide());
         text.addView(v.meta(meta), v.margins(Views.wide(), 0, 2, 0, 0));
         line.addView(text, Views.fill());
@@ -126,9 +140,9 @@ final class Parts {
     }
 
     /** A row led by a soft tile: classwork, notifications, files, people. */
-    Item tiled(String key, String ok, int icon, int tileFill, int tileTint, String title, String meta, View right,
+    Item tiled(String key, int icon, int tileFill, int tileTint, String title, String meta, View right,
                Runnable action) {
-        Item row = new Item(app, key, ok, action);
+        Item row = new Item(app, key, action);
         LinearLayout line = v.row();
         v.pad(line, 12, 6, 12, 6);
         line.addView(v.tile(icon, tileFill, tileTint, 26, 14, 8));
@@ -149,7 +163,7 @@ final class Parts {
         int fill;
         int tint;
         int icon;
-        String k = kind == null ? "" : kind.toLowerCase(java.util.Locale.US);
+        String k = kind == null ? "" : kind.toLowerCase(Locale.US);
         if (k.equals("pdf")) {
             fill = look.dark ? 0xFF3A1A10 : 0xFFFFEDE6;
             tint = look.dark ? 0xFFFF8A65 : 0xFFC4320A;
@@ -166,21 +180,18 @@ final class Parts {
             fill = look.paper;
             tint = look.ink;
             icon = R.drawable.ic_link;
-        } else if (k.equals("text")) {
-            fill = look.dark ? 0xFF1B2350 : 0xFFE8ECFF;
-            tint = look.dark ? 0xFF9AA8FF : 0xFF3D5AFE;
-            icon = R.drawable.ic_edit;
         } else {
+            // Typed answers and every other kind of document share the blue.
             fill = look.dark ? 0xFF1B2350 : 0xFFE8ECFF;
             tint = look.dark ? 0xFF9AA8FF : 0xFF3D5AFE;
-            icon = R.drawable.ic_doc;
+            icon = k.equals("text") ? R.drawable.ic_edit : R.drawable.ic_doc;
         }
         return v.tile(icon, fill, tint, 24, 13, 6);
     }
 
     /** A bordered box for a file or a piece of work; its border turns ink under the d-pad. */
-    Item box(String key, String ok, View tile, String title, String meta, Runnable action) {
-        Item row = new Item(app, key, ok, action);
+    Item box(String key, View tile, String title, String meta, Runnable action) {
+        Item row = new Item(app, key, action);
         LinearLayout line = v.row();
         v.pad(line, 5, 5, 7, 5);
         line.addView(tile);
@@ -201,10 +212,15 @@ final class Parts {
         return file.size >= 0 ? file.kind() + " · " + size(file.size) : file.kind();
     }
 
+    /** "1 item", "3 items". */
+    static String items(int count) {
+        return count + (count == 1 ? " item" : " items");
+    }
+
     static String size(long bytes) {
         if (bytes < 1024) return bytes + " B";
         if (bytes < 1024 * 1024) return Math.round(bytes / 1024.0) + " KB";
-        return String.format(java.util.Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0));
+        return String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0));
     }
 
     /** A small line drawing, one sentence, and the next key to press. */
@@ -216,7 +232,7 @@ final class Parts {
             ImageView picture = new ImageView(app);
             picture.setImageResource(art);
             picture.setColorFilter(null);
-            if (look.dark) picture.setColorFilter(new android.graphics.LightingColorFilter(0, look.ink));
+            if (look.dark) picture.setColorFilter(new LightingColorFilter(0, look.ink));
             LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(v.dp(84), v.dp(60));
             at.bottomMargin = v.dp(10);
             box.addView(picture, at);
@@ -241,12 +257,12 @@ final class Parts {
      * rest anyway, and then the rest jumps in under them.
      */
     View spinner() {
-        android.widget.FrameLayout box = new android.widget.FrameLayout(app);
+        FrameLayout box = new FrameLayout(app);
         box.setBackgroundColor(look.bg);
-        android.widget.ProgressBar wheel = new android.widget.ProgressBar(app);
+        ProgressBar wheel = new ProgressBar(app);
         wheel.setIndeterminate(true);
-        wheel.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(look.ink));
-        box.addView(wheel, new android.widget.FrameLayout.LayoutParams(v.dp(28), v.dp(28), Gravity.CENTER));
+        wheel.setIndeterminateTintList(ColorStateList.valueOf(look.ink));
+        box.addView(wheel, new FrameLayout.LayoutParams(v.dp(28), v.dp(28), Gravity.CENTER));
         box.setFocusable(true);
         box.setDefaultFocusHighlightEnabled(false);
         return box;
@@ -260,9 +276,9 @@ final class Parts {
         v.pad(box, 8, 6, 8, 6);
         box.addView(v.icon(R.drawable.ic_cloud_off, look.ink, 14));
         TextView text = v.text("", 9.5f, look.regular, look.body);
-        android.text.SpannableStringBuilder said = new android.text.SpannableStringBuilder();
+        SpannableStringBuilder said = new SpannableStringBuilder();
         said.append(strong);
-        said.setSpan(new android.text.style.ForegroundColorSpan(look.ink), 0, strong.length(), 0);
+        said.setSpan(new ForegroundColorSpan(look.ink), 0, strong.length(), 0);
         said.setSpan(new TypefaceSpan2(look.bold), 0, strong.length(), 0);
         said.append(" ").append(rest);
         text.setText(said);
@@ -294,22 +310,17 @@ final class Parts {
 
     /** Puts every link the phone can follow in reach of the d-pad (see LinkText). */
     private void links(View view, URI base) {
-        if (view instanceof android.view.ViewGroup) {
-            android.view.ViewGroup group = (android.view.ViewGroup) view;
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) links(group.getChildAt(i), base);
             return;
         }
-        if (!(view instanceof TextView) || !(((TextView) view).getText() instanceof android.text.Spanned)) return;
+        if (!(view instanceof TextView) || !(((TextView) view).getText() instanceof Spanned)) return;
         TextView text = (TextView) view;
-        final android.text.Spanned spanned = (android.text.Spanned) text.getText();
+        final Spanned spanned = (Spanned) text.getText();
         Markdown.Link[] found = spanned.getSpans(0, spanned.length(), Markdown.Link.class);
         if (found.length == 0) return;
-        Arrays.sort(found, new Comparator<Markdown.Link>() {
-            @Override
-            public int compare(Markdown.Link a, Markdown.Link b) {
-                return spanned.getSpanStart(a) - spanned.getSpanStart(b);
-            }
-        });
+        Arrays.sort(found, (a, b) -> spanned.getSpanStart(a) - spanned.getSpanStart(b));
         URI canvas = app.backend.config().canvasBase();
         LinkText wrapped = null;
         for (Markdown.Link span : found) {
@@ -319,16 +330,15 @@ final class Parts {
             int to = spanned.getSpanEnd(span);
             if (to <= from) continue;
             if (wrapped == null) {
-                android.view.ViewGroup parent = (android.view.ViewGroup) text.getParent();
+                ViewGroup parent = (ViewGroup) text.getParent();
                 int at = parent.indexOfChild(text);
-                android.view.ViewGroup.LayoutParams params = text.getLayoutParams();
+                ViewGroup.LayoutParams params = text.getLayoutParams();
                 parent.removeViewAt(at);
                 wrapped = new LinkText(app, text, look.markStroke);
                 parent.addView(wrapped, at, params);
             }
             final String label = spanned.subSequence(from, to).toString().trim();
-            Item stop = new Item(app, "link:" + links++, "Open",
-                () -> LinkMenu.show(app, link, label));
+            Item stop = new Item(app, "link:" + links++, () -> LinkMenu.show(app, link, label));
             wrapped.add(from, to, stop);
         }
     }
@@ -336,19 +346,19 @@ final class Parts {
     private void restyle(View view) {
         if (view instanceof TextView) {
             TextView text = (TextView) view;
-            android.graphics.Typeface face = text.getTypeface();
+            Typeface face = text.getTypeface();
             boolean strong = face != null && face.isBold();
-            boolean mono = face != null && face.equals(android.graphics.Typeface.MONOSPACE);
+            boolean mono = face != null && face.equals(Typeface.MONOSPACE);
             if (!mono) text.setTypeface(strong ? look.bold : look.regular);
             float size = text.getTextSize() / app.getResources().getDisplayMetrics().scaledDensity;
-            text.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, size * 10.5f / 11f * look.scale);
+            text.setTextSize(TypedValue.COMPLEX_UNIT_SP, size * 10.5f / 11f * look.scale);
             int color = text.getCurrentTextColor();
             if (color == app.getColor(R.color.text_muted)) text.setTextColor(look.muted);
             else text.setTextColor(strong ? look.ink : look.body);
             text.setLinkTextColor(look.ink);
             text.setLineSpacing(0, 1.3f);
-        } else if (view instanceof android.view.ViewGroup) {
-            android.view.ViewGroup group = (android.view.ViewGroup) view;
+        } else if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) restyle(group.getChildAt(i));
         } else if (look.dark) {
             // Rules and table lines: drawn in the light palette's colours.
@@ -381,20 +391,20 @@ final class Parts {
     }
 
     /** A typeface as a span, for one bold phrase inside a line of body text. */
-    static final class TypefaceSpan2 extends android.text.style.MetricAffectingSpan {
-        private final android.graphics.Typeface face;
+    static final class TypefaceSpan2 extends MetricAffectingSpan {
+        private final Typeface face;
 
-        TypefaceSpan2(android.graphics.Typeface face) {
+        TypefaceSpan2(Typeface face) {
             this.face = face;
         }
 
         @Override
-        public void updateDrawState(android.text.TextPaint paint) {
+        public void updateDrawState(TextPaint paint) {
             paint.setTypeface(face);
         }
 
         @Override
-        public void updateMeasureState(android.text.TextPaint paint) {
+        public void updateMeasureState(TextPaint paint) {
             paint.setTypeface(face);
         }
     }

@@ -22,9 +22,7 @@ public final class Normalizer {
         "DEVICE_SESSION_FINAL|CANCELLED|CANCELED|STOPPED|COMPLETE|ENDED|TERMINATED|FAILED|EXPIRED"
     );
     private static final Pattern STOPPING_EVENT = Pattern.compile("TERMINATING|STOPPING");
-    private static final Pattern INITIALIZING_EVENT = Pattern.compile(
-        "INITIALIZING_CHARGE|STARTING"
-    );
+    private static final Pattern INITIALIZING_EVENT = Pattern.compile("INITIALIZING_CHARGE|STARTING");
     private static final Pattern CHARGING_EVENT = Pattern.compile(
         "CHARGING_STARTED|CHARGING_IN_PROGRESS|SESSION_STARTED"
     );
@@ -48,7 +46,6 @@ public final class Normalizer {
         // demotes the city line, while the detail screen wants the whole thing.
         Jsons.put(result, "addressStreet", streetLine(site.optJSONObject("address")));
         Jsons.put(result, "addressLocality", localityLine(site.optJSONObject("address")));
-        Jsons.put(result, "postalCode", Jsons.string(site.optJSONObject("address"), "postalCode"));
         Jsons.put(result, "coordinates", site.optJSONObject("centroid"));
         Jsons.put(result, "distanceMiles", Jsons.number(site, "haversineDistanceMiles"));
         String siteType = Jsons.string(site, "siteType");
@@ -59,7 +56,6 @@ public final class Normalizer {
                 ? "Charger"
                 : titleCase(siteType == null ? "" : siteType.replace("SITE_TYPE_", ""))
         );
-        Jsons.put(result, "powerType", Jsons.string(site, "powerType"));
         Jsons.put(result, "maxPowerKw", Jsons.number(site, "maxPowerKw"));
         Jsons.put(result, "totalStalls", Jsons.longNumber(site, "totalStalls"));
         Jsons.put(result, "availableStalls", Jsons.longNumber(site, "availableStalls"));
@@ -67,27 +63,10 @@ public final class Normalizer {
         JSONArray amenities = new JSONArray();
         JSONArray rawAmenities = site.optJSONArray("amenities");
         if (rawAmenities != null) for (int i = 0; i < rawAmenities.length(); i++) amenities.put(
-            titleCase(
-                rawAmenities.optString(i).replace("AMENITIES_", "")
-                    .replace("TWENTY_FOUR_HOUR", "OPEN_24_HOURS")
-            )
+            titleCase(rawAmenities.optString(i).replace("AMENITIES_", "").replace("TWENTY_FOUR_HOUR", "OPEN_24_HOURS"))
         );
         result.put("amenities", amenities);
-        Jsons.put(
-            result,
-            "openToNonTeslas",
-            site.has("openToNonTeslas")
-                ? site.optBoolean("openToNonTeslas")
-                : null
-        );
-        result.put("hasHighCongestion", site.optBoolean("hasHighCongestion"));
-        Jsons.put(
-            result,
-            "waitEstimate",
-            labelWithoutPrefix(Jsons.string(site, "waitEstimateBucket"), "WAIT_ESTIMATE_BUCKET_")
-        );
         Jsons.put(result, "outage", Jsons.string(site, "activeOutageMessage"));
-        Jsons.put(result, "timeZone", Jsons.string(site, "timeZone"));
         return result;
     }
 
@@ -99,84 +78,35 @@ public final class Normalizer {
         JSONArray chargers = new JSONArray();
         JSONArray raw = site.optJSONArray("chargerList");
         List<JSONObject> sorted = new ArrayList<>();
-        if (raw != null) for (int i = 0; i < raw.length(); i++) if (
-            raw.optJSONObject(i) != null
-        ) sorted.add(raw.optJSONObject(i));
-        Collections.sort(
-            sorted,
-            (a, b) -> {
-                return naturalLabel(a.optString("label"), b.optString("label"));
-            }
-        );
+        for (int i = 0; raw != null && i < raw.length(); i++) {
+            if (raw.optJSONObject(i) != null) sorted.add(raw.optJSONObject(i));
+        }
+        Collections.sort(sorted, (a, b) -> naturalLabel(a.optString("label"), b.optString("label")));
         int available = 0;
         for (JSONObject charger : sorted) {
-            String state = charger.optString("availability");
-            boolean isAvailable = "CHARGER_AVAILABILITY_AVAILABLE".equals(state);
+            boolean isAvailable = "CHARGER_AVAILABILITY_AVAILABLE".equals(charger.optString("availability"));
             if (isAvailable) available++;
-            chargers.put(
-                new JSONObject().put("id", charger.optString("id"))
-                    .put("connectorId", charger.optString("connectorId"))
-                    .put("label", charger.optString("label")).put(
-                        "powerKw",
-                        charger.has("powerKw")
-                            ? charger.optDouble("powerKw")
-                            : JSONObject.NULL
-                    ).put("standard", charger.optString("standard")).put("availability", state)
-                    .put("available", isAvailable).put(
-                        "availabilityLabel",
-                        titleCase(state.replace("CHARGER_AVAILABILITY_", ""))
-                    )
-            );
+            chargers.put(new JSONObject().put("id", charger.optString("id"))
+                .put("label", charger.optString("label"))
+                .put("powerKw", charger.has("powerKw") ? charger.optDouble("powerKw") : JSONObject.NULL)
+                .put("available", isAvailable));
         }
         result.put("chargers", chargers).put("availableChargers", available);
 
         JSONArray extras = new JSONArray();
-        addExtraRate(
-            extras,
-            activePricebook == null
-                ? null
-                : activePricebook.optJSONObject("congestion"),
-            "Congestion fee"
-        );
-        addExtraRate(
-            extras,
-            activePricebook == null
-                ? null
-                : activePricebook.optJSONObject("parking"),
-            "Idle / parking fee"
-        );
-        addExtraRate(
-            extras,
-            activePricebook == null
-                ? null
-                : activePricebook.optJSONObject("duration"),
-            "Duration fee"
-        );
-        addExtraRate(
-            extras,
-            activePricebook == null
-                ? null
-                : activePricebook.optJSONObject("flat"),
-            "Session fee"
-        );
+        String[][] fees = {
+            {"congestion", "Congestion fee"}, {"parking", "Idle / parking fee"},
+            {"duration", "Duration fee"}, {"flat", "Session fee"},
+        };
+        for (String[] fee : fees) {
+            addExtraRate(extras, activePricebook == null ? null : activePricebook.optJSONObject(fee[0]), fee[1]);
+        }
         result.put("extraRates", extras);
         Jsons.put(result, "holdAmount", priceObject(site.optJSONObject("holdAmount")));
-        Jsons.put(result, "currentCongestion", Jsons.number(site, "currentCongestion"));
-        Jsons.put(result, "accessRestriction", Jsons.string(site, "accessRestriction"));
         Jsons.put(result, "accessInstruction", Jsons.string(site, "accessInstruction"));
-        Jsons.put(
-            result,
-            "additionalNavInstructions",
-            Jsons.string(site, "additionalNavInstructions")
-        );
         Jsons.put(result, "criticalInfo", Jsons.string(site, "criticalInfo"));
         result.put("payToPark", site.optBoolean("payToPark"));
         Jsons.put(result, "payToParkInstructions", Jsons.string(site, "payToParkInstructions"));
-        Jsons.put(result, "parkingLevel", Jsons.string(site, "parkingLevel"));
-        result.put("valetOnly", site.optBoolean("valetOnly"));
-        Jsons.put(result, "owner", Jsons.string(site, "owner"));
-        Jsons.put(result, "operator", Jsons.string(site, "operator"));
-        Jsons.put(result, "entryPoint", site.optJSONObject("entryPoint"));
         return result;
     }
 
@@ -188,17 +118,12 @@ public final class Normalizer {
         double powerW = nestedNumber(info, "instantaneousPowerW", "value", 0);
         double energy = number(info, "cumulativeEnergy", 0);
         boolean isFinal = eventMatches(events, FINAL_EVENT);
-        String endReason = info.optString(
-            "authorizationEndReason",
-            "AUTHORIZATION_END_REASON_INVALID"
-        );
+        String endReason = info.optString("authorizationEndReason", "AUTHORIZATION_END_REASON_INVALID");
         boolean authEnded =
             info.optJSONObject("chargeEndTimeEpoch") != null ||
             !"AUTHORIZATION_END_REASON_INVALID".equals(endReason);
-        boolean stopping =
-            !isFinal && (authEnded || eventMatches(events, STOPPING_EVENT));
-        boolean everCharged =
-            energy > 0 || info.optBoolean("hasCumulativeEnergy");
+        boolean stopping = !isFinal && (authEnded || eventMatches(events, STOPPING_EVENT));
+        boolean everCharged = energy > 0 || info.optBoolean("hasCumulativeEnergy");
         boolean awaitingUnplug = stopping && powerW == 0 && everCharged;
         boolean cancelled =
             isFinal &&
@@ -210,21 +135,15 @@ public final class Normalizer {
         String phase;
         if (isFinal) phase = cancelled ? "cancelled" : "ended";
         else if (stopping) phase = "stopping";
-        else if (
-            powerW > 0 || energy > 0 || eventMatches(events, CHARGING_EVENT)
-        ) phase = "charging";
-        else if (eventMatches(events, INITIALIZING_EVENT)) phase =
-            "initializing";
-        else if (eventContains(events, "WAITING_FOR_PLUG_IN")) phase =
-            "waiting_for_plug_in";
+        else if (powerW > 0 || energy > 0 || eventMatches(events, CHARGING_EVENT)) phase = "charging";
+        else if (eventMatches(events, INITIALIZING_EVENT)) phase = "initializing";
+        else if (eventContains(events, "WAITING_FOR_PLUG_IN")) phase = "waiting_for_plug_in";
         else phase = "authorizing";
 
         String status;
         if ("authorizing".equals(phase)) status = "Authorizing at the stall…";
-        else if ("waiting_for_plug_in".equals(phase)) status =
-            "Ready, waiting for plug in";
-        else if ("initializing".equals(phase)) status =
-            "Plugged in, starting up…";
+        else if ("waiting_for_plug_in".equals(phase)) status = "Ready, waiting for plug in";
+        else if ("initializing".equals(phase)) status = "Plugged in, starting up…";
         else if ("charging".equals(phase)) status = "Charging";
         else if ("stopping".equals(phase)) status = awaitingUnplug
             ? "Unplug to finish"
@@ -232,8 +151,7 @@ public final class Normalizer {
         else if ("cancelled".equals(phase)) status = "Session cancelled";
         else status = "Session complete";
 
-        JSONObject result =
-            extra == null ? new JSONObject() : Jsons.copy(extra);
+        JSONObject result = extra == null ? new JSONObject() : Jsons.copy(extra);
         String id = first(
             info.optString("authorizationSessionId", null),
             extra == null
@@ -241,22 +159,14 @@ public final class Normalizer {
                 : extra.optString("authorizationSessionId", null)
         );
         Jsons.put(result, "authorizationSessionId", id);
-        result.put("phase", phase).put("statusText", status).put(
-                "pending",
-                "authorizing".equals(phase) ||
-                    "waiting_for_plug_in".equals(phase)
-            ).put("active", !isFinal).put(
-                "charging",
-                "charging".equals(phase) || "initializing".equals(phase)
-            ).put("cancellable", !isFinal && !stopping).put("awaitingUnplug", awaitingUnplug)
-            .put("summaryReady", isFinal).put("events", events).put("energyKwh", energy)
+        result.put("phase", phase).put("statusText", status).put("active", !isFinal)
+            .put("charging", "charging".equals(phase) || "initializing".equals(phase))
+            .put("cancellable", !isFinal && !stopping).put("awaitingUnplug", awaitingUnplug)
+            .put("summaryReady", isFinal).put("energyKwh", energy)
             .put("hasEnergyReading", info.optBoolean("hasCumulativeEnergy"))
             .put("cost", number(info, "cumulativeCost", 0)).put("powerKw", powerW / 1000.0);
         Jsons.put(result, "currency", Jsons.string(info, "currency"));
-        Jsons.put(result, "voltageV", nestedNullableNumber(info, "voltageV", "value"));
-        Jsons.put(result, "currentA", nestedNullableNumber(info, "currentA", "value"));
         Jsons.put(result, "stateOfCharge", nestedNullableNumber(info, "stateOfCharge", "value"));
-        Jsons.put(result, "timeToFullSecs", duration(info.optJSONObject("timeToFull")));
         Jsons.put(result, "timeToBulkSecs", duration(info.optJSONObject("timeToBulk")));
         Jsons.put(result, "startedAt", timestamp(info.optJSONObject("chargeStartTimeEpoch")));
         Jsons.put(result, "endedAt", timestamp(info.optJSONObject("chargeEndTimeEpoch")));
@@ -267,8 +177,6 @@ public final class Normalizer {
         throws JSONException {
         if (summary == null) return null;
         JSONObject result = feeTotals(summary.optJSONArray("fees"));
-        result.put("chargeSessionId", summary.optString("chargeSessionId"));
-        result.put("siteName", summary.optString("siteLocationName"));
         return result;
     }
 
@@ -301,8 +209,6 @@ public final class Normalizer {
         Jsons.put(result, "label", paymentMethod(instrument));
         Jsons.put(result, "brand", labelOf(Jsons.string(instrument, "accountType")));
         Jsons.put(result, "lastFour", Jsons.string(instrument, "lastFourDigits"));
-        Jsons.put(result, "type", labelOf(Jsons.string(instrument, "paymentInstrumentType")));
-        Jsons.put(result, "channels", labelList(instrument.optJSONArray("paymentChannels")));
         int month = intOf(instrument.opt("expiryMonth"));
         // Two-digit years are written on the card itself; a card expiring in
         // "28" is not a card from 1928.
@@ -352,7 +258,7 @@ public final class Normalizer {
                     .put("sessions", sessions.get(entry.getKey()))
             );
         }
-        return new JSONObject().put("owed", entries.length() > 0).put("entries", entries);
+        return new JSONObject().put("entries", entries);
     }
 
     /**
@@ -384,13 +290,7 @@ public final class Normalizer {
         result.put("hasNacsAdapter", ev.optBoolean("hasNacsAdapter"));
         double range = ev.optDouble("maxRange", 0);
         if (range > 0) {
-            Jsons.put(
-                result,
-                "range",
-                Math.round(range) +
-                    " " +
-                    rangeUnit(Jsons.string(ev, "maxRangeUnit"))
-            );
+            Jsons.put(result, "range", Math.round(range) + " " + rangeUnit(Jsons.string(ev, "maxRangeUnit")));
         }
         return result;
     }
@@ -424,18 +324,6 @@ public final class Normalizer {
         if (unit.toUpperCase(Locale.US).startsWith("KM")) return "km";
         if (unit.toUpperCase(Locale.US).startsWith("KILO")) return "km";
         return unit.toLowerCase(Locale.US);
-    }
-
-    /** Enum-shaped values joined for display: "Credit Card · Apple Pay". */
-    private static String labelList(JSONArray values) {
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; values != null && i < values.length(); i++) {
-            String label = labelOf(values.optString(i, null));
-            if (label == null) continue;
-            if (result.length() > 0) result.append(" · ");
-            result.append(label);
-        }
-        return result.length() == 0 ? null : result.toString();
     }
 
     private static String labelOf(String value) {
@@ -487,7 +375,6 @@ public final class Normalizer {
             Long unlatchedAt = isoTime(Jsons.string(item, "unlatchDateTime"));
             Jsons.put(session, "startedAt", startedAt);
             Jsons.put(session, "endedAt", endedAt);
-            Jsons.put(session, "unlatchedAt", unlatchedAt);
             // How long the charge ran, and how long the car then sat on the
             // stall afterwards. Idle time is billable, so the gap is worth
             // naming even in the sessions that were not billed for it.
@@ -496,11 +383,7 @@ public final class Normalizer {
             // What the session worked out to per kilowatt-hour with every fee
             // counted: the one figure two sessions compare on.
             double energy = session.optDouble("energyKwh", 0);
-            Jsons.put(
-                session,
-                "pricePerKwh",
-                energy > 0 ? session.optDouble("total", 0) / energy : null
-            );
+            Jsons.put(session, "pricePerKwh", energy > 0 ? session.optDouble("total", 0) / energy : null);
             sessions.add(session);
         }
         Collections.sort(sessions, (a, b) -> Long.compare(startedAt(b), startedAt(a)));
@@ -557,23 +440,16 @@ public final class Normalizer {
             if (fee == null) continue;
             String type = fee.optString("feeType");
             String uom = fee.optString("uom");
-            double usage =
-                number(fee, "usageBase", 0) +
-                number(fee, "usageTier1", 0) +
-                number(fee, "usageTier2", 0);
+            double usage = number(fee, "usageBase", 0) + number(fee, "usageTier1", 0) + number(fee, "usageTier2", 0);
             double feeTotal = number(fee, "totalDue", 0);
             if ("kwh".equalsIgnoreCase(uom)) energy += usage;
             total += feeTotal;
             paid = paid && (fee.optBoolean("isPaid") || feeTotal == 0);
             if (currency == null) currency = Jsons.string(fee, "currencyCode");
-            fees.put(
-                new JSONObject().put("type", type).put("label", feeLabel(type))
-                    .put("currency", fee.optString("currencyCode")).put("uom", uom).put(
-                        "waived",
-                        "NO_CHARGE".equals(fee.optString("pricingType"))
-                    ).put("total", feeTotal).put("usage", usage)
-                    .put("rate", number(fee, "rateBase", 0))
-            );
+            fees.put(new JSONObject().put("type", type).put("label", feeLabel(type))
+                .put("currency", fee.optString("currencyCode")).put("uom", uom)
+                .put("waived", "NO_CHARGE".equals(fee.optString("pricingType")))
+                .put("total", feeTotal));
         }
         result.put("fees", fees).put("energyKwh", energy).put("total", total).put("paid", paid);
         Jsons.put(result, "currency", currency);
@@ -601,15 +477,8 @@ public final class Normalizer {
             }
             sites.add(site);
         }
-        Collections.sort(
-            sites,
-            (a, b) -> {
-                return Double.compare(
-                    a.optDouble("distanceMiles", Double.MAX_VALUE),
-                    b.optDouble("distanceMiles", Double.MAX_VALUE)
-                );
-            }
-        );
+        Collections.sort(sites, (a, b) -> Double.compare(
+            a.optDouble("distanceMiles", Double.MAX_VALUE), b.optDouble("distanceMiles", Double.MAX_VALUE)));
         return sites;
     }
 
@@ -622,32 +491,17 @@ public final class Normalizer {
         Jsons.put(result, "currency", Jsons.string(charging, "currencyCode"));
         Jsons.put(result, "uom", Jsons.string(charging, "uom"));
         Jsons.put(result, "price", rates != null && rates.length() > 0 ? rates.optDouble(0) : null);
-        result.put(
-            "dynamic",
-            Jsons.object(charging, "dynamicRates") != null &&
-                Jsons.object(charging, "dynamicRates").optBoolean("enabled")
-        );
         return result;
     }
 
     private static JSONObject schedule(JSONObject site) throws JSONException {
-        JSONObject charging = Jsons.object(
-            site,
-            "pricing",
-            "userRates",
-            "activePricebook",
-            "charging"
-        );
+        JSONObject charging = Jsons.object(site, "pricing", "userRates", "activePricebook", "charging");
         if (charging == null) return null;
         JSONArray rates = charging.optJSONArray("rates");
-        Double flat =
-            rates != null && rates.length() > 0 ? rates.optDouble(0) : null;
+        Double flat = rates != null && rates.length() > 0 ? rates.optDouble(0) : null;
         int hour = currentHour(site.optString("timeZone", "UTC"));
         JSONObject tou = charging.optJSONObject("touRates");
-        JSONArray windows =
-            tou != null && tou.optBoolean("enabled")
-                ? tou.optJSONArray("activeRatesByTime")
-                : null;
+        JSONArray windows = tou != null && tou.optBoolean("enabled") ? tou.optJSONArray("activeRatesByTime") : null;
         JSONArray hours = new JSONArray();
         Double current = flat;
         for (int h = 0; h < 24; h++) {
@@ -659,8 +513,7 @@ public final class Normalizer {
         }
         JSONObject result = new JSONObject()
             .put("currency", charging.optString("currencyCode", "USD"))
-            .put("uom", charging.optString("uom", "kwh")).put("currentHour", hour)
-            .put("hours", hours);
+            .put("uom", charging.optString("uom", "kwh")).put("hours", hours);
         Jsons.put(result, "currentPrice", current);
         return result;
     }
@@ -684,22 +537,11 @@ public final class Normalizer {
         return fallback;
     }
 
-    private static void addExtraRate(
-        JSONArray target,
-        JSONObject rate,
-        String label
-    ) throws JSONException {
-        if (
-            rate == null ||
-            rate.optJSONArray("rates") == null ||
-            rate.optJSONArray("rates").length() == 0
-        ) return;
-        target.put(
-            new JSONObject().put("label", label)
-                .put("price", rate.optJSONArray("rates").optDouble(0))
-                .put("currency", rate.optString("currencyCode", "USD"))
-                .put("uom", rate.optString("uom"))
-        );
+    private static void addExtraRate(JSONArray target, JSONObject rate, String label) throws JSONException {
+        JSONArray rates = rate == null ? null : rate.optJSONArray("rates");
+        if (rates == null || rates.length() == 0) return;
+        target.put(new JSONObject().put("label", label).put("price", rates.optDouble(0))
+            .put("currency", rate.optString("currencyCode", "USD")).put("uom", rate.optString("uom")));
     }
 
     private static JSONObject priceObject(JSONObject price)
@@ -710,16 +552,12 @@ public final class Normalizer {
     }
 
     private static boolean eventMatches(JSONArray events, Pattern pattern) {
-        for (int i = 0; i < events.length(); i++) if (
-            pattern.matcher(events.optString(i)).find()
-        ) return true;
+        for (int i = 0; i < events.length(); i++) if (pattern.matcher(events.optString(i)).find()) return true;
         return false;
     }
 
     private static boolean eventContains(JSONArray events, String needle) {
-        for (int i = 0; i < events.length(); i++) if (
-            events.optString(i).contains(needle)
-        ) return true;
+        for (int i = 0; i < events.length(); i++) if (events.optString(i).contains(needle)) return true;
         return false;
     }
 
@@ -735,12 +573,7 @@ public final class Normalizer {
         return seconds > 0 ? seconds * 1000L : null;
     }
 
-    private static double nestedNumber(
-        JSONObject root,
-        String object,
-        String key,
-        double fallback
-    ) {
+    private static double nestedNumber(JSONObject root, String object, String key, double fallback) {
         JSONObject child = root.optJSONObject(object);
         return child == null ? fallback : number(child, key, fallback);
     }
@@ -799,11 +632,7 @@ public final class Normalizer {
      *  are spaced rather than comma-separated. */
     private static String localityLine(JSONObject address) {
         if (address == null) return "";
-        String region = join(
-            " ",
-            Jsons.string(address, "state"),
-            Jsons.string(address, "postalCode")
-        );
+        String region = join(" ", Jsons.string(address, "state"), Jsons.string(address, "postalCode"));
         return join(", ", Jsons.string(address, "city"), region);
     }
 
@@ -821,10 +650,6 @@ public final class Normalizer {
         for (String value : values)
             if (value != null && value.length() > 0) return value;
         return null;
-    }
-
-    private static String labelWithoutPrefix(String value, String prefix) {
-        return value == null ? null : titleCase(value.replace(prefix, ""));
     }
 
     private static String titleCase(String value) {
@@ -861,10 +686,7 @@ public final class Normalizer {
     private static int minutes(String hhmm) {
         String[] parts = hhmm.split(":");
         try {
-            return (
-                Integer.parseInt(parts[0]) * 60 +
-                (parts.length > 1 ? Integer.parseInt(parts[1]) : 0)
-            );
+            return (Integer.parseInt(parts[0]) * 60 + (parts.length > 1 ? Integer.parseInt(parts[1]) : 0));
         } catch (Exception ignored) {
             return 0;
         }

@@ -3,12 +3,10 @@ package com.tablet.xp3;
 import android.content.Context;
 import android.text.TextUtils;
 import android.view.View;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -17,7 +15,7 @@ import java.util.List;
  * folder or picks a file, Back goes up a folder. Laid out as Transforms is,
  * so the list never moves under the eye.
  */
-final class UploadScreen extends FrameLayout {
+final class UploadScreen extends ListScreen {
 
     /** One line: a place, a folder or a file. */
     static final class Line {
@@ -32,91 +30,32 @@ final class UploadScreen extends FrameLayout {
         }
     }
 
-    private final TextView where = new TextView(getContext());
-    private final ScrollView scroll;
-    private final LinearLayout list;
-
     UploadScreen(Context c) {
-        super(c);
-        setBackgroundColor(Look.PAPER);
-        addView(Parts.header(c, "Upload", 0, where), Parts.headerAt(c));
-        where.setEllipsize(TextUtils.TruncateAt.START);
-        where.setMaxWidth(Look.dp(c, 110));
-        scroll = new ScrollView(c);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setFocusable(false);
-        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        list = Parts.column(c);
-        list.setPadding(0, 0, 0, Look.dp(c, 8));
-        scroll.addView(list, new LayoutParams(Parts.FILL, Parts.WRAP));
-        LayoutParams lp = new LayoutParams(Parts.FILL, Parts.FILL);
-        lp.topMargin = Look.dp(c, 34);
-        lp.leftMargin = Look.dp(c, 8);
-        lp.rightMargin = Look.dp(c, 8);
-        addView(scroll, lp);
+        super(c, "Upload");
+        side.setEllipsize(TextUtils.TruncateAt.START);
+        side.setMaxWidth(Look.dp(c, 110));
     }
 
     /** `selected` is the highlighted line, or -1 while the drawer or a sheet is over the list. */
     void show(String path, List<Line> lines, int selected, String empty) {
         Context c = getContext();
-        where.setText(path);
-        list.removeAllViews();
+        side.setText(path);
         if (lines.isEmpty()) {
             TextView none = Look.text(c, empty, Look.ui, 10.5f, Look.GRAPHITE);
             none.setPadding(Look.dp(c, 4), Look.dp(c, 4), Look.dp(c, 4), Look.dp(c, 4));
-            list.addView(none);
+            showEmpty(none, Parts.line(Parts.FILL, Parts.WRAP));
             return;
         }
-        View chosen = null;
+        List<View> rows = new ArrayList<>();
         for (int i = 0; i < lines.size(); i++) {
-            View row = row(c, lines.get(i), i == selected, i < lines.size() - 1);
-            list.addView(row);
-            if (i == selected) chosen = row;
+            Line line = lines.get(i);
+            boolean on = i == selected;
+            ImageView glyph = new ImageView(c);
+            glyph.setImageDrawable(Look.icon(c, line.folder ? R.drawable.ic_folder : R.drawable.ic_file, Look.INK, 14));
+            glyph.setScaleType(ImageView.ScaleType.CENTER);
+            rows.add(row(c, glyph, 18, 5, on ? Look.uiBold : Look.ui, line.name, on,
+                line.about.length() > 0 ? line.about : null));
         }
-        final View open = chosen;
-        scroll.post(() -> {
-            if (open == null) return;
-            int room = scroll.getHeight();
-            int y = scroll.getScrollY();
-            if (open.getTop() < y) scroll.scrollTo(0, open.getTop());
-            else if (open.getBottom() > y + room) scroll.scrollTo(0, open.getBottom() - room);
-        });
-    }
-
-    private static View row(Context c, Line line, boolean on, boolean divider) {
-        LinearLayout outer = Parts.column(c);
-        LinearLayout row = Parts.row(c);
-        row.setPadding(Look.dp(c, 2), Look.dp(c, 5), Look.dp(c, 4), Look.dp(c, 5));
-        ImageView glyph = new ImageView(c);
-        glyph.setImageDrawable(Look.icon(c, line.folder ? R.drawable.ic_folder : R.drawable.ic_file, Look.INK, 14));
-        glyph.setScaleType(ImageView.ScaleType.CENTER);
-        row.addView(glyph, Parts.line(Look.dp(c, 18), Look.dp(c, 18)));
-
-        LinearLayout text = Parts.column(c);
-        Mark title = new Mark(c);
-        Look.style(title, on ? Look.uiBold : Look.ui, 11, Look.INK);
-        title.setText(line.name);
-        title.setSingleLine();
-        title.setEllipsize(TextUtils.TruncateAt.END);
-        title.setPadding(Look.dp(c, 2), Look.dp(c, 1), Look.dp(c, 2), Look.dp(c, 1));
-        title.mark(on);
-        text.addView(title, Parts.line(Parts.WRAP, Parts.WRAP));
-        if (line.about.length() > 0) {
-            TextView sub = Look.text(c, line.about, Look.ui, 9, on ? Look.INK : Look.GRAPHITE);
-            sub.setSingleLine();
-            sub.setEllipsize(TextUtils.TruncateAt.END);
-            sub.setPadding(Look.dp(c, 2), 0, 0, 0);
-            LinearLayout.LayoutParams under = Parts.line(Parts.FILL, Parts.WRAP);
-            under.topMargin = Look.dp(c, 2);
-            text.addView(sub, under);
-        }
-        LinearLayout.LayoutParams lp = Parts.line(0, Parts.WRAP);
-        lp.weight = 1;
-        lp.leftMargin = Look.dp(c, 6);
-        row.addView(text, lp);
-
-        outer.addView(row);
-        if (divider) outer.addView(Parts.rule(c), Parts.line(Parts.FILL, 1));
-        return outer;
+        showRows(rows, selected);
     }
 }

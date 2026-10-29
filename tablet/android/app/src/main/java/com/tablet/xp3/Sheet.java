@@ -77,10 +77,6 @@ final class Sheet extends FrameLayout {
         addView(body, lp);
     }
 
-    int count() {
-        return choices.size();
-    }
-
     void pick(int index) {
         picked = Math.max(0, Math.min(choices.size() - 1, index));
         for (int i = 0; i < choices.size(); i++) choices.get(i).on(i == picked);

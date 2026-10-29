@@ -5,14 +5,13 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The ordered checklist, shared by the person and the assistant.
+ * The ordered checklist.
  *
- * Both edit it from different threads: the person from the main thread with
- * the keypad, the assistant from the chat worker through `set_list`. Every
- * change, from either side, bumps a version number. That number is what lets
- * the assistant's write be refused when the list has moved on since it last
- * read it, and the compare-and-replace below is what makes that check and the
- * write one step rather than two with a gap between them.
+ * Every change bumps a version number. With the chat assistant (since
+ * removed) that number let its write of the whole list be refused when the
+ * list had moved on since it last read it, and the compare-and-replace below
+ * made that check and the write one step. Both are kept, tested, for any
+ * future second writer.
  */
 public final class Checklist {
 
@@ -96,7 +95,7 @@ public final class Checklist {
     }
 
     // ------------------------------------------------------------------
-    // The assistant's edit: the whole list, if nothing changed underneath
+    // A second writer's edit: the whole list, if nothing changed underneath
     // ------------------------------------------------------------------
 
     /**

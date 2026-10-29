@@ -12,8 +12,6 @@ import android.os.Bundle;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.LeadingMarginSpan;
-import android.text.style.MetricAffectingSpan;
-import android.text.TextPaint;
 import android.graphics.Typeface;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -32,6 +30,7 @@ import android.widget.TextView;
 import com.newyorker.xp3.news.Article;
 import com.newyorker.xp3.news.Block;
 import com.newyorker.xp3.news.Story;
+import com.xp3.common.ui.FaceSpan;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
 
@@ -221,10 +220,7 @@ public final class ArticleActivity extends BaseActivity {
     }
 
     private void body() {
-        int last = -1;
-        for (int i = 0; i < article.blocks.size(); i++) {
-            if (article.blocks.get(i).kind == Block.PARAGRAPH) last = i;
-        }
+        int last = article.lastParagraph();
         boolean first = true;
         for (int i = 0; i < article.blocks.size(); i++) {
             Block block = article.blocks.get(i);
@@ -283,14 +279,8 @@ public final class ArticleActivity extends BaseActivity {
     }
 
     private void dropCap(TextView view, SpannableStringBuilder text) {
-        int at = 0;
-        // An opening quotation mark goes with the initial, as in print.
-        while (at < text.length() && "“‘\"'".indexOf(text.charAt(at)) >= 0) at++;
-        if (at >= text.length() || !Character.isLetterOrDigit(text.charAt(at))) return;
-        // Too short a paragraph to wrap three lines beside an initial.
-        if (text.length() < 160) return;
-        String letter = text.subSequence(0, at + 1).toString();
-        text.delete(0, at + 1);
+        String letter = DropCap.take(text);
+        if (letter == null) return;
         Paint paint = view.getPaint();
         Rect bounds = new Rect();
         paint.getTextBounds("H", 0, 1, bounds);
@@ -311,7 +301,7 @@ public final class ArticleActivity extends BaseActivity {
             text.append(run.text);
             int style = (run.style & Block.Run.BOLD) != 0 ? Look.BOLD : (run.style & Block.Run.ITALIC) != 0 ? Look.ITALIC : Look.REGULAR;
             if (style != Look.REGULAR) {
-                text.setSpan(new Face(Look.caslon(context, style)), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                text.setSpan(new FaceSpan(Look.caslon(context, style)), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
         // The site's last paragraph often carries the end mark already; it is set once.
@@ -327,25 +317,6 @@ public final class ArticleActivity extends BaseActivity {
             text.setSpan(new EndMark(), at, at + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         return text;
-    }
-
-    /** A run in another of the Caslon faces. */
-    private static final class Face extends MetricAffectingSpan {
-        private final Typeface face;
-
-        Face(Typeface face) {
-            this.face = face;
-        }
-
-        @Override
-        public void updateMeasureState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
-
-        @Override
-        public void updateDrawState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
     }
 
     private void picture(String url, String caption, int top) {
@@ -387,15 +358,7 @@ public final class ArticleActivity extends BaseActivity {
         message.setGravity(Gravity.CENTER_HORIZONTAL);
         message.setText(error);
         add(message, 16, 16, 16, 10);
-        TextView button = Look.text(this, Look.sans(this, true), 11, R.color.ink);
-        button.setText("Try again");
-        button.setAllCaps(true);
-        button.setLetterSpacing(0.08f);
-        button.setBackgroundResource(R.drawable.button);
-        button.setPadding(dp(16), dp(7), dp(16), dp(7));
-        button.setFocusable(true);
-        button.setOnFocusChangeListener((view, focused) ->
-            button.setTextColor(color(focused ? R.color.page : R.color.ink)));
+        TextView button = Look.retry(this);
         button.setOnClickListener(view -> {
             render();
             load();

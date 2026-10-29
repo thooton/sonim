@@ -1,8 +1,13 @@
 package com.canvas.xp3.data;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Canvas assignment bodies, turned into the Markdown the detail page renders.
@@ -103,15 +108,14 @@ public final class Html {
             String inside = source.substring(start + 1, end);
             boolean closing = inside.startsWith("/");
             if (closing) inside = inside.substring(1);
-            boolean selfClosing = inside.endsWith("/");
-            if (selfClosing) inside = inside.substring(0, inside.length() - 1);
+            if (inside.endsWith("/")) inside = inside.substring(0, inside.length() - 1);
             String name = inside.trim();
             int space = firstSpace(name);
             String attributes = space < 0 ? "" : name.substring(space + 1);
             name = (space < 0 ? name : name.substring(0, space)).toLowerCase(Locale.US);
             if (name.length() == 0 || !Character.isLetter(name.charAt(0))) return null;
             i = end + 1;
-            return new Tag(name, closing, selfClosing, attributes);
+            return new Tag(name, closing, attributes);
         }
 
         private static int firstSpace(String value) {
@@ -193,12 +197,8 @@ public final class Html {
             }
 
             if (heading(name) > 0) {
-                if (tag.closing) {
-                    flushBlock();
-                } else {
-                    flushBlock();
-                    marker = repeat('#', heading(name)) + " ";
-                }
+                flushBlock();
+                if (!tag.closing) marker = "######".substring(6 - heading(name)) + " ";
                 return;
             }
 
@@ -218,12 +218,8 @@ public final class Html {
                 return;
             }
             if (name.equals("li")) {
-                if (tag.closing) {
-                    flushLine();
-                } else {
-                    flushLine();
-                    marker = bullet();
-                }
+                flushLine();
+                if (!tag.closing) marker = bullet();
                 return;
             }
 
@@ -247,7 +243,7 @@ public final class Html {
                 return;
             }
 
-            if (block(name)) {
+            if (BLOCKS.contains(name)) {
                 flushBlock();
                 return;
             }
@@ -370,13 +366,9 @@ public final class Html {
             return 0;
         }
 
-        private static boolean block(String name) {
-            return name.equals("p") || name.equals("div") || name.equals("section") || name.equals("article")
-                || name.equals("header") || name.equals("footer") || name.equals("main")
-                || name.equals("table") || name.equals("tbody") || name.equals("thead") || name.equals("tfoot")
-                || name.equals("figure") || name.equals("figcaption") || name.equals("dl")
-                || name.equals("dt") || name.equals("dd") || name.equals("form") || name.equals("iframe");
-        }
+        private static final Set<String> BLOCKS = new HashSet<>(Arrays.asList("p", "div", "section", "article",
+            "header", "footer", "main", "table", "tbody", "thead", "tfoot", "figure", "figcaption", "dl", "dt", "dd",
+            "form", "iframe"));
 
         // ----------------------------------------------------------------
         // Text and lines
@@ -442,25 +434,17 @@ public final class Html {
             }
             return out.toString().trim();
         }
-
-        private static String repeat(char c, int count) {
-            StringBuilder out = new StringBuilder();
-            for (int j = 0; j < count; j++) out.append(c);
-            return out.toString();
-        }
     }
 
     private static final class Tag {
 
         final String name;
         final boolean closing;
-        final boolean selfClosing;
         final String attributes;
 
-        Tag(String name, boolean closing, boolean selfClosing, String attributes) {
+        Tag(String name, boolean closing, String attributes) {
             this.name = name;
             this.closing = closing;
-            this.selfClosing = selfClosing;
             this.attributes = attributes;
         }
     }
@@ -512,25 +496,15 @@ public final class Html {
                 return null;
             }
         }
-        if (name.equals("amp")) return "&";
-        if (name.equals("lt")) return "<";
-        if (name.equals("gt")) return ">";
-        if (name.equals("quot")) return "\"";
-        if (name.equals("apos")) return "'";
-        if (name.equals("nbsp")) return " ";
-        if (name.equals("ndash")) return "–";
-        if (name.equals("mdash")) return "—";
-        if (name.equals("hellip")) return "…";
-        if (name.equals("lsquo")) return "‘";
-        if (name.equals("rsquo")) return "’";
-        if (name.equals("ldquo")) return "“";
-        if (name.equals("rdquo")) return "”";
-        if (name.equals("bull")) return "•";
-        if (name.equals("middot")) return "·";
-        if (name.equals("deg")) return "°";
-        if (name.equals("times")) return "×";
-        if (name.equals("frac12")) return "½";
-        if (name.equals("rarr")) return "→";
-        return null;
+        return NAMED.get(name);
+    }
+
+    private static final Map<String, String> NAMED = new HashMap<>();
+
+    static {
+        String[] pairs = { "amp", "&", "lt", "<", "gt", ">", "quot", "\"", "apos", "'", "nbsp", " ",
+            "ndash", "–", "mdash", "—", "hellip", "…", "lsquo", "‘", "rsquo", "’", "ldquo", "“", "rdquo", "”",
+            "bull", "•", "middot", "·", "deg", "°", "times", "×", "frac12", "½", "rarr", "→" };
+        for (int i = 0; i < pairs.length; i += 2) NAMED.put(pairs[i], pairs[i + 1]);
     }
 }

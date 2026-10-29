@@ -1,6 +1,7 @@
 package com.print.xp3;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -8,6 +9,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.xp3.common.ui.Ui;
 import java.io.File;
 
 /**
@@ -64,7 +66,7 @@ final class PreviewScreen extends Screen {
         frame.removeAllViews();
         if (pages == Pages.LOCKED || pages <= 0) {
             boolean locked = pages == Pages.LOCKED;
-            TextView back = Parts.button(c, "Back to files", Parts.PRIMARY, () -> app.close());
+            TextView back = Parts.button(c, "Back to files", Parts.PRIMARY, app::close);
             frame.addView(Parts.status(c, Parts.badge(c, locked ? R.drawable.ic_lock : R.drawable.ic_alert, 0xFFFFF1D6, Look.WARN), 56,
                 "Can't open this file",
                 locked ? "This PDF is protected with a password, which this phone's PDF reader can't open."
@@ -100,72 +102,69 @@ final class PreviewScreen extends Screen {
         area.setDefaultFocusHighlightEnabled(false);
         pageView = new ImageView(c);
         pageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        pageView.setElevation(Look.dp(c, 2));
+        pageView.setElevation(Ui.dp(c, 2));
         pageView.setBackgroundColor(Look.WHITE);
         area.addView(pageView, new FrameLayout.LayoutParams(Parts.WRAP, Parts.WRAP, Gravity.CENTER));
         sizeChip = Look.line(c, "", 9, Look.SEMIBOLD, Look.BLUE);
         sizeChip.setBackground(Look.rounded(Look.WHITE, 3, c));
-        sizeChip.setPadding(Look.dp(c, 5), Look.dp(c, 2), Look.dp(c, 5), Look.dp(c, 2));
+        sizeChip.setPadding(Ui.dp(c, 5), Ui.dp(c, 2), Ui.dp(c, 5), Ui.dp(c, 2));
         FrameLayout.LayoutParams chipAt = new FrameLayout.LayoutParams(Parts.WRAP, Parts.WRAP, Gravity.RIGHT | Gravity.TOP);
-        chipAt.setMargins(0, Look.dp(c, 6), Look.dp(c, 6), 0);
+        chipAt.setMargins(0, Ui.dp(c, 6), Ui.dp(c, 6), 0);
         area.addView(sizeChip, chipAt);
         left = arrow(c, R.drawable.ic_chev_left);
         right = arrow(c, R.drawable.ic_chev_right);
-        FrameLayout.LayoutParams leftAt = new FrameLayout.LayoutParams(Look.dp(c, 20), Look.dp(c, 20), Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        leftAt.leftMargin = Look.dp(c, 8);
+        FrameLayout.LayoutParams leftAt = new FrameLayout.LayoutParams(Ui.dp(c, 20), Ui.dp(c, 20), Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        leftAt.leftMargin = Ui.dp(c, 8);
         area.addView(left, leftAt);
-        FrameLayout.LayoutParams rightAt = new FrameLayout.LayoutParams(Look.dp(c, 20), Look.dp(c, 20), Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        rightAt.rightMargin = Look.dp(c, 8);
+        FrameLayout.LayoutParams rightAt = new FrameLayout.LayoutParams(Ui.dp(c, 20), Ui.dp(c, 20), Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        rightAt.rightMargin = Ui.dp(c, 8);
         area.addView(right, rightAt);
         counter = Look.line(c, "", 9, Look.SEMIBOLD, Look.WHITE);
         counter.setBackground(Look.rounded(0xBF1A1C22, 9, c));
-        counter.setPadding(Look.dp(c, 7), Look.dp(c, 2), Look.dp(c, 7), Look.dp(c, 2));
+        counter.setPadding(Ui.dp(c, 7), Ui.dp(c, 2), Ui.dp(c, 7), Ui.dp(c, 2));
         FrameLayout.LayoutParams counterAt = new FrameLayout.LayoutParams(Parts.WRAP, Parts.WRAP, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        counterAt.bottomMargin = Look.dp(c, 6);
+        counterAt.bottomMargin = Ui.dp(c, 6);
         area.addView(counter, counterAt);
         column.addView(area, new LinearLayout.LayoutParams(Parts.FILL, 0, 1));
 
         column.addView(Parts.rule(c), Parts.line(Parts.FILL, 1));
         LinearLayout foot = Parts.column(c);
-        foot.setPadding(0, Look.dp(c, 8), 0, Look.dp(c, 6));
+        foot.setPadding(0, Ui.dp(c, 8), 0, Ui.dp(c, 6));
         LinearLayout summary = Parts.row(c);
-        summary.setPadding(Look.dp(c, 12), 0, Look.dp(c, 12), Look.dp(c, 5));
+        summary.setPadding(Ui.dp(c, 12), 0, Ui.dp(c, 12), Ui.dp(c, 5));
         summary.addView(Parts.image(c, R.drawable.ic_printer, Look.MUTE, 11));
         summaryName = Look.line(c, "", 10, Look.SEMIBOLD, Look.INK);
         LinearLayout.LayoutParams nameAt = Parts.line(Parts.WRAP, Parts.WRAP);
-        nameAt.leftMargin = Look.dp(c, 5);
+        nameAt.leftMargin = Ui.dp(c, 5);
         summary.addView(summaryName, nameAt);
-        summaryName.setMaxWidth(Look.dp(c, 110));
+        summaryName.setMaxWidth(Ui.dp(c, 110));
         summaryRest = Look.line(c, "", 10, Look.REGULAR, Look.MUTE);
         summary.addView(summaryRest, Parts.weighted());
         foot.addView(summary);
         slow = Look.line(c, "", 10, Look.REGULAR, Look.MUTE);
-        slow.setPadding(Look.dp(c, 28), 0, Look.dp(c, 12), Look.dp(c, 5));
+        slow.setPadding(Ui.dp(c, 28), 0, Ui.dp(c, 12), Ui.dp(c, 5));
         slow.setVisibility(View.GONE);
         foot.addView(slow);
         settings = Parts.button(c, "Settings", Parts.SECONDARY, () -> app.open(new PrintSettingsScreen(draft, this::print)));
         settings.setCompoundDrawablesRelativeWithIntrinsicBounds(scaled(c, R.drawable.ic_gear, 13), null, null, null);
-        settings.setCompoundDrawablePadding(Look.dp(c, 5));
+        settings.setCompoundDrawablePadding(Ui.dp(c, 5));
         print = Parts.button(c, "Print", Parts.PRIMARY, this::print);
         foot.addView(Parts.pair(c, settings, print));
         column.addView(foot);
         return column;
     }
 
-    private static android.graphics.drawable.Drawable scaled(Context c, int id, float size) {
-        android.graphics.drawable.Drawable icon = Look.icon(c, id, Look.INK);
-        icon.setBounds(0, 0, Look.dp(c, size), Look.dp(c, size));
+    private static Drawable scaled(Context c, int id, float size) {
+        Drawable icon = Look.icon(c, id, Look.INK);
+        icon.setBounds(0, 0, Ui.dp(c, size), Ui.dp(c, size));
         return icon;
     }
 
     private static View arrow(Context c, int icon) {
         FrameLayout arrow = new FrameLayout(c);
-        android.graphics.drawable.GradientDrawable circle = new android.graphics.drawable.GradientDrawable();
-        circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        circle.setColor(Look.WHITE);
-        arrow.setBackground(circle);
-        arrow.setElevation(Look.dp(c, 1.5f));
-        arrow.addView(Parts.image(c, icon, Look.INK, 12), new FrameLayout.LayoutParams(Look.dp(c, 12), Look.dp(c, 12), Gravity.CENTER));
+        arrow.setBackground(Look.oval(Look.WHITE));
+        arrow.setElevation(Ui.dp(c, 1.5f));
+        arrow.addView(Parts.image(c, icon, Look.INK, 12), new FrameLayout.LayoutParams(Ui.dp(c, 12), Ui.dp(c, 12), Gravity.CENTER));
         return arrow;
     }
 
@@ -196,8 +195,8 @@ final class PreviewScreen extends Screen {
         drawn = draft.page;
         final int page = draft.page;
         area.post(() -> {
-            int w = area.getWidth() - Look.dp(app, 64);
-            int h = area.getHeight() - Look.dp(app, 36);
+            int w = area.getWidth() - Ui.dp(app, 64);
+            int h = area.getHeight() - Ui.dp(app, 36);
             if (w <= 0 || h <= 0) {
                 drawn = -1;
                 return;

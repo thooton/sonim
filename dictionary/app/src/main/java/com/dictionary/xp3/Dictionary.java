@@ -254,7 +254,7 @@ final class Dictionary {
         }
     }
 
-    private static String inflate(InputStream raw) throws IOException {
+    static String inflate(InputStream raw) throws IOException {
         InputStream in = new InflaterInputStream(raw);
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();

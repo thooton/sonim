@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.util.Locale;
 import javax.net.ssl.SSLContext;
@@ -48,7 +49,7 @@ public final class IppClient {
         }
     }
 
-    private static final Charset ASCII = Charset.forName("US-ASCII");
+    private static final Charset ASCII = StandardCharsets.US_ASCII;
     private static final int CONNECT_MILLIS = 5000;
     private static final int LIMIT = 4 << 20;
 

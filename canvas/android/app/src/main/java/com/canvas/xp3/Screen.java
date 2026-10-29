@@ -39,16 +39,11 @@ abstract class Screen {
     abstract View build();
 
     /**
-     * The Menu key, which opens Options; null where Menu does nothing. The
-     * phone has only Menu and Back, so no screen gives either another job.
+     * Whether the Menu key opens Options here. The phone has only Menu and
+     * Back, so no screen gives either another job.
      */
-    String left() {
-        return "Options";
-    }
-
-    /** What OK does when no item names it. */
-    String center() {
-        return "";
+    boolean menu() {
+        return true;
     }
 
     /** The screen's own entries in the Options menu, above the app-wide ones. */

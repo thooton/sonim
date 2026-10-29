@@ -10,7 +10,6 @@
 
     <dimen name="item_min_height">38dp</dimen>
     <dimen name="row_pad_h">10dp</dimen>
-    <dimen name="focus_rule">2dp</dimen>
     <dimen name="text_item">14sp</dimen>
     <dimen name="check_size">18dp</dimen>
     <dimen name="check_gap">10dp</dimen>

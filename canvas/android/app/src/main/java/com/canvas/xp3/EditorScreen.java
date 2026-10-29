@@ -1,8 +1,6 @@
 package com.canvas.xp3;
 
-import android.text.Editable;
 import android.text.InputType;
-import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -11,7 +9,9 @@ import android.widget.TextView;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Draft;
+import com.xp3.common.ui.Ui;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -47,16 +47,6 @@ final class EditorScreen extends Screen {
         this.piece = piece;
     }
 
-    @Override
-    String left() {
-        return "Format";
-    }
-
-    @Override
-    String center() {
-        return "Done";
-    }
-
     private void deleteWord() {
         // One word at a time: one key per word is what makes a
         // T9 slip cheap to undo, without the risk of losing the whole answer.
@@ -76,7 +66,7 @@ final class EditorScreen extends Screen {
     View build() {
         Parts parts = new Parts(app);
         LinearLayout root = v.column();
-        root.addView(parts.nav("Your work", (String) null), Views.wide());
+        root.addView(parts.nav("Your work"), Views.wide());
         TextView title = v.text(piece.name, 14, look.heavy, look.ink);
         title.setLetterSpacing(-0.01f);
         v.pad(title, 12, 0, 12, 0);
@@ -87,7 +77,7 @@ final class EditorScreen extends Screen {
         field.setOnFocusChangeListener(null);
         field.setPadding(v.dp(9), v.dp(8), v.dp(9), v.dp(8));
         field.setVerticalScrollBarEnabled(true);
-        root.addView(field, v.margins(Views.tall(), 10, 4, 10, 0));
+        root.addView(field, v.margins(Ui.weighted(), 10, 4, 10, 0));
         LinearLayout foot = v.row();
         v.pad(foot, 12, 4, 12, 5);
         count = v.text("", 9, look.semibold, look.muted);
@@ -97,18 +87,9 @@ final class EditorScreen extends Screen {
         foot.addView(saved);
         root.addView(foot, Views.wide());
         field.formatted = this::changed;
-        field.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int n, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int n) {}
-
-            @Override
-            public void afterTextChanged(Editable s) {
-                counted();
-                changed();
-            }
+        Fields.onChange(field, () -> {
+            counted();
+            changed();
         });
         counted();
         saved.setText(piece.text != null && piece.text.length() > 0 ? "✓ Saved on phone" : "");
@@ -125,7 +106,6 @@ final class EditorScreen extends Screen {
     void shown() {
         field.requestFocus();
         field.setSelection(field.getText().length());
-        app.refreshKeys();
     }
 
     private void counted() {
@@ -142,7 +122,7 @@ final class EditorScreen extends Screen {
         try {
             app.backend.saveDraft(draft.with(piece, System.currentTimeMillis()));
             if (saved != null) saved.setText("✓ Saved on phone");
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             if (saved != null) saved.setText("Not saved");
         }
     }
@@ -151,7 +131,7 @@ final class EditorScreen extends Screen {
     boolean onKey(KeyEvent event) {
         // OK is Done: the text field would otherwise take it as a new line,
         // which the keypad already gives with its own key.
-        if (com.xp3.common.ui.Ui.isOk(event.getKeyCode()) && app.getCurrentFocus() == field) {
+        if (Ui.isOk(event.getKeyCode()) && app.getCurrentFocus() == field) {
             if (event.getAction() == KeyEvent.ACTION_UP) done();
             return true;
         }

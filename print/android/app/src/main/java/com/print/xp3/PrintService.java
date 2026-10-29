@@ -199,7 +199,7 @@ public final class PrintService extends Service {
         Job.Status status = entry.status;
         builder.setContentTitle(entry.title)
             .setContentText(status == null ? "Waiting" : status.text)
-            .setContentIntent(PendingIntent.getActivity(this, entry.id, Queue.open(this, entry), PendingIntent.FLAG_UPDATE_CURRENT));
+            .setContentIntent(open(entry));
         if (status != null && status.percent >= 0 && status.phase < Job.PRINTING) builder.setProgress(100, status.percent, false);
         return builder.build();
     }
@@ -208,20 +208,30 @@ public final class PrintService extends Service {
     private void problem(Queue.Entry entry) {
         channels();
         NotificationManager notifications = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        notifications.notify(100 + entry.id, new Notification.Builder(this, DONE_CHANNEL)
+        notifications.notify(problemId(entry), new Notification.Builder(this, DONE_CHANNEL)
             .setSmallIcon(R.drawable.ic_alert)
             .setColor(Look.ERR)
             .setContentTitle(entry.title + " didn't print")
             .setContentText(entry.status == null ? "" : entry.status.text)
-            .setContentIntent(PendingIntent.getActivity(this, entry.id, Queue.open(this, entry), PendingIntent.FLAG_UPDATE_CURRENT))
+            .setContentIntent(open(entry))
             .setAutoCancel(true)
             .build());
+    }
+
+    /** Opens the job's Printing screen. */
+    private PendingIntent open(Queue.Entry entry) {
+        return PendingIntent.getActivity(this, entry.id, Queue.open(this, entry), PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    /** A failed job's own notification, apart from the service's. */
+    private static int problemId(Queue.Entry entry) {
+        return 100 + entry.id;
     }
 
     /** Takes away a job's "didn't print", once it is sent again. */
     static void forget(Context context, Queue.Entry entry) {
         NotificationManager notifications = (NotificationManager) context.getSystemService(NOTIFICATION_SERVICE);
-        if (notifications != null) notifications.cancel(100 + entry.id);
+        if (notifications != null) notifications.cancel(problemId(entry));
     }
 
     private void hold() {

@@ -2,7 +2,6 @@ package com.source.xp3;
 
 import android.content.Context;
 import android.text.TextUtils;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -13,6 +12,7 @@ import com.source.xp3.net.Music;
 import com.xp3.common.ui.Ui;
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 /**
  * A row of results or downloads, at the proposal's sizes: the drawn cover,
@@ -69,12 +69,9 @@ final class ResultRow extends LinearLayout {
         LinearLayout tagLine = new LinearLayout(context);
         tagLine.setOrientation(HORIZONTAL);
         tagLine.setGravity(Gravity.CENTER_VERTICAL);
-        tag = new TextView(context);
+        tag = Tonal.sized(context, R.dimen.text_tag, R.color.on_tag);
         tag.setBackgroundResource(R.drawable.tag);
-        tag.setTextColor(context.getColor(R.color.on_tag));
-        tag.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.text_tag));
         tag.setTypeface(Tonal.BOLD);
-        tag.setIncludeFontPadding(false);
         tag.setSingleLine(true);
         tag.setLetterSpacing(0.04f);
         tag.setPadding(Ui.dp(context, 4), Ui.dp(context, 1), Ui.dp(context, 4), Ui.dp(context, 1));
@@ -102,11 +99,8 @@ final class ResultRow extends LinearLayout {
         lines.setGravity(Gravity.CENTER_VERTICAL);
     }
 
-    private TextView line(Context context, int size, int color) {
-        TextView view = new TextView(context);
-        view.setTextColor(context.getColor(color));
-        view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(size));
-        view.setIncludeFontPadding(false);
+    private static TextView line(Context context, int size, int color) {
+        TextView view = Tonal.sized(context, size, color);
         view.setPadding(0, Ui.dp(context, 2), 0, 0);
         return view;
     }
@@ -132,11 +126,7 @@ final class ResultRow extends LinearLayout {
             folders.setCompoundDrawablesRelative(null, null, null, null);
             return;
         }
-        android.graphics.drawable.Drawable icon = getContext().getDrawable(R.drawable.ic_folder).mutate();
-        icon.setTint(getContext().getColor(R.color.text_muted));
-        int size = Ui.dp(getContext(), 10);
-        icon.setBounds(0, 0, size, size);
-        folders.setCompoundDrawablesRelative(icon, null, null, null);
+        folders.setCompoundDrawablesRelative(Tonal.icon(getContext(), R.drawable.ic_folder, R.color.text_muted, 10), null, null, null);
     }
 
     void hit(Music.Hit hit, int state, float progress, boolean picked) {
@@ -145,11 +135,7 @@ final class ResultRow extends LinearLayout {
         show(folders, hit.folders());
         folderIcon(true);
         show(tag, hit.formats());
-        meta.setText(join(hit.brief(), hit.free ? hit.user : hit.user + " (queued)"));
-        ((View) meta.getParent()).setVisibility(VISIBLE);
-        show(extra, null);
-        state(state, progress, picked);
-        picked(picked);
+        result(join(hit.brief(), hit.free ? hit.user : hit.user + " (queued)"), state, progress, picked);
     }
 
     void book(Books.Book book, int state, float progress, boolean picked) {
@@ -157,18 +143,18 @@ final class ResultRow extends LinearLayout {
         cover.set(Download.BOOK, name, state == Download.FAILED, Download.IDLE);
         title.setText(name);
         show(folders, null);
-        show(tag, book.extension.toUpperCase(java.util.Locale.US));
-        meta.setText(join(book.author, book.size));
-        ((View) meta.getParent()).setVisibility(VISIBLE);
-        show(extra, null);
-        state(state, progress, picked);
-        picked(picked);
+        show(tag, book.extension.toUpperCase(Locale.US));
+        result(join(book.author, book.size), state, progress, picked);
     }
 
-    /** A result's state, or nothing while it hasn't been asked for. */
-    private void state(int state, float progress, boolean picked) {
+    /** A result's line beside its tag, and its state, or nothing while it hasn't been asked for. */
+    private void result(String about, int state, float progress, boolean picked) {
+        meta.setText(about);
+        ((View) meta.getParent()).setVisibility(VISIBLE);
+        show(extra, null);
         button.set(state, progress, picked);
         button.setVisibility(state == Download.IDLE ? GONE : VISIBLE);
+        picked(picked);
     }
 
     /** A download of this session, running, queued or failed. */

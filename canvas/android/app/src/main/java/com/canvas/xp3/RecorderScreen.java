@@ -7,12 +7,14 @@ import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.os.SystemClock;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Draft;
+import com.xp3.common.ui.Ui;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -44,11 +46,6 @@ final class RecorderScreen extends Screen {
     }
 
     @Override
-    String center() {
-        return "Stop";
-    }
-
-    @Override
     List<Sheet.Choice> options() {
         List<Sheet.Choice> out = new ArrayList<>();
         out.add(new Sheet.Choice(paused ? "Resume" : "Pause", R.drawable.ic_pause, null, this::pause));
@@ -66,10 +63,10 @@ final class RecorderScreen extends Screen {
     }
 
     @Override
-    boolean onKey(android.view.KeyEvent event) {
+    boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
-        if (com.xp3.common.ui.Ui.isOk(code)) {
-            if (event.getAction() == android.view.KeyEvent.ACTION_UP) stop();
+        if (Ui.isOk(code)) {
+            if (event.getAction() == KeyEvent.ACTION_UP) stop();
             return true;
         }
         return false;
@@ -100,7 +97,7 @@ final class RecorderScreen extends Screen {
         hint.setGravity(Gravity.CENTER);
         hint.setLineSpacing(0, 1.3f);
         middle.addView(hint, v.margins(Views.wide(), 0, 7, 0, 0));
-        root.addView(middle, Views.tall());
+        root.addView(middle, Ui.weighted());
         return root;
     }
 
@@ -177,7 +174,6 @@ final class RecorderScreen extends Screen {
             return;
         }
         status.setText(paused ? "Paused" : "Recording");
-        app.refreshKeys();
     }
 
     private void stop() {

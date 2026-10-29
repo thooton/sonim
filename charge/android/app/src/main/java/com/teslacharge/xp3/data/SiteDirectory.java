@@ -58,6 +58,13 @@ public final class SiteDirectory {
         this.api = api;
     }
 
+    /** True once this session's site has been looked up, whether or not it was
+     *  found. Lets a caller tell an instant {@link #resolve} from one that has
+     *  to go to the network before it can draw anything. */
+    public boolean knows(JSONObject session) {
+        return known.containsKey(session.optString("siteName", ""));
+    }
+
     /**
      * Attaches the locationGUID to one session. Each distinct site is looked up
      * once per run, so the second session opened at a charger already visited
@@ -67,13 +74,6 @@ public final class SiteDirectory {
      * answer, costs the session its "open this charger" button; the address it
      * already came with is untouched.
      */
-    /** True once this session's site has been looked up, whether or not it was
-     *  found. Lets a caller tell an instant {@link #resolve} from one that has
-     *  to go to the network before it can draw anything. */
-    public boolean knows(JSONObject session) {
-        return known.containsKey(session.optString("siteName", ""));
-    }
-
     public void resolve(JSONObject session) {
         String label = session.optString("siteName", "");
         if (label.length() == 0) return;
@@ -99,11 +99,7 @@ public final class SiteDirectory {
      */
     private JSONObject lookUp(JSONObject session) throws ApiException, JSONException {
         if (session.isNull("lat") || session.isNull("lng")) return unmatched();
-        JSONArray nearby = api.fetchSitesInArea(
-            session.getDouble("lat"),
-            session.getDouble("lng"),
-            SITE_RADIUS_MILES
-        );
+        JSONArray nearby = api.fetchSitesInArea(session.getDouble("lat"), session.getDouble("lng"), SITE_RADIUS_MILES);
         JSONObject match = byName(nearby).get(key(session.optString("siteName")));
         if (match == null) return unmatched();
         String locationGuid = match.optString("locationGUID");

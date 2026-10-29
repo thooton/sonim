@@ -6,28 +6,14 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * Dates written the way someone says them out loud.
+ * Dates written the way someone says them out loud, always with the weekday
+ * ("Tue, Oct 20"), and the calendar arithmetic behind the week strip and the
+ * sections work is filed under.
  *
- * A date on this screen is only ever read to answer "how much time have I
- * got", and "10/22/20" makes you do arithmetic to find that out. So the
- * nearest days get their names, the fortnight around today gets its weekday,
- * and only past that does a calendar date appear, still with its weekday in
- * front of it:
- *
- *   today, tomorrow, yesterday   Today / Tomorrow / Yesterday
- *   elsewhere in this week       Thursday
- *   the week either side         Next Thu / Last Thu
- *   further out                  Thu, Oct 3
- *
- * The Next and Last prefixes follow the calendar week rather than a count of
- * days, which is the only way they can agree with the section a row is filed
- * under. Thirteen days out from a Friday is a fortnight away in the sense
- * anybody means it, so it belongs under Later with a date on it, not under a
- * heading that says next week.
- *
- * A bare weekday is deliberately allowed to mean either direction, because
- * every list that shows one is already sitting under a section header saying
- * which week it is in, and "Thursday" is what you would have said anyway.
+ * Weeks are calendar weeks rather than counts of days, which is the only way
+ * a row's date can agree with the section it is filed under. Thirteen days
+ * out from a Friday is a fortnight away in the sense anybody means it, so it
+ * belongs under Later, not under a heading that says next week.
  */
 public final class Dates {
 
@@ -63,10 +49,6 @@ public final class Dates {
 
     public static void setWeekStart(int day) {
         firstDay = day == Calendar.SUNDAY ? Calendar.SUNDAY : Calendar.MONDAY;
-    }
-
-    public static int weekStartDay() {
-        return firstDay;
     }
 
     /** "Tuesday, Oct 20": the due date as the assignment page states it. */
@@ -116,21 +98,6 @@ public final class Dates {
         return format("d", when);
     }
 
-    /** "Due Tue, Oct 20 at 10:30", the line under a title with room for one. */
-    public static String dueLine(long when) {
-        return "Due " + shortDay(when) + " at " + time(when);
-    }
-
-    /** Midnight at the start of the week `when` falls in. */
-    public static long weekOf(long when) {
-        return startOfWeek(when);
-    }
-
-    /** Midnight at the start of the day `when` falls in. */
-    public static long dayOf(long when) {
-        return startOfDay(when);
-    }
-
     /**
      * Midnight `days` calendar days after the day `when` falls in. Counted
      * on the calendar rather than in milliseconds, so a daylight saving
@@ -138,7 +105,7 @@ public final class Dates {
      */
     public static long addDays(long when, int days) {
         Calendar day = Calendar.getInstance(Locale.US);
-        day.setTimeInMillis(startOfDay(when));
+        day.setTimeInMillis(dayOf(when));
         day.add(Calendar.DAY_OF_MONTH, days);
         return day.getTimeInMillis();
     }
@@ -150,27 +117,9 @@ public final class Dates {
         return (day.get(Calendar.DAY_OF_WEEK) - firstDay + 7) % 7;
     }
 
-    /** "Today", "Thursday", "Next Thu", "Thu, Oct 3". */
-    public static String day(long when, long now) {
-        int days = daysBetween(now, when);
-        if (days == 0) return "Today";
-        if (days == 1) return "Tomorrow";
-        if (days == -1) return "Yesterday";
-        int weeks = weeksBetween(now, when);
-        if (weeks == 0) return weekday(when, false);
-        if (weeks == 1) return "Next " + weekday(when, true);
-        if (weeks == -1) return "Last " + weekday(when, true);
-        return format("EEE, MMM d", when);
-    }
-
     /** "11:59 PM", or "23:59" on a phone set to a 24 hour clock. */
     public static String time(long when) {
         return format(twentyFourHour ? "HH:mm" : "h:mm a", when);
-    }
-
-    /** "Tomorrow, 11:59 PM", for the places with a full line to spend. */
-    public static String dayAndTime(long when, long now) {
-        return day(when, now) + ", " + time(when);
     }
 
     /**
@@ -183,7 +132,7 @@ public final class Dates {
         // out of the difference; nothing else here is within twelve hours of a
         // boundary, so nearest-day is exact.
         return (int) Math.round(
-            (double) (startOfDay(to) - startOfDay(from)) / (double) DAY_MS
+            (double) (dayOf(to) - dayOf(from)) / (double) DAY_MS
         );
     }
 
@@ -194,21 +143,8 @@ public final class Dates {
      */
     public static int weeksBetween(long from, long to) {
         return (int) Math.round(
-            (double) (startOfWeek(to) - startOfWeek(from)) / (double) (7L * DAY_MS)
+            (double) (weekOf(to) - weekOf(from)) / (double) (7L * DAY_MS)
         );
-    }
-
-    /** Whether two instants fall in the same calendar year. */
-    public static boolean sameYear(long from, long to) {
-        Calendar first = Calendar.getInstance(Locale.US);
-        first.setTimeInMillis(from);
-        Calendar second = Calendar.getInstance(Locale.US);
-        second.setTimeInMillis(to);
-        return first.get(Calendar.YEAR) == second.get(Calendar.YEAR);
-    }
-
-    private static String weekday(long when, boolean shortened) {
-        return format(shortened ? "EEE" : "EEEE", when);
     }
 
     /*
@@ -237,7 +173,8 @@ public final class Dates {
         return format.format(new Date(when));
     }
 
-    private static long startOfDay(long when) {
+    /** Midnight at the start of the day `when` falls in. */
+    public static long dayOf(long when) {
         Calendar day = Calendar.getInstance(Locale.US);
         day.setTimeInMillis(when);
         day.set(Calendar.HOUR_OF_DAY, 0);
@@ -247,12 +184,11 @@ public final class Dates {
         return day.getTimeInMillis();
     }
 
-    private static long startOfWeek(long when) {
+    /** Midnight at the start of the week `when` falls in. */
+    public static long weekOf(long when) {
         Calendar week = Calendar.getInstance(Locale.US);
-        week.setTimeInMillis(startOfDay(when));
-        int first = firstDay;
-        int shift = (week.get(Calendar.DAY_OF_WEEK) - first + 7) % 7;
-        week.add(Calendar.DAY_OF_MONTH, -shift);
+        week.setTimeInMillis(dayOf(when));
+        week.add(Calendar.DAY_OF_MONTH, -column(when));
         return week.getTimeInMillis();
     }
 }

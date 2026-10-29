@@ -19,3 +19,9 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 }
+
+// Logins works on common/core's Login. Only the apps that sign in use it, and
+// they depend on :common:core themselves, so the rest don't carry it.
+dependencies {
+    compileOnly project(":common:core")
+}

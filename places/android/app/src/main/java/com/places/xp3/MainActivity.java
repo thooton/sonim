@@ -34,7 +34,9 @@ import com.xp3.common.Json;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
+import com.xp3.common.ui.Logins;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -100,15 +102,15 @@ public final class MainActivity extends BaseActivity {
     private boolean topRated;
 
     /** The results so far, the search they answer, and Google's token for more. */
-    private final List<Place> results = new ArrayList<Place>();
+    private final List<Place> results = new ArrayList<>();
     private String searched;
     private Anchor searchedNear;
     private boolean searchedOpen;
     private boolean searchedRated;
     private String nextPage;
     /** Places whose details were fetched, by id, so going back and forth costs nothing. */
-    private final Map<String, Place> details = new HashMap<String, Place>();
-    private final List<String> recent = new ArrayList<String>();
+    private final Map<String, Place> details = new HashMap<>();
+    private final List<String> recent = new ArrayList<>();
 
     private Zone zone = Zone.QUERY;
     private int filter;
@@ -126,27 +128,25 @@ public final class MainActivity extends BaseActivity {
         setContentView(R.layout.activity_main);
         look = new Look(this);
         photos = new Photos(() -> places());
-        query = (EditText) findViewById(R.id.query);
-        near = (EditText) findViewById(R.id.near);
-        lead = (ImageView) findViewById(R.id.lead);
-        clear = (ImageView) findViewById(R.id.clear);
-        progress = (ProgressBar) findViewById(R.id.progress);
-        filtersScroll = (HorizontalScrollView) findViewById(R.id.filters_scroll);
-        filters = (LinearLayout) findViewById(R.id.filters);
-        list = (ListView) findViewById(R.id.results);
-        message = (TextView) findViewById(R.id.message);
+        query = findViewById(R.id.query);
+        near = findViewById(R.id.near);
+        lead = findViewById(R.id.lead);
+        clear = findViewById(R.id.clear);
+        progress = findViewById(R.id.progress);
+        filtersScroll = findViewById(R.id.filters_scroll);
+        filters = findViewById(R.id.filters);
+        list = findViewById(R.id.results);
+        message = findViewById(R.id.message);
         searchScreen = findViewById(R.id.search);
         placeScreen = findViewById(R.id.place);
-        placeScroll = (ScrollView) findViewById(R.id.place_scroll);
+        placeScroll = findViewById(R.id.place_scroll);
         page = new PlacePage(look, photos,
-            (LinearLayout) findViewById(R.id.place_head),
-            placeScroll,
-            (LinearLayout) findViewById(R.id.place_body));
+            findViewById(R.id.place_head), placeScroll, findViewById(R.id.place_body));
 
         query.setTypeface(look.regular);
         near.setTypeface(look.regular);
         message.setTypeface(look.regular);
-        clear.setBackground(circle(R.color.button));
+        clear.setBackground(Look.circle(color(R.color.button)));
         clear.setImageTintList(ColorStateList.valueOf(color(R.color.text)));
         list.setAdapter(adapter);
         list.setDivider(new ColorDrawable(color(R.color.hairline)));
@@ -154,7 +154,7 @@ public final class MainActivity extends BaseActivity {
         list.setSelector(new ColorDrawable(0));
 
         SharedPreferences prefs = prefs();
-        login = loadLogin(prefs);
+        login = Logins.load(prefs, Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         anchor = Anchor.parse(prefs.getString("anchor", ""));
         near.setText(prefs.getString("near", ""));
         openNow = prefs.getBoolean("open_now", false);
@@ -228,22 +228,6 @@ public final class MainActivity extends BaseActivity {
      * The bundled login is adopted once per build that carries a new one;
      * otherwise whatever was saved (perhaps typed in from the menu) is kept.
      */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     private SharedPreferences prefs() {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
@@ -352,14 +336,7 @@ public final class MainActivity extends BaseActivity {
                     anchor = at;
                     prefs().edit().putString("anchor", at.toJson()).apply();
                 }
-                results.clear();
-                results.addAll(found.places);
-                searched = found.query;
-                searchedNear = found.near;
-                searchedOpen = open;
-                searchedRated = rated;
-                nextPage = found.next;
-                picked = 0;
+                took(found.places, found.next, found.query, found.near, open, rated);
                 // A filter changed from its chip keeps the d-pad on it.
                 if (zone != Zone.FILTERS) zone = results.isEmpty() ? Zone.QUERY : Zone.LIST;
                 say(results.isEmpty() ? "No results for “" + what + "”" + (at == null ? "" : " near " + at.label) : "");
@@ -394,20 +371,12 @@ public final class MainActivity extends BaseActivity {
             final String what = exact != null ? exact.name() : found.query != null ? found.query : found.near.label;
             final Places.Page page = exact != null ? null : client.search(what, found.near, null);
             return () -> {
-                results.clear();
                 if (exact != null) {
-                    results.add(exact);
                     details.put(exact.id(), exact);
-                    nextPage = null;
+                    took(Collections.singletonList(exact), null, what, found.near, false, false);
                 } else {
-                    results.addAll(page.places);
-                    nextPage = page.next;
+                    took(page.places, page.next, what, found.near, false, false);
                 }
-                searched = what;
-                searchedNear = found.near;
-                searchedOpen = false;
-                searchedRated = false;
-                picked = 0;
                 query.setText(what);
                 remember(what);
                 say(results.isEmpty() ? "No results for “" + what + "”" : "");
@@ -417,6 +386,18 @@ public final class MainActivity extends BaseActivity {
                 if (!results.isEmpty()) open();
             };
         });
+    }
+
+    /** A search's first page, in place of what was shown, with what it searched for. */
+    private void took(List<Place> found, String next, String what, Anchor near, boolean open, boolean rated) {
+        results.clear();
+        results.addAll(found);
+        nextPage = next;
+        searched = what;
+        searchedNear = near;
+        searchedOpen = open;
+        searchedRated = rated;
+        picked = 0;
     }
 
     /** The next page of the same search, after the ones already shown. */
@@ -673,8 +654,18 @@ public final class MainActivity extends BaseActivity {
      * address, copy its website's address.
      */
     private void actions() {
+        List<Choice> choices = new ArrayList<>();
+        placeChoices(choices);
+        if (choices.isEmpty()) {
+            toast(busy() ? "Still loading." : "Nothing to call or copy.");
+            return;
+        }
+        choose(choices);
+    }
+
+    /** What can be done with the place showing: call it, copy its address or its website's. */
+    private void placeChoices(List<Choice> choices) {
         final Place place = current();
-        List<Choice> choices = new ArrayList<Choice>();
         if (place.phone().length() > 0) choices.add(new Choice(R.drawable.ic_call, "Call", () -> dial(place.phone())));
         if (place.address().length() > 0) {
             choices.add(new Choice(R.drawable.ic_place, "Copy address", () -> copy("Address", place.localAddress())));
@@ -682,11 +673,6 @@ public final class MainActivity extends BaseActivity {
         if (place.website().length() > 0) {
             choices.add(new Choice(R.drawable.ic_language, "Copy website URL", () -> copy("Website", place.website())));
         }
-        if (choices.isEmpty()) {
-            toast(busy() ? "Still loading." : "Nothing to call or copy.");
-            return;
-        }
-        choose(choices);
     }
 
     private void copy(String what, String text) {
@@ -812,17 +798,10 @@ public final class MainActivity extends BaseActivity {
     // ---- Menu ----
 
     private void menu() {
-        List<Choice> choices = new ArrayList<Choice>();
+        List<Choice> choices = new ArrayList<>();
         if (busy()) choices.add(new Choice(R.drawable.ic_close, "Stop", () -> stop()));
         if (showing) {
-            final Place place = current();
-            if (place.phone().length() > 0) choices.add(new Choice(R.drawable.ic_call, "Call", () -> dial(place.phone())));
-            if (place.address().length() > 0) {
-                choices.add(new Choice(R.drawable.ic_place, "Copy address", () -> copy("Address", place.localAddress())));
-            }
-            if (place.website().length() > 0) {
-                choices.add(new Choice(R.drawable.ic_language, "Copy website URL", () -> copy("Website", place.website())));
-            }
+            placeChoices(choices);
             choices.add(new Choice(R.drawable.ic_arrow_back, "Back to results", () -> close()));
         } else {
             if (query.getText().toString().trim().length() > 0) {
@@ -966,13 +945,6 @@ public final class MainActivity extends BaseActivity {
             if (event.getAction() == KeyEvent.ACTION_DOWN) to.requestFocus();
             return true;
         });
-    }
-
-    private android.graphics.drawable.GradientDrawable circle(int fill) {
-        android.graphics.drawable.GradientDrawable circle = new android.graphics.drawable.GradientDrawable();
-        circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        circle.setColor(color(fill));
-        return circle;
     }
 
     /**

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Printers on the Wi-Fi: talking to them, hearing their announcements
          (multicast), and the network's name for the screens (which Android
          8.1 gives only to apps with the location permission). -->
@@ -35,8 +36,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- "Open with" for a PDF elsewhere: a mail attachment, a file manager. -->
-            <intent-filter>
+            <!-- "Open with" for a PDF elsewhere: a mail attachment, a file manager.
+                 A type with no scheme takes content: and file: links, which is
+                 what is wanted; lint reads it as a web link missing its URL. -->
+            <intent-filter tools:ignore="AppLinkUrlError">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/pdf" />
