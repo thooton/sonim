@@ -13,6 +13,7 @@ import com.source.xp3.net.Names;
 import com.source.xp3.net.Store;
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
+import com.xp3.common.ui.Card;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -123,15 +124,31 @@ final class Download {
         }
     }
 
-    /**
-     * What runs on the worker thread; told how it ended on the main thread.
-     * As it stands it is a search, which ends in its log and status line; a
-     * download overrides how it ends.
-     */
-    private abstract static class Task {
-        abstract void run() throws IOException, InterruptedException;
+    private interface Work {
+        void run() throws IOException, InterruptedException;
+    }
 
-        abstract void cancel();
+    /**
+     * What runs on the worker thread, and how it is stopped; told how it
+     * ended on the main thread. As it stands it is a search, which ends in
+     * its log and status line; a download (JobTask) ends in its job.
+     */
+    private static class Task {
+        private final Work work;
+        private final Runnable stop;
+
+        Task(Work work, Runnable stop) {
+            this.work = work;
+            this.stop = stop;
+        }
+
+        final void run() throws IOException, InterruptedException {
+            work.run();
+        }
+
+        final void cancel() {
+            stop.run();
+        }
 
         void cancelled() {
             apply("Cancelled.", "Cancelled");
@@ -140,6 +157,28 @@ final class Download {
         void failed(String why) {
             searchError = why;
             apply("✗ " + why, "Failed: " + why);
+        }
+    }
+
+    /** A download: cancelled, it is as if never asked for; failed, it says why. */
+    private static final class JobTask extends Task {
+        private final Job job;
+
+        JobTask(Job job, Work work, Runnable stop) {
+            super(work, stop);
+            this.job = job;
+        }
+
+        @Override
+        void cancelled() {
+            jobs.remove(job.key);
+        }
+
+        @Override
+        void failed(String why) {
+            job.state = FAILED;
+            job.error = why;
+            job.log.add("✗ " + why);
         }
     }
 
@@ -177,9 +216,6 @@ final class Download {
         history = History.parse(Disk.read(new File(app.getFilesDir(), HISTORY_FILE), 4 * 1024 * 1024));
     }
 
-    static boolean busy() {
-        return current != null;
-    }
 
     /** Whether a search is running, or waiting to. */
     static boolean searching() {
@@ -238,23 +274,24 @@ final class Download {
     static void clearLog() {
         if (searching()) return;
         log.clear();
-        status = "";
-        searchError = null;
-        changed();
+        cleared();
     }
 
     static void clearResults() {
         if (searching()) return;
         results = null;
-        status = "";
-        searchError = null;
-        changed();
+        cleared();
     }
 
     static void clearFound() {
         if (searching()) return;
         musicFound = null;
         logShown = true;
+        cleared();
+    }
+
+    /** After clearing something away, nothing is said about the last search. */
+    private static void cleared() {
         status = "";
         searchError = null;
         changed();
@@ -388,68 +425,20 @@ final class Download {
         job.state = RUNNING;
         if (job.music()) {
             job.phase = "Downloading from " + job.hit.user;
-            final Music music = new Music(job.login);
-            start(job, "music-download", new Task() {
-                @Override
-                void run() throws IOException, InterruptedException {
-                    runMusic(job, music);
-                }
-
-                @Override
-                void cancel() {
-                    music.cancel();
-                }
-
-                @Override
-                void cancelled() {
-                    jobs.remove(job.key);
-                }
-
-                @Override
-                void failed(String why) {
-                    fail(job, why);
-                }
-            });
+            Music music = new Music(job.login);
+            start(job, "music-download", new JobTask(job, () -> runMusic(job, music), music::cancel));
         } else {
             job.phase = "Downloading";
-            final Books books = books(job.login);
-            start(job, "book-download", new Task() {
-                @Override
-                void run() throws IOException, InterruptedException {
-                    runBook(job, books);
-                }
-
-                @Override
-                void cancel() {
-                    books.cancel();
-                }
-
-                @Override
-                void cancelled() {
-                    jobs.remove(job.key);
-                }
-
-                @Override
-                void failed(String why) {
-                    fail(job, why);
-                }
-            });
+            Books books = books(job.login);
+            start(job, "book-download", new JobTask(job, () -> runBook(job, books), books::cancel));
         }
-    }
-
-    private static void fail(Job job, String why) {
-        job.state = FAILED;
-        job.error = why;
-        job.log.add("✗ " + why);
     }
 
     private static void start(Job job, String name, final Task task) {
         current = task;
         runningJob = job;
         changed();
-        new Thread(() -> {
-            work(task);
-        }, name).start();
+        new Thread(() -> work(task), name).start();
     }
 
     private static void work(final Task task) {
@@ -491,26 +480,18 @@ final class Download {
         searchMode = mode;
         searchError = null;
         line("» Search for " + (Music.ALBUM.equals(mode) ? "album: " : "song: ") + query);
-        search(new Task() {
-            @Override
-            void run() throws IOException, InterruptedException {
-                final Music.Found result = music.search(mode, query, (text, error) -> Download.line(text));
-                final int count = result.hits.size();
-                final String said = count == 0 ? "Nothing found" : count + (count == 1 ? " result" : " results");
-                if (result.error != null) line("✗ " + result.error);
-                else line("✓ " + said);
-                MAIN.post(() -> {
-                    musicFound = result;
-                    logShown = count == 0;
-                    status = said;
-                });
-            }
-
-            @Override
-            void cancel() {
-                music.cancel();
-            }
-        }, "music-search", "Searching…");
+        search(new Task(() -> {
+            final Music.Found result = music.search(mode, query, (text, error) -> Download.line(text));
+            final int count = result.hits.size();
+            final String said = count == 0 ? "Nothing found" : count + (count == 1 ? " result" : " results");
+            if (result.error != null) line("✗ " + result.error);
+            else line("✓ " + said);
+            MAIN.post(() -> {
+                musicFound = result;
+                logShown = count == 0;
+                status = said;
+            });
+        }, music::cancel), "music-search", "Searching…");
     }
 
     private static void search(final Task task, final String name, final String searching) {
@@ -518,9 +499,7 @@ final class Download {
             current = task;
             runningJob = null;
             setStatus(searching);
-            new Thread(() -> {
-                work(task);
-            }, name).start();
+            new Thread(() -> work(task), name).start();
         };
         if (current == null) {
             go.run();
@@ -578,7 +557,7 @@ final class Download {
 
     /** Fetches the job's files into the Music folder on the SD card. */
     private static Saved save(final Job job, final Music music, String id, final long total) throws IOException, InterruptedException {
-        File card = Files.card(app);
+        File card = Card.root(app);
         if (card == null) throw new IOException("No SD card in the phone.");
         final Store store = store(card);
         final File root = new File(card, MUSIC_FOLDER);
@@ -688,35 +667,27 @@ final class Download {
         final Books books = books(login);
         searchMode = BOOK;
         searchError = null;
-        search(new Task() {
-            @Override
-            void run() throws IOException, InterruptedException {
-                Books.Page found = books.search(query, page, format);
-                String note = "";
-                if (found.books.isEmpty() && format != null && page == 1) {
-                    post(null, "No " + format.toUpperCase(Locale.US) + "s; searching every format…");
-                    found = books.search(query, 1, null);
-                    if (!found.books.isEmpty()) note = "No " + format.toUpperCase(Locale.US) + "s, so every format. ";
-                }
-                final Books.Page shown = found;
-                final String said = found.books.isEmpty()
-                    ? "Nothing found"
-                    : note + "Page " + found.page + " of " + found.pages;
-                MAIN.post(() -> {
-                    results = shown;
-                    status = said;
-                });
+        search(new Task(() -> {
+            Books.Page found = books.search(query, page, format);
+            String note = "";
+            if (found.books.isEmpty() && format != null && page == 1) {
+                post(null, "No " + format.toUpperCase(Locale.US) + "s; searching every format…");
+                found = books.search(query, 1, null);
+                if (!found.books.isEmpty()) note = "No " + format.toUpperCase(Locale.US) + "s, so every format. ";
             }
-
-            @Override
-            void cancel() {
-                books.cancel();
-            }
-        }, "book-search", page > 1 ? "Loading page " + page + "…" : "Searching…");
+            final Books.Page shown = found;
+            final String said = found.books.isEmpty()
+                ? "Nothing found"
+                : note + "Page " + found.page + " of " + found.pages;
+            MAIN.post(() -> {
+                results = shown;
+                status = said;
+            });
+        }, books::cancel), "book-search", page > 1 ? "Loading page " + page + "…" : "Searching…");
     }
 
     private static void runBook(Job job, Books books) throws IOException, InterruptedException {
-        File card = Files.card(app);
+        File card = Card.root(app);
         if (card == null) throw new IOException("No SD card in the phone.");
         File folder = new File(card, BOOKS_FOLDER);
         Books.Saved saved = books.download(job.book, folder, store(card), (done, total) -> progress(job, "Downloading", done, total));

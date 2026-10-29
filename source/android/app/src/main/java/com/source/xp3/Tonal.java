@@ -1,7 +1,6 @@
 package com.source.xp3;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -11,11 +10,17 @@ import android.content.res.Configuration;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.text.TextPaint;
+import android.text.style.MetricAffectingSpan;
+import android.util.TypedValue;
 import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.TextView;
 import com.source.xp3.net.Music;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.Ui;
 
 /**
  * What every screen of Source shares: the Tonal look (DESIGN.md, "Source:
@@ -201,10 +206,38 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
 
     /** A tinted icon, `size` dp square, for a TextView's side. */
     protected final Drawable icon(int id, int color, int size) {
-        Drawable drawn = getDrawable(id).mutate();
-        drawn.setTint(getColor(color));
-        drawn.setBounds(0, 0, dp(size), dp(size));
+        return icon(this, id, color, size);
+    }
+
+    static Drawable icon(Context context, int id, int color, int size) {
+        Drawable drawn = context.getDrawable(id).mutate();
+        drawn.setTint(context.getColor(color));
+        drawn.setBounds(0, 0, Ui.dp(context, size), Ui.dp(context, size));
         return drawn;
+    }
+
+    /** As text(), at a size between whole sp. */
+    protected final TextView line(CharSequence value, float sp, int color) {
+        TextView view = text(value, 0, color);
+        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        return view;
+    }
+
+    /** A text at one of the dimens' sizes (R.dimen.text_row, text_meta), in a colour resource. */
+    static TextView sized(Context context, int size, int color) {
+        TextView view = new TextView(context);
+        view.setTextColor(context.getColor(color));
+        view.setTextSize(TypedValue.COMPLEX_UNIT_PX, context.getResources().getDimension(size));
+        view.setIncludeFontPadding(false);
+        return view;
+    }
+
+    /** A horizontal LinearLayout, its children placed by `gravity`. */
+    protected final LinearLayout row(int gravity) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(gravity);
+        return row;
     }
 
     /** What a tab or kind is called: Song, Album or Book. */
@@ -222,20 +255,20 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
     }
 
     /** Text in a given face; TypefaceSpan only takes a Typeface from API 28. */
-    static final class Face extends android.text.style.MetricAffectingSpan {
-        private final android.graphics.Typeface face;
+    static final class Face extends MetricAffectingSpan {
+        private final Typeface face;
 
-        Face(android.graphics.Typeface face) {
+        Face(Typeface face) {
             this.face = face;
         }
 
         @Override
-        public void updateMeasureState(android.text.TextPaint paint) {
+        public void updateMeasureState(TextPaint paint) {
             paint.setTypeface(face);
         }
 
         @Override
-        public void updateDrawState(android.text.TextPaint paint) {
+        public void updateDrawState(TextPaint paint) {
             paint.setTypeface(face);
         }
     }

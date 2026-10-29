@@ -1,9 +1,7 @@
 package com.source.xp3;
 
 import android.app.Dialog;
-import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -139,35 +137,24 @@ final class Sheet {
     }
 
     private View rowView(Row row) {
-        LinearLayout view = new LinearLayout(activity);
-        view.setOrientation(LinearLayout.HORIZONTAL);
-        view.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout view = activity.row(Gravity.CENTER_VERTICAL);
         view.setBackgroundResource(R.drawable.row_pick);
         int pad = Ui.dp(activity, 16);
         view.setPadding(pad, 0, pad, 0);
         view.setMinimumHeight(Ui.dp(activity, 30));
 
-        TextView label = new TextView(activity);
+        TextView label = Tonal.sized(activity, R.dimen.text_row, R.color.text);
         label.setId(android.R.id.text1);
         label.setText(row.label);
-        label.setTextColor(activity.getColor(R.color.text));
-        label.setTextSize(TypedValue.COMPLEX_UNIT_PX, activity.getResources().getDimension(R.dimen.text_row));
-        label.setIncludeFontPadding(false);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
         label.setCompoundDrawablePadding(Ui.dp(activity, 10));
-        Drawable icon = activity.getDrawable(row.icon).mutate();
-        icon.setTint(activity.getColor(R.color.text_muted));
-        icon.setBounds(0, 0, Ui.dp(activity, 16), Ui.dp(activity, 16));
-        label.setCompoundDrawablesRelative(icon, null, null, null);
+        label.setCompoundDrawablesRelative(Tonal.icon(activity, row.icon, R.color.text_muted, 16), null, null, null);
         view.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
         if (row.value != null && row.value.length() > 0) {
-            TextView value = new TextView(activity);
+            TextView value = Tonal.sized(activity, R.dimen.text_meta, R.color.text_muted);
             value.setText(row.value);
-            value.setTextColor(activity.getColor(R.color.text_muted));
-            value.setTextSize(TypedValue.COMPLEX_UNIT_PX, activity.getResources().getDimension(R.dimen.text_meta));
-            value.setIncludeFontPadding(false);
             value.setSingleLine(true);
             value.setPadding(Ui.dp(activity, 6), 0, 0, 0);
             view.addView(value);
