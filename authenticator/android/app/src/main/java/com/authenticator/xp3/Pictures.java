@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 
 import com.authenticator.xp3.qr.QrReader;
+import com.xp3.common.ui.Ui;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,8 +33,7 @@ final class Pictures {
         int longest = Math.max(bounds.outWidth, bounds.outHeight);
         int lastSample = 0;
         for (int side : SIDES) {
-            int sample = 1;
-            while (longest / (sample * 2) >= side) sample *= 2;
+            int sample = Ui.sampleSize(longest, side);
             if (sample == lastSample) continue;
             lastSample = sample;
             BitmapFactory.Options options = new BitmapFactory.Options();

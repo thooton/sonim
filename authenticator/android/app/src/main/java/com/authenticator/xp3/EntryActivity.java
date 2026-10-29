@@ -195,10 +195,7 @@ public final class EntryActivity extends BaseActivity {
 
     /** A pill like a field's that steps through the algorithms on OK. */
     private TextView choice(LinearLayout page, String label) {
-        TextView name = text(label, 12, color(R.color.ink_muted));
-        name.setTypeface(Look.medium(this));
-        name.setPadding(dp(4), 0, 0, dp(4));
-        page.addView(name);
+        label(page, label);
         TextView pill = new TextView(this);
         pill.setTextSize(13.5f);
         pill.setTypeface(Look.regular(this));
@@ -223,16 +220,20 @@ public final class EntryActivity extends BaseActivity {
         return pill;
     }
 
+    private void label(LinearLayout page, String label) {
+        TextView name = text(label, 12, color(R.color.ink_muted));
+        name.setTypeface(Look.medium(this));
+        name.setPadding(dp(4), 0, 0, dp(4));
+        page.addView(name);
+    }
+
     private static void step(TextView pill, int by) {
         int at = java.util.Arrays.asList(ALGORITHMS).indexOf(pill.getText().toString());
         pill.setText(ALGORITHMS[Math.floorMod(at + by, ALGORITHMS.length)]);
     }
 
     private EditText field(LinearLayout page, String label, int inputType) {
-        TextView name = text(label, 12, color(R.color.ink_muted));
-        name.setTypeface(Look.medium(this));
-        name.setPadding(dp(4), 0, 0, dp(4));
-        page.addView(name);
+        label(page, label);
         EditText edit = new EditText(this) {
             // Back hides the keyboard and leaves in the same press; the XP3
             // never shows one, so a press spent on hiding it looks dead.
@@ -262,30 +263,25 @@ public final class EntryActivity extends BaseActivity {
 
     /** A white pill, outlined in the ink while it takes the keys. */
     private StateListDrawable fieldBackground() {
-        StateListDrawable states = new StateListDrawable();
-        GradientDrawable focused = new GradientDrawable();
-        focused.setColor(color(R.color.card));
-        focused.setCornerRadius(dp(17));
-        focused.setStroke(dp(1.5f), color(R.color.ink));
-        GradientDrawable rest = new GradientDrawable();
-        rest.setColor(color(R.color.card));
-        rest.setCornerRadius(dp(17));
-        rest.setStroke(dp(1), color(R.color.track));
-        states.addState(new int[] {android.R.attr.state_focused}, focused);
-        states.addState(new int[0], rest);
-        return states;
+        return pill(color(R.color.card), 17, 1.5f, color(R.color.ink), 1, color(R.color.track));
     }
 
     /** Authy's navy pill; ringed while the d-pad is on it. */
     private StateListDrawable button() {
-        StateListDrawable states = new StateListDrawable();
+        return pill(color(R.color.ink), 18, 3, 0xFF8891AA, 0, 0);
+    }
+
+    /** A pill of `fill`, its edge `focusedStroke` dp of `focusedColor` while focused, else `restStroke` (0 for none). */
+    private StateListDrawable pill(int fill, float radius, float focusedStroke, int focusedColor, float restStroke, int restColor) {
         GradientDrawable focused = new GradientDrawable();
-        focused.setColor(color(R.color.ink));
-        focused.setCornerRadius(dp(18));
-        focused.setStroke(dp(3), 0xFF8891AA);
+        focused.setColor(fill);
+        focused.setCornerRadius(dp(radius));
+        focused.setStroke(dp(focusedStroke), focusedColor);
         GradientDrawable rest = new GradientDrawable();
-        rest.setColor(color(R.color.ink));
-        rest.setCornerRadius(dp(18));
+        rest.setColor(fill);
+        rest.setCornerRadius(dp(radius));
+        if (restStroke > 0) rest.setStroke(dp(restStroke), restColor);
+        StateListDrawable states = new StateListDrawable();
         states.addState(new int[] {android.R.attr.state_focused}, focused);
         states.addState(new int[0], rest);
         return states;
