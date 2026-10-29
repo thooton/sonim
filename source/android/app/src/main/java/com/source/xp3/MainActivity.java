@@ -32,6 +32,7 @@ import com.source.xp3.data.Recents;
 import com.source.xp3.net.Books;
 import com.source.xp3.net.Music;
 import com.xp3.common.Login;
+import com.xp3.common.ui.FaceSpan;
 import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -583,7 +584,7 @@ public final class MainActivity extends Tonal {
         int start = out.length();
         out.append(count);
         out.setSpan(new ForegroundColorSpan(getColor(R.color.text)), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        out.setSpan(new Face(BOLD), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        out.setSpan(new FaceSpan(BOLD), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return out;
     }
 

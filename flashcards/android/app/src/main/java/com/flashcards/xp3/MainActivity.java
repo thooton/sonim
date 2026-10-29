@@ -41,6 +41,7 @@ import com.xp3.common.ui.NightShift;
 import com.xp3.common.ui.Card;
 import com.xp3.common.ui.CardGrant;
 import com.xp3.common.ui.Ui;
+import com.xp3.common.ui.Logins;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -151,7 +152,7 @@ public final class MainActivity extends BaseActivity {
         setContentView(R.layout.activity_main);
         content = findViewById(R.id.content);
         NightShift.apply(getWindow().getDecorView(), nightShift());
-        login = loadLogin(prefs());
+        login = Logins.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         collection = load();
         collection.zone = zone.getId();
         showDecks();
@@ -967,23 +968,6 @@ public final class MainActivity extends BaseActivity {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
     }
 
-    /** The bundled login, adopted once per build that carries a new one, else what was typed in. */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     private void askLogin() {
         LinearLayout box = vertical();

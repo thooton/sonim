@@ -14,7 +14,6 @@ import android.text.style.AlignmentSpan;
 import android.text.style.CharacterStyle;
 import android.text.style.LeadingMarginSpan;
 import android.text.style.LineHeightSpan;
-import android.text.style.MetricAffectingSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.UpdateAppearance;
 
@@ -24,6 +23,8 @@ import com.books.xp3.book.Section;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import com.xp3.common.ui.FaceSpan;
 
 /**
  * One section of a book laid out for the screen and cut into pages.
@@ -289,25 +290,6 @@ final class Pages {
     // ------------------------------------------------------------------
     // Spans
     // ------------------------------------------------------------------
-
-    /** Sets a run in one of the book font's real faces. */
-    static final class FaceSpan extends MetricAffectingSpan {
-        private final Typeface face;
-
-        FaceSpan(Typeface face) {
-            this.face = face;
-        }
-
-        @Override
-        public void updateMeasureState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
-
-        @Override
-        public void updateDrawState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
-    }
 
     /**
      * Space above a paragraph's first line and below its last.

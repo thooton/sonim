@@ -12,8 +12,6 @@ import android.os.Bundle;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.LeadingMarginSpan;
-import android.text.style.MetricAffectingSpan;
-import android.text.TextPaint;
 import android.graphics.Typeface;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -32,6 +30,7 @@ import android.widget.TextView;
 import com.newyorker.xp3.news.Article;
 import com.newyorker.xp3.news.Block;
 import com.newyorker.xp3.news.Story;
+import com.xp3.common.ui.FaceSpan;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
 
@@ -302,7 +301,7 @@ public final class ArticleActivity extends BaseActivity {
             text.append(run.text);
             int style = (run.style & Block.Run.BOLD) != 0 ? Look.BOLD : (run.style & Block.Run.ITALIC) != 0 ? Look.ITALIC : Look.REGULAR;
             if (style != Look.REGULAR) {
-                text.setSpan(new Face(Look.caslon(context, style)), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                text.setSpan(new FaceSpan(Look.caslon(context, style)), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
         // The site's last paragraph often carries the end mark already; it is set once.
@@ -318,25 +317,6 @@ public final class ArticleActivity extends BaseActivity {
             text.setSpan(new EndMark(), at, at + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         return text;
-    }
-
-    /** A run in another of the Caslon faces. */
-    private static final class Face extends MetricAffectingSpan {
-        private final Typeface face;
-
-        Face(Typeface face) {
-            this.face = face;
-        }
-
-        @Override
-        public void updateMeasureState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
-
-        @Override
-        public void updateDrawState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
     }
 
     private void picture(String url, String caption, int top) {

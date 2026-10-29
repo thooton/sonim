@@ -16,10 +16,8 @@ import android.os.Looper;
 import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
-import android.text.TextPaint;
 import android.text.format.DateFormat;
 import android.text.style.ForegroundColorSpan;
-import android.text.style.MetricAffectingSpan;
 import android.graphics.drawable.ColorDrawable;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -43,9 +41,11 @@ import com.tablet.xp3.data.When;
 import com.tablet.xp3.net.Center;
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
+import com.xp3.common.ui.FaceSpan;
 import com.xp3.common.ui.Card;
 import com.xp3.common.ui.CardGrant;
 import com.xp3.common.ui.Ui;
+import com.xp3.common.ui.Logins;
 
 import java.io.File;
 import java.io.IOException;
@@ -157,7 +157,7 @@ public final class MainActivity extends Activity {
         worker = Ui.worker("tablet");
         pages = new Pages(this);
         pages.onChange(() -> library.shelf.invalidate());
-        login = loadLogin(prefs());
+        login = Logins.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         signIn();
         String saved = Disk.read(listingFile(), 8000000);
         if (saved != null) {
@@ -242,22 +242,6 @@ public final class MainActivity extends Activity {
      * The bundled login is adopted once per build that carries a new one;
      * otherwise whatever was saved (perhaps typed in from Settings) is kept.
      */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     private void signIn() {
         tablet = login.ready() ? new Center(login) : null;
@@ -472,32 +456,13 @@ public final class MainActivity extends Activity {
         if (lead.length() > 0) {
             text.append(lead);
             text.setSpan(new ForegroundColorSpan(Look.MARK), 0, lead.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            text.setSpan(new Face(Look.uiBold), 0, lead.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(new FaceSpan(Look.uiBold), 0, lead.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         text.append(rest);
         toast.setText(text);
         toast.setVisibility(View.VISIBLE);
         handler.removeCallbacks(hideToast);
         handler.postDelayed(hideToast, Math.max(2600, 45L * text.length()));
-    }
-
-    /** A run of text in another face (TypefaceSpan only takes a Typeface from API 28). */
-    private static final class Face extends MetricAffectingSpan {
-        private final Typeface face;
-
-        Face(Typeface face) {
-            this.face = face;
-        }
-
-        @Override
-        public void updateDrawState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
-
-        @Override
-        public void updateMeasureState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
     }
 
     // ---- Drawing.

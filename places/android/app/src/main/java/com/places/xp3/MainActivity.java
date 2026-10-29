@@ -34,6 +34,7 @@ import com.xp3.common.Json;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
+import com.xp3.common.ui.Logins;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -153,7 +154,7 @@ public final class MainActivity extends BaseActivity {
         list.setSelector(new ColorDrawable(0));
 
         SharedPreferences prefs = prefs();
-        login = loadLogin(prefs);
+        login = Logins.load(prefs, Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         anchor = Anchor.parse(prefs.getString("anchor", ""));
         near.setText(prefs.getString("near", ""));
         openNow = prefs.getBoolean("open_now", false);
@@ -227,22 +228,6 @@ public final class MainActivity extends BaseActivity {
      * The bundled login is adopted once per build that carries a new one;
      * otherwise whatever was saved (perhaps typed in from the menu) is kept.
      */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     private SharedPreferences prefs() {
         return getSharedPreferences(PREFS, MODE_PRIVATE);

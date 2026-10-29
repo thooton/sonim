@@ -19,8 +19,6 @@ import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
-import android.text.style.MetricAffectingSpan;
-import android.text.TextPaint;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -38,8 +36,10 @@ import android.widget.TextView;
 
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
+import com.xp3.common.ui.FaceSpan;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
+import com.xp3.common.ui.Logins;
 
 import java.io.File;
 import java.io.IOException;
@@ -139,7 +139,7 @@ public final class MainActivity extends BaseActivity {
         setContentView(root);
 
         accounts = readCache();
-        login = loadLogin(prefs());
+        login = Logins.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
         show();
         if (login.ready()) sync();
         else askLogin();
@@ -299,7 +299,7 @@ public final class MainActivity extends BaseActivity {
                 line.append('(').append(detail).append(')');
                 line.setSpan(new ForegroundColorSpan(color(R.color.ink_muted)), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 line.setSpan(new AbsoluteSizeSpan(10, true), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                line.setSpan(new Face(Look.regular(MainActivity.this)), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                line.setSpan(new FaceSpan(Look.regular(MainActivity.this)), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
             name.setText(line);
             focused = !focus;
@@ -321,25 +321,6 @@ public final class MainActivity extends BaseActivity {
             if (on == focused) return;
             focused = on;
             card.setBackground(Look.card(MainActivity.this, on));
-        }
-    }
-
-    /** A typeface for part of a line. */
-    private static final class Face extends MetricAffectingSpan {
-        private final Typeface face;
-
-        Face(Typeface face) {
-            this.face = face;
-        }
-
-        @Override
-        public void updateDrawState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
-
-        @Override
-        public void updateMeasureState(TextPaint paint) {
-            paint.setTypeface(face);
         }
     }
 
@@ -763,22 +744,6 @@ public final class MainActivity extends BaseActivity {
      * The bundled login is adopted once per build that carries a new one;
      * otherwise whatever was saved (typed in from the menu) is kept.
      */
-    private Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     /** The fallback for a build without a bundled login. */
     private void askLogin() {

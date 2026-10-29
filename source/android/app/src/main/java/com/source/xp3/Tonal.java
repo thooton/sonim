@@ -10,8 +10,6 @@ import android.content.res.Configuration;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.text.TextPaint;
-import android.text.style.MetricAffectingSpan;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -19,8 +17,10 @@ import android.widget.ListView;
 import android.widget.TextView;
 import com.source.xp3.net.Music;
 import com.xp3.common.Login;
+import com.xp3.common.ui.FaceSpan;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
+import com.xp3.common.ui.Logins;
 
 /**
  * What every screen of Source shares: the Tonal look (DESIGN.md, "Source:
@@ -72,7 +72,7 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
         lightStatusBar(!dark(this));
         loadFonts();
         Download.init(this);
-        login = loadLogin(prefs());
+        login = Logins.load(prefs(), Bundled.REVISION, Bundled.SERVER, Bundled.TOKEN);
     }
 
     @Override
@@ -133,22 +133,6 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
      * The bundled login is adopted once per build that carries a new one;
      * otherwise whatever was saved (perhaps typed in from Options) is kept.
      */
-    private static Login loadLogin(SharedPreferences prefs) {
-        String revision = Bundled.REVISION;
-        if (revision.length() > 0 && !revision.equals(prefs.getString("bundled", ""))) {
-            Login bundled;
-            try {
-                bundled = Login.of(Bundled.SERVER, Bundled.TOKEN);
-            } catch (IllegalArgumentException e) {
-                bundled = Login.blank();
-            }
-            if (bundled.ready()) {
-                prefs.edit().putString("login", bundled.toJson()).putString("bundled", revision).apply();
-                return bundled;
-            }
-        }
-        return Login.parse(prefs.getString("login", ""));
-    }
 
     /**
      * Runs `then`, a download, once Source may save onto the SD card: storage
@@ -252,25 +236,6 @@ abstract class Tonal extends BaseActivity implements Download.Listener {
         if (Music.ALBUM.equals(kind)) return R.drawable.ic_album;
         if (Download.BOOK.equals(kind)) return R.drawable.ic_book;
         return R.drawable.ic_music_note;
-    }
-
-    /** Text in a given face; TypefaceSpan only takes a Typeface from API 28. */
-    static final class Face extends MetricAffectingSpan {
-        private final Typeface face;
-
-        Face(Typeface face) {
-            this.face = face;
-        }
-
-        @Override
-        public void updateMeasureState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
-
-        @Override
-        public void updateDrawState(TextPaint paint) {
-            paint.setTypeface(face);
-        }
     }
 
     /**

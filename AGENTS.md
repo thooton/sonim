@@ -141,7 +141,8 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
   `weighted`, `isOk`, `onSelect`), `Card` (the SD card, where downloads
   go), `CardGrant` (Android's grant for the whole card, which Android 8.1
   wants before an app writes there, and sometimes before it reads what
-  another app put there), `Tabs` (tab bar with d-pad cycling),
+  another app put there), `Logins` (the saved login, adopting a bundled one once per build), `FaceSpan`
+  (a run in another Typeface on API 27), `Tabs` (tab bar with d-pad cycling),
   `SelectableAdapter` (rows that paint their own highlight), `NightShift` (the
   warm colour filter Books and Flashcards draw through), `Markdown`, and
   the shared tab, focus and Markdown drawables. An app's own colors and

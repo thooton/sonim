@@ -15,6 +15,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.xp3.common.ui.FaceSpan;
 import com.xp3.common.ui.Card;
 import com.xp3.common.ui.Ui;
 import java.io.File;
@@ -91,7 +92,7 @@ final class StorageCard extends LinearLayout {
         }
         SpannableStringBuilder line = new SpannableStringBuilder(Download.human(space[0]));
         line.setSpan(new AbsoluteSizeSpan(18, true), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        line.setSpan(new Tonal.Face(Tonal.BOLD), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        line.setSpan(new FaceSpan(Tonal.BOLD), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         int start = line.length();
         line.append(" free of ").append(Download.human(space[1]));
         line.setSpan(new AbsoluteSizeSpan(11, true), start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
