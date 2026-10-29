@@ -18,8 +18,8 @@ android {
 
     defaultConfig {
         applicationId "com.flashcards.xp3"
-        versionCode 26
-        versionName "1.12.2"
+        versionCode 27
+        versionName "1.12.3"
     }
 }
 

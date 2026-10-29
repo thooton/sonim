@@ -122,7 +122,6 @@ public final class MainActivity extends BaseActivity {
 
     private boolean syncing;
     private boolean syncAgain;
-    private String syncError;
     private boolean unpaired;
 
     private Center.Pairing pairing;
@@ -293,7 +292,6 @@ public final class MainActivity extends BaseActivity {
                 error = "The command center's answer was unreadable";
             }
         }
-        syncError = error;
         if (isFinishing() || isDestroyed()) return;
         // What came in shows at once, except under a card being studied,
         // which picks it up with the next card.
@@ -466,20 +464,19 @@ public final class MainActivity extends BaseActivity {
         });
         Ui.onSelect(list, at -> deckAt = at);
         page.addView(list, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        LinearLayout.LayoutParams under = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         if (!login.ready()) {
-            page.addView(pairingPanel(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            Ui.fill(content, page);
-            list.requestFocus();
-            list.setSelection(Math.min(deckAt, decks.size() - 1));
-            return;
+            page.addView(pairingPanel(), under);
+        } else {
+            // Anki's line under the deck list.
+            int studied = studiedToday();
+            TextView today = text("Studied " + studied + (studied == 1 ? " card" : " cards") + " today.",
+                11, color(R.color.text_subtle));
+            today.setGravity(Gravity.CENTER);
+            today.setPadding(0, dp(4), 0, dp(6));
+            page.addView(today, under);
         }
-        // Anki's line under the deck list.
-        int studied = studiedToday();
-        TextView today = text("Studied " + studied + (studied == 1 ? " card" : " cards") + " today.",
-            11, color(R.color.text_subtle));
-        today.setGravity(Gravity.CENTER);
-        today.setPadding(0, dp(4), 0, dp(6));
-        page.addView(today, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         Ui.fill(content, page);
         list.requestFocus();
         list.setSelection(Math.min(deckAt, decks.size() - 1));
@@ -526,7 +523,6 @@ public final class MainActivity extends BaseActivity {
             cell.setGravity(Gravity.END);
             row.addView(cell, new LinearLayout.LayoutParams(dp(i == 1 ? 38 : 34), ViewGroup.LayoutParams.WRAP_CONTENT));
         }
-        if (header) row.setBackground(null);
         return row;
     }
 
@@ -772,11 +768,7 @@ public final class MainActivity extends BaseActivity {
                 line.setPadding(0, dp(1), 0, dp(1));
                 page.addView(line, new LinearLayout.LayoutParams(dp(160), ViewGroup.LayoutParams.WRAP_CONTENT));
             }
-            study = Anki.button(this, "Study Now");
-            study.setOnClickListener(v -> startReview(false));
-            LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(dp(120), dp(30));
-            at.topMargin = dp(16);
-            page.addView(study, at);
+            study = studyButton(page, "Study Now", 120, false);
         } else {
             TextView done = text("Congratulations! You have finished this deck for now.", 14, color(R.color.text));
             done.setGravity(Gravity.CENTER);
@@ -795,11 +787,7 @@ public final class MainActivity extends BaseActivity {
             }
             // Anki's "Review ahead": the cards not yet due, likeliest forgotten first.
             if (studied(open)) {
-                study = Anki.button(this, "Review Ahead");
-                study.setOnClickListener(v -> startReview(true));
-                LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(dp(130), dp(30));
-                at.topMargin = dp(16);
-                page.addView(study, at);
+                study = studyButton(page, "Review Ahead", 130, true);
             }
         }
 
@@ -827,6 +815,16 @@ public final class MainActivity extends BaseActivity {
         } else {
             options.requestFocus();
         }
+    }
+
+    /** The overview's big button, which starts a review (`ahead`: of cards not yet due). */
+    private TextView studyButton(LinearLayout page, String label, int width, boolean ahead) {
+        TextView study = Anki.button(this, label);
+        study.setOnClickListener(v -> startReview(ahead));
+        LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(dp(width), dp(30));
+        at.topMargin = dp(16);
+        page.addView(study, at);
+        return study;
     }
 
     private static boolean studied(Deck deck) {
@@ -1013,7 +1011,6 @@ public final class MainActivity extends BaseActivity {
                     if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
                     login = next;
                     prefs().edit().putString("login", next.toJson()).apply();
-                    syncError = null;
                     pairing = null;
                     if (screen == Screen.DECKS) showDecks();
                     sync();
