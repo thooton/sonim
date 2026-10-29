@@ -71,6 +71,12 @@ abstract class Screen {
         return false;
     }
 
+    /**
+     * The item to focus on the next redraw, for when the focused one is about
+     * to be gone (a removed piece): without it the focus falls to the top.
+     */
+    String focusNext;
+
     /** The key of the item to focus when nothing was focused before. */
     String firstFocus() {
         return null;

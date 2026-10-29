@@ -116,9 +116,13 @@ final class ClassScreen extends Screen {
 
         LinearLayout tabs = v.row();
         v.pad(tabs, 12, 7, 12, 0);
+        // Large text (1.3x) would push Grades off the 240px row, so the labels
+        // grow only part of the way and sit closer.
+        float size = 10 * Math.min(look.scale, 1.15f) / look.scale;
+        int gap = look.scale > 1.05f ? 6 : 12;
         for (int i = 0; i < TABS.length; i++) {
             boolean on = i == tab;
-            TextView label = v.text(TABS[i], 10, on ? look.heavy : look.semibold, on ? look.ink : look.muted);
+            TextView label = v.text(TABS[i], size, on ? look.heavy : look.semibold, on ? look.ink : look.muted);
             label.setSingleLine(true);
             v.pad(label, 0, 0, 0, 5);
             if (on) {
@@ -131,7 +135,7 @@ final class ClassScreen extends Screen {
                 under.setLayerHeight(0, v.dp(2));
                 label.setBackground(under);
             }
-            tabs.addView(label, v.margins(Views.wrap(), 0, 0, 12, 0));
+            tabs.addView(label, v.margins(Views.wrap(), 0, 0, gap, 0));
         }
         root.addView(tabs, Views.wide());
         root.addView(v.hairline());

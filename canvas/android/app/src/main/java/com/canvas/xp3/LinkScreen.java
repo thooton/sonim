@@ -25,6 +25,7 @@ final class LinkScreen extends Screen {
     private final Draft.Piece editing;
     private EditText link;
     private EditText name;
+    private LinearLayout chips;
 
     LinkScreen(MainActivity app, Assignment work, Draft.Piece editing) {
         super(app);
@@ -55,6 +56,26 @@ final class LinkScreen extends Screen {
             if (event.getAction() == KeyEvent.ACTION_UP) add();
             return true;
         }
+        View focus = app.getCurrentFocus();
+        boolean down = code == KeyEvent.KEYCODE_DPAD_DOWN;
+        // A text field keeps Up and Down for itself (the cursor), so the
+        // d-pad would never reach the chips; step between the rows by hand.
+        if (focus instanceof EditText && (down || code == KeyEvent.KEYCODE_DPAD_UP) && chips != null
+            && chips.getChildCount() > 0 && (focus == link ? down : !down)) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) chips.getChildAt(0).requestFocus();
+            return true;
+        }
+        // Up from the first row of chips goes back to the Link field, Down to Title.
+        if (focus instanceof Item && chips != null && chips.indexOfChild(focus) >= 0
+            && (down || code == KeyEvent.KEYCODE_DPAD_UP)) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) (down ? name : link).requestFocus();
+            return true;
+        }
+        if (focus instanceof Item && chips != null && chips.indexOfChild(focus) >= 0
+            && code >= KeyEvent.KEYCODE_1 && code <= KeyEvent.KEYCODE_0 + PIECES.length) {
+            if (event.getAction() == KeyEvent.ACTION_UP) insert(PIECES[code - KeyEvent.KEYCODE_1]);
+            return true;
+        }
         return false;
     }
 
@@ -76,7 +97,7 @@ final class LinkScreen extends Screen {
         link.setSingleLine(true);
         root.addView(link, v.margins(Views.wide(), 12, 0, 12, 0));
 
-        LinearLayout chips = v.row();
+        chips = v.row();
         v.pad(chips, 12, 7, 12, 0);
         for (int i = 0; i < PIECES.length; i++) {
             final String piece = PIECES[i];

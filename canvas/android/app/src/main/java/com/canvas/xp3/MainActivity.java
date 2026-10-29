@@ -299,6 +299,10 @@ public final class MainActivity extends BaseActivity {
         String key = focused instanceof Item ? ((Item) focused).key : null;
         int y = screen.scroll == null ? 0 : screen.scroll.getScrollY();
         if (overlay != null) return;
+        if (screen.focusNext != null) {
+            key = screen.focusNext;
+            screen.focusNext = null;
+        }
         show(screen, key, y);
     }
 
@@ -682,7 +686,10 @@ public final class MainActivity extends BaseActivity {
                 queue(backend.draft(draft.key));
                 return;
             } else {
+                // Redraw first: redraw() does nothing while a dialog is open.
+                redraw();
                 tell("Couldn't turn in", problem + " Your work is saved on the phone.");
+                return;
             }
             redraw();
         });
@@ -707,6 +714,9 @@ public final class MainActivity extends BaseActivity {
     }
 
     void cancelQueued(Draft draft) {
+        // The Cancel button is replaced by Turn in, which keeps the focus.
+        Screen screen = top();
+        if (screen != null) screen.focusNext = "turnin";
         try {
             backend.saveDraft(draft.queued(false, System.currentTimeMillis()));
         } catch (java.io.IOException e) {

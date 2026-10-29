@@ -602,6 +602,10 @@ final class AssignmentScreen extends Screen {
     private void remove(final Draft.Piece piece) {
         Sheet.ask(app, "Remove " + piece.name + "?", "It's deleted from this phone.", "Remove", "Keep it", () -> {
             if (piece.file != null) new java.io.File(app.backend.draftFolder(draft), piece.file).delete();
+            // Focus moves on to the next piece, or to Add more work after the last.
+            int at = -1;
+            for (int i = 0; i < draft.pieces.size(); i++) if (draft.pieces.get(i).id.equals(piece.id)) at = i;
+            focusNext = at >= 0 && at + 1 < draft.pieces.size() ? "piece:" + draft.pieces.get(at + 1).id : "add";
             save(draft.without(piece.id, System.currentTimeMillis()));
         });
     }

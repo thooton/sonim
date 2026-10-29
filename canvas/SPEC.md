@@ -198,7 +198,7 @@ Empty: "Nothing here" ("No pictures here" from Gallery: jpg, png, webp).
 ### Add a link
 
 "Link" starting "https://", chips 1 https:// 2 www. 3 .com 4 / (OK
-inserts at the cursor), "Title (optional)". OK in a field adds it; not
+inserts at the cursor; Down from Link reaches the chips, and 1-4 pick one there), "Title (optional)". OK in a field adds it; not
 like "https://x.y": "Type the whole address, like https://example.com". No
 title: the address without https:// and www. Options: Clear, Cancel.
 
