@@ -7,6 +7,7 @@ import android.os.Looper;
 import android.util.LruCache;
 import android.widget.ImageView;
 import com.places.xp3.net.Places;
+import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * A place's photo, at the top of its page. Each one is billed when fetched,
@@ -32,7 +32,7 @@ final class Photos {
     private static final int SIZE = 240;
 
     private final Client client;
-    private final ExecutorService pool = Executors.newFixedThreadPool(2);
+    private final ExecutorService pool = Ui.workers("photos", 2);
     private final Handler main = new Handler(Looper.getMainLooper());
     private final LruCache<String, Bitmap> cache = new LruCache<String, Bitmap>(10 * 1024 * 1024) {
         @Override

@@ -135,7 +135,7 @@ public final class Places {
         }
         if (after != null) body.put("pageToken", after);
         Map<String, Object> result = google("/places:searchText", SEARCH_FIELDS, Json.write(body));
-        List<Place> places = new ArrayList<Place>();
+        List<Place> places = new ArrayList<>();
         for (Object item : Json.children(result, "places")) {
             if (item instanceof Map) places.add(new Place(Json.object(item)));
         }
@@ -161,10 +161,7 @@ public final class Places {
                 + "&maxHeightPx=" + maxPx + "&skipHttpRedirect=true"))
             .header("X-Goog-Api-Key", key())
             .timeout(30000));
-        if (response.status() / 100 != 2) {
-            if (response.status() == 400 || response.status() == 401 || response.status() == 403) key = null;
-            throw new IOException("Google Maps: " + problem(response));
-        }
+        if (response.status() / 100 != 2) throw refused(response);
         String address;
         try {
             address = Json.string(Json.object(Json.parse(response.body())), "photoUri");
@@ -247,16 +244,18 @@ public final class Places {
             .timeout(30000);
         if (body != null) request.post(body).header("Content-Type", "application/json");
         Http.Response response = http.send(request);
-        if (response.status() / 100 != 2) {
-            // A key Google refuses may have been replaced since: fetch it again next time.
-            if (response.status() == 400 || response.status() == 401 || response.status() == 403) key = null;
-            throw new IOException("Google Maps: " + problem(response));
-        }
+        if (response.status() / 100 != 2) throw refused(response);
         try {
             return Json.object(Json.parse(response.body()));
         } catch (RuntimeException e) {
             throw new IOException("Google Maps sent something unreadable.");
         }
+    }
+
+    private IOException refused(Http.Response response) {
+        // A key Google refuses may have been replaced since: fetch it again next time.
+        if (response.status() == 400 || response.status() == 401 || response.status() == 403) key = null;
+        return new IOException("Google Maps: " + problem(response));
     }
 
     /** Google's own message, which names the problem ("API key not valid…"), cut to fit a screen. */

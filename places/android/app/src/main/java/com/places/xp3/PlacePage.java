@@ -1,7 +1,6 @@
 package com.places.xp3;
 
 import android.content.res.ColorStateList;
-import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -261,10 +260,7 @@ final class PlacePage {
         TextView initial = look.text(author.substring(0, author.offsetByCodePoints(0, 1)).toUpperCase(Locale.getDefault()), 14f, R.color.text);
         initial.setTypeface(look.medium);
         initial.setGravity(Gravity.CENTER);
-        GradientDrawable circle = new GradientDrawable();
-        circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(AVATARS[(author.hashCode() & 0x7fffffff) % AVATARS.length]);
-        initial.setBackground(circle);
+        initial.setBackground(Look.circle(AVATARS[(author.hashCode() & 0x7fffffff) % AVATARS.length]));
         top.addView(initial, new LinearLayout.LayoutParams(dp(30), dp(30)));
         TextView who = look.line(author, 13.5f, R.color.text);
         LinearLayout.LayoutParams beside = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
