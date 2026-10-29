@@ -21,6 +21,7 @@ import android.widget.TextView;
 
 import com.list.xp3.data.Item;
 import com.xp3.common.ui.SelectableAdapter;
+import com.xp3.common.ui.Ui;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -178,8 +179,7 @@ final class ItemAdapter extends SelectableAdapter {
                 return view;
             case COMPLETED: {
                 if (view == null) view = inflater.inflate(R.layout.row_completed, parent, false);
-                ((TextView) view.findViewById(R.id.completed_text))
-                    .setText("Completed");
+                ((TextView) view.findViewById(R.id.completed_text)).setText("Completed");
                 ((ImageView) view.findViewById(R.id.completed_chevron))
                     .setImageResource(expanded ? R.drawable.ic_expand_less : R.drawable.ic_expand_more);
                 view.setContentDescription("Completed, " + doneCount + (expanded ? ", shown" : ", hidden"));
@@ -238,9 +238,10 @@ final class ItemAdapter extends SelectableAdapter {
 
         GradientDrawable pill = new GradientDrawable();
         pill.setColor(focusColor);
-        pill.setCornerRadius(radius - dp(3));
-        int inset = dp(3);
-        return new LayerDrawable(new Drawable[] {fill, new InsetDrawable(pill, inset, dp(1), inset, dp(1))});
+        int inset = Ui.dp(context, 3);
+        pill.setCornerRadius(radius - inset);
+        int edge = Ui.dp(context, 1);
+        return new LayerDrawable(new Drawable[] {fill, new InsetDrawable(pill, inset, edge, inset, edge)});
     }
 
     private CharSequence emptyText(String title, String hint) {
@@ -257,7 +258,4 @@ final class ItemAdapter extends SelectableAdapter {
         return out;
     }
 
-    private int dp(float value) {
-        return Math.round(value * context.getResources().getDisplayMetrics().density);
-    }
 }
