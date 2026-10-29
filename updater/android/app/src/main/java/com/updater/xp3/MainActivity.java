@@ -235,22 +235,17 @@ public final class MainActivity extends BaseActivity {
                 entry.notes));
         }
         Collections.sort(rows, (a, b) -> {
-            int c = rank(a.status) - rank(b.status);
+            int c = a.group() - b.group();
             return c != 0 ? c : a.label.compareToIgnoreCase(b.label);
         });
         return rows;
     }
 
-    private static int rank(Status status) {
-        if (status == Status.UPDATE) return 0;
-        if (status == Status.INSTALL) return 1;
-        return 2;
-    }
-
-    /** What is being done to an app, or null. */
-    private String activity(Catalog.Entry entry) {
-        Job working = job(entry);
-        return working != null ? working.activity : null;
+    /** How many of `rows` Update All would queue. */
+    private static int updates(List<AppAdapter.Row> rows) {
+        int updates = 0;
+        for (AppAdapter.Row row : rows) if (row.updatable()) updates++;
+        return updates;
     }
 
     /** The app's job, running or waiting, or null. */
@@ -268,10 +263,7 @@ public final class MainActivity extends BaseActivity {
 
     private void render() {
         List<AppAdapter.Row> rows = rows();
-        int updates = 0;
-        for (AppAdapter.Row row : rows) {
-            if (row.status == Status.UPDATE && row.activity == null) updates++;
-        }
+        int updates = updates(rows);
         // Update All while there is anything left to update; the spinner
         // while a check runs over a list already showing.
         boolean hadBar = updateAll.hasFocus();
@@ -360,8 +352,7 @@ public final class MainActivity extends BaseActivity {
     /** Checking (a spinner, as the App Store shows), the reason a check failed, or an empty release. */
     private void showMessage() {
         if (messageView == null) {
-            LinearLayout view = new LinearLayout(this);
-            view.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout view = vertical();
             view.setGravity(Gravity.CENTER);
             view.setPadding(dp(20), dp(20), dp(20), dp(20));
             view.setBackgroundColor(color(R.color.page));
@@ -455,15 +446,20 @@ public final class MainActivity extends BaseActivity {
         }
     }
 
+    /** The highlighted row's position, or -1 when no list is showing. */
+    private int selectedAt() {
+        if (listView == null || adapter == null || adapter.getCount() == 0) return -1;
+        return Math.max(0, Math.min(adapter.getSelectedPosition(), adapter.getCount() - 1));
+    }
+
     private AppAdapter.Row selectedRow() {
-        if (listView == null || adapter == null || adapter.getCount() == 0) return null;
-        int position = Math.max(0, Math.min(adapter.getSelectedPosition(), adapter.getCount() - 1));
-        return adapter.getItem(position);
+        int position = selectedAt();
+        return position < 0 ? null : adapter.getItem(position);
     }
 
     private void updateAll() {
         for (AppAdapter.Row row : rows()) {
-            if (row.status == Status.UPDATE && row.activity == null) enqueue(row, MENU_UPDATE);
+            if (row.updatable()) enqueue(row, MENU_UPDATE);
         }
         if (listView != null) listView.requestFocus();
     }
@@ -629,11 +625,11 @@ public final class MainActivity extends BaseActivity {
 
     /** Fills the menu for the highlighted app and returns the view it belongs beside. */
     private View fillMenu() {
-        if (listView == null || adapter == null || adapter.getCount() == 0) {
+        int position = selectedAt();
+        if (position < 0) {
             if (!checking) add(MENU_CHECK, "Check Again");
             return messageView != null ? messageView : content;
         }
-        int position = Math.max(0, Math.min(adapter.getSelectedPosition(), adapter.getCount() - 1));
         AppAdapter.Row row = adapter.getItem(position);
         menuRow = row;
         boolean self = row.entry.packageName.equals(getPackageName());
@@ -646,11 +642,7 @@ public final class MainActivity extends BaseActivity {
             add(MENU_REINSTALL, "Reinstall");
         }
         add(MENU_NOTES, "What's New");
-        int updates = 0;
-        for (int i = 0; i < adapter.getCount(); i++) {
-            AppAdapter.Row other = adapter.getItem(i);
-            if (other.status == Status.UPDATE && other.activity == null) updates++;
-        }
+        int updates = updates(adapter.rows());
         if (updates > 1) add(MENU_UPDATE_ALL, "Update All (" + updates + ")");
         if (!checking) add(MENU_CHECK, "Check Again");
         View view = listView.getChildAt(position - listView.getFirstVisiblePosition());
@@ -704,7 +696,7 @@ public final class MainActivity extends BaseActivity {
      * Updater can't carry on once it has been stopped.
      */
     private void enqueue(AppAdapter.Row row, int action) {
-        if (activity(row.entry) != null) return;
+        if (job(row.entry) != null) return;
         Job added = new Job(row.entry, action, row.label);
         int order = order(row.entry);
         int at = queue.size();
@@ -747,9 +739,7 @@ public final class MainActivity extends BaseActivity {
                         render();
                     });
                 });
-                post(() -> {
-                    downloaded(next, apk);
-                });
+                post(() -> downloaded(next, apk));
             } catch (final IOException e) {
                 post(() -> {
                     done(next);
