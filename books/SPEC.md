@@ -64,7 +64,9 @@ Empty and waiting states, centred, title only:
 
 - First launch: "No storage access" while Android asks for storage.
 - Denied: "No storage access"; denied with "don't ask again": "Storage is
-  turned off".
+  turned off". OK on "Storage is turned off" opens Books' App info page in
+  Android's settings, since Android won't ask again; the library rescans on
+  return.
 - Scanning with nothing known yet: "Looking for books…".
 - No books found: "No books yet", and no count in the header.
 

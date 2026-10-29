@@ -195,6 +195,7 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
     protected void onDestroy() {
         super.onDestroy();
         handler.removeCallbacks(sleep);
+        handler.removeCallbacks(saveLater);
         worker.shutdownNow();
     }
 
@@ -369,10 +370,22 @@ public final class ReaderActivity extends BaseActivity implements PageView.SizeL
         long time = System.currentTimeMillis();
         shelf.progress(path, position, book.length, time);
         if (now || time - lastSave > SAVE_EVERY) {
+            handler.removeCallbacks(saveLater);
             lastSave = time;
             Shared.save(shelf);
+        } else {
+            // A turn soon after a write is written once the interval is up, so resting on it keeps it.
+            handler.removeCallbacks(saveLater);
+            handler.postDelayed(saveLater, lastSave + SAVE_EVERY - time + 50);
         }
     }
+
+    private final Runnable saveLater = new Runnable() {
+        @Override
+        public void run() {
+            record(true);
+        }
+    };
 
     // ------------------------------------------------------------------
     // Keys

@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.media.MediaScannerConnection;
 import android.os.Bundle;
 import android.os.Environment;
@@ -103,6 +104,9 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
         scan();
     }
 
+    /** Android has stopped asking: only the app's settings page can turn storage back on. */
+    private boolean storageOff;
+
     private boolean allowed() {
         return checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
@@ -124,6 +128,7 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
             view.setMessage("Looking for books\u2026", null);
             scan();
         } else if (!shouldShowRequestPermissionRationale(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+            storageOff = true;
             view.setMessage("Storage is turned off", null);
         } else {
             view.setMessage("No storage access", null);
@@ -274,6 +279,16 @@ public final class LibraryActivity extends BaseActivity implements ListPanel.Lis
 
     private void ok() {
         if (!allowed()) {
+            if (storageOff) {
+                // Android won't ask again; take the user to Books' own settings page.
+                try {
+                    startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+                } catch (ActivityNotFoundException e) {
+                    // nowhere to go
+                }
+                return;
+            }
             requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, ASK_STORAGE);
             return;
         }
