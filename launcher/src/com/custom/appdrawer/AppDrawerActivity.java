@@ -9,10 +9,10 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -123,10 +123,10 @@ public final class AppDrawerActivity extends Activity {
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
 
         root = new FrameLayout(this);
-        root.setBackgroundColor(getResources().getColor(R.color.drawer_background));
+        root.setBackgroundColor(getColor(R.color.drawer_background));
 
         grid = new GridView(this);
-        grid.setBackgroundColor(getResources().getColor(R.color.drawer_background));
+        grid.setBackgroundColor(getColor(R.color.drawer_background));
         grid.setNumColumns(3);
         grid.setColumnWidth(dp(80));
         grid.setHorizontalSpacing(0);
@@ -141,32 +141,30 @@ public final class AppDrawerActivity extends Activity {
 
         adapter = new AppAdapter();
         grid.setAdapter(adapter);
+        // No lambdas here: build.sh's javac compiles against android.jar alone,
+        // which has no LambdaMetafactory.
         grid.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 if (isMoving()) {
                     endMove(true);
-                    return;
+                } else {
+                    launch(adapter.getItem(position));
                 }
-                launch(adapter.getEntry(position));
             }
         });
         grid.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             @Override
             public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-                if (isMoving()) {
-                    return true;
+                if (!isMoving()) {
+                    showProgramMenu(position);
                 }
-                showProgramMenu(position);
                 return true;
             }
         });
 
-        TextView empty = new TextView(this);
+        TextView empty = labelText();
         empty.setText(R.string.drawer_empty);
-        empty.setTextColor(getResources().getColor(R.color.app_label));
-        empty.setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                getResources().getDimension(R.dimen.app_label_size));
         empty.setGravity(Gravity.CENTER);
         int emptyPadding = getResources().getDimensionPixelSize(R.dimen.empty_hint_padding);
         empty.setPadding(emptyPadding, emptyPadding, emptyPadding, emptyPadding);
@@ -199,7 +197,7 @@ public final class AppDrawerActivity extends Activity {
         super.onResume();
         resumed = true;
         refreshApps();
-        focusFirstApp();
+        selectPosition(0);
     }
 
     @Override
@@ -222,7 +220,7 @@ public final class AppDrawerActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        focusFirstApp();
+        selectPosition(0);
     }
 
     /**
@@ -287,16 +285,17 @@ public final class AppDrawerActivity extends Activity {
     @Override
     public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
         super.onCreateContextMenu(menu, view, menuInfo);
-        if (isValidPosition(menuPosition)) {
-            menu.setHeaderTitle(adapter.getEntry(menuPosition).label);
+        boolean onApp = isValidPosition(menuPosition);
+        if (onApp) {
+            menu.setHeaderTitle(adapter.getItem(menuPosition).label);
         } else {
             menu.setHeaderTitle(R.string.app_name);
         }
         menu.add(Menu.NONE, MENU_ADD, Menu.NONE, R.string.menu_add_program);
-        if (isValidPosition(menuPosition) && targets.size() > 1) {
+        if (onApp && targets.size() > 1) {
             menu.add(Menu.NONE, MENU_MOVE, Menu.NONE, R.string.menu_move_program);
         }
-        if (isValidPosition(menuPosition)) {
+        if (onApp) {
             menu.add(Menu.NONE, MENU_REMOVE, Menu.NONE, R.string.menu_remove_program);
         }
     }
@@ -332,7 +331,7 @@ public final class AppDrawerActivity extends Activity {
         Intent query = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         List<ResolveInfo> resolved = pm.queryIntentActivities(query, 0);
 
-        final List<Candidate> candidates = new ArrayList<>(resolved.size());
+        final List<Target> candidates = new ArrayList<>(resolved.size());
         for (ResolveInfo info : resolved) {
             ActivityInfo activity = info.activityInfo;
             if (activity == null
@@ -345,7 +344,7 @@ public final class AppDrawerActivity extends Activity {
             if (TextUtils.isEmpty(label)) {
                 label = activity.packageName;
             }
-            candidates.add(new Candidate(activity.packageName, activity.name, label.toString()));
+            candidates.add(new Target(activity.packageName, activity.name, label.toString()));
         }
 
         if (candidates.isEmpty()) {
@@ -354,16 +353,16 @@ public final class AppDrawerActivity extends Activity {
         }
 
         final Collator collator = Collator.getInstance();
-        Collections.sort(candidates, new Comparator<Candidate>() {
+        Collections.sort(candidates, new Comparator<Target>() {
             @Override
-            public int compare(Candidate a, Candidate b) {
-                return collator.compare(a.label, b.label);
+            public int compare(Target a, Target b) {
+                return collator.compare(a.fallbackLabel, b.fallbackLabel);
             }
         });
 
         CharSequence[] labels = new CharSequence[candidates.size()];
         for (int i = 0; i < labels.length; i++) {
-            labels[i] = candidates.get(i).label;
+            labels[i] = candidates.get(i).fallbackLabel;
         }
 
         new AlertDialog.Builder(this)
@@ -371,8 +370,7 @@ public final class AppDrawerActivity extends Activity {
                 .setItems(labels, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        Candidate chosen = candidates.get(which);
-                        addTarget(new Target(chosen.packageName, chosen.className, chosen.label));
+                        addTarget(candidates.get(which));
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
@@ -518,10 +516,6 @@ public final class AppDrawerActivity extends Activity {
         List<Entry> entries = new ArrayList<>(targets.size());
         for (Target target : targets) {
             ComponentName component = new ComponentName(target.packageName, target.className);
-            Drawable icon = pm.getDefaultActivityIcon();
-            CharSequence label = target.fallbackLabel;
-            Intent launchIntent = null;
-
             Presentation cached = presentations.get(component);
             if (cached == null) {
                 cached = loadPresentation(pm, component);
@@ -529,21 +523,18 @@ public final class AppDrawerActivity extends Activity {
                     presentations.put(component, cached);
                 }
             }
-            // Otherwise keep the slot visible, dimmed, so installation problems are obvious.
-            if (cached != null) {
-                if (cached.icon != null) {
-                    icon = cached.icon;
-                }
-                if (!TextUtils.isEmpty(cached.label)) {
-                    label = cached.label;
-                }
-                launchIntent = new Intent(Intent.ACTION_MAIN)
-                        .addCategory(Intent.CATEGORY_LAUNCHER)
-                        .setComponent(cached.component)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (cached == null) {
+                // Keep the slot visible, dimmed, so installation problems are obvious.
+                entries.add(new Entry(target.fallbackLabel, pm.getDefaultActivityIcon(), null));
+                continue;
             }
-
-            entries.add(new Entry(label, icon, launchIntent));
+            entries.add(new Entry(
+                    TextUtils.isEmpty(cached.label) ? target.fallbackLabel : cached.label,
+                    cached.icon != null ? cached.icon : pm.getDefaultActivityIcon(),
+                    new Intent(Intent.ACTION_MAIN)
+                            .addCategory(Intent.CATEGORY_LAUNCHER)
+                            .setComponent(cached.component)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
         }
         adapter.replace(entries);
     }
@@ -573,24 +564,15 @@ public final class AppDrawerActivity extends Activity {
     }
 
     private void launch(Entry entry) {
-        if (entry.intent == null) {
-            Toast.makeText(this,
-                    getString(R.string.app_unavailable, entry.label),
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-
         try {
-            startActivity(entry.intent);
+            if (entry.intent != null) {
+                startActivity(entry.intent);
+                return;
+            }
         } catch (ActivityNotFoundException | SecurityException exception) {
-            Toast.makeText(this,
-                    getString(R.string.app_unavailable, entry.label),
-                    Toast.LENGTH_SHORT).show();
+            // Said the same way as an app that isn't there.
         }
-    }
-
-    private void focusFirstApp() {
-        selectPosition(0);
+        Toast.makeText(this, getString(R.string.app_unavailable, entry.label), Toast.LENGTH_SHORT).show();
     }
 
     private void selectPosition(final int position) {
@@ -625,10 +607,15 @@ public final class AppDrawerActivity extends Activity {
     }
 
     private int dp(int value) {
-        return Math.round(TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP,
-                value,
-                getResources().getDisplayMetrics()));
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    /** A TextView in the app labels' colour and size. */
+    private TextView labelText() {
+        TextView view = new TextView(this);
+        view.setTextColor(getColor(R.color.app_label));
+        view.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.app_label_size));
+        return view;
     }
 
     private static final class DefaultTarget {
@@ -655,17 +642,6 @@ public final class AppDrawerActivity extends Activity {
         }
     }
 
-    private static final class Candidate {
-        final String packageName;
-        final String className;
-        final String label;
-
-        Candidate(String packageName, String className, String label) {
-            this.packageName = packageName;
-            this.className = className;
-            this.label = label;
-        }
-    }
 
     private static final class Presentation {
         final Drawable icon;
@@ -713,9 +689,6 @@ public final class AppDrawerActivity extends Activity {
             notifyDataSetChanged();
         }
 
-        Entry getEntry(int position) {
-            return entries.get(position);
-        }
 
         /** Whether some entry already starts {@code component}. */
         boolean launches(ComponentName component) {
@@ -746,35 +719,29 @@ public final class AppDrawerActivity extends Activity {
         public View getView(int position, View convertView, ViewGroup parent) {
             Holder holder;
             if (convertView == null) {
+                Resources res = getResources();
                 LinearLayout item = new LinearLayout(AppDrawerActivity.this);
                 item.setOrientation(LinearLayout.VERTICAL);
                 item.setGravity(Gravity.CENTER_HORIZONTAL);
-                item.setBackgroundColor(Color.TRANSPARENT);
                 item.setLayoutParams(new AbsListView.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                        getResources().getDimensionPixelSize(R.dimen.app_item_height)));
+                        res.getDimensionPixelSize(R.dimen.app_item_height)));
 
                 ImageView icon = new ImageView(AppDrawerActivity.this);
                 icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
-                        getResources().getDimensionPixelSize(R.dimen.app_icon_size),
-                        getResources().getDimensionPixelSize(R.dimen.app_icon_size));
-                iconParams.topMargin = getResources().getDimensionPixelSize(
-                        R.dimen.app_icon_top_margin);
+                int iconSize = res.getDimensionPixelSize(R.dimen.app_icon_size);
+                LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+                iconParams.topMargin = res.getDimensionPixelSize(R.dimen.app_icon_top_margin);
                 item.addView(icon, iconParams);
 
-                TextView label = new TextView(AppDrawerActivity.this);
-                label.setTextColor(getResources().getColor(R.color.app_label));
-                label.setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                        getResources().getDimension(R.dimen.app_label_size));
+                TextView label = labelText();
                 label.setGravity(Gravity.CENTER_HORIZONTAL);
                 label.setSingleLine(true);
                 label.setEllipsize(TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT);
-                labelParams.topMargin = getResources().getDimensionPixelSize(
-                        R.dimen.app_label_top_margin);
+                labelParams.topMargin = res.getDimensionPixelSize(R.dimen.app_label_top_margin);
                 item.addView(label, labelParams);
 
                 holder = new Holder(icon, label);
@@ -787,8 +754,9 @@ public final class AppDrawerActivity extends Activity {
             Entry entry = getItem(position);
             holder.icon.setImageDrawable(entry.icon);
             holder.label.setText(entry.label);
-            holder.icon.setAlpha(entry.intent == null ? 0.45f : 1.0f);
-            holder.label.setAlpha(entry.intent == null ? 0.45f : 1.0f);
+            float alpha = entry.intent == null ? 0.45f : 1.0f;
+            holder.icon.setAlpha(alpha);
+            holder.label.setAlpha(alpha);
             if (position == movingPosition) {
                 convertView.setBackgroundResource(R.drawable.grid_moving);
             } else {
