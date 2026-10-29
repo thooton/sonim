@@ -12,7 +12,6 @@ import java.util.TimeZone;
  */
 public final class Doc {
 
-    public static final String NOTEBOOK = "notebook";
     public static final String PDF = "pdf";
     public static final String EPUB = "epub";
 

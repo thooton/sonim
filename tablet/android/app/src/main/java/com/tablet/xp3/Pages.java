@@ -105,7 +105,7 @@ final class Pages {
 
     /** The width covers are drawn at: enough for the shelf's largest and the Transform sheet. */
     int coverWidth() {
-        return Math.round(240 * context.getResources().getDisplayMetrics().density);
+        return Ui.dp(context, 240);
     }
 
     /** The width a preview page is drawn at: sharp at 300%. */

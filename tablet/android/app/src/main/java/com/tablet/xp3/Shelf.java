@@ -40,7 +40,7 @@ final class Shelf extends View {
     private static final float[] TOP = {92, 82, 72, 52, 72, 82, 92};
     private static final float[] SHOWN = {0, 1, 1, 1, 1, 1, 0};
     /** The middle of the row of dots, in dp from the top of the shelf. */
-    static final float NAV_MID = 225;
+    private static final float NAV_MID = 225;
     /** The most files shown as dots. */
     private static final int DOTS = 12;
 

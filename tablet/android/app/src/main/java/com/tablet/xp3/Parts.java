@@ -18,14 +18,6 @@ final class Parts {
     static final int WRAP = LinearLayout.LayoutParams.WRAP_CONTENT;
     static final int FILL = LinearLayout.LayoutParams.MATCH_PARENT;
 
-    /** A view placed at (left, top) dp in a FrameLayout. */
-    static FrameLayout.LayoutParams at(Context c, float left, float top, int width, int height) {
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height);
-        lp.leftMargin = Look.dp(c, left);
-        lp.topMargin = Look.dp(c, top);
-        return lp;
-    }
-
     static LinearLayout.LayoutParams line(int width, int height) {
         return new LinearLayout.LayoutParams(width, height);
     }

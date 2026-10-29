@@ -122,7 +122,8 @@ comes to the front.
 - `android/app`: one activity, `MainActivity`, owning the state, the
   network calls and the key routing (left soft key is `KEYCODE_MENU`, right
   is `KEYCODE_BACK`), over `LibraryScreen` (with `Shelf`, the sliding
-  covers), `TransformsScreen` (with `Ring`), `UploadScreen`, `PageView` (the preview, its chrome drawn over
+  covers), `TransformsScreen` (with `Ring`) and `UploadScreen` (both a
+  `ListScreen`, a ruled list under the header), `PageView` (the preview, its chrome drawn over
   the page), `Drawer` and `Sheet` (the file menu, Formats, Details,
   Rename, Move, Settings, a job's menu and its Download sheet). `Pages` fetches and draws pages; `Look` is the
   palette, fonts and scale; `Mark` the highlighter stroke; `Parts` shared

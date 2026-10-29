@@ -114,20 +114,15 @@ public final class Center {
      * many pages there are. Throws NoPage when there is no page n.
      */
     public int page(String id, int n, File dest) throws IOException, InterruptedException {
-        Http.Stream stream = http.stream(request("/remarkable/" + segment(id) + "/pages/" + n, SLOW));
-        try {
-            int status = stream.status();
-            int pages = number(stream.header("X-Pages"));
-            if (status == 404 && stream.header("X-Pages").length() > 0) {
-                throw new NoPage(pages, pages == 0 ? "No pages to show"
-                    : pages + (pages == 1 ? " page" : " pages"));
+        int[] pages = {0};
+        fetch("/remarkable/" + segment(id) + "/pages/" + n, dest, MAX_PAGE, "Page too big to show", "show the page", stream -> {
+            pages[0] = number(stream.header("X-Pages"));
+            if (stream.status() == 404 && stream.header("X-Pages").length() > 0) {
+                throw new NoPage(pages[0], pages[0] == 0 ? "No pages to show"
+                    : pages[0] + (pages[0] == 1 ? " page" : " pages"));
             }
-            if (status < 200 || status >= 300) fail(status, small(stream.stream()), "show the page");
-            save(stream.stream(), dest, MAX_PAGE, "Page too big to show");
-            return Math.max(pages, n);
-        } finally {
-            stream.close();
-        }
+        });
+        return Math.max(pages[0], n);
     }
 
     /**
@@ -136,14 +131,7 @@ public final class Center {
      * none, and the command center says so.
      */
     public void pdf(String id, File dest) throws IOException, InterruptedException {
-        Http.Stream stream = http.stream(request("/remarkable/" + segment(id) + "/pdf", SLOW));
-        try {
-            int status = stream.status();
-            if (status < 200 || status >= 300) fail(status, small(stream.stream()), "download it");
-            save(stream.stream(), dest, MAX_FILE, "File too big");
-        } finally {
-            stream.close();
-        }
+        fetch("/remarkable/" + segment(id) + "/pdf", dest, MAX_FILE, "File too big", "download it", stream -> {});
     }
 
     /**
@@ -171,12 +159,29 @@ public final class Center {
      * Word document it was made from) to `dest`.
      */
     public void download(String name, File dest) throws IOException, InterruptedException {
-        Http.Stream stream = http.stream(request("/files/" + segment(name), SLOW));
+        fetch("/files/" + segment(name), dest, MAX_FILE, "File too big", "download it", stream -> {
+            if (stream.status() == 404) throw new IOException("File not found");
+        });
+    }
+
+    /** Looks at a response before its status is judged, and may throw its own error. */
+    private interface Before {
+        void check(Http.Stream stream) throws IOException;
+    }
+
+    /**
+     * Streams `path` into `dest`, at most `max` bytes. `before` sees the
+     * response first; any other failure is the command center's words for
+     * why it couldn't `what`.
+     */
+    private void fetch(String path, File dest, long max, String tooBig, String what, Before before)
+        throws IOException, InterruptedException {
+        Http.Stream stream = http.stream(request(path, SLOW));
         try {
+            before.check(stream);
             int status = stream.status();
-            if (status == 404) throw new IOException("File not found");
-            if (status < 200 || status >= 300) fail(status, small(stream.stream()), "download it");
-            save(stream.stream(), dest, MAX_FILE, "File too big");
+            if (status < 200 || status >= 300) fail(status, small(stream.stream()), what);
+            save(stream.stream(), dest, max, tooBig);
         } finally {
             stream.close();
         }

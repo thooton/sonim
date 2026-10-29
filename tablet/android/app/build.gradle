@@ -18,8 +18,8 @@ android {
 
     defaultConfig {
         applicationId "com.tablet.xp3"
-        versionCode 14
-        versionName "0.11.2"
+        versionCode 15
+        versionName "0.11.3"
     }
 }
 
