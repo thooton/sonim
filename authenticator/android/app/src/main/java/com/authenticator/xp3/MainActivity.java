@@ -425,10 +425,9 @@ public final class MainActivity extends BaseActivity {
     // Menu.
 
     private void menu() {
-        // On the empty list the popup hangs from the top: from the + it would
-        // run off the bottom and hide Command center.
-        View anchor = list.getParent() != null && list.getSelectedView() != null ? list.getSelectedView() : content;
-        PopupMenu popup = new PopupMenu(this, anchor, Gravity.END);
+        // The popup hangs from the top: from a card lower down, or from the +,
+        // it would run off the bottom and hide Delete and Command center.
+        PopupMenu popup = new PopupMenu(this, content, Gravity.END);
         Menu menu = popup.getMenu();
         menu.add(0, ADD_CAMERA, 0, "Add by camera");
         menu.add(0, ADD_IMAGE, 1, "Add by image");

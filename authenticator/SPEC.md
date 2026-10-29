@@ -88,8 +88,8 @@ Keys:
 
 ### The menu
 
-A rounded popup over the selected card (or, on the empty list, from the
-top of the screen, so every item shows). Items, in order:
+A rounded popup hanging from the top of the screen, whichever card is
+selected, so every item shows. Items, in order:
 
 1. Add by camera
 2. Add by image

@@ -11,6 +11,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -232,7 +233,19 @@ public final class EntryActivity extends BaseActivity {
         name.setTypeface(Look.medium(this));
         name.setPadding(dp(4), 0, 0, dp(4));
         page.addView(name);
-        EditText edit = new EditText(this);
+        EditText edit = new EditText(this) {
+            // Back hides the keyboard and leaves in the same press; the XP3
+            // never shows one, so a press spent on hiding it looks dead.
+            @Override
+            public boolean onKeyPreIme(int keyCode, KeyEvent event) {
+                if (keyCode != KeyEvent.KEYCODE_BACK) return super.onKeyPreIme(keyCode, event);
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    InputMethodManager ime = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                    if (ime != null) ime.hideSoftInputFromWindow(getWindowToken(), 0);
+                }
+                return EntryActivity.this.dispatchKeyEvent(event);
+            }
+        };
         edit.setSingleLine(true);
         edit.setInputType(inputType);
         edit.setTextSize(13.5f);
