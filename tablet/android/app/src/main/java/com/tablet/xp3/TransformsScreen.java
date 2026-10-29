@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -49,13 +50,14 @@ final class TransformsScreen extends FrameLayout {
     /** `selected` is the highlighted job's place in `jobs`, or -1 while the drawer is over the list. */
     void show(List<Job> jobs, int active, int selected, String empty) {
         Context c = getContext();
-        counts.setText(active + " running");
+        counts.setText(active > 0 ? active + " running" : "");
         list.removeAllViews();
         if (jobs.isEmpty()) {
-            TextView none = Look.text(c, empty, Look.ui, 10.5f, Look.GRAPHITE);
-            none.setLineSpacing(0, 1.3f);
-            none.setPadding(Look.dp(c, 4), Look.dp(c, 4), Look.dp(c, 4), Look.dp(c, 4));
-            list.addView(none);
+            // The same mid-screen caption as an empty Library.
+            TextView none = Look.text(c, empty, Look.serifBold, 13, Look.INK);
+            none.setGravity(Gravity.CENTER_HORIZONTAL);
+            none.setPadding(0, Look.dp(c, 100), 0, 0);
+            list.addView(none, Parts.line(Parts.FILL, Parts.WRAP));
             return;
         }
         long now = System.currentTimeMillis();

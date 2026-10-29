@@ -111,7 +111,7 @@ ticked puts anything on the tablet.
 ### Drawer (Menu, from Library, Transforms or Upload)
 
 Slides over the left 168dp with a dimmed scrim. Top: "Tablet" and the same
-freshness line as the Library header. Then Library ("12 files", "1 file"),
+freshness line as the Library header. Then Library ("12 files", "1 file", nothing when signed out),
 Transforms (newest running job "Essay · 40%" or "Nothing running", and an
 ink badge with the running count when any), Upload, Settings. Foot:
 "COMMAND CENTER" and the host, or "Not signed in". Opens on the screen you
@@ -120,7 +120,7 @@ there; Back or Menu closes it.
 
 ### Transforms
 
-Header "Transforms", right "N running". One line per job, running first,
+Header "Transforms", right "N running" (nothing while none run). One line per job, running first,
 newest first within each: a glyph (running: a ring filling clockwise from
 the top with the percentage inside; done: a filled ink circle with a tick;
 failed: an outlined circle with an ×), the heading (the agent's title, else
@@ -130,7 +130,7 @@ reason). Rows keep their height when selected; the list scrolls only enough
 to keep the selected one in view.
 
 - Up/Down: the previous/next job, stopping at the ends. OK: the job's menu.
-  Back: the Library. Empty: "No transforms" (or "Not signed in").
+  Back: the Library. Empty: "No transforms" (or "Not signed in"), as a mid-screen caption like the Library's.
 - When a running job finishes (seen at the next read) a toast says
   "Done  <result name>" or "Failed  <heading>", on any screen, and the
   Library is read again.
@@ -174,7 +174,7 @@ card when one is in. Inside a folder: its folders, then its PDFs and ePubs
 "SETTINGS", "Command center", a Server row (host or "Not signed in"), then
 Refresh, "Change server…" (or "Sign in…" when signed out), Done. Opens on
 Refresh when signed in, on Sign in… when not. Refresh reads the files and
-jobs again (signed out, it asks to sign in). The sign-in dialog has an
+jobs again (signed out, it asks to sign in). The sign-in dialog (no soft keyboard; Up/Down step through the fields, Cancel and Save) has an
 address field and a token field (shown as dots when one is saved; left
 blank keeps it); Save with both signs in ("Signed in to <host>") and reads
 again; a missing part says "Both the address and the token are needed".
@@ -249,9 +249,7 @@ coloured with an ink edge on its right.
    from Menu → Settings.", which tells the user where to find something,
    against the app's wording rule; downloads and uploads just say "Not
    signed in". Should it be just "Not signed in" everywhere?
-2. Transforms' header always shows "N running", including "0 running";
-   DESIGN.md rule 8 discourages counters for their own sake. Keep it, or
-   show it only while something runs?
+2. (Settled: the header shows "N running" only while something runs.)
 3. Menu does nothing in the preview (no drawer there). Intended?
 4. OK on Start when a job has meanwhile started on the same file closes
    the sheet without a word. Should it show the running job instead?

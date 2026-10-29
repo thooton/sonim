@@ -117,7 +117,7 @@ final class Drawer extends LinearLayout {
             items[i].on(i == picked);
             Look.style(items[i].label, i == picked ? Look.uiBold : Look.ui, 12, Look.INK);
         }
-        files.setText(fileCount + (fileCount == 1 ? " file" : " files"));
+        files.setText(fileCount < 0 ? "" : fileCount + (fileCount == 1 ? " file" : " files"));
         progress.setText(running);
         count.setText(String.valueOf(active));
         count.setVisibility(active > 0 ? VISIBLE : GONE);

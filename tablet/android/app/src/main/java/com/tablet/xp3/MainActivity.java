@@ -21,6 +21,7 @@ import android.text.format.DateFormat;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.MetricAffectingSpan;
 import android.view.Gravity;
+import android.graphics.drawable.ColorDrawable;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -277,7 +278,7 @@ public final class MainActivity extends Activity {
         token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         box.addView(server);
         box.addView(token);
-        new AlertDialog.Builder(this)
+        final AlertDialog sign = new AlertDialog.Builder(this)
             .setTitle("Command center")
             .setView(box)
             .setPositiveButton("Save", (dialog, which) -> {
@@ -296,7 +297,27 @@ public final class MainActivity extends Activity {
                 }
             })
             .setNegativeButton("Cancel", null)
-            .show();
+            .create();
+        // The keypad types and the d-pad walks: no soft keyboard, and Up/Down
+        // step through both fields, Cancel and Save, as the phone has no Tab.
+        server.setShowSoftInputOnFocus(false);
+        token.setShowSoftInputOnFocus(false);
+        sign.getWindow().setBackgroundDrawable(new ColorDrawable(Look.SHEET));
+        sign.show();
+        final View[] order = {server, token, sign.getButton(AlertDialog.BUTTON_NEGATIVE),
+            sign.getButton(AlertDialog.BUTTON_POSITIVE)};
+        View.OnKeyListener walk = (v, code, event) -> {
+            if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+            int at = java.util.Arrays.asList(order).indexOf(v);
+            if (code == KeyEvent.KEYCODE_DPAD_DOWN && at < order.length - 1) order[at + 1].requestFocus();
+            else if (code == KeyEvent.KEYCODE_DPAD_UP && at > 0) order[at - 1].requestFocus();
+            else return false;
+            return true;
+        };
+        for (View v : order) {
+            v.setOnKeyListener(walk);
+            if (v instanceof android.widget.Button) ((android.widget.Button) v).setTextColor(Look.INK);
+        }
     }
 
     // ---- Reading the tablet.
@@ -509,7 +530,7 @@ public final class MainActivity extends Activity {
         if (drawerOpen) {
             Job running = jobs.running();
             String line = running != null ? running.heading() + " · " + running.percent + "%" : "Nothing running";
-            drawer.show(drawerPick, lib.docs.size(), line, jobs.active(), status(),
+            drawer.show(drawerPick, tablet == null ? -1 : lib.docs.size(), line, jobs.active(), status(),
                 tablet == null ? "Not signed in" : login.host());
         }
     }
