@@ -81,18 +81,9 @@ public final class Conversation {
 
     /**
      * Who is in it, as Gmail's list says: the senders' first names (or the
-     * one sender in full), "me" for the user, "Draft" for an unsent one, and
-     * how many messages when there are several. In Sent it is who it went to.
+     * one sender in full), "me" for the user, and "Draft" for an unsent one.
+     * In Sent it is who it went to.
      */
-    public String people(Me me, boolean sent) {
-        String to = sent ? sentTo(me) : null;
-        if (to != null) return to;
-        String names = names(me, false);
-        int count = messages.size();
-        return count > 1 ? names + " (" + count + ")" : names;
-    }
-
-    /** As {@link #people}, without the count, for a list that shows it apart. */
     public String names(Me me, boolean sent) {
         String to = sent ? sentTo(me) : null;
         if (to != null) return to;

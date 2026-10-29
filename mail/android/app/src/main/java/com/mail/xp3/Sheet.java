@@ -78,7 +78,7 @@ final class Sheet {
                 Action action = actions.get(position);
                 ((ImageView) row.findViewById(R.id.icon)).setImageResource(action.icon);
                 ((TextView) row.findViewById(R.id.label)).setText(action.label);
-                TextView key = (TextView) row.findViewById(R.id.key);
+                TextView key = row.findViewById(R.id.key);
                 key.setText(action.key == 0 ? "" : String.valueOf(action.key));
                 key.setVisibility(action.key == 0 ? View.GONE : View.VISIBLE);
                 return row;

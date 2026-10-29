@@ -80,6 +80,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 
 /**
  * Thunderbird for Android, as a flip phone drives it: one screen showing a
@@ -118,6 +119,11 @@ public final class MainActivity extends BaseActivity {
     /** Work for the background thread: returns what to do with its result on the main thread. */
     private interface Work {
         Runnable call() throws Exception;
+    }
+
+    /** A change sent to Gmail, in order with the others. */
+    private interface Call {
+        void run() throws Exception;
     }
 
     private ImageView barIcon;
@@ -218,37 +224,37 @@ public final class MainActivity extends BaseActivity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
-        barIcon = (ImageView) findViewById(R.id.bar_icon);
-        titleView = (TextView) findViewById(R.id.title);
-        subtitleView = (TextView) findViewById(R.id.subtitle);
-        countView = (TextView) findViewById(R.id.count);
-        barAction = (ImageView) findViewById(R.id.bar_action);
-        progress = (ProgressBar) findViewById(R.id.progress);
-        statusView = (TextView) findViewById(R.id.status);
-        listView = (ListView) findViewById(R.id.list);
+        barIcon = findViewById(R.id.bar_icon);
+        titleView = findViewById(R.id.title);
+        subtitleView = findViewById(R.id.subtitle);
+        countView = findViewById(R.id.count);
+        barAction = findViewById(R.id.bar_action);
+        progress = findViewById(R.id.progress);
+        statusView = findViewById(R.id.status);
+        listView = findViewById(R.id.list);
         emptyView = findViewById(R.id.empty);
-        emptyIcon = (ImageView) findViewById(R.id.empty_icon);
-        emptyText = (TextView) findViewById(R.id.empty_text);
-        reader = (ScrollView) findViewById(R.id.reader);
-        readerBody = (LinearLayout) findViewById(R.id.reader_body);
+        emptyIcon = findViewById(R.id.empty_icon);
+        emptyText = findViewById(R.id.empty_text);
+        reader = findViewById(R.id.reader);
+        readerBody = findViewById(R.id.reader_body);
         readerLoading = findViewById(R.id.reader_loading);
-        readerSpinner = (ProgressBar) findViewById(R.id.reader_spinner);
-        readerFailed = (TextView) findViewById(R.id.reader_failed);
+        readerSpinner = findViewById(R.id.reader_spinner);
+        readerFailed = findViewById(R.id.reader_failed);
         compose = findViewById(R.id.compose);
         fromRow = findViewById(R.id.from_row);
-        fromView = (TextView) findViewById(R.id.from);
+        fromView = findViewById(R.id.from);
         ccRow = findViewById(R.id.cc_row);
-        toField = (EditText) findViewById(R.id.to);
-        ccField = (EditText) findViewById(R.id.cc);
-        subjectField = (EditText) findViewById(R.id.subject);
-        filesView = (TextView) findViewById(R.id.files);
-        bodyField = (EditText) findViewById(R.id.body);
-        suggestView = (LinearLayout) findViewById(R.id.suggestions);
+        toField = findViewById(R.id.to);
+        ccField = findViewById(R.id.cc);
+        subjectField = findViewById(R.id.subject);
+        filesView = findViewById(R.id.files);
+        bodyField = findViewById(R.id.body);
+        suggestView = findViewById(R.id.suggestions);
         scrim = findViewById(R.id.scrim);
         drawer = findViewById(R.id.drawer);
-        foldersView = (ListView) findViewById(R.id.folders);
-        accountName = (TextView) findViewById(R.id.account_name);
-        accountEmail = (TextView) findViewById(R.id.account_email);
+        foldersView = findViewById(R.id.folders);
+        accountName = findViewById(R.id.account_name);
+        accountEmail = findViewById(R.id.account_email);
 
         listView.setAdapter(adapter);
         Family.list(listView);
@@ -257,10 +263,10 @@ public final class MainActivity extends BaseActivity {
         listView.setDividerHeight(1);
         foldersView.setAdapter(folderAdapter);
         filesView.setCompoundDrawablesRelative(small(R.drawable.ic_attachment), null, null, null);
-        Pills.attach(toField, color(R.color.pill_wash), color(R.color.focus_rule), color(R.color.draft), dp(4));
-        Pills.attach(ccField, color(R.color.pill_wash), color(R.color.focus_rule), color(R.color.draft), dp(4));
-        offerPeople(toField);
-        offerPeople(ccField);
+        for (EditText field : new EditText[] {toField, ccField}) {
+            Pills.attach(field, color(R.color.pill_wash), color(R.color.focus_rule), color(R.color.draft), dp(4));
+            offerPeople(field);
+        }
 
         SharedPreferences prefs = prefs();
         login = loadLogin(prefs);
@@ -374,6 +380,21 @@ public final class MainActivity extends BaseActivity {
 
     private boolean busy() {
         return job != null;
+    }
+
+    /**
+     * Sends `call` to Gmail after the changes before it, beside whatever is
+     * loading; if it fails, `failed` hears why, on the main thread.
+     */
+    private void inOrder(Call call, Consumer<String> failed) {
+        changes.submit(() -> {
+            try {
+                call.run();
+            } catch (Exception e) {
+                final String message = message(e);
+                runOnUiThread(() -> failed.accept(message));
+            }
+        });
     }
 
     /** Abandons what is running; whatever it was doing is never shown. */
@@ -864,14 +885,14 @@ public final class MainActivity extends BaseActivity {
         if (message.draft()) span(name, "  Draft", new ForegroundColorSpan(color(R.color.draft)));
         ((TextView) view.findViewById(R.id.name)).setText(name);
         ((TextView) view.findViewById(R.id.date)).setText(shortDate(message.time()));
-        TextView detail = (TextView) view.findViewById(R.id.detail);
+        TextView detail = view.findViewById(R.id.detail);
         String line = folded ? message.snippet() : join(recipients(message), timeUnlessToday(message.time()));
         detail.setText(line);
         detail.setVisibility(line.length() == 0 ? View.GONE : View.VISIBLE);
 
-        TextView body = (TextView) view.findViewById(R.id.body);
-        TextView quoted = (TextView) view.findViewById(R.id.quoted);
-        LinearLayout files = (LinearLayout) view.findViewById(R.id.files);
+        TextView body = view.findViewById(R.id.body);
+        TextView quoted = view.findViewById(R.id.quoted);
+        LinearLayout files = view.findViewById(R.id.files);
         if (folded) {
             body.setVisibility(View.GONE);
             quoted.setVisibility(View.GONE);
@@ -904,10 +925,7 @@ public final class MainActivity extends BaseActivity {
             files.setVisibility(View.GONE);
             return view;
         }
-        long size = 0;
-        for (Attachment attachment : attachments) size += attachment.size;
-        TextView header = fileLine(R.drawable.ic_attachment,
-            files(attachments.size()) + ", " + Mime.size(size), R.color.text_read, true);
+        TextView header = fileLine(R.drawable.ic_attachment, files(attachments), R.color.text_read, true);
         header.setPadding(0, 0, 0, dp(5));
         files.addView(header);
         for (Attachment attachment : attachments) {
@@ -1088,17 +1106,10 @@ public final class MainActivity extends BaseActivity {
         else if (screen == READ && conversation.starred() != wasStarred) rerender();
         else refresh();
         final Gmail client = gmail();
-        changes.submit(() -> {
-            try {
-                client.change(id, change);
-            } catch (Exception e) {
-                final String message = message(e);
-                runOnUiThread(() -> {
-                    say("Couldn't do that: " + message);
-                    whole.remove(id);
-                    if (screen == LIST) load();
-                });
-            }
+        inOrder(() -> client.change(id, change), message -> {
+            say("Couldn't do that: " + message);
+            whole.remove(id);
+            if (screen == LIST) load();
         });
     }
 
@@ -1147,14 +1158,7 @@ public final class MainActivity extends BaseActivity {
                 refresh();
                 toast("Labels changed");
                 final Gmail client = gmail();
-                changes.submit(() -> {
-                    try {
-                        client.relabel(id, add, remove);
-                    } catch (Exception e) {
-                        final String message = message(e);
-                        runOnUiThread(() -> say("Couldn't change the labels: " + message));
-                    }
-                });
+                inOrder(() -> client.relabel(id, add, remove), message -> say("Couldn't change the labels: " + message));
             })
             .setNegativeButton("Cancel", null)
             .show();
@@ -1179,9 +1183,7 @@ public final class MainActivity extends BaseActivity {
         if (out.attachments.isEmpty()) {
             filesView.setVisibility(View.GONE);
         } else {
-            long size = 0;
-            for (Attachment attachment : out.attachments) size += attachment.size;
-            filesView.setText(files(out.attachments.size()) + ", " + Mime.size(size));
+            filesView.setText(files(out.attachments));
             filesView.setVisibility(View.VISIBLE);
         }
         EditText focus = out.to.length() == 0 ? toField : out.subject.length() == 0 ? subjectField : bodyField;
@@ -1226,8 +1228,12 @@ public final class MainActivity extends BaseActivity {
         write(Outgoing.forward(target, me, TimeZone.getDefault()), READ, "");
     }
 
-    private static String files(int count) {
-        return count == 1 ? "1 attachment" : count + " attachments";
+    /** "2 attachments, 1.2 MB". */
+    private static String files(List<Attachment> attachments) {
+        long size = 0;
+        for (Attachment attachment : attachments) size += attachment.size;
+        int count = attachments.size();
+        return (count == 1 ? "1 attachment" : count + " attachments") + ", " + Mime.size(size);
     }
 
     /** A draft, opened to carry on with: Gmail's id for it is looked up first, so sending sends it. */
@@ -1290,24 +1296,10 @@ public final class MainActivity extends BaseActivity {
         }
         final Outgoing out = writing;
         final Gmail client = gmail();
-        sending = true;
-        start("Sending…", () -> {
-            try {
-                client.send(out);
-            } catch (IOException | RuntimeException e) {
-                final String message = message(e);
-                return () -> {
-                    sending = false;
-                    say(message);
-                };
-            }
-            return () -> {
-                sending = false;
-                people.wrote(to);
-                prefs().edit().putString("people", people.toJson()).apply();
-                toast("Sent");
-                finishWriting(true);
-            };
+        deliver("Sending…", () -> client.send(out), () -> {
+            people.wrote(to);
+            prefs().edit().putString("people", people.toJson()).apply();
+            toast("Sent");
         });
     }
 
@@ -1317,10 +1309,18 @@ public final class MainActivity extends BaseActivity {
         if (!signedIn()) return;
         final Outgoing out = writing;
         final Gmail client = gmail();
+        deliver("Saving the draft…", () -> client.save(out), () -> toast("Saved to Drafts"));
+    }
+
+    /**
+     * Sends or saves the message being written: once `call` has, `done` and
+     * back to where writing began; if it fails, the message stays and why is said.
+     */
+    private void deliver(String doing, Call call, Runnable done) {
         sending = true;
-        start("Saving the draft…", () -> {
+        start(doing, () -> {
             try {
-                client.save(out);
+                call.run();
             } catch (IOException | RuntimeException e) {
                 final String message = message(e);
                 return () -> {
@@ -1330,7 +1330,7 @@ public final class MainActivity extends BaseActivity {
             }
             return () -> {
                 sending = false;
-                toast("Saved to Drafts");
+                done.run();
                 finishWriting(true);
             };
         });
@@ -1349,14 +1349,7 @@ public final class MainActivity extends BaseActivity {
             .setMessage("Delete this draft from Gmail too?")
             .setPositiveButton("Delete", (dialog, which) -> {
                 final Gmail client = gmail();
-                changes.submit(() -> {
-                    try {
-                        client.discard(draftId);
-                    } catch (Exception e) {
-                        final String message = message(e);
-                        runOnUiThread(() -> say("Couldn't delete the draft: " + message));
-                    }
-                });
+                inOrder(() -> client.discard(draftId), message -> say("Couldn't delete the draft: " + message));
                 toast("Draft deleted");
                 finishWriting(true);
             })
@@ -1518,7 +1511,7 @@ public final class MainActivity extends BaseActivity {
             View row = inflater.inflate(R.layout.row_suggestion, suggestView, false);
             ((TextView) row.findViewById(R.id.avatar)).setText(Avatar.letter(address.display()));
             ((TextView) row.findViewById(R.id.name)).setText(address.display());
-            TextView email = (TextView) row.findViewById(R.id.email);
+            TextView email = row.findViewById(R.id.email);
             email.setText(address.email);
             email.setVisibility(address.name.length() > 0 ? View.VISIBLE : View.GONE);
             row.setBackgroundColor(color(i == suggestPick ? R.color.focus_fill : R.color.row));
@@ -1656,10 +1649,8 @@ public final class MainActivity extends BaseActivity {
             askForCardFolder(attachment, card);
             return;
         }
-        final Gmail client = gmail();
         final ContentResolver resolver = getContentResolver();
-        start("Saving " + attachment.name + "…", () -> {
-            byte[] data = client.attachment(attachment);
+        save(attachment, "SD card/Download", data -> {
             Uri parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
             // Octet-stream keeps the name as it is; the provider adds " (1)" and so on when it is taken.
             Uri doc = DocumentsContract.createDocument(resolver, parent, "application/octet-stream", Mime.safeName(attachment.name));
@@ -1667,24 +1658,41 @@ public final class MainActivity extends BaseActivity {
             try {
                 OutputStream out = resolver.openOutputStream(doc);
                 if (out == null) throw new IOException("Couldn't write to the SD card's Download folder.");
-                try {
-                    out.write(data);
-                } finally {
-                    out.close();
-                }
+                write(out, data);
             } catch (IOException | RuntimeException e) {
                 DocumentsContract.deleteDocument(resolver, doc);
                 throw e;
             }
             // "0403-0201:Download/test (1).pdf": the path on the card follows the colon.
             String id = DocumentsContract.getDocumentId(doc);
-            final File file = new File(card, id.substring(id.indexOf(':') + 1));
+            return new File(card, id.substring(id.indexOf(':') + 1));
+        });
+    }
+
+    /** Where an attachment goes: given its bytes, it writes them and says to which file. */
+    private interface Place {
+        File put(byte[] data) throws IOException;
+    }
+
+    /** Fetches `attachment` and has `place` write it; `shown` is its folder as the toast names it. */
+    private void save(Attachment attachment, String shown, Place place) {
+        final Gmail client = gmail();
+        start("Saving " + attachment.name + "…", () -> {
+            final File file = place.put(client.attachment(attachment));
             MediaScannerConnection.scanFile(this, new String[] {file.getPath()}, null, null);
             return () -> {
                 say("");
-                toast("Saved to SD card/Download/" + file.getName());
+                toast("Saved to " + shown + "/" + file.getName());
             };
         });
+    }
+
+    private static void write(OutputStream out, byte[] data) throws IOException {
+        try {
+            out.write(data);
+        } finally {
+            out.close();
+        }
     }
 
     /** The card's Download folder, if the user has let Mail write there; null if not. */
@@ -1747,23 +1755,11 @@ public final class MainActivity extends BaseActivity {
             return;
         }
         final File folder = own;
-        final String shown = "SD card" + folder.getPath().substring(card.getPath().length());
-        final Gmail client = gmail();
-        start("Saving " + attachment.name + "…", () -> {
-            byte[] data = client.attachment(attachment);
+        save(attachment, "SD card" + folder.getPath().substring(card.getPath().length()), data -> {
             if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Couldn't open Mail's folder on the SD card.");
-            final File file = unused(folder, Mime.safeName(attachment.name));
-            OutputStream out = new FileOutputStream(file);
-            try {
-                out.write(data);
-            } finally {
-                out.close();
-            }
-            MediaScannerConnection.scanFile(this, new String[] {file.getPath()}, null, null);
-            return () -> {
-                say("");
-                toast("Saved to " + shown + "/" + file.getName());
-            };
+            File file = unused(folder, Mime.safeName(attachment.name));
+            write(new FileOutputStream(file), data);
+            return file;
         });
     }
 
@@ -2179,10 +2175,16 @@ public final class MainActivity extends BaseActivity {
         }
     }
 
-    private void askSearch() {
+    /** The padded column a dialog's fields go in. */
+    private LinearLayout fields() {
         LinearLayout box = vertical();
         int pad = dp(12);
         box.setPadding(pad, pad / 2, pad, 0);
+        return box;
+    }
+
+    private void askSearch() {
+        LinearLayout box = fields();
         final EditText field = new EditText(this);
         field.setSingleLine(true);
         field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT);
@@ -2214,9 +2216,7 @@ public final class MainActivity extends BaseActivity {
 
     /** The fallback for a build without a bundled login. */
     private void askLogin() {
-        LinearLayout box = vertical();
-        int pad = dp(12);
-        box.setPadding(pad, pad / 2, pad, 0);
+        LinearLayout box = fields();
         final EditText server = new EditText(this);
         server.setHint("https://…");
         server.setSingleLine(true);
@@ -2310,23 +2310,23 @@ public final class MainActivity extends BaseActivity {
             String names = conversation.names(me, sent);
             ((TextView) row.findViewById(R.id.avatar)).setText(Avatar.letter(person(conversation, names, sent)));
 
-            TextView who = (TextView) row.findViewById(R.id.who);
+            TextView who = row.findViewById(R.id.who);
             who.setText(names.length() == 0 ? "(nobody)" : names);
             who.setTypeface(face);
             who.setTextColor(conversation.onlyDrafts() ? color(R.color.draft) : ink);
 
             row.findViewById(R.id.star).setVisibility(conversation.starred() ? View.VISIBLE : View.GONE);
-            TextView when = (TextView) row.findViewById(R.id.when);
+            TextView when = row.findViewById(R.id.when);
             when.setText(shortDate(conversation.time()));
             when.setTextColor(color(unread ? R.color.focus_rule : R.color.text_muted));
             when.setTypeface(face);
 
-            TextView subject = (TextView) row.findViewById(R.id.subject);
+            TextView subject = row.findViewById(R.id.subject);
             subject.setText(conversation.subject());
             subject.setTypeface(face);
             subject.setTextColor(ink);
             row.findViewById(R.id.clip).setVisibility(conversation.hasFiles() ? View.VISIBLE : View.GONE);
-            TextView thread = (TextView) row.findViewById(R.id.thread);
+            TextView thread = row.findViewById(R.id.thread);
             int count = conversation.messages.size();
             thread.setVisibility(count > 1 ? View.VISIBLE : View.GONE);
             thread.setText(count > 99 ? "99+" : String.valueOf(count));
@@ -2334,7 +2334,7 @@ public final class MainActivity extends BaseActivity {
             thread.setTextColor(badge);
             thread.setBackgroundTintList(ColorStateList.valueOf(badge));
 
-            TextView snippet = (TextView) row.findViewById(R.id.snippet);
+            TextView snippet = row.findViewById(R.id.snippet);
             snippet.setText(conversation.snippet());
             snippet.setTextColor(color(R.color.text_muted));
             snippet.setVisibility(conversation.snippet().length() == 0 ? View.GONE : View.VISIBLE);
@@ -2411,14 +2411,14 @@ public final class MainActivity extends BaseActivity {
             row.setBackgroundResource(open && !picked ? R.drawable.drawer_open : R.drawable.drawer_item);
             row.setActivated(picked);
             int ink = picked ? color(R.color.on_primary) : open ? color(R.color.focus_rule) : color(R.color.text);
-            ImageView icon = (ImageView) row.findViewById(R.id.icon);
+            ImageView icon = row.findViewById(R.id.icon);
             icon.setImageResource(entry.icon);
             icon.setImageTintList(ColorStateList.valueOf(picked || open ? ink : color(R.color.icon)));
-            TextView name = (TextView) row.findViewById(R.id.name);
+            TextView name = row.findViewById(R.id.name);
             name.setText(entry.name);
             name.setTextColor(ink);
             name.setTypeface(picked || open ? Family.MEDIUM : Typeface.DEFAULT);
-            TextView count = (TextView) row.findViewById(R.id.count);
+            TextView count = row.findViewById(R.id.count);
             int n = entry.folder == null ? 0 : count(entry.folder);
             count.setText(n > 999 ? "999+" : String.valueOf(n));
             count.setVisibility(n > 0 ? View.VISIBLE : View.GONE);
