@@ -6,6 +6,8 @@ import android.content.ContentUris;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.InsetDrawable;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
@@ -18,6 +20,8 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -44,13 +48,22 @@ public class MainActivity extends Activity {
     private FrameLayout player;
     private VideoView video;
     private TextView bar;
+    private ProgressBar progress;
+    private LinearLayout controls;
     private boolean playing;
+    private Uri current;
+    private int resumeAt = -1;
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (playing) {
-                bar.setText(clock(video.getCurrentPosition()) + " / " + clock(video.getDuration())
-                        + (video.isPlaying() ? "" : "  ||"));
+                int at = resumeAt >= 0 ? resumeAt : video.getCurrentPosition();
+                int total = video.getDuration();
+                bar.setText(clock(at) + " / " + clock(total)
+                        + (video.isPlaying() ? "" : "   PAUSED"));
+                bar.setTextColor(video.isPlaying() ? Color.WHITE : 0xFFFFC857);
+                progress.setMax(Math.max(1, total));
+                progress.setProgress(at);
                 handler.postDelayed(this, 500);
             }
         }
@@ -62,6 +75,8 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Color.BLACK);
 
         list = new ListView(this);
+        list.setSelector(new InsetDrawable(focusCard(), dp(4), 0, dp(4), 0));
+        list.setDivider(null);
         list.setOnItemClickListener((p, v, i, id) -> play(uris.get(i)));
         root.addView(list, new FrameLayout.LayoutParams(-1, -1));
 
@@ -79,12 +94,19 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams vp = new FrameLayout.LayoutParams(-1, -1);
         vp.gravity = Gravity.CENTER;
         player.addView(video, vp);
+        controls = new LinearLayout(this);
+        controls.setOrientation(LinearLayout.VERTICAL);
+        controls.setBackgroundColor(0xB3000000);
+        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(0xFF4FA3FF));
+        progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF555555));
+        controls.addView(progress, new LinearLayout.LayoutParams(-1, dp(6)));
         bar = new TextView(this);
         bar.setTextColor(Color.WHITE);
-        bar.setBackgroundColor(0x99000000);
-        bar.setPadding(8, 4, 8, 4);
-        bar.setTextSize(12);
-        player.addView(bar, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+        bar.setPadding(dp(8), dp(4), dp(8), dp(4));
+        bar.setTextSize(16);
+        controls.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+        player.addView(controls, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
         root.addView(player, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
 
@@ -124,23 +146,63 @@ public class MainActivity extends Activity {
                 names.add(c.getString(1));
             }
         }
-        list.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, names));
+        list.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, names) {
+            @Override public View getView(int i, View v, ViewGroup parent) {
+                TextView t = (TextView) super.getView(i, v, parent);
+                t.setTextColor(Color.WHITE);
+                t.setTextSize(15);
+                t.setSingleLine(true);
+                t.setPadding(dp(10), 0, dp(10), 0);
+                return t;
+            }
+        });
         empty.setVisibility(uris.isEmpty() ? View.VISIBLE : View.GONE);
         list.requestFocus();
     }
 
+    private GradientDrawable focusCard() {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(0xFF1F3A5C);
+        g.setCornerRadius(dp(8));
+        g.setStroke(dp(2), 0xFF4FA3FF);
+        return g;
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    private void immersive(boolean on) {
+        getWindow().getDecorView().setSystemUiVisibility(on
+                ? View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                : View.SYSTEM_UI_FLAG_VISIBLE);
+    }
+
     private void play(Uri uri) {
+        current = uri;
+        resumeAt = -1;
+        immersive(true);
         playing = true;
         list.setVisibility(View.GONE);
         player.setVisibility(View.VISIBLE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         video.setVideoURI(uri);
-        video.setOnPreparedListener((MediaPlayer m) -> video.start());
+        video.setOnPreparedListener((MediaPlayer m) -> {
+            if (resumeAt >= 0) {
+                video.seekTo(resumeAt);
+                resumeAt = -1;
+            } else {
+                video.start();
+            }
+        });
         handler.post(tick);
     }
 
     private void stop() {
         playing = false;
+        resumeAt = -1;
+        immersive(false);
         handler.removeCallbacks(tick);
         video.stopPlayback();
         player.setVisibility(View.GONE);
@@ -173,7 +235,20 @@ public class MainActivity extends Activity {
 
     @Override protected void onPause() {
         super.onPause();
-        if (playing) video.pause();
+        if (playing) {
+            resumeAt = video.getCurrentPosition();
+            video.pause();
+        }
+    }
+
+    /** VideoView drops its player when the window goes away, so reopen the
+     *  video paused at the place we left it. */
+    @Override protected void onResume() {
+        super.onResume();
+        if (playing && resumeAt >= 0 && current != null) {
+            immersive(true);
+            video.setVideoURI(current);
+        }
     }
 
     private static String clock(int ms) {
