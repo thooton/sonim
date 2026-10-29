@@ -12,6 +12,7 @@ import android.widget.TextView;
 
 import com.newyorker.xp3.news.Feed;
 import com.newyorker.xp3.news.Story;
+import com.xp3.common.ui.Ui;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +43,7 @@ final class StoryAdapter extends BaseAdapter {
     }
 
     private final Context context;
-    private final List<Item> items = new ArrayList<Item>();
+    private final List<Item> items = new ArrayList<>();
 
     StoryAdapter(Context context) {
         this.context = context;
@@ -142,7 +143,13 @@ final class StoryAdapter extends BaseAdapter {
     }
 
     private int dp(float value) {
-        return Look.dp(context, value);
+        return Ui.dp(context, value);
+    }
+
+    private LinearLayout vertical() {
+        LinearLayout box = new LinearLayout(context);
+        box.setOrientation(LinearLayout.VERTICAL);
+        return box;
     }
 
     private View title(String text, View convert) {
@@ -160,8 +167,7 @@ final class StoryAdapter extends BaseAdapter {
         if (convert instanceof LinearLayout) {
             box = (LinearLayout) convert;
         } else {
-            box = new LinearLayout(context);
-            box.setOrientation(LinearLayout.VERTICAL);
+            box = vertical();
             View rule = new View(context);
             rule.setBackgroundColor(context.getColor(R.color.ink));
             LinearLayout.LayoutParams ruled = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(2));
@@ -195,8 +201,7 @@ final class StoryAdapter extends BaseAdapter {
             holder = (Holder) convert.getTag();
         } else {
             holder = new Holder();
-            box = new LinearLayout(context);
-            box.setOrientation(LinearLayout.VERTICAL);
+            box = vertical();
             box.setPadding(0, dp(6), 0, dp(10));
             holder.picture = new ImageView(context);
             holder.picture.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -222,18 +227,15 @@ final class StoryAdapter extends BaseAdapter {
             holder = (Holder) convert.getTag();
         } else {
             holder = new Holder();
-            outer = new LinearLayout(context);
-            outer.setOrientation(LinearLayout.VERTICAL);
+            outer = vertical();
             holder.rule = new View(context);
             holder.rule.setBackgroundColor(context.getColor(R.color.rule));
             LinearLayout.LayoutParams ruled = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1);
             ruled.setMargins(dp(10), 0, dp(10), 0);
             outer.addView(holder.rule, ruled);
             LinearLayout line = new LinearLayout(context);
-            line.setOrientation(LinearLayout.HORIZONTAL);
             line.setPadding(0, dp(9), dp(10), dp(9));
-            LinearLayout words = new LinearLayout(context);
-            words.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout words = vertical();
             words(holder, words, 14.5f, false);
             line.addView(words, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
             holder.picture = new ImageView(context);

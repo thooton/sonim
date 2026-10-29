@@ -5,6 +5,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.text.Layout;
+import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.LeadingMarginSpan;
 
@@ -38,6 +39,22 @@ final class DropCap implements LeadingMarginSpan.LeadingMarginSpan2 {
         paint.getTextBounds("H", 0, 1, bounds);
         paint.setTextSize(100 * span / Math.max(1, bounds.height()));
         width = (int) Math.ceil(paint.measureText(letter));
+    }
+
+    /**
+     * Takes the initial off the front of `text` (with any opening quotation
+     * mark, which goes with it, as in print) and returns it; null, leaving
+     * the text alone, when it opens on no letter or is too short a paragraph
+     * to wrap three lines beside one. Shared by the screen and the PDF.
+     */
+    static String take(SpannableStringBuilder text) {
+        int at = 0;
+        while (at < text.length() && "“‘\"'".indexOf(text.charAt(at)) >= 0) at++;
+        if (at >= text.length() || !Character.isLetterOrDigit(text.charAt(at))) return null;
+        if (text.length() < 160) return null;
+        String letter = text.subSequence(0, at + 1).toString();
+        text.delete(0, at + 1);
+        return letter;
     }
 
     @Override

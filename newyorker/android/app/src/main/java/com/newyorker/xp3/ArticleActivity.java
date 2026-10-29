@@ -221,10 +221,7 @@ public final class ArticleActivity extends BaseActivity {
     }
 
     private void body() {
-        int last = -1;
-        for (int i = 0; i < article.blocks.size(); i++) {
-            if (article.blocks.get(i).kind == Block.PARAGRAPH) last = i;
-        }
+        int last = article.lastParagraph();
         boolean first = true;
         for (int i = 0; i < article.blocks.size(); i++) {
             Block block = article.blocks.get(i);
@@ -283,14 +280,8 @@ public final class ArticleActivity extends BaseActivity {
     }
 
     private void dropCap(TextView view, SpannableStringBuilder text) {
-        int at = 0;
-        // An opening quotation mark goes with the initial, as in print.
-        while (at < text.length() && "“‘\"'".indexOf(text.charAt(at)) >= 0) at++;
-        if (at >= text.length() || !Character.isLetterOrDigit(text.charAt(at))) return;
-        // Too short a paragraph to wrap three lines beside an initial.
-        if (text.length() < 160) return;
-        String letter = text.subSequence(0, at + 1).toString();
-        text.delete(0, at + 1);
+        String letter = DropCap.take(text);
+        if (letter == null) return;
         Paint paint = view.getPaint();
         Rect bounds = new Rect();
         paint.getTextBounds("H", 0, 1, bounds);
@@ -387,15 +378,7 @@ public final class ArticleActivity extends BaseActivity {
         message.setGravity(Gravity.CENTER_HORIZONTAL);
         message.setText(error);
         add(message, 16, 16, 16, 10);
-        TextView button = Look.text(this, Look.sans(this, true), 11, R.color.ink);
-        button.setText("Try again");
-        button.setAllCaps(true);
-        button.setLetterSpacing(0.08f);
-        button.setBackgroundResource(R.drawable.button);
-        button.setPadding(dp(16), dp(7), dp(16), dp(7));
-        button.setFocusable(true);
-        button.setOnFocusChangeListener((view, focused) ->
-            button.setTextColor(color(focused ? R.color.page : R.color.ink)));
+        TextView button = Look.retry(this);
         button.setOnClickListener(view -> {
             render();
             load();

@@ -58,7 +58,6 @@ public final class MainActivity extends BaseActivity {
 
     private int tab = TODAY;
     private TextView header;
-    private View headerRule;
     private FrameLayout content;
     private ListView list;
     private StoryAdapter adapter;
@@ -80,9 +79,7 @@ public final class MainActivity extends BaseActivity {
         header.setGravity(Gravity.CENTER);
         header.setSingleLine(true);
         root.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34)));
-        headerRule = new View(this);
-        headerRule.setBackgroundColor(color(R.color.rule));
-        root.addView(headerRule, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+        root.addView(rule());
 
         content = new FrameLayout(this);
         root.addView(content, Ui.weighted());
@@ -125,11 +122,8 @@ public final class MainActivity extends BaseActivity {
 
     private LinearLayout tabBar() {
         LinearLayout bar = vertical();
-        View rule = new View(this);
-        rule.setBackgroundColor(color(R.color.rule));
-        bar.addView(rule, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+        bar.addView(rule());
         LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
         for (int i = 0; i < TABS.length; i++) {
             TextView label = text(TABS[i], 11, color(R.color.muted));
             label.setGravity(Gravity.CENTER);
@@ -138,6 +132,14 @@ public final class MainActivity extends BaseActivity {
         }
         bar.addView(row);
         return bar;
+    }
+
+    /** A hairline across the screen. */
+    private View rule() {
+        View rule = new View(this);
+        rule.setBackgroundColor(color(R.color.rule));
+        rule.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+        return rule;
     }
 
     private void show(int which) {
@@ -216,16 +218,8 @@ public final class MainActivity extends BaseActivity {
             box.addView(line);
         }
         if (retry) {
-            TextView button = Look.text(this, Look.sans(this, true), 11, R.color.ink);
-            button.setText("Try again");
-            button.setAllCaps(true);
-            button.setLetterSpacing(0.08f);
+            TextView button = Look.retry(this);
             button.setGravity(Gravity.CENTER);
-            button.setBackgroundResource(R.drawable.button);
-            button.setPadding(dp(16), dp(7), dp(16), dp(7));
-            button.setFocusable(true);
-            button.setOnFocusChangeListener((view, focused) ->
-                button.setTextColor(color(focused ? R.color.page : R.color.ink)));
             final int which = tab;
             button.setOnClickListener(view -> load(which));
             LinearLayout.LayoutParams placed = new LinearLayout.LayoutParams(

@@ -1,5 +1,6 @@
 package com.newyorker.xp3;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -18,7 +19,6 @@ import android.text.style.LeadingMarginSpan;
 
 import com.newyorker.xp3.news.Article;
 import com.newyorker.xp3.news.Block;
-import com.newyorker.xp3.news.Site;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -82,11 +82,8 @@ final class PdfExport {
         PdfExport export = new PdfExport(context, article);
         try {
             export.draw();
-            OutputStream out = new FileOutputStream(file);
-            try {
+            try (OutputStream out = new FileOutputStream(file)) {
                 export.document.writeTo(out);
-            } finally {
-                out.close();
             }
         } catch (IOException | InterruptedException | RuntimeException e) {
             file.delete();
@@ -164,10 +161,7 @@ final class PdfExport {
     }
 
     private void body() throws InterruptedException {
-        int last = -1;
-        for (int i = 0; i < article.blocks.size(); i++) {
-            if (article.blocks.get(i).kind == Block.PARAGRAPH) last = i;
-        }
+        int last = article.lastParagraph();
         boolean first = true;
         int previous = -1;
         for (int i = 0; i < article.blocks.size(); i++) {
@@ -230,12 +224,8 @@ final class PdfExport {
 
     /** Puts the drop cap span on `text`, as on screen; false when it is too short or opens oddly. */
     private boolean dropCap(SpannableStringBuilder text, TextPaint paint) {
-        int at = 0;
-        while (at < text.length() && "“‘\"'".indexOf(text.charAt(at)) >= 0) at++;
-        if (at >= text.length() || !Character.isLetterOrDigit(text.charAt(at))) return false;
-        if (text.length() < 160) return false;
-        String letter = text.subSequence(0, at + 1).toString();
-        text.delete(0, at + 1);
+        String letter = DropCap.take(text);
+        if (letter == null) return false;
         Rect bounds = new Rect();
         paint.getTextBounds("H", 0, 1, bounds);
         int lineHeight = Math.round(paint.getFontSpacing() * LEADING);
@@ -258,6 +248,8 @@ final class PdfExport {
      * `keep` lines at the foot of a page, so a paragraph does not leave one
      * line behind and a drop cap is never cut.
      */
+    // Lint asks for LineBreaker's constants, which arrive in API 29; Layout's are the same values.
+    @SuppressLint("WrongConstant")
     private void text(CharSequence text, TextPaint paint, Layout.Alignment alignment, float leading,
                       int left, int right, int keep) {
         int width = COLUMN - left - right;
@@ -299,10 +291,9 @@ final class PdfExport {
 
     /** A picture at the column's width (narrower when it is tall), and its caption under it. */
     private void picture(String url, String caption) throws InterruptedException {
-        String sized = Site.picture(url, PICTURE_PIXELS);
         Bitmap bitmap;
         try {
-            bitmap = Net.picture(sized == null ? url : sized, PICTURE_PIXELS);
+            bitmap = Net.picture(Net.sized(url, PICTURE_PIXELS), PICTURE_PIXELS);
         } catch (IOException | RuntimeException | OutOfMemoryError e) {
             // A picture that will not come is left out rather than failing the whole PDF.
             return;
