@@ -5,6 +5,7 @@ import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -44,10 +45,13 @@ final class ReviewPane extends LinearLayout {
     private final TextView back;
     private final TextView aux;
     private final TextView counts;
+    private final TextView progress;
+    private final boolean showProgress;
     private final LinearLayout answers;
 
-    ReviewPane(Context context, ReviewSession session, Listener listener) {
+    ReviewPane(Context context, ReviewSession session, boolean showProgress, Listener listener) {
         super(context);
+        this.showProgress = showProgress;
         this.session = session;
         this.listener = listener;
         setOrientation(VERTICAL);
@@ -94,12 +98,26 @@ final class ReviewPane extends LinearLayout {
         bar.setBackgroundColor(color(R.color.canvas));
         bar.setPadding(dp(4), dp(3), dp(4), dp(5));
         addView(bar, wide());
+        FrameLayout countsRow = new FrameLayout(context);
         counts = new TextView(context);
         counts.setTextSize(12);
         counts.setGravity(Gravity.CENTER);
         counts.setIncludeFontPadding(false);
         counts.setPadding(0, 0, 0, dp(3));
-        bar.addView(counts, wide());
+        countsRow.addView(counts, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
+        // Off unless the options ask for it: how far through the deck, small and to the side.
+        progress = new TextView(context);
+        progress.setTextSize(10);
+        progress.setTextColor(color(R.color.text_subtle));
+        progress.setIncludeFontPadding(false);
+        progress.setVisibility(showProgress ? VISIBLE : GONE);
+        FrameLayout.LayoutParams progressAt = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.END | Gravity.CENTER_VERTICAL);
+        progressAt.rightMargin = dp(2);
+        countsRow.addView(progress, progressAt);
+        bar.addView(countsRow, wide());
         answers = new LinearLayout(context);
         answers.setOrientation(HORIZONTAL);
         answers.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
@@ -146,6 +164,7 @@ final class ReviewPane extends LinearLayout {
         else if (state == State.LEARNING || state == State.RELEARNING) queue = 1;
         else queue = 2;
         counts.setText(Anki.counts(getContext(), session.counts(now()), queue));
+        if (showProgress) progress.setText(session.progress() + "%");
     }
 
     private void reveal() {

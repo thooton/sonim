@@ -112,6 +112,11 @@ The app opens on the deck list. There is no header naming the app.
   on Auto stays Auto. Digits replace the number (typing 1 then 5 gives 15);
   further digits append, up to 9999. `*` sets Auto. Del drops the last digit
   (to Auto from 0).
+- Up and Down move the ring between `New cards/day` and, under a `Display`
+  heading, `Show progress` (`‹  Off  ›`, off by default). Left, Right and OK
+  flip it. It is kept on this device for every deck, never synced. When on,
+  the reviewer shows `N%` in small grey at the right of the counts line:
+  100% minus the share of the deck's cards still New.
 - Back saves the value (if changed it syncs) and shows the deck's overview,
   whose counts reflect it. There is no Cancel.
 - Menu does nothing.

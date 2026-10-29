@@ -24,9 +24,14 @@ final class OptionsPane extends LinearLayout {
     /** Digits typed since the box took the keys, so typing replaces rather than appends. */
     private boolean typing;
     private final TextView box;
+    private final TextView progressBox;
+    private boolean showProgress;
+    /** Which row has the keys: 0 New cards/day, 1 Show progress. */
+    private int row;
 
-    OptionsPane(Context context, Deck deck) {
+    OptionsPane(Context context, Deck deck, boolean showProgress) {
         super(context);
+        this.showProgress = showProgress;
         value = deck.newPerDay;
         setOrientation(VERTICAL);
         setFocusable(true);
@@ -66,7 +71,27 @@ final class OptionsPane extends LinearLayout {
         box.setFocusable(false);
         Anki.ring(box);
         row.addView(box, new LayoutParams(dp(84), dp(28)));
+
+        // Not part of the deck: kept on this device, for every deck.
+        TextView display = text("Display", 15, R.color.text);
+        display.setTypeface(Anki.MEDIUM);
+        display.setPadding(0, dp(12), 0, dp(8));
+        card.addView(display);
+        LinearLayout shown = new LinearLayout(context);
+        shown.setOrientation(HORIZONTAL);
+        shown.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(shown, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        shown.addView(text("Show progress", 13, R.color.text), new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        progressBox = Anki.button(context, "");
+        progressBox.setTextSize(13);
+        progressBox.setPadding(dp(4), 0, dp(4), 0);
+        progressBox.setFocusable(false);
+        shown.addView(progressBox, new LayoutParams(dp(84), dp(28)));
         show();
+    }
+
+    boolean showProgress() {
+        return showProgress;
     }
 
     /** {@link Deck#AUTO} or the number set. */
@@ -76,10 +101,27 @@ final class OptionsPane extends LinearLayout {
 
     private void show() {
         box.setText("‹  " + (value < 0 ? "Auto" : Integer.toString(value)) + "  ›");
+        progressBox.setText("‹  " + (showProgress ? "On" : "Off") + "  ›");
+        if (row == 0) { Anki.ring(box); progressBox.setBackground(Anki.buttonFace(getContext())); }
+        else { Anki.ring(progressBox); box.setBackground(Anki.buttonFace(getContext())); }
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            row = keyCode == KeyEvent.KEYCODE_DPAD_UP ? 0 : 1;
+            show();
+            return true;
+        }
+        if (row == 1) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                || Ui.isOk(keyCode)) {
+                showProgress = !showProgress;
+                show();
+                return true;
+            }
+            return super.onKeyDown(keyCode, event);
+        }
         int digit = digitOf(keyCode);
         if (digit >= 0) {
             int base = typing && value > 0 ? value : 0;

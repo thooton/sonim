@@ -84,6 +84,8 @@ public final class MainActivity extends BaseActivity {
 
     private static final String FILE = "collection.json";
     private static final String PREFS = "flashcards";
+    /** Options > Show progress, kept on this device for every deck. */
+    private static final String PREF_PROGRESS = "show_progress";
     /** The deck the app bundled before the command center kept them. */
     private static final String[] BUNDLED = {
         "spanish-words", "Spanish words", "decks/spanish-words.tsv", "decks/spanish-words.state"};
@@ -792,7 +794,7 @@ public final class MainActivity extends BaseActivity {
     private void startReview(boolean ahead) {
         screen = Screen.REVIEW;
         session(open).setAhead(ahead);
-        review = new ReviewPane(this, session(open), new ReviewPane.Listener() {
+        review = new ReviewPane(this, session(open), prefs().getBoolean(PREF_PROGRESS, false), new ReviewPane.Listener() {
             @Override public void onRated() {
                 later(saveSoon, SAVE_AFTER_MS);
                 later(syncSoon, SYNC_AFTER_MS);
@@ -831,7 +833,7 @@ public final class MainActivity extends BaseActivity {
     private void showOptions(final Deck deck) {
         open = deck;
         screen = Screen.OPTIONS;
-        OptionsPane pane = new OptionsPane(this, deck);
+        OptionsPane pane = new OptionsPane(this, deck, prefs().getBoolean(PREF_PROGRESS, false));
         Ui.fill(content, pane);
         pane.requestFocus();
     }
@@ -839,6 +841,7 @@ public final class MainActivity extends BaseActivity {
     /** Leaving the options keeps what was set, as Anki's Save does. */
     private void closeOptions() {
         OptionsPane pane = (OptionsPane) content.getChildAt(0);
+        prefs().edit().putBoolean(PREF_PROGRESS, pane.showProgress()).apply();
         if (pane.value() != open.newPerDay) {
             open.newPerDay = pane.value();
             Collection.touch(open, System.currentTimeMillis());

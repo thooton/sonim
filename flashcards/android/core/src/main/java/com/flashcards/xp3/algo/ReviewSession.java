@@ -60,6 +60,15 @@ public final class ReviewSession {
         this.zone = zone;
     }
 
+    /** How far through the deck: 100% minus the share of its cards still New. */
+    public int progress() {
+        int size = deck.size();
+        if (size == 0) return 100;
+        int fresh = 0;
+        for (DeckCard card : deck.cards()) if (card.isNew()) fresh++;
+        return (int) ((size - fresh) * 100L / size);
+    }
+
     public boolean hasCards() {
         return deck.size() > 0;
     }
