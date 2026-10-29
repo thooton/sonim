@@ -197,13 +197,4 @@ public final class Config {
     public String cookieToken() {
         return cookieToken;
     }
-
-    public ZoneId zone() {
-        if (zone == null) return ZoneId.systemDefault();
-        try {
-            return ZoneId.of(zone);
-        } catch (RuntimeException e) {
-            return ZoneId.systemDefault();
-        }
-    }
 }

@@ -3,6 +3,8 @@ package com.canvas.xp3;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.widget.EditText;
@@ -22,17 +24,33 @@ final class Fields {
     static EditText box(MainActivity app, final Views v, String text, String hint, int type) {
         EditText field = new EditText(app);
         field.setText(text);
-        return styled(app, v, field, hint, type);
+        return styled(v, field, hint, type);
     }
 
     /** A box for an answer, its formatting shown; `stored` is in `Rich`'s form. */
     static AnswerField answer(MainActivity app, final Views v, String stored, String hint, int type) {
         AnswerField field = new AnswerField(app, v.look.bold);
         field.show(stored);
-        return styled(app, v, field, hint, type);
+        return styled(v, field, hint, type);
     }
 
-    private static <T extends EditText> T styled(MainActivity app, final Views v, T field, String hint, int type) {
+    /** Runs `changed` after every edit to the field's text. */
+    static void onChange(EditText field, final Runnable changed) {
+        field.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                changed.run();
+            }
+        });
+    }
+
+    private static <T extends EditText> T styled(final Views v, T field, String hint, int type) {
         final Look look = v.look;
         field.setHint(hint);
         field.setHintTextColor(look.faint);
@@ -52,7 +70,6 @@ final class Fields {
         field.setOnFocusChangeListener((view, has) -> {
             view.setBackground(has ? focused : idle);
             view.setPadding(v.dp(8), v.dp(6), v.dp(8), v.dp(8));
-            app.refreshKeys();
         });
         field.setSelection(field.getText().length());
         return field;

@@ -9,17 +9,15 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.pdf.PdfDocument;
 import android.hardware.Camera;
-import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Draft;
+import com.xp3.common.ui.Ui;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -59,11 +57,6 @@ final class CameraScreen extends Screen {
     }
 
     @Override
-    String center() {
-        return busy ? "" : "Capture";
-    }
-
-    @Override
     List<Sheet.Choice> options() {
         List<Sheet.Choice> out = new ArrayList<>();
         out.add(new Sheet.Choice("Gallery", R.drawable.ic_image, null,
@@ -78,7 +71,7 @@ final class CameraScreen extends Screen {
     @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
-        if (com.xp3.common.ui.Ui.isOk(code) || code == KeyEvent.KEYCODE_CAMERA) {
+        if (Ui.isOk(code) || code == KeyEvent.KEYCODE_CAMERA) {
             if (event.getAction() == KeyEvent.ACTION_UP) capture();
             return true;
         }
@@ -156,10 +149,8 @@ final class CameraScreen extends Screen {
     private void capture() {
         if (camera == null || busy) return;
         busy = true;
-        app.refreshKeys();
         try {
-            camera.takePicture(null, null, (data, cam) -> {
-                final byte[] jpeg = data;
+            camera.takePicture(null, null, (jpeg, cam) -> {
                 app.background(() -> save(jpeg), (file, problem) -> {
                     busy = false;
                     if (file == null) {
@@ -191,11 +182,16 @@ final class CameraScreen extends Screen {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length, bounds);
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = Math.max(1, Math.max(bounds.outWidth, bounds.outHeight) / 1800);
-        Bitmap raw = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length, options);
+        Bitmap raw = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length, shrunk(bounds));
         if (raw == null) throw new IOException("Unreadable photo");
         return page(upright(raw, rotation), true);
+    }
+
+    /** Decoding for a picture this size, at no more than about 1800 pixels along its longer side. */
+    private static BitmapFactory.Options shrunk(BitmapFactory.Options bounds) {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = Math.max(1, Math.max(bounds.outWidth, bounds.outHeight) / 1800);
+        return options;
     }
 
     static Bitmap upright(Bitmap raw, int degrees) {
@@ -238,9 +234,7 @@ final class CameraScreen extends Screen {
             BitmapFactory.Options bounds = new BitmapFactory.Options();
             bounds.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(chosen.getPath(), bounds);
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inSampleSize = Math.max(1, Math.max(bounds.outWidth, bounds.outHeight) / 1800);
-            Bitmap raw = BitmapFactory.decodeFile(chosen.getPath(), options);
+            Bitmap raw = BitmapFactory.decodeFile(chosen.getPath(), shrunk(bounds));
             if (raw == null) throw new IOException("That isn't a picture.");
             return page(raw, false);
         }, (file, problem) -> {
@@ -261,8 +255,7 @@ final class CameraScreen extends Screen {
         PdfDocument pdf = new PdfDocument();
         try {
             for (int i = 0; i < pages.size(); i++) {
-                BitmapFactory.Options options = new BitmapFactory.Options();
-                Bitmap bitmap = BitmapFactory.decodeFile(pages.get(i).getPath(), options);
+                Bitmap bitmap = BitmapFactory.decodeFile(pages.get(i).getPath());
                 if (bitmap == null) continue;
                 int width = 612;
                 int height = Math.round(612f * bitmap.getHeight() / bitmap.getWidth());
@@ -287,11 +280,6 @@ final class CameraScreen extends Screen {
         } finally {
             pdf.close();
         }
-    }
-
-    @Override
-    void shown() {
-        app.refreshKeys();
     }
 
     @Override

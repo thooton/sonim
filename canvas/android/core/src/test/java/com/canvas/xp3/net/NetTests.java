@@ -7,7 +7,6 @@ import com.xp3.common.TestServer;
 
 import java.math.BigDecimal;
 import java.net.URI;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,7 +27,6 @@ public final class NetTests {
         check.run("canvas paging", () -> paging(check));
         check.run("canvas auth", () -> auth(check));
         check.run("canvas ids", () -> ids(check));
-        check.run("canvas due", () -> due(check));
         check.run("web links", () -> web(check));
     }
 
@@ -128,8 +126,8 @@ public final class NetTests {
         check.fails("bad timezone refused", () -> {
             Config.blank().with(Config.TIMEZONE, "Mars/Olympus");
         });
-        check.same("timezone is used", "America/Phoenix",
-            Config.blank().with(Config.TIMEZONE, "America/Phoenix").zone().getId());
+        check.same("timezone is kept", "America/Phoenix",
+            Config.blank().with(Config.TIMEZONE, "America/Phoenix").get(Config.TIMEZONE));
     }
 
     private static void origins(final Check check) {
@@ -252,7 +250,7 @@ public final class NetTests {
                 .header("Link: <" + request.path.split("\\?")[0] + "?page=2>; rel=\"next\"");
         });
         try {
-            List<Object> courses = canvas(server).courses(true);
+            List<Object> courses = canvas(server).courses();
             check.same("both pages", 2, courses.size());
             check.same("followed the Link header", 2, pages.get());
             check.same("first page", "Bio", Json.object(courses.get(0)).get("name"));
@@ -270,7 +268,7 @@ public final class NetTests {
         });
         try {
             final Canvas client = canvas(cycle);
-            check.fails("a Link cycle is caught", "cycle", () -> client.courses(true));
+            check.fails("a Link cycle is caught", "cycle", () -> client.courses());
         } finally {
             cycle.close();
         }
@@ -281,7 +279,7 @@ public final class NetTests {
         });
         try {
             final Canvas client = canvas(away);
-            check.fails("a Link off-origin is refused", "outside the configured", () -> client.courses(true));
+            check.fails("a Link off-origin is refused", "outside the configured", () -> client.courses());
         } finally {
             away.close();
         }
@@ -297,7 +295,7 @@ public final class NetTests {
             return TestServer.Reply.json("[{\"id\":1,\"name\":\"Bio\"}]");
         });
         try {
-            check.same("a stale cookie is retried through", 1, canvas(recovering).courses(true).size());
+            check.same("a stale cookie is retried through", 1, canvas(recovering).courses().size());
             check.same("it took two attempts", 2, attempts.get());
         } finally {
             recovering.close();
@@ -310,7 +308,7 @@ public final class NetTests {
         try {
             final Canvas client = canvas(expired);
             check.fails("it gives up rather than hanging", "would not accept the session", () -> {
-                client.courses(true);
+                client.courses();
             });
         } finally {
             expired.close();
@@ -322,7 +320,7 @@ public final class NetTests {
         });
         try {
             final Canvas client = canvas(login);
-            check.fails("a login page is not data", "login page", () -> client.courses(true));
+            check.fails("a login page is not data", "login page", () -> client.courses());
         } finally {
             login.close();
         }
@@ -333,54 +331,11 @@ public final class NetTests {
         });
         try {
             final Canvas client = canvas(forbidden);
-            check.fails("403 is explained without its body", "not permitted", () -> client.courses(true));
+            check.fails("403 is explained without its body", "not permitted", () -> client.courses());
         } finally {
             forbidden.close();
         }
     }
-
-    private static void due(Check check) throws Exception {
-        TestServer server = new TestServer(request -> {
-            if (request.path.startsWith("/cookie")) return TestServer.Reply.json(COOKIE_BODY);
-            if (request.path.contains("/courses/1/assignments")) {
-                return TestServer.Reply.json("["
-                    + "{\"id\":11,\"name\":\"Late lab\",\"due_at\":\"2026-09-02T06:59:00Z\","
-                    + "\"submission\":{\"workflow_state\":\"unsubmitted\",\"missing\":true}},"
-                    + "{\"id\":12,\"name\":\"Handed in\",\"due_at\":\"2026-09-03T06:59:00Z\","
-                    + "\"submission\":{\"workflow_state\":\"submitted\",\"submitted_at\":\"2026-09-01T00:00:00Z\"}},"
-                    + "{\"id\":13,\"name\":\"Personal date\",\"due_at\":\"2026-09-30T06:59:00Z\","
-                    + "\"submission\":{\"cached_due_date\":\"2026-09-04T06:59:00Z\"}},"
-                    + "{\"id\":14,\"name\":\"No date\"}]");
-            }
-            if (request.path.contains("/courses/2/assignments")) {
-                return TestServer.Reply.of(403, "application/json", "{}");
-            }
-            return TestServer.Reply.json("[{\"id\":1,\"name\":\"Bio\"},{\"id\":2,\"name\":\"Locked\"}]");
-        });
-        try {
-            Map<String, Object> result = Json.object(canvas(server).due(
-                java.time.Instant.parse("2026-09-01T00:00:00Z"),
-                java.time.Instant.parse("2026-09-10T00:00:00Z"), false));
-            List<Object> found = Json.children(result, "assignments");
-            check.same("undated and completed work is left out", 2, found.size());
-            check.same("sorted by the date that applies", "Late lab",
-                Json.object(found.get(0)).get("name"));
-            check.same("a personal due date is used", "2026-09-04T06:59:00Z",
-                Json.object(found.get(1)).get("effective_due_at"));
-            check.same("the course is named", "Bio", Json.object(found.get(0)).get("course_name"));
-            check.ok("an unreadable course is reported", !Json.flag(result, "complete"));
-            check.same("and named", 1, Json.children(result, "unavailable_courses").size());
-
-            Map<String, Object> withDone = Json.object(canvas(server).due(
-                java.time.Instant.parse("2026-09-01T00:00:00Z"),
-                java.time.Instant.parse("2026-09-10T00:00:00Z"), true));
-            check.same("completed work can be included", 3, Json.children(withDone, "assignments").size());
-        } finally {
-            server.close();
-        }
-    }
-
-    // ------------------------------------------------------------------
 
     private static void ids(Check check) {
         Map<String, Object> args = Json.object(Json.parse("{\"a\":12,\"b\":0,\"c\":\"x\",\"d\":1.5}"));
@@ -427,7 +382,6 @@ public final class NetTests {
             out.reset();
             Web.Got page = web.fetch(server.uri("/article"), out, 1000, null);
             check.ok("html is a page", page.page());
-            check.same("page charset", "ISO-8859-1", page.charset());
             check.same("a page keeps the link's words", "Read this.html", Web.fileName(page, "Read this"));
 
             check.fails("too large refused", () -> web.fetch(server.uri("/files/notes.pdf"),

@@ -1,5 +1,6 @@
 package com.canvas.xp3;
 
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -8,6 +9,7 @@ import com.canvas.xp3.data.Dates;
 import com.canvas.xp3.data.Prefs;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 /**
@@ -45,14 +47,14 @@ final class SettingsScreen extends Screen {
     }
 
     private Item setting(String key, String name, String value, Runnable change) {
-        Item row = new Item(app, key, "Change", change);
+        Item row = new Item(app, key, change);
         LinearLayout line = v.row();
         v.pad(line, 12, 7, 12, 7);
         MarkText label = v.mark(name, 11, look.semibold, look.ink);
         line.addView(label, Views.fill());
         TextView current = v.text(value, 9.5f, look.medium, look.muted);
         current.setSingleLine(true);
-        current.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        current.setEllipsize(TextUtils.TruncateAt.END);
         line.addView(current, v.margins(Views.wrap(), 8, 0, 0, 0));
         row.addView(line, Views.wide());
         row.addView(v.hairline());
@@ -67,7 +69,7 @@ final class SettingsScreen extends Screen {
     private static String weekLabel(String value) {
         if (Prefs.MONDAY.equals(value)) return "Monday";
         if (Prefs.SUNDAY.equals(value)) return "Sunday";
-        return java.util.Calendar.getInstance().getFirstDayOfWeek() == java.util.Calendar.SUNDAY
+        return Calendar.getInstance().getFirstDayOfWeek() == Calendar.SUNDAY
             ? "Sunday (region)" : "Monday (region)";
     }
 
@@ -112,7 +114,7 @@ final class SettingsScreen extends Screen {
     private void week() {
         // Until chosen the region decides, and its day is the one in use.
         String current = app.prefs.weekStart != null ? app.prefs.weekStart
-            : java.util.Calendar.getInstance().getFirstDayOfWeek() == java.util.Calendar.SUNDAY
+            : Calendar.getInstance().getFirstDayOfWeek() == Calendar.SUNDAY
             ? Prefs.SUNDAY : Prefs.MONDAY;
         choose("Week starts on", new String[] { Prefs.MONDAY, Prefs.SUNDAY }, new String[] { "Monday", "Sunday" },
             current, null, value -> app.savePrefs(app.prefs.withWeekStart(value)));

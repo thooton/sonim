@@ -1,6 +1,7 @@
 package com.canvas.xp3;
 
 import android.os.Environment;
+import android.util.TypedValue;
 import android.view.View;
 import android.webkit.MimeTypeMap;
 import android.widget.LinearLayout;
@@ -17,6 +18,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -91,9 +94,9 @@ final class PickerScreen extends Screen {
     View build() {
         Parts parts = new Parts(app);
         LinearLayout root = v.column();
-        root.addView(parts.nav(folder == null ? "Add work" : "Back", (String) null), Views.wide());
+        root.addView(parts.nav(folder == null ? "Add work" : "Back"), Views.wide());
         TextView heading = v.screenTitle(imagesOnly ? "Choose a picture" : "Choose a file");
-        heading.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16 * look.scale);
+        heading.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16 * look.scale);
         v.pad(heading, 12, 0, 12, 0);
         root.addView(heading, Views.wide());
         TextView where = v.meta(path());
@@ -106,7 +109,7 @@ final class PickerScreen extends Screen {
             for (int i = 0; i < places.size(); i++) {
                 final File place = places.get(i);
                 String name = i == 0 ? "Phone" : "SD card";
-                list.addView(parts.tiled("dir:" + place.getPath(), "Open", R.drawable.ic_folder, look.paper, look.ink,
+                list.addView(parts.tiled("dir:" + place.getPath(), R.drawable.ic_folder, look.paper, look.ink,
                     name, count(place), null, () -> {
                         folder = place;
                         app.redraw();
@@ -114,7 +117,7 @@ final class PickerScreen extends Screen {
             }
             File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
             if (downloads.isDirectory()) {
-                list.addView(parts.tiled("dir:" + downloads.getPath(), "Open", R.drawable.ic_folder, look.paper,
+                list.addView(parts.tiled("dir:" + downloads.getPath(), R.drawable.ic_folder, look.paper,
                     look.ink, "Downloads", count(downloads), null, () -> {
                         folder = downloads;
                         app.redraw();
@@ -133,13 +136,13 @@ final class PickerScreen extends Screen {
                 else if (!imagesOnly || isImage(file)) files.add(file);
             }
         }
-        java.util.Comparator<File> order = byName
+        Comparator<File> order = byName
             ? (a, b) -> a.getName().compareToIgnoreCase(b.getName())
             : (a, b) -> Long.compare(b.lastModified(), a.lastModified());
-        java.util.Collections.sort(folders, order);
-        java.util.Collections.sort(files, order);
+        Collections.sort(folders, order);
+        Collections.sort(files, order);
         for (final File dir : folders) {
-            list.addView(parts.tiled("dir:" + dir.getPath(), "Open", R.drawable.ic_folder, look.paper, look.ink,
+            list.addView(parts.tiled("dir:" + dir.getPath(), R.drawable.ic_folder, look.paper, look.ink,
                 dir.getName(), count(dir), null, () -> {
                     folder = dir;
                     app.redraw();
@@ -147,7 +150,7 @@ final class PickerScreen extends Screen {
         }
         for (final File file : files) {
             String meta = Parts.size(file.length()) + " · " + Dates.shortDay(file.lastModified()).split(", ")[1];
-            Item row = parts.tiled("file:" + file.getPath(), "Select", R.drawable.ic_doc, look.paper, look.ink,
+            Item row = parts.tiled("file:" + file.getPath(), R.drawable.ic_doc, look.paper, look.ink,
                 file.getName(), meta, null, () -> choose(file));
             list.addView(row, Views.wide());
         }
@@ -170,8 +173,7 @@ final class PickerScreen extends Screen {
 
     private static String count(File dir) {
         String[] names = dir.list();
-        int n = names == null ? 0 : names.length;
-        return n + (n == 1 ? " item" : " items");
+        return Parts.items(names == null ? 0 : names.length);
     }
 
     private static boolean isImage(File file) {

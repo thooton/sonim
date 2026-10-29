@@ -1,10 +1,12 @@
 package com.canvas.xp3;
 
 import android.Manifest;
+import android.media.MediaScannerConnection;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Detail;
 import com.canvas.xp3.data.Link;
+import com.xp3.common.ui.Card;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -47,9 +49,9 @@ final class LinkMenu {
     private static void save(final MainActivity app, final Link link, final String title) {
         app.say("Downloading…");
         app.background(() -> {
-            File kept = link.kind == Link.FILE ? app.backend.download(link.id, null) : app.backend.fetchLink(link, title);
-            File saved = app.backend.saveToCard(com.xp3.common.ui.Card.root(app), kept);
-            android.media.MediaScannerConnection.scanFile(app, new String[] { saved.getPath() }, null, null);
+            File kept = link.kind == Link.FILE ? app.backend.download(link.id) : app.backend.fetchLink(link, title);
+            File saved = app.backend.saveToCard(Card.root(app), kept);
+            MediaScannerConnection.scanFile(app, new String[] { saved.getPath() }, null, null);
             return saved;
         }, (saved, failure) -> app.say(saved != null ? "Saved to SD card/Download/" + saved.getName() : failure));
     }

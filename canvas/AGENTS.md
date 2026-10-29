@@ -45,8 +45,6 @@ rationale comments beside the implementation.
   - `net/Canvas.java`, `RemoteCookies.java`, and `Cookies.java` implement
     fixed Canvas routes and short-lived cookie access over the shared bounded
     `Http` (`common/core`).
-    `grading`, `enrollment`, `gradingStandard` and `due` are unused leftovers
-    from the chat; they remain tested.
   - `data/Link.java` reads a link in a teacher's text: a Canvas file, an
     assignment, another Canvas page, or the web (with Google Drive, Docs and
     Dropbox viewer links pointed at the file behind them). `net/Web.java`
@@ -56,8 +54,8 @@ rationale comments beside the implementation.
     saved work and how it becomes one submission (`Draft.plan`),
     notifications, settings, quizzes and reminder times.
 - `android/app`: Android UI and orchestration.
-  - `MainActivity.java` owns the screen stack, the hidden softkey bar, overlays,
-    key routing, sync and turn-in orchestration.
+  - `MainActivity.java` owns the screen stack, overlays, key routing, sync and
+    turn-in orchestration.
   - Each screen is a `Screen` subclass that rebuilds its whole view from its
     state; `MainActivity` restores focus by `Item.key` afterwards.
   - `Look` (palette, fonts, text scale), `Views` and `Parts` (shared shapes),
@@ -174,8 +172,9 @@ d-pad reachability and visible selection for every action.
 
 - The home tab indices intentionally equal `Assignment.ASSIGNED`, `MISSING`,
   and `DONE`.
-- Yellow (`Look.mark`) means focus and nothing else. The softkey bar is
-  hidden (its labels are still kept up to date, unshown).
+- Yellow (`Look.mark`) means focus and nothing else. No softkey bar is
+  drawn, so nothing names what OK or Menu does; `Screen.menu` only says
+  whether Menu opens Options.
 - The phone has two softkeys, Menu and Back, used like a right click and a
   back arrow: Menu (MENU or SOFT_LEFT) opens Options and Back goes back.
   Never give either another job, and never put an action on a softkey alone:

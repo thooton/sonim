@@ -55,7 +55,7 @@ final class ClassesScreen extends Screen {
             for (Assignment item : app.todos.inState(Assignment.ASSIGNED, now)) {
                 if (item.courseId.equals(course.id) && item.due != null) due++;
             }
-            Item row = new Item(app, "class:" + course.id, "Open", () -> app.push(new ClassScreen(app, course)));
+            Item row = new Item(app, "class:" + course.id, () -> app.push(new ClassScreen(app, course)));
             LinearLayout line = v.row();
             v.pad(line, 12, 6, 12, 6);
             line.addView(tile(course));

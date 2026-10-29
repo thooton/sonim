@@ -40,15 +40,8 @@ public final class Web {
             return type.toLowerCase(Locale.US).startsWith("text/html")
                 || type.toLowerCase(Locale.US).startsWith("application/xhtml");
         }
-
-        /** The page's declared character set, or UTF-8. */
-        public String charset() {
-            Matcher m = CHARSET.matcher(type);
-            return m.find() ? m.group(1) : "UTF-8";
-        }
     }
 
-    private static final Pattern CHARSET = Pattern.compile("(?i)charset=\"?([A-Za-z0-9._-]+)");
     private static final Pattern NAME_STAR = Pattern.compile("(?i)filename\\*\\s*=\\s*[A-Za-z0-9_-]*'[^']*'([^;]+)");
     private static final Pattern NAME = Pattern.compile("(?i)filename\\s*=\\s*(?:\"([^\"]*)\"|([^;]+))");
     // Some sites turn away a client that does not look like a browser.

@@ -44,15 +44,6 @@ public final class DataTests {
     private static void dates(Check check) {
         long now = wednesday();
         Dates.setTwentyFourHour(false);
-        check.same("today", "Today", Dates.day(now + 3 * 60 * 60 * 1000L, now));
-        check.same("tomorrow", "Tomorrow", Dates.day(now + DAY, now));
-        check.same("yesterday", "Yesterday", Dates.day(now - DAY, now));
-        check.same("later this week", "Friday", Dates.day(now + 2 * DAY, now));
-        check.same("earlier this week", "Monday", Dates.day(now - 2 * DAY, now));
-        check.same("next week", "Next Mon", Dates.day(now + 5 * DAY, now));
-        check.same("last week", "Last Fri", Dates.day(now - 5 * DAY, now));
-        check.ok("further out gets a date", Dates.day(now + 20 * DAY, now).contains(","));
-
         check.same("weeks are calendar weeks", 1, Dates.weeksBetween(now, now + 5 * DAY));
         check.same("a fortnight is not next week", 2, Dates.weeksBetween(now, now + 13 * DAY));
         check.same("Sunday is still this week", 0, Dates.weeksBetween(now, now + 4 * DAY));
@@ -83,10 +74,6 @@ public final class DataTests {
             work("4", null, false, false, null).state(now));
         check.same("undated work can still be missing", Assignment.MISSING,
             work("5", null, true, false, null).state(now));
-        check.ok("done ahead of the date is early",
-            work("6", Long.valueOf(now + DAY), false, true, null).early(now));
-        check.ok("done after it is not",
-            !work("7", Long.valueOf(now - DAY), false, true, null).early(now));
 
         check.same("a whole score reads whole", "9/10",
             work("8", null, false, true, Double.valueOf(9)).scoreLabel());

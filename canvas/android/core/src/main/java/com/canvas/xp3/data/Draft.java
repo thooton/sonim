@@ -72,10 +72,6 @@ public final class Draft {
             return new Piece(id, kind, value, text, url, file, mime, size, amount, uploaded);
         }
 
-        public Piece withText(String value) {
-            return new Piece(id, kind, name, value, url, file, mime, size, amount, null);
-        }
-
         /** A typed answer with its formatting, in `Rich`'s form. */
         public Piece withRich(String stored) {
             return new Piece(id, kind, name, stored, url, file, Rich.MIME, size, amount, null);

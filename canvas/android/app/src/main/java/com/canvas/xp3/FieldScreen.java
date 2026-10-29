@@ -9,6 +9,8 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.xp3.common.ui.Ui;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -54,16 +56,6 @@ final class FieldScreen extends Screen {
     }
 
     @Override
-    String left() {
-        return "Options";
-    }
-
-    @Override
-    String center() {
-        return "Save";
-    }
-
-    @Override
     boolean globalOptions() {
         return false;
     }
@@ -89,7 +81,7 @@ final class FieldScreen extends Screen {
     View build() {
         Parts parts = new Parts(app);
         LinearLayout root = v.column();
-        root.addView(parts.nav("Back", (String) null), Views.wide());
+        root.addView(parts.nav("Back"), Views.wide());
         TextView heading = v.screenTitle(title);
         v.pad(heading, 12, 0, 12, 0);
         root.addView(heading, Views.wide());
@@ -111,12 +103,11 @@ final class FieldScreen extends Screen {
     @Override
     void shown() {
         field.requestFocus();
-        app.refreshKeys();
     }
 
     @Override
     boolean onKey(KeyEvent event) {
-        if (com.xp3.common.ui.Ui.isOk(event.getKeyCode())) {
+        if (Ui.isOk(event.getKeyCode())) {
             // Acting on the release: dismissing on the press would hand the
             // release to the screen underneath, which reads it as OK again.
             if (event.getAction() == KeyEvent.ACTION_UP) {

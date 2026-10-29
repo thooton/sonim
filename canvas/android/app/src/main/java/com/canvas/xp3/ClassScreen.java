@@ -1,5 +1,10 @@
 package com.canvas.xp3;
 
+import android.content.Intent;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
+import android.net.Uri;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -14,6 +19,7 @@ import com.canvas.xp3.data.Dates;
 import com.canvas.xp3.data.Detail;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -127,10 +133,10 @@ final class ClassScreen extends Screen {
             v.pad(label, 0, 0, 0, 5);
             if (on) {
                 // The open tab's ink rule, drawn under its own text only.
-                android.graphics.drawable.GradientDrawable rule = new android.graphics.drawable.GradientDrawable();
+                GradientDrawable rule = new GradientDrawable();
                 rule.setColor(look.ink);
-                android.graphics.drawable.LayerDrawable under = new android.graphics.drawable.LayerDrawable(
-                    new android.graphics.drawable.Drawable[] { rule });
+                LayerDrawable under = new LayerDrawable(
+                    new Drawable[] { rule });
                 under.setLayerGravity(0, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL);
                 under.setLayerHeight(0, v.dp(2));
                 label.setBackground(under);
@@ -164,7 +170,7 @@ final class ClassScreen extends Screen {
         }
         if (next != null) {
             final Assignment upcoming = next;
-            Item card = new Item(app, "upcoming", "Open", () -> app.push(new AssignmentScreen(app, upcoming, "Stream")));
+            Item card = new Item(app, "upcoming", () -> app.push(new AssignmentScreen(app, upcoming, "Stream")));
             LinearLayout inside = v.column();
             v.pad(inside, 9, 6, 9, 6);
             inside.addView(v.label("Upcoming"));
@@ -203,7 +209,7 @@ final class ClassScreen extends Screen {
         }
         v.pad(text, 0, 3, 0, 0);
         card.addView(text, Views.wide());
-        Item foot = new Item(app, "post:" + post.id, "Open", () -> app.push(new PostScreen(app, course, post)));
+        Item foot = new Item(app, "post:" + post.id, () -> app.push(new PostScreen(app, course, post)));
         LinearLayout line = v.row();
         v.pad(line, 0, 5, 0, 0);
         line.addView(v.icon(R.drawable.ic_comment, look.ink, 11));
@@ -230,7 +236,7 @@ final class ClassScreen extends Screen {
             v.pad(heading, 12, 8, 12, 2);
             TextView name = v.text(topic.name, 10.5f, look.heavy, look.ink);
             heading.addView(name, Views.fill());
-            heading.addView(v.text(count + (count == 1 ? " item" : " items"), 8.5f, look.semibold, look.muted));
+            heading.addView(v.text(Parts.items(count), 8.5f, look.semibold, look.muted));
             page.addView(heading, Views.wide());
             for (int i = 0; i < topic.items.size(); i++) {
                 final ClassData.Item item = topic.items.get(i);
@@ -279,7 +285,7 @@ final class ClassScreen extends Screen {
             meta += " · Due " + Dates.shortDay(item.due.longValue());
         }
         int tint = look.course(course.color);
-        return parts.tiled(key, "Open", icon, look.courseWash(course.color), tint, item.title, meta, right,
+        return parts.tiled(key, icon, look.courseWash(course.color), tint, item.title, meta, right,
             () -> open(item));
     }
 
@@ -308,8 +314,8 @@ final class ClassScreen extends Screen {
         } else if (item.url != null) {
             Sheet.ask(app, item.title, item.url, "Open in browser", "Close", () -> {
                 try {
-                    app.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse(item.url)));
+                    app.startActivity(new Intent(Intent.ACTION_VIEW,
+                        Uri.parse(item.url)));
                 } catch (RuntimeException e) {
                     app.say("This phone has no browser for that.");
                 }
@@ -328,7 +334,7 @@ final class ClassScreen extends Screen {
                 page.addView(parts.section(group, null), Views.wide());
                 last = group;
             }
-            Item row = new Item(app, "person:" + i, null, null);
+            Item row = new Item(app, "person:" + i, null);
             LinearLayout line = v.row();
             v.pad(line, 12, 5, 12, 5);
             line.addView(parts.avatar(person.name, "Student".equals(person.role) ? look.faint
@@ -364,7 +370,7 @@ final class ClassScreen extends Screen {
             if (work.returned || work.excused) returned.add(work);
             else if (work.done && work.points > 0) waiting.add(work);
         }
-        java.util.Collections.sort(returned, (a, b) -> Long.compare(at(b), at(a)));
+        Collections.sort(returned, (a, b) -> Long.compare(at(b), at(a)));
         for (final Assignment work : returned) {
             Long when = work.gradedAt != null ? work.gradedAt : work.turnedIn;
             String chip = work.gradeChip();
@@ -389,7 +395,7 @@ final class ClassScreen extends Screen {
     }
 
     private Item row(final Assignment work, String meta, View right) {
-        Item row = new Item(app, "g:" + work.id, "Open", () -> app.push(new AssignmentScreen(app, work, "Grades")));
+        Item row = new Item(app, "g:" + work.id, () -> app.push(new AssignmentScreen(app, work, "Grades")));
         LinearLayout line = v.row();
         v.pad(line, 12, 6, 12, 6);
         LinearLayout text = v.column();

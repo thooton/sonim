@@ -1,5 +1,6 @@
 package com.canvas.xp3;
 
+import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -9,8 +10,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.xp3.common.ui.Ui;
-
 import java.util.List;
 
 /**
@@ -18,8 +17,8 @@ import java.util.List;
  * and a short question with two buttons.
  *
  * Each is drawn in the page itself over a dimmed screen, not as a system
- * dialog, so it keeps the type, the highlighter and the softkey bar. A menu's
- * numbers are keys: pressing one picks that row.
+ * dialog, so it keeps the type and the highlighter. A menu's numbers are
+ * keys: pressing one picks that row.
  */
 final class Sheet {
 
@@ -48,14 +47,10 @@ final class Sheet {
     /** What the activity needs to run an open overlay. */
     static final class Open {
         final View view;
-        final String left;
-        final String center;
         final List<Choice> numbered;
 
-        Open(View view, String left, String center, List<Choice> numbered) {
+        Open(View view, List<Choice> numbered) {
             this.view = view;
-            this.left = left;
-            this.center = center;
             this.numbered = numbered;
         }
 
@@ -81,7 +76,7 @@ final class Sheet {
         LinearLayout sheet = sheet(v, title);
         for (int i = 0; i < choices.size(); i++) {
             final Choice choice = choices.get(i);
-            Item row = new Item(app, "menu:" + i, "Select", () -> {
+            Item row = new Item(app, "menu:" + i, () -> {
                 app.closeOverlay();
                 choice.action.run();
             });
@@ -98,7 +93,7 @@ final class Sheet {
             row.keyed(badge, name, v);
             sheet.addView(row, Views.wide());
         }
-        app.openOverlay(new Open(wrap(app, sheet, true), "Close", "Select", choices));
+        app.openOverlay(new Open(wrap(app, sheet), choices));
     }
 
     /** A choice among values (H3): large rows, the current one filled with an ink dot. */
@@ -122,8 +117,8 @@ final class Sheet {
             v.pad(help, 12, 6, 12, 2);
             sheet.addView(help, Views.wide());
         }
-        View wrapped = wrap(app, sheet, true);
-        app.openOverlay(new Open(wrapped, "Cancel", "Select", null));
+        View wrapped = wrap(app, sheet);
+        app.openOverlay(new Open(wrapped, null));
         Item first = Screen.find(wrapped, "pick:" + start);
         if (first != null) first.requestFocus();
     }
@@ -134,7 +129,7 @@ final class Sheet {
      */
     static Item option(MainActivity app, final Views v, String key, String label, boolean chosen, Runnable action) {
         final Look look = v.look;
-        Item option = new Item(app, key, "Select", action);
+        Item option = new Item(app, key, action);
         LinearLayout line = v.row();
         v.pad(line, 9, 7, 9, 7);
         View radio = radio(v, chosen, false);
@@ -163,8 +158,8 @@ final class Sheet {
     private static void fillRadio(Views v, FrameLayout ring, boolean chosen, boolean focused) {
         Look look = v.look;
         int edge = focused ? Look.ON_MARK : chosen ? look.ink : look.faint;
-        android.graphics.drawable.GradientDrawable circle = new android.graphics.drawable.GradientDrawable();
-        circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
         circle.setStroke(Math.max(1, v.dp(1.5f)), edge);
         ring.setBackground(circle);
         if (chosen) {
@@ -196,21 +191,18 @@ final class Sheet {
             app.closeOverlay();
             onYes.run();
         });
-        box.addView(primary, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 12, 10, 12, 0));
+        box.addView(primary, v.margins(v.buttonRow(), 12, 10, 12, 0));
         // A statement has nothing to decline: one OK, and Back closes it too.
         if (no != null) {
             Item secondary = button(app, v, "ask:no", no, false, app::closeOverlay);
-            box.addView(secondary, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 12, 8, 12, 0));
+            box.addView(secondary, v.margins(v.buttonRow(), 12, 8, 12, 0));
         }
 
-        FrameLayout layer = new FrameLayout(app);
-        View shade = new View(app);
-        shade.setBackgroundColor(look.dim);
-        layer.addView(shade, new FrameLayout.LayoutParams(-1, -1));
+        FrameLayout layer = shade(app);
         FrameLayout.LayoutParams at = new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL);
         at.setMargins(v.dp(12), 0, v.dp(12), 0);
         layer.addView(box, at);
-        app.openOverlay(new Open(layer, "Cancel", yes, null));
+        app.openOverlay(new Open(layer, null));
         primary.requestFocus();
     }
 
@@ -220,7 +212,7 @@ final class Sheet {
      */
     static Item button(MainActivity app, Views v, String key, String label, boolean primary, Runnable action) {
         Look look = v.look;
-        Item button = new Item(app, key, label, action);
+        Item button = new Item(app, key, action);
         button.setGravity(Gravity.CENTER);
         TextView name = v.text(label, 11.5f, look.heavy, primary ? look.bg : look.ink);
         name.setGravity(Gravity.CENTER);
@@ -236,11 +228,7 @@ final class Sheet {
     private static LinearLayout sheet(Views v, String title) {
         Look look = v.look;
         LinearLayout sheet = v.column();
-        android.graphics.drawable.GradientDrawable top = new android.graphics.drawable.GradientDrawable();
-        top.setColor(look.bg);
-        float r = v.dp(14);
-        top.setCornerRadii(new float[] { r, r, r, r, 0, 0, 0, 0 });
-        sheet.setBackground(top);
+        sheet.setBackground(v.topRounded(look.bg, 14));
         v.pad(sheet, 0, 5, 0, 4);
         View grab = new View(v.context);
         grab.setBackground(v.round(look.line, 2, 0, 0));
@@ -254,21 +242,23 @@ final class Sheet {
         return sheet;
     }
 
-    private static View wrap(MainActivity app, LinearLayout sheet, boolean bottom) {
-        Views v = app.views();
-        FrameLayout layer = new FrameLayout(app);
-        View shade = new View(app);
-        shade.setBackgroundColor(v.look.dim);
-        layer.addView(shade, new FrameLayout.LayoutParams(-1, -1));
+    /** A sheet at the foot of the dimmed screen, scrolling if it is taller than the screen. */
+    private static View wrap(MainActivity app, LinearLayout sheet) {
+        FrameLayout layer = shade(app);
         ScrollView scroll = new ScrollView(app);
         scroll.setDefaultFocusHighlightEnabled(false);
         scroll.setFillViewport(false);
         scroll.addView(sheet, new FrameLayout.LayoutParams(-1, -2));
-        layer.addView(scroll, new FrameLayout.LayoutParams(-1, -2, bottom ? Gravity.BOTTOM : Gravity.CENTER));
+        layer.addView(scroll, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
         return layer;
     }
 
-    static boolean isOk(int code) {
-        return Ui.isOk(code);
+    /** The screen dimmed under an overlay. */
+    private static FrameLayout shade(MainActivity app) {
+        FrameLayout layer = new FrameLayout(app);
+        View shade = new View(app);
+        shade.setBackgroundColor(app.views().look.dim);
+        layer.addView(shade, new FrameLayout.LayoutParams(-1, -1));
+        return layer;
     }
 }

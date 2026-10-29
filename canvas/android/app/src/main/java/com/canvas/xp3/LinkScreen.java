@@ -1,6 +1,7 @@
 package com.canvas.xp3;
 
 import android.text.InputType;
+import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.EditText;
@@ -9,6 +10,7 @@ import android.widget.TextView;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Draft;
+import com.xp3.common.ui.Ui;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,11 +36,6 @@ final class LinkScreen extends Screen {
     }
 
     @Override
-    String center() {
-        return "Add";
-    }
-
-    @Override
     List<Sheet.Choice> options() {
         List<Sheet.Choice> out = new ArrayList<>();
         final View focus = app.getCurrentFocus();
@@ -52,7 +49,7 @@ final class LinkScreen extends Screen {
     @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
-        if (com.xp3.common.ui.Ui.isOk(code) && app.getCurrentFocus() instanceof EditText) {
+        if (Ui.isOk(code) && app.getCurrentFocus() instanceof EditText) {
             if (event.getAction() == KeyEvent.ACTION_UP) add();
             return true;
         }
@@ -83,9 +80,9 @@ final class LinkScreen extends Screen {
     View build() {
         Parts parts = new Parts(app);
         LinearLayout root = v.column();
-        root.addView(parts.nav("Add work", (String) null), Views.wide());
+        root.addView(parts.nav("Add work"), Views.wide());
         TextView heading = v.screenTitle("Add a link");
-        heading.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16 * look.scale);
+        heading.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16 * look.scale);
         v.pad(heading, 12, 0, 12, 0);
         root.addView(heading, Views.wide());
 
@@ -101,7 +98,7 @@ final class LinkScreen extends Screen {
         v.pad(chips, 12, 7, 12, 0);
         for (int i = 0; i < PIECES.length; i++) {
             final String piece = PIECES[i];
-            Item chip = new Item(app, "chip:" + i, "Insert", () -> insert(piece));
+            Item chip = new Item(app, "chip:" + i, () -> insert(piece));
             LinearLayout inside = v.row();
             v.pad(inside, 6, 2, 6, 2);
             inside.addView(v.text(Integer.toString(i + 1), 9.5f, look.semibold, look.muted));

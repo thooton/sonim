@@ -18,7 +18,6 @@ import com.xp3.common.ui.Ui;
  * dim screen or to a student who does not see yellow.
  *
  * OK acts on release, and both the codes Sonim firmware sends for it work.
- * Each item names what OK does, which the softkey bar shows in its middle.
  */
 final class Item extends LinearLayout {
 
@@ -27,16 +26,14 @@ final class Item extends LinearLayout {
     }
 
     final String key;
-    String ok;
     Runnable action;
     Painter painter;
     /** The day this row belongs to, on the home timeline; 0 elsewhere. */
     long day;
 
-    Item(Context context, String key, String ok, Runnable action) {
+    Item(Context context, String key, Runnable action) {
         super(context);
         this.key = key;
-        this.ok = ok;
         this.action = action;
         setOrientation(VERTICAL);
         setFocusable(true);
@@ -46,7 +43,6 @@ final class Item extends LinearLayout {
         setOnClickListener(view -> fire());
         setOnFocusChangeListener((view, focused) -> {
             if (painter != null) painter.paint(focused);
-            if (focused && getContext() instanceof MainActivity) ((MainActivity) getContext()).focusMoved(this);
         });
     }
 

@@ -2,6 +2,7 @@ package com.canvas.xp3;
 
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Course;
@@ -40,7 +41,7 @@ final class NoticesScreen extends Screen {
     View build() {
         Parts parts = new Parts(app);
         LinearLayout root = v.column();
-        android.widget.TextView heading = v.screenTitle("Notifications");
+        TextView heading = v.screenTitle("Notifications");
         v.pad(heading, 12, 4, 12, 6);
         root.addView(heading, Views.wide());
         if (notices.isEmpty() && loading) return parts.spinner();
@@ -75,7 +76,7 @@ final class NoticesScreen extends Screen {
                 : Notice.COMMENT.equals(notice.kind) ? R.drawable.ic_comment
                 : Notice.REMINDER.equals(notice.kind) ? R.drawable.ic_bell : R.drawable.ic_forum;
             String meta = notice.detail + " · " + Dates.time(notice.at);
-            list.addView(parts.tiled("n:" + i, "Open", icon, look.paper, look.ink, notice.title, meta, null,
+            list.addView(parts.tiled("n:" + i, icon, look.paper, look.ink, notice.title, meta, null,
                 () -> open(notice)), Views.wide());
         }
         return root;

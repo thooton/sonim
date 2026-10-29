@@ -11,7 +11,6 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.math.BigDecimal;
 import java.net.URI;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -68,15 +67,10 @@ public final class Canvas {
         this.sleeper = sleeper;
     }
 
-    public List<Object> courses(boolean activeOnly) throws IOException, InterruptedException {
+    /** The student's active courses. */
+    public List<Object> courses() throws IOException, InterruptedException {
         return list("courses?enrollment_type=student&include%5B%5D=total_scores&include%5B%5D=term"
-            + "&include%5B%5D=teachers"
-            + (activeOnly ? "&enrollment_state=active" : ""), COURSE_FIELDS);
-    }
-
-    public Object course(String id) throws IOException, InterruptedException {
-        return select(get("courses/" + id
-            + "?include%5B%5D=syllabus_body&include%5B%5D=total_scores&include%5B%5D=term"), COURSE_FIELDS);
+            + "&include%5B%5D=teachers&enrollment_state=active", COURSE_FIELDS);
     }
 
     public List<Object> assignments(String course) throws IOException, InterruptedException {
@@ -87,95 +81,12 @@ public final class Canvas {
         Map<String, Object> data = Json.object(get("courses/" + course + "/assignments/" + id
             + "?" + INCLUDE_SUBMISSION));
         Map<String, Object> result = select(data, ASSIGNMENT_FIELDS);
-        String[] extra = { "description", "rubric", "rubric_settings", "lock_info", "lock_explanation",
-            "submission_types", "allowed_extensions" };
-        for (int i = 0; i < extra.length; i++) {
-            if (data.containsKey(extra[i])) result.put(extra[i], data.get(extra[i]));
-        }
+        result.putAll(select(data, DETAIL_FIELDS));
         return result;
     }
 
-    public Object grading(String course) throws IOException, InterruptedException {
-        return list("courses/" + course + "/assignment_groups",
-            new String[] { "id", "name", "group_weight", "rules", "position" });
-    }
-
-    public Object enrollment(String course) throws IOException, InterruptedException {
-        return list("courses/" + course + "/enrollments?user_id=self&type%5B%5D=StudentEnrollment",
-            new String[] { "course_id", "type", "enrollment_state", "grades", "html_url" });
-    }
-
-    public Object gradingStandard(String course, String standard) throws IOException, InterruptedException {
-        return get("courses/" + course + "/grading_standards/" + standard);
-    }
-
-    public Object posts(String course, boolean announcements) throws IOException, InterruptedException {
-        return list("courses/" + course + "/discussion_topics?order_by=recent_activity&only_announcements="
-            + announcements, POST_FIELDS);
-    }
-
-    public Object post(String course, String topic) throws IOException, InterruptedException {
-        return select(get("courses/" + course + "/discussion_topics/" + topic), POST_FIELDS);
-    }
-
-    public Object entries(String course, String topic) throws IOException, InterruptedException {
+    public List<Object> entries(String course, String topic) throws IOException, InterruptedException {
         return list("courses/" + course + "/discussion_topics/" + topic + "/entries", ENTRY_FIELDS);
-    }
-
-    public Object replies(String course, String topic, String entry) throws IOException, InterruptedException {
-        return list("courses/" + course + "/discussion_topics/" + topic + "/entries/" + entry + "/replies",
-            ENTRY_FIELDS);
-    }
-
-    public Object pages(String course) throws IOException, InterruptedException {
-        return list("courses/" + course + "/pages", PAGE_FIELDS);
-    }
-
-    public Object page(String course, String page) throws IOException, InterruptedException {
-        return select(get("courses/" + course + "/pages/page_id:" + page), PAGE_FIELDS);
-    }
-
-    /**
-     * Dated work across every active course, sorted by the date that actually
-     * applies to this student rather than the one printed on the assignment.
-     */
-    public Object due(Instant from, Instant to, boolean includeCompleted)
-        throws IOException, InterruptedException {
-        if (!from.isBefore(to)) throw new IllegalArgumentException("from must be before to (exclusive)");
-        List<Object> found = new ArrayList<Object>();
-        List<Object> failures = new ArrayList<Object>();
-        for (Object c : courses(true)) {
-            Map<String, Object> course = Json.object(c);
-            String id = id(course, "id");
-            try {
-                for (Object a : assignments(id)) {
-                    Map<String, Object> assignment = new LinkedHashMap<String, Object>(Json.object(a));
-                    Map<String, Object> submission = Json.child(assignment, "submission");
-                    Object date = submission.containsKey("cached_due_date")
-                        ? submission.get("cached_due_date")
-                        : assignment.get("due_at");
-                    if (!(date instanceof String)) continue;
-                    Instant due = Instant.parse((String) date);
-                    if (due.isBefore(from) || !due.isBefore(to)) continue;
-                    if (!includeCompleted && Submissions.completed(submission)) continue;
-                    assignment.put("effective_due_at", date);
-                    assignment.put("course_name", course.get("name"));
-                    assignment.put("course_id", course.get("id"));
-                    found.add(assignment);
-                }
-            } catch (IOException e) {
-                failures.add(Json.map("course_id", id, "error", e.getMessage()));
-            } catch (IllegalArgumentException e) {
-                failures.add(Json.map("course_id", id, "error", "Invalid Canvas data"));
-            }
-        }
-        Collections.sort(found, (left, right) -> {
-            return Instant.parse((String) Json.object(left).get("effective_due_at"))
-                .compareTo(Instant.parse((String) Json.object(right).get("effective_due_at")));
-        });
-        return Json.map("from", from.toString(), "to_exclusive", to.toString(), "assignments", found,
-            "complete", Boolean.valueOf(failures.isEmpty()), "unavailable_courses", failures,
-            "scope", "Active student enrollments; dated assignments only. No-date work is available via list_assignments.");
     }
 
     // ------------------------------------------------------------------
@@ -235,11 +146,7 @@ public final class Canvas {
     public Map<String, Object> submission(String course, String assignment) throws IOException, InterruptedException {
         Map<String, Object> data = Json.object(get("courses/" + course + "/assignments/" + assignment
             + "/submissions/self?include%5B%5D=submission_comments&include%5B%5D=rubric_assessment"));
-        Map<String, Object> result = new LinkedHashMap<String, Object>();
-        for (int i = 0; i < OWN_SUBMISSION_FIELDS.length; i++) {
-            String key = OWN_SUBMISSION_FIELDS[i];
-            if (data.containsKey(key)) result.put(key, data.get(key));
-        }
+        Map<String, Object> result = select(data, OWN_SUBMISSION_FIELDS);
         if (result.get("attachments") instanceof List) {
             result.put("attachments", selectAll(Json.array(result.get("attachments")), FILE_FIELDS));
         }
@@ -254,7 +161,7 @@ public final class Canvas {
         return select(get("files/" + id), FILE_FIELDS);
     }
 
-    public Map<String, Object> pageById(String course, String id) throws IOException, InterruptedException {
+    public Map<String, Object> page(String course, String id) throws IOException, InterruptedException {
         return select(get("courses/" + course + "/pages/page_id:" + id), PAGE_FIELDS);
     }
 
@@ -306,9 +213,7 @@ public final class Canvas {
             throw new IOException("This file can't be downloaded.");
         }
         for (int hop = 0; hop < 5; hop++) {
-            if (!"https".equals(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null) {
-                throw new IOException("Refused a download address that is not https");
-            }
+            if (!https(uri)) throw new IOException("Refused a download address that is not https");
             Http.Request request = Http.Request.to(uri).timeout(300000).identity();
             if (canvasDownload(base, uri)) request.header("Cookie", cookies.fetch());
             Http.Stream stream = http.stream(request);
@@ -343,6 +248,11 @@ public final class Canvas {
             }
         }
         throw new IOException("Download redirected too many times");
+    }
+
+    /** An https address with a host and no login in it: the only kind a file goes to or comes from. */
+    private static boolean https(URI uri) {
+        return "https".equals(uri.getScheme()) && uri.getHost() != null && uri.getUserInfo() == null;
     }
 
     /** Canvas's own download path, the only place outside the API a cookie is sent. */
@@ -454,9 +364,7 @@ public final class Canvas {
         } catch (IllegalArgumentException e) {
             throw new IOException("Refused an upload address that is not https");
         }
-        if (!"https".equals(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null) {
-            throw new IOException("Refused an upload address that is not https");
-        }
+        if (!https(uri)) throw new IOException("Refused an upload address that is not https");
         String field = Json.text(ticket, "file_param");
         String boundary = "xp3" + Long.toHexString(Double.doubleToLongBits(Math.random()))
             + Long.toHexString(System.nanoTime());
@@ -589,7 +497,7 @@ public final class Canvas {
     }
 
     private Object get(String path) throws IOException, InterruptedException {
-        return Json.parse(request(base.resolve("api/v1/" + path)).body());
+        return Json.parse(send("GET", base.resolve("api/v1/" + path), null, null).body());
     }
 
     private List<Object> list(String path, String[] fields) throws IOException, InterruptedException {
@@ -601,7 +509,7 @@ public final class Canvas {
             if (!seen.add(next) || seen.size() > 100) {
                 throw new IOException("Canvas pagination limit or cycle; results are incomplete");
             }
-            Http.Response response = request(next);
+            Http.Response response = send("GET", next, null, null);
             for (Object item : Json.array(Json.parse(response.body()))) {
                 Map<String, Object> selected = select(item, fields);
                 chars += Json.write(selected).length();
@@ -637,12 +545,7 @@ public final class Canvas {
      * to somebody holding a phone, and "still trying, a minute in" is a thing it
      * can say. Failing after about half a minute and showing the last-known
      * list beats a spinner with no end written into it.
-     */
-    private Http.Response request(URI uri) throws IOException, InterruptedException {
-        return send("GET", uri, null, null);
-    }
-
-    /*
+     *
      * A write is retried only after a 401, which Canvas sends before it has
      * done anything. A write whose connection fails is never sent again: it
      * may have arrived, and turning work in twice is a second attempt the
@@ -669,16 +572,12 @@ public final class Canvas {
                 }
                 response = http.send(request);
             } catch (IOException e) {
-                if (attempt == 0 || !reading) throw e;
                 // Mid-recovery the service itself may be briefly unavailable;
-                // that is the same failure, not a new one.
-                if (attempt >= RETRIES) throw e;
-                cookies.invalidate();
-                sleeper.sleep(delay);
-                delay = Math.min(16000, delay * 2);
-                continue;
+                // that is the same failure as the 401 before it, not a new one.
+                if (attempt == 0 || !reading || attempt >= RETRIES) throw e;
+                response = null;
             }
-            if (response.status() == 401) {
+            if (response == null || response.status() == 401) {
                 cookies.invalidate();
                 if (attempt >= RETRIES) {
                     throw new IOException("Canvas would not accept the session; the cookie service's own login may have expired");
@@ -769,6 +668,9 @@ public final class Canvas {
         "teachers", "course_color",
         "time_zone", "enrollments", "apply_assignment_group_weights", "grading_standard_id",
         "hide_final_grades", "syllabus_body", "public_description", "start_at", "end_at", "grading_periods" };
+    /** What only an assignment's own page needs, on top of ASSIGNMENT_FIELDS. */
+    private static final String[] DETAIL_FIELDS = { "description", "rubric", "rubric_settings", "lock_info",
+        "lock_explanation", "submission_types", "allowed_extensions" };
     private static final String[] ASSIGNMENT_FIELDS = { "id", "course_id", "name", "due_at", "unlock_at",
         "lock_at", "points_possible", "grading_type", "assignment_group_id", "html_url", "submission",
         "has_submitted_submissions", "published", "locked_for_user", "omit_from_final_grade",
@@ -790,29 +692,18 @@ public final class Canvas {
      */
     public static String id(Map<String, Object> args, String key) {
         Object value = args.get(key);
-
         if (!(value instanceof Number)) {
-            throw new IllegalArgumentException(
-                "The '" + key + "' field needs to be a number."
-            );
+            throw new IllegalArgumentException("The '" + key + "' field needs to be a number.");
         }
-
         long parsed;
-
         try {
             parsed = new BigDecimal(value.toString()).longValueExact();
         } catch (ArithmeticException e) {
-            throw new IllegalArgumentException(
-                "The '" + key + "' field needs to be a whole number."
-            );
+            throw new IllegalArgumentException("The '" + key + "' field needs to be a whole number.");
         }
-
         if (parsed <= 0) {
-            throw new IllegalArgumentException(
-                "The '" + key + "' field needs to be a positive number."
-            );
+            throw new IllegalArgumentException("The '" + key + "' field needs to be a positive number.");
         }
-
         return Long.toString(parsed);
     }
 }

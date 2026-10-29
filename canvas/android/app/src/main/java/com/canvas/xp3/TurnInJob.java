@@ -17,6 +17,7 @@ import com.canvas.xp3.data.Detail;
 import com.canvas.xp3.data.Draft;
 import com.canvas.xp3.data.Sync;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -98,7 +99,7 @@ public final class TurnInJob extends JobService {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return true;
-            } catch (java.io.IOException | RuntimeException e) {
+            } catch (IOException | RuntimeException e) {
                 waiting = true;
             } finally {
                 release(draft.key);

@@ -1,10 +1,9 @@
 package com.canvas.xp3;
 
-import android.text.Editable;
 import android.text.InputType;
-import android.text.TextWatcher;
+import android.text.TextUtils;
+import android.util.TypedValue;
 import android.view.Gravity;
-import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -16,8 +15,12 @@ import com.canvas.xp3.data.Dates;
 import com.canvas.xp3.data.Detail;
 import com.canvas.xp3.data.Draft;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * The assignment page (C1, C2, D8, E1, F2, F4, G1): one page scrolled with
@@ -123,7 +126,7 @@ final class AssignmentScreen extends Screen {
         // The title takes the d-pad first, so Down reads down the page before
         // it lands on anything: the instructions come before the buttons.
         MarkText title = v.pageTitle(work.title);
-        Item top = new Item(app, "title", null, null);
+        Item top = new Item(app, "title", null);
         top.addView(title, Views.wide());
         top.marks(title, look);
         v.pad(top, 12, 0, 12, 0);
@@ -140,9 +143,7 @@ final class AssignmentScreen extends Screen {
             }
         } else {
             page.addView(due(work), Views.wide());
-            if (work.done && (work.turnedIn != null || stamped != null)) {
-                page.addView(stamp(work, stamped), Views.wide());
-            } else if (stamped != null) {
+            if (stamped != null || (work.done && work.turnedIn != null)) {
                 page.addView(stamp(work, stamped), Views.wide());
             }
             LinearLayout pills = v.row();
@@ -179,7 +180,7 @@ final class AssignmentScreen extends Screen {
             page.addView(parts.section("From your teacher", null), Views.wide());
             LinearLayout stack = stack();
             for (final Detail.FileRef file : detail.files) {
-                stack.addView(parts.box("file:" + file.id, "Open", parts.fileTile(file.kind()), file.name,
+                stack.addView(parts.box("file:" + file.id, parts.fileTile(file.kind()), file.name,
                     parts.fileMeta(file), () -> app.push(new ViewerScreen(app, file, work.title))), boxGap());
             }
             page.addView(stack, Views.wide());
@@ -198,7 +199,7 @@ final class AssignmentScreen extends Screen {
         page.addView(parts.section("Private comments", detail != null && !detail.comments.isEmpty()
             ? detail.comments.size() + "" : null), Views.wide());
         LinearLayout stack = stack();
-        Item comment = parts.box("comments", "Comment", v.tile(R.drawable.ic_lock, look.paper, look.ink, 24, 13, 6),
+        Item comment = parts.box("comments", v.tile(R.drawable.ic_lock, look.paper, look.ink, 24, 13, 6),
             detail != null && !detail.comments.isEmpty() ? "Private comments" : "Add a private comment",
             null, this::comments);
         stack.addView(comment, boxGap());
@@ -240,7 +241,7 @@ final class AssignmentScreen extends Screen {
         TextView tab = v.text(Dates.weekdayTab(when), 7.5f, look.heavy, look.bg);
         tab.setGravity(Gravity.CENTER);
         tab.setLetterSpacing(0.1f);
-        tab.setBackground(topRounded(look.ink, 6));
+        tab.setBackground(v.topRounded(look.ink, 6));
         v.pad(tab, 0, 2, 0, 2);
         cal.addView(tab, Views.wide());
         TextView day = v.text(Dates.dayOfMonth(when), 16, look.heavy, look.ink);
@@ -251,7 +252,7 @@ final class AssignmentScreen extends Screen {
         row.addView(cal, new LinearLayout.LayoutParams(v.dp(38), -2));
         LinearLayout words = v.column();
         TextView label = v.label("Due");
-        label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 8 * look.scale);
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 8 * look.scale);
         words.addView(label);
         TextView date = v.text(Dates.longDay(when), 13, look.bold, look.ink);
         words.addView(date, v.margins(Views.wrap(), 0, 2, 0, 0));
@@ -259,14 +260,6 @@ final class AssignmentScreen extends Screen {
         words.addView(time, v.margins(Views.wrap(), 0, 1, 0, 0));
         row.addView(words, v.margins(Views.fill(), 10, 0, 0, 0));
         return row;
-    }
-
-    private android.graphics.drawable.GradientDrawable topRounded(int color, float radius) {
-        android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
-        shape.setColor(color);
-        float r = v.dp(radius);
-        shape.setCornerRadii(new float[] { r, r, r, r, 0, 0, 0, 0 });
-        return shape;
     }
 
     /** The green stamp: turned in, when, and how much. */
@@ -280,8 +273,7 @@ final class AssignmentScreen extends Screen {
         words.addView(v.text("Turned in", 13, look.heavy, look.okText));
         long at = stamped != null ? stamped.longValue() : work.turnedIn.longValue();
         int count = submittedCount();
-        String line = Dates.shortDay(at) + " at " + Dates.time(at) + (count > 0 ? " · " + count
-            + (count == 1 ? " item" : " items") : "");
+        String line = Dates.shortDay(at) + " at " + Dates.time(at) + (count > 0 ? " · " + Parts.items(count) : "");
         words.addView(v.text(line, 9, look.semibold, look.okText), v.margins(Views.wrap(), 0, 2, 0, 0));
         box.addView(words, v.margins(Views.fill(), 9, 0, 0, 0));
         LinearLayout holder = v.column();
@@ -346,12 +338,7 @@ final class AssignmentScreen extends Screen {
 
     private View bubble(Detail.Comment said) {
         LinearLayout box = v.column();
-        android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
-        shape.setColor(look.paper);
-        float r = v.dp(12);
-        float small = v.dp(3);
-        shape.setCornerRadii(new float[] { r, r, r, r, r, r, small, small });
-        box.setBackground(shape);
+        box.setBackground(v.bubble(look.paper, false));
         v.pad(box, 8, 5, 8, 5);
         TextView who = v.text(Course.shortName(said.author) + " · private", 8, look.bold, look.muted);
         box.addView(who);
@@ -387,8 +374,8 @@ final class AssignmentScreen extends Screen {
         String note;
         if (draft.queued) note = "Waiting to turn in";
         else if (sending) note = "Turning in";
-        else if (!draft.isEmpty()) note = draft.pieces.size() + (draft.pieces.size() == 1 ? " item" : " items");
-        else if (submitted) note = submittedCount() == 1 ? "1 item" : submittedCount() + " items";
+        else if (!draft.isEmpty()) note = Parts.items(draft.pieces.size());
+        else if (submitted) note = Parts.items(submittedCount());
         else note = status(work, state);
         page.addView(parts.section("Your work", note), Views.wide());
 
@@ -404,7 +391,7 @@ final class AssignmentScreen extends Screen {
             }
             if (!work.done || work.attemptsLeft()) {
                 stack.addView(Sheet.button(app, v, "quiz", work.done ? "Take it again" : "Start quiz", true,
-                    () -> app.push(new QuizScreen(app, work))), new LinearLayout.LayoutParams(-1, v.dp(28)));
+                    () -> app.push(new QuizScreen(app, work))), v.buttonRow());
             }
             page.addView(stack, Views.wide());
             return;
@@ -430,36 +417,32 @@ final class AssignmentScreen extends Screen {
             stack.addView(piece(parts, piece, waiting), boxGap());
         }
 
-        boolean can = canAdd(work);
-        if (can) {
+        if (canAdd(work)) {
             if (draft.isEmpty() && !submitted) {
-                Item add = addBox();
-                stack.addView(add, boxGap());
+                stack.addView(addBox(), boxGap());
             } else {
-                Item more = parts.tiled("add", "Add", R.drawable.ic_add, look.paper, look.ink,
-                    submitted && draft.isEmpty() ? "Turn in again" : "Add more work",
-                    null, null,
-                    this::addWork);
-                stack.addView(more, Views.wide());
+                stack.addView(parts.tiled("add", R.drawable.ic_add, look.paper, look.ink,
+                    submitted && draft.isEmpty() ? "Turn in again" : "Add more work", null, null, this::addWork),
+                    Views.wide());
             }
         }
 
         if (draft.queued) {
             stack.addView(Sheet.button(app, v, "cancel", "Cancel turn-in", false, () -> app.cancelQueued(draft)),
-                v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 0, 4, 0, 0));
+                v.margins(v.buttonRow(), 0, 4, 0, 0));
         } else if (!draft.isEmpty()) {
             Item button = Sheet.button(app, v, "turnin", sending ? "Turning in…" : "Turn in", true,
                 () -> confirmTurnIn(work));
-            stack.addView(button, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 0, 4, 0, 0));
+            stack.addView(button, v.margins(v.buttonRow(), 0, 4, 0, 0));
         } else if (work.nothingToSend() && !work.done) {
             final boolean checked = app.todos.checked(work);
             stack.addView(Sheet.button(app, v, "markdone", checked ? "Mark as not done" : "Mark as done", false,
-                () -> markDone(work, !checked)), v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 0, 4, 0, 0));
+                () -> markDone(work, !checked)), v.margins(v.buttonRow(), 0, 4, 0, 0));
         } else if (!work.takesWork() && !work.done) {
-            TextView note2 = v.bodyText(work.locked ? "This assignment is locked."
+            TextView elsewhere = v.bodyText(work.locked ? "This assignment is locked."
                 : "This one is turned in on a computer.");
-            note2.setTextColor(look.muted);
-            stack.addView(note2, Views.wide());
+            elsewhere.setTextColor(look.muted);
+            stack.addView(elsewhere, Views.wide());
         }
         page.addView(stack, Views.wide());
     }
@@ -472,14 +455,14 @@ final class AssignmentScreen extends Screen {
     /** A plain row for something already turned in (F2). */
     private View submittedRow(String key, String kind, String title, String meta, Runnable open) {
         Parts parts = new Parts(app);
-        Item row = new Item(app, key, open == null ? null : "Open", open);
+        Item row = new Item(app, key, open);
         LinearLayout line = v.row();
         v.pad(line, 2, 4, 2, 4);
         line.addView(parts.fileTile(kind));
         LinearLayout words = v.column();
         MarkText name = v.mark(title, 11, look.semibold, look.ink);
         name.setSingleLine(true);
-        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        name.setEllipsize(TextUtils.TruncateAt.END);
         words.addView(name, Views.wide());
         words.addView(v.meta(meta), v.margins(Views.wide(), 0, 1, 0, 0));
         line.addView(words, v.margins(Views.fill(), 9, 0, 0, 0));
@@ -491,7 +474,7 @@ final class AssignmentScreen extends Screen {
 
     /** The dashed "Add work" box, solid ink under the d-pad. */
     private Item addBox() {
-        Item add = new Item(app, "add", "Add", this::addWork);
+        Item add = new Item(app, "add", this::addWork);
         LinearLayout line = v.row();
         v.pad(line, 7, 7, 7, 7);
         line.addView(v.tile(R.drawable.ic_add, look.paper, look.ink, 24, 13, 6));
@@ -542,20 +525,19 @@ final class AssignmentScreen extends Screen {
             kind = "link";
             meta = piece.url;
         } else {
-            kind = Draft.TEXT.equals(piece.kind) ? "text" : extension(piece.file);
-            meta = extension(piece.file).toUpperCase(java.util.Locale.US) + " · " + Parts.size(piece.size);
+            kind = extension(piece.file);
+            meta = extension(piece.file).toUpperCase(Locale.US) + " · " + Parts.size(piece.size);
         }
-        if (draft.queued) meta = waiting ? (piece.isFile() ? "Saved on phone · will upload" : "Saved on phone") : meta;
+        if (draft.queued && waiting) meta = piece.isFile() ? "Saved on phone · will upload" : "Saved on phone";
         long[] sent = app.progress.get(piece.id);
         if (sent != null && sent[1] > 0) meta += " · Uploading " + (int) (100 * sent[0] / sent[1]) + "%";
-        Item box = parts.box("piece:" + piece.id, "Open", parts.fileTile(kind), piece.name, meta, () -> openPiece(piece));
+        Item box = parts.box("piece:" + piece.id, parts.fileTile(kind), piece.name, meta, () -> openPiece(piece));
         if (sent != null && sent[1] > 0) {
             FrameLayout track = new FrameLayout(app);
             track.setBackground(v.round(look.line, 2, 0, 0));
-            View fill = new View(app);
-            fill.setBackground(v.round(look.ink, 2, 0, 0));
-            track.addView(fill, new FrameLayout.LayoutParams(0, -1));
-            final View bar = fill;
+            View bar = new View(app);
+            bar.setBackground(v.round(look.ink, 2, 0, 0));
+            track.addView(bar, new FrameLayout.LayoutParams(0, -1));
             final float fraction = (float) sent[0] / (float) sent[1];
             track.post(() -> {
                 FrameLayout.LayoutParams at = (FrameLayout.LayoutParams) bar.getLayoutParams();
@@ -573,11 +555,6 @@ final class AssignmentScreen extends Screen {
         return dot < 0 ? "file" : file.substring(dot + 1);
     }
 
-    /** An upload moved on; only the bar redraws, not the page. */
-    void progress(String pieceId) {
-        refresh();
-    }
-
     private void openPiece(Draft.Piece piece) {
         if (draft.queued) return;
         if (Draft.TEXT.equals(piece.kind)) {
@@ -585,9 +562,9 @@ final class AssignmentScreen extends Screen {
         } else if (Draft.LINK.equals(piece.kind)) {
             app.push(new LinkScreen(app, current(), piece));
         } else if (Draft.AUDIO.equals(piece.kind)) {
-            RecorderScreen.play(app, new java.io.File(app.backend.draftFolder(draft), piece.file));
+            RecorderScreen.play(app, new File(app.backend.draftFolder(draft), piece.file));
         } else {
-            java.io.File file = new java.io.File(app.backend.draftFolder(draft), piece.file);
+            File file = new File(app.backend.draftFolder(draft), piece.file);
             app.push(new ViewerScreen(app, file, piece.name, current().title));
         }
     }
@@ -601,7 +578,7 @@ final class AssignmentScreen extends Screen {
 
     private void remove(final Draft.Piece piece) {
         Sheet.ask(app, "Remove " + piece.name + "?", "It's deleted from this phone.", "Remove", "Keep it", () -> {
-            if (piece.file != null) new java.io.File(app.backend.draftFolder(draft), piece.file).delete();
+            if (piece.file != null) new File(app.backend.draftFolder(draft), piece.file).delete();
             // Focus moves on to the next piece, or to Add more work after the last.
             int at = -1;
             for (int i = 0; i < draft.pieces.size(); i++) if (draft.pieces.get(i).id.equals(piece.id)) at = i;
@@ -613,7 +590,7 @@ final class AssignmentScreen extends Screen {
     private void save(Draft next) {
         try {
             app.backend.saveDraft(next);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             app.say("Couldn't save on the phone.");
         }
         draft = next;
@@ -668,24 +645,19 @@ final class AssignmentScreen extends Screen {
             Sheet.ask(app, "Can't turn in yet", plan.problem, "OK", "Close", () -> { });
             return;
         }
-        int count = draft.pieces.size();
-        final List<String> allowed = extensions;
-        Sheet.ask(app, "Turn in your work?", count + (count == 1 ? " item" : " items")
+        Sheet.ask(app, "Turn in your work?", Parts.items(draft.pieces.size())
             + " will be turned in for " + work.title + ".", "Turn in", "Cancel",
-            () -> app.turnIn(work, draft, allowed));
+            () -> app.turnIn(work, draft, extensions));
     }
 
     private void markDone(final Assignment work, final boolean done) {
         final String override = app.snapshot == null ? null : app.snapshot.overrides.get(work.assignmentId);
-        app.background(() -> {
-            app.backend.markDone(work, override, done);
-            return Boolean.TRUE;
-        }, (ok, failure) -> {
+        app.send(() -> app.backend.markDone(work, override, done), (ok, failure) -> {
             if (ok == null) {
                 app.say(failure);
                 return;
             }
-            java.util.Set<String> checked = app.todos.checkedIds();
+            Set<String> checked = app.todos.checkedIds();
             if (done) checked.add(work.assignmentId);
             else checked.remove(work.assignmentId);
             app.todos.check(checked);
@@ -719,21 +691,10 @@ final class AssignmentScreen extends Screen {
                 | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         answer.setMinLines(3);
         answer.formatted = this::keepAnswer;
-        answer.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
-            @Override
-            public void afterTextChanged(Editable s) {
-                keepAnswer();
-            }
-        });
+        Fields.onChange(answer, this::keepAnswer);
         page.addView(answer, v.margins(Views.wide(), 12, 0, 12, 0));
         Item post = Sheet.button(app, v, "post", "Post", true, () -> postAnswer(work));
-        page.addView(post, v.margins(new LinearLayout.LayoutParams(-1, v.dp(28)), 10, 8, 10, 0));
+        page.addView(post, v.margins(v.buttonRow(), 10, 8, 10, 0));
     }
 
     private void keepAnswer() {
@@ -741,7 +702,7 @@ final class AssignmentScreen extends Screen {
         draft = draft.with(piece, System.currentTimeMillis());
         try {
             app.backend.saveDraft(draft);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             // Kept on screen; the next keystroke tries again.
         }
     }
@@ -752,11 +713,10 @@ final class AssignmentScreen extends Screen {
             return;
         }
         final String stored = answer.stored();
-        Sheet.ask(app, "Post your answer?", "Everyone in " + (app.course(work.courseId) == null ? "the class"
-            : app.course(work.courseId).code) + " can read it.", "Post", "Cancel", () -> app.background(() -> {
-                app.backend.reply(work.courseId, work.topicId, stored);
-                return Boolean.TRUE;
-            }, (ok, failure) -> {
+        Course course = app.course(work.courseId);
+        Sheet.ask(app, "Post your answer?", "Everyone in " + (course == null ? "the class" : course.code)
+            + " can read it.", "Post", "Cancel", () -> app.send(
+            () -> app.backend.reply(work.courseId, work.topicId, stored), (ok, failure) -> {
                 if (ok == null) {
                     app.tell("Couldn't post", failure + " Your answer is saved on the phone.");
                     return;

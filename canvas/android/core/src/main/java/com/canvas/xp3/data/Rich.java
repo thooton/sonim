@@ -108,12 +108,7 @@ public final class Rich {
 
     /** The draft form of text with these styles over it. */
     public static String write(String text, List<Run> runs) {
-        int[] mask = new int[text.length()];
-        if (runs != null) {
-            for (Run run : runs) {
-                for (int k = Math.max(0, run.start); k < Math.min(text.length(), run.end); k++) mask[k] |= run.style;
-            }
-        }
+        int[] mask = mask(text.length(), runs);
         StringBuilder out = new StringBuilder(text.length() + 16);
         int on = 0;
         for (int k = 0; k < text.length(); k++) {
@@ -201,10 +196,7 @@ public final class Rich {
         int end = text.length();
         while (start < end && Character.isWhitespace(text.charAt(start))) start++;
         while (end > start && Character.isWhitespace(text.charAt(end - 1))) end--;
-        int[] mask = new int[text.length()];
-        for (Run run : styled.runs) {
-            for (int k = run.start; k < run.end; k++) mask[k] |= run.style;
-        }
+        int[] mask = mask(text.length(), styled.runs);
         int k = start;
         while (k < end) {
             int m = mask[k];
@@ -219,6 +211,16 @@ public final class Rich {
             if ((m & BOLD) != 0) out.append("</strong>");
             k = stop;
         }
+    }
+
+    /** The styles over each character of a text `length` long. */
+    private static int[] mask(int length, List<Run> runs) {
+        int[] mask = new int[length];
+        if (runs == null) return mask;
+        for (Run run : runs) {
+            for (int k = Math.max(0, run.start); k < Math.min(length, run.end); k++) mask[k] |= run.style;
+        }
+        return mask;
     }
 
     private static void markers(StringBuilder out, int bits) {

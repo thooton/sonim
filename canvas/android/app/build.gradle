@@ -35,8 +35,8 @@ android {
         // install a second app beside the old one, without its settings or
         // cached work.
         applicationId "com.todo.xp3"
-        versionCode 22
-        versionName "1.5.2"
+        versionCode 23
+        versionName "1.5.3"
     }
 }
 

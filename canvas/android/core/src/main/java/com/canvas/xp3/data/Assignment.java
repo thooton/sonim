@@ -1,7 +1,6 @@
 package com.canvas.xp3.data;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -118,11 +117,6 @@ public final class Assignment {
         return due != null && due.longValue() < now ? MISSING : ASSIGNED;
     }
 
-    /** True while the work is turned in ahead of a date that has not arrived. */
-    public boolean early(long now) {
-        return done && due != null && due.longValue() > now;
-    }
-
     public boolean accepts(String kind) {
         return kinds.contains(kind);
     }
@@ -187,9 +181,5 @@ public final class Assignment {
      */
     public static String number(double value) {
         return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
-    }
-
-    static List<String> kinds(String... values) {
-        return Arrays.asList(values);
     }
 }

@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * What the app writes down, in its own private directory: the settings and
@@ -75,15 +76,10 @@ public final class Store {
     }
 
     public Config settings() {
-        String json = read(SETTINGS);
-        if (json == null) return Config.blank();
-        try {
-            return Config.parse(json);
-        } catch (RuntimeException e) {
-            // A settings file this version cannot read is not a reason to
-            // refuse to start; the Settings screen will show it as unset.
-            return Config.blank();
-        }
+        // A settings file this version cannot read is not a reason to refuse
+        // to start; the Settings screen will show it as unset.
+        Config config = record(SETTINGS, Config::from);
+        return config == null ? Config.blank() : config;
     }
 
     public void saveSettings(Config config) throws IOException {
@@ -132,40 +128,33 @@ public final class Store {
     // ------------------------------------------------------------------
 
     public Sync.Result cache() {
-        String json = read(CACHE);
-        if (json == null) return null;
-        try {
-            Map<String, Object> root = Json.object(Json.parse(json));
-            List<Assignment> work = new ArrayList<>();
-            for (Object entry : Json.children(root, "work")) {
-                Assignment item = assignment(Json.object(entry));
-                if (item != null) work.add(item);
-            }
-            List<Course> courses = new ArrayList<>();
-            for (Object entry : Json.children(root, "courses")) {
-                Course course = course(Json.object(entry));
-                if (course != null) courses.add(course);
-            }
-            List<String> unavailable = new ArrayList<>();
-            for (Object entry : Json.children(root, "unavailable")) {
-                if (entry instanceof String) unavailable.add((String) entry);
-            }
-            Map<String, String> overrides = new HashMap<>();
-            Set<String> checked = new HashSet<>();
-            for (Object entry : Json.children(root, "overrides")) {
-                Map<String, Object> o = Json.object(entry);
-                String assignment = Json.text(o, "assignment");
-                String id = Json.text(o, "id");
-                if (assignment == null || id == null) continue;
-                overrides.put(assignment, id);
-                if (Json.flag(o, "done")) checked.add(assignment);
-            }
-            Double at = Json.number(root, "fetchedAt");
-            return new Sync.Result(work, courses, unavailable, at == null ? 0L : (long) at.doubleValue(),
-                overrides, checked);
-        } catch (RuntimeException e) {
-            return null;
+        return record(CACHE, Store::result);
+    }
+
+    private static Sync.Result result(Map<String, Object> root) {
+        List<Assignment> work = new ArrayList<>();
+        for (Object entry : Json.children(root, "work")) {
+            Assignment item = assignment(Json.object(entry));
+            if (item != null) work.add(item);
         }
+        List<Course> courses = new ArrayList<>();
+        for (Object entry : Json.children(root, "courses")) {
+            Course course = course(Json.object(entry));
+            if (course != null) courses.add(course);
+        }
+        Map<String, String> overrides = new HashMap<>();
+        Set<String> checked = new HashSet<>();
+        for (Object entry : Json.children(root, "overrides")) {
+            Map<String, Object> o = Json.object(entry);
+            String assignment = Json.text(o, "assignment");
+            String id = Json.text(o, "id");
+            if (assignment == null || id == null) continue;
+            overrides.put(assignment, id);
+            if (Json.flag(o, "done")) checked.add(assignment);
+        }
+        Long at = millis(root, "fetchedAt");
+        return new Sync.Result(work, courses, strings(root, "unavailable"), at == null ? 0L : at.longValue(),
+            overrides, checked);
     }
 
     public void saveCache(Sync.Result result) throws IOException {
@@ -220,10 +209,7 @@ public final class Store {
         Double turnedIn = Json.number(record, "turnedIn");
         String course = Json.text(record, "course");
         Double score = Json.number(record, "score");
-        List<String> kinds = new ArrayList<>();
-        for (Object kind : Json.children(record, "kinds")) {
-            if (kind instanceof String) kinds.add((String) kind);
-        }
+        List<String> kinds = strings(record, "kinds");
         Double allowed = Json.number(record, "attemptsAllowed");
         Double attempts = Json.number(record, "attempts");
         // A cache from before this version has no "returned"; a score was
@@ -248,6 +234,15 @@ public final class Store {
         return value == null ? null : Long.valueOf((long) value.doubleValue());
     }
 
+    /** The strings in the list at `key`, skipping anything else. */
+    private static List<String> strings(Map<String, Object> record, String key) {
+        List<String> out = new ArrayList<>();
+        for (Object entry : Json.children(record, key)) {
+            if (entry instanceof String) out.add((String) entry);
+        }
+        return out;
+    }
+
     private static Map<String, Object> fields(Course course) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", course.id);
@@ -266,10 +261,7 @@ public final class Store {
         String title = Json.text(record, "title");
         String code = Json.text(record, "code");
         if (id == null || title == null || code == null) return null;
-        List<String> teachers = new ArrayList<>();
-        for (Object name : Json.children(record, "teachers")) {
-            if (name instanceof String) teachers.add((String) name);
-        }
+        List<String> teachers = strings(record, "teachers");
         Double color = Json.number(record, "color");
         return new Course(id, title, code, Json.text(record, "term"), teachers,
             color == null ? 0 : Math.abs((int) color.doubleValue()) % Course.COLORS,
@@ -281,13 +273,7 @@ public final class Store {
     // ------------------------------------------------------------------
 
     public Detail detail(Assignment item) {
-        String json = read(DETAILS + "/" + item.courseId + "-" + item.assignmentId + ".json");
-        if (json == null) return null;
-        try {
-            return Detail.fromMap(Json.object(Json.parse(json)));
-        } catch (RuntimeException e) {
-            return null;
-        }
+        return record(DETAILS + "/" + item.courseId + "-" + item.assignmentId + ".json", Detail::fromMap);
     }
 
     public void saveDetail(Assignment item, Detail detail) throws IOException {
@@ -295,13 +281,7 @@ public final class Store {
     }
 
     public ClassData classData(String courseId) {
-        String json = read(CLASSES + "/" + courseId + ".json");
-        if (json == null) return null;
-        try {
-            return ClassData.fromMap(Json.object(Json.parse(json)));
-        } catch (RuntimeException e) {
-            return null;
-        }
+        return record(CLASSES + "/" + courseId + ".json", ClassData::fromMap);
     }
 
     public void saveClassData(String courseId, ClassData data) throws IOException {
@@ -334,14 +314,8 @@ public final class Store {
     // ------------------------------------------------------------------
 
     public Draft draft(String key) {
-        String json = read(DRAFTS + "/" + Draft.empty(key).folder() + ".json");
-        if (json == null) return Draft.empty(key);
-        try {
-            Draft draft = Draft.fromMap(Json.object(Json.parse(json)));
-            return draft == null || !draft.key.equals(key) ? Draft.empty(key) : draft;
-        } catch (RuntimeException e) {
-            return Draft.empty(key);
-        }
+        Draft draft = record(DRAFTS + "/" + Draft.empty(key).folder() + ".json", Draft::fromMap);
+        return draft == null || !draft.key.equals(key) ? Draft.empty(key) : draft;
     }
 
     public void saveDraft(Draft draft) throws IOException {
@@ -374,14 +348,8 @@ public final class Store {
         if (files == null) return out;
         for (File file : files) {
             if (!file.isFile() || !file.getName().endsWith(".json")) continue;
-            String json = read(DRAFTS + "/" + file.getName());
-            if (json == null) continue;
-            try {
-                Draft draft = Draft.fromMap(Json.object(Json.parse(json)));
-                if (draft != null && draft.queued) out.add(draft);
-            } catch (RuntimeException e) {
-                // Not a draft this version can read.
-            }
+            Draft draft = record(DRAFTS + "/" + file.getName(), Draft::fromMap);
+            if (draft != null && draft.queued) out.add(draft);
         }
         return out;
     }
@@ -440,6 +408,20 @@ public final class Store {
 
     private synchronized String read(String name) {
         return Disk.read(new File(directory, name), MAX_FILE);
+    }
+
+    /**
+     * A file holding one JSON object, read by `reader`; null if it is missing,
+     * unreadable, or not something this version understands.
+     */
+    private <T> T record(String name, Function<Map<String, Object>, T> reader) {
+        String json = read(name);
+        if (json == null) return null;
+        try {
+            return reader.apply(Json.object(Json.parse(json)));
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private synchronized void write(String name, String content, boolean secret) throws IOException {

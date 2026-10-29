@@ -1,5 +1,6 @@
 package com.canvas.xp3;
 
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.EditText;
@@ -8,9 +9,10 @@ import android.widget.TextView;
 
 import com.canvas.xp3.data.ClassData;
 import com.canvas.xp3.data.Course;
-import com.canvas.xp3.data.Dates;
 import com.canvas.xp3.data.Detail;
+import com.xp3.common.ui.Ui;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -44,16 +46,6 @@ final class PostScreen extends Screen {
             else problem = failure;
             refresh();
         });
-    }
-
-    @Override
-    String left() {
-        return "Options";
-    }
-
-    @Override
-    String center() {
-        return post.open ? (sending ? "" : "Send") : "";
     }
 
     @Override
@@ -92,7 +84,7 @@ final class PostScreen extends Screen {
             long now = System.currentTimeMillis();
             for (Detail.Comment said : replies) {
                 LinearLayout row = v.row();
-                row.setGravity(android.view.Gravity.TOP);
+                row.setGravity(Gravity.TOP);
                 v.pad(row, 12, 5, 12, 5);
                 row.addView(parts.avatar(said.author, look.faint, 20));
                 LinearLayout words = v.column();
@@ -123,14 +115,13 @@ final class PostScreen extends Screen {
     @Override
     void shown() {
         if (field != null) field.requestFocus();
-        app.refreshKeys();
     }
 
     @Override
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
         if (field != null && app.getCurrentFocus() == field) {
-            if (com.xp3.common.ui.Ui.isOk(code)) {
+            if (Ui.isOk(code)) {
                 if (event.getAction() == KeyEvent.ACTION_UP) send();
                 return true;
             }
@@ -177,8 +168,8 @@ final class PostScreen extends Screen {
     }
 
     @Override
-    java.util.List<Sheet.Choice> options() {
-        java.util.List<Sheet.Choice> out = new java.util.ArrayList<>();
+    List<Sheet.Choice> options() {
+        List<Sheet.Choice> out = new ArrayList<>();
         if (post.open && field != null) {
             out.add(new Sheet.Choice("Clear", R.drawable.ic_undo, null, () -> field.setText("")));
         }

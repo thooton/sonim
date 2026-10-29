@@ -1,10 +1,14 @@
 package com.canvas.xp3;
 
+import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.canvas.xp3.net.Config;
+
+import java.io.IOException;
 
 /**
  * The Canvas account: the school's Canvas address, the cookie service that
@@ -26,7 +30,7 @@ final class AccountScreen extends Screen {
         Parts parts = new Parts(app);
         Config config = app.backend.config();
         LinearLayout root = v.column();
-        root.addView(parts.nav("Settings", (String) null), Views.wide());
+        root.addView(parts.nav("Settings"), Views.wide());
         TextView heading = v.screenTitle("Account");
         v.pad(heading, 12, 0, 12, 2);
         root.addView(heading, Views.wide());
@@ -49,15 +53,15 @@ final class AccountScreen extends Screen {
     private Item field(Config config, final String key, final String label, boolean secret, final boolean address) {
         String value = config.get(key);
         String shown = value.length() == 0 ? "Not set" : secret ? "••••••••" : value.replaceFirst("^https://", "");
-        Item row = new Item(app, key, "Change", () -> edit(key, label, address));
+        Item row = new Item(app, key, () -> edit(key, label, address));
         LinearLayout line = v.row();
         v.pad(line, 12, 7, 12, 7);
         MarkText name = v.mark(label, 11, look.semibold, look.ink);
         line.addView(name, v.margins(Views.wrap(), 0, 0, 8, 0));
         TextView current = v.text(shown, 9.5f, look.medium, look.muted);
         current.setSingleLine(true);
-        current.setEllipsize(android.text.TextUtils.TruncateAt.START);
-        current.setGravity(android.view.Gravity.RIGHT);
+        current.setEllipsize(TextUtils.TruncateAt.START);
+        current.setGravity(Gravity.RIGHT);
         line.addView(current, Views.fill());
         row.addView(line, Views.wide());
         row.addView(v.hairline());
@@ -66,7 +70,7 @@ final class AccountScreen extends Screen {
     }
 
     private Item action(String key, String label, Runnable run) {
-        Item row = new Item(app, key, "Select", run);
+        Item row = new Item(app, key, run);
         LinearLayout line = v.row();
         v.pad(line, 12, 7, 12, 7);
         MarkText name = v.mark(label, 11, look.semibold, look.ink);
@@ -104,7 +108,7 @@ final class AccountScreen extends Screen {
         }
         try {
             app.backend.saveSettings(next);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             app.tell("Not saved", "Couldn't write to this phone's storage.");
             return;
         }
@@ -118,7 +122,7 @@ final class AccountScreen extends Screen {
     private void restore() {
         try {
             app.backend.restoreBundledSetup();
-        } catch (java.io.IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException e) {
             app.tell("Not restored", "This build's setup couldn't be used.");
             return;
         }

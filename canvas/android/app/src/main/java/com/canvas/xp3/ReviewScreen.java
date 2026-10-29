@@ -10,6 +10,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.canvas.xp3.data.Draft;
+import com.xp3.common.ui.Ui;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -33,11 +34,6 @@ final class ReviewScreen extends Screen {
     }
 
     @Override
-    String center() {
-        return "Keep";
-    }
-
-    @Override
     List<Sheet.Choice> options() {
         List<Sheet.Choice> out = new ArrayList<>();
         out.add(new Sheet.Choice("Add page", R.drawable.ic_camera, null, app::pop));
@@ -49,7 +45,7 @@ final class ReviewScreen extends Screen {
     boolean onKey(KeyEvent event) {
         int code = event.getKeyCode();
         boolean up = event.getAction() == KeyEvent.ACTION_UP;
-        if (com.xp3.common.ui.Ui.isOk(code)) {
+        if (Ui.isOk(code)) {
             if (up) keep();
             return true;
         }
@@ -107,7 +103,7 @@ final class ReviewScreen extends Screen {
         TextView note = v.text("Page " + (index + 1) + " of " + camera.pages.size(),
             9, look.regular, look.muted);
         area.addView(note, v.margins(Views.wrap(), 0, 6, 0, 0));
-        root.addView(area, Views.tall());
+        root.addView(area, Ui.weighted());
         return root;
     }
 

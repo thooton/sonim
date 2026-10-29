@@ -1,17 +1,16 @@
 package com.canvas.xp3;
 
 import android.Manifest;
-import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
 import android.net.ConnectivityManager;
 import android.net.Network;
-import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.format.DateFormat;
-import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,19 +18,22 @@ import android.view.Window;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.TextView;
+import android.widget.ScrollView;
 
 import com.canvas.xp3.data.Assignment;
 import com.canvas.xp3.data.Course;
 import com.canvas.xp3.data.Dates;
+import com.canvas.xp3.data.Detail;
 import com.canvas.xp3.data.Draft;
 import com.canvas.xp3.data.Notice;
 import com.canvas.xp3.data.Prefs;
 import com.canvas.xp3.data.Sync;
+import com.canvas.xp3.data.Terms;
 import com.canvas.xp3.data.Todos;
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Ui;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -40,14 +42,13 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 /**
- * The one activity: a stack of screens, the softkey bar under them, and
- * whatever is sliding over them.
+ * The one activity: a stack of screens, and whatever is sliding over them.
  *
  * The phone has two softkeys, Menu and Back, and they mean only that: Menu
  * opens Options, like a right click, and Back goes back one screen. Every
- * action is a row or button the d-pad reaches, or an entry in Options, and OK
- * does what the middle of the bar says. Some firmware sends Menu as the
- * soft-left code, so both open Options.
+ * action is a row or button the d-pad reaches, or an entry in Options. No
+ * softkey bar is drawn: the screen's rows are worth more than its labels.
+ * Some firmware sends Menu as the soft-left code, so both open Options.
  *
  * The work list lives here, above the screens, because nearly every screen
  * reads it: the home timeline, a class's grades, the assignment page.
@@ -83,9 +84,6 @@ public final class MainActivity extends BaseActivity {
     private final List<Screen> stack = new ArrayList<>();
     private FrameLayout content;
     private FrameLayout layer;
-    private TextView keyLeft;
-    private TextView keyCenter;
-    private View bar;
     private Sheet.Open overlay;
     private View focusBeforeOverlay;
     private Runnable afterPermission;
@@ -100,7 +98,7 @@ public final class MainActivity extends BaseActivity {
         prefs = backend.prefs();
         applyWeekStart();
         snapshot = backend.cached();
-        if (snapshot != null) snapshot = com.canvas.xp3.data.Terms.current(snapshot, System.currentTimeMillis());
+        if (snapshot != null) snapshot = Terms.current(snapshot, System.currentTimeMillis());
         if (snapshot != null) {
             todos.replace(snapshot.work);
             todos.check(snapshot.checked);
@@ -145,10 +143,6 @@ public final class MainActivity extends BaseActivity {
     // Look
     // ------------------------------------------------------------------
 
-    Look look() {
-        return look;
-    }
-
     Views views() {
         return views;
     }
@@ -164,16 +158,13 @@ public final class MainActivity extends BaseActivity {
         getWindow().setStatusBarColor(look.bg);
         getWindow().setNavigationBarColor(look.bg);
         getWindow().getDecorView().setSystemUiVisibility(look.dark ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(look.bg));
+        getWindow().setBackgroundDrawable(new ColorDrawable(look.bg));
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(look.bg);
         LinearLayout column = views.column();
         content = new FrameLayout(this);
-        column.addView(content, Views.tall());
-        // The softkey bar is built but not shown: the screen's rows are
-        // worth more than the labels, and the keys still do the same things.
-        softkeys();
+        column.addView(content, Ui.weighted());
         root.addView(column, new FrameLayout.LayoutParams(-1, -1));
         layer = new FrameLayout(this);
         root.addView(layer, new FrameLayout.LayoutParams(-1, -1));
@@ -183,22 +174,6 @@ public final class MainActivity extends BaseActivity {
             screen.v = views;
         }
         if (!stack.isEmpty()) show(top(), key, y);
-    }
-
-    private View softkeys() {
-        LinearLayout row = views.row();
-        row.setBackgroundColor(look.bg);
-        views.pad(row, 8, 0, 8, 0);
-        keyLeft = views.text("", 9.5f, look.semibold, look.muted);
-        keyCenter = views.text("", 9.5f, look.heavy, look.ink);
-        keyCenter.setGravity(Gravity.CENTER);
-        row.addView(keyLeft, Views.fill());
-        row.addView(keyCenter, Views.fill());
-        LinearLayout holder = views.column();
-        holder.addView(views.hairline());
-        holder.addView(row, new LinearLayout.LayoutParams(-1, views.dp(18)));
-        bar = holder;
-        return holder;
     }
 
     void applyWeekStart() {
@@ -326,7 +301,7 @@ public final class MainActivity extends BaseActivity {
             if (!all.isEmpty()) target = all.get(0);
         }
         if (screen.scroll != null) {
-            final android.widget.ScrollView scroller = screen.scroll;
+            final ScrollView scroller = screen.scroll;
             final Item focusAfter = target;
             scroller.post(() -> {
                 scroller.scrollTo(0, y);
@@ -334,48 +309,19 @@ public final class MainActivity extends BaseActivity {
                 // brought into view if the old position left it off screen.
                 if (focusAfter != null && focusAfter.isFocused()) {
                     focusAfter.requestRectangleOnScreen(
-                        new android.graphics.Rect(0, 0, focusAfter.getWidth(), focusAfter.getHeight()), true);
+                        new Rect(0, 0, focusAfter.getWidth(), focusAfter.getHeight()), true);
                 }
             });
         }
         if (target != null) {
             target.requestFocus();
-            focusMoved(target);
         } else {
             view.setFocusable(true);
             view.setDefaultFocusHighlightEnabled(false);
             view.requestFocus();
-            updateKeys(null);
         }
         screen.savedFocus = null;
         screen.shown();
-    }
-
-    // ------------------------------------------------------------------
-    // The softkey bar
-    // ------------------------------------------------------------------
-
-    void focusMoved(Item item) {
-        if (overlay != null) {
-            keyCenter.setText(item.ok == null ? overlay.center : item.ok);
-            return;
-        }
-        updateKeys(item);
-    }
-
-    void updateKeys(Item item) {
-        Screen screen = top();
-        if (screen == null) return;
-        keyLeft.setText(screen.left() == null ? "" : screen.left());
-        String center = item != null && item.ok != null ? item.ok : screen.center();
-        View focused = getCurrentFocus();
-        if (focused instanceof EditText) center = screen.center();
-        keyCenter.setText(center == null ? "" : center);
-    }
-
-    void refreshKeys() {
-        View focused = getCurrentFocus();
-        updateKeys(focused instanceof Item ? (Item) focused : null);
     }
 
     // ------------------------------------------------------------------
@@ -388,8 +334,6 @@ public final class MainActivity extends BaseActivity {
         overlay = open;
         ((ViewGroup) content).setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         layer.addView(open.view, new FrameLayout.LayoutParams(-1, -1));
-        keyLeft.setText(open.left == null ? "" : open.left);
-        keyCenter.setText(open.center == null ? "" : open.center);
         List<Item> items = Screen.items(open.view);
         if (!items.isEmpty()) items.get(0).requestFocus();
     }
@@ -403,7 +347,6 @@ public final class MainActivity extends BaseActivity {
             focusBeforeOverlay.requestFocus();
         }
         focusBeforeOverlay = null;
-        refreshKeys();
     }
 
     boolean overlayOpen() {
@@ -460,7 +403,7 @@ public final class MainActivity extends BaseActivity {
         Screen screen = top();
         if (screen != null && screen.onKey(event)) return true;
         if (isLeftSoft(code)) {
-            if (up && screen != null && screen.left() != null) showOptions();
+            if (up && screen != null && screen.menu()) showOptions();
             return true;
         }
         // Clear backs out like Back, except in a text field, where it is how
@@ -485,7 +428,7 @@ public final class MainActivity extends BaseActivity {
     }
 
     // ------------------------------------------------------------------
-    // Permissions and other activities
+    // Permissions
     // ------------------------------------------------------------------
 
     /** Runs `then` once the permission is granted, asking for it first if need be. */
@@ -509,29 +452,6 @@ public final class MainActivity extends BaseActivity {
         }
     }
 
-    private ActivityResult pendingResult;
-
-    interface ActivityResult {
-        void done(int code, Intent data);
-    }
-
-    void startForResult(Intent intent, ActivityResult then) {
-        pendingResult = then;
-        try {
-            startActivityForResult(intent, 2);
-        } catch (RuntimeException e) {
-            pendingResult = null;
-            toast("This phone has no app for that.");
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int request, int code, Intent data) {
-        ActivityResult then = pendingResult;
-        pendingResult = null;
-        if (then != null) then.done(code, data);
-    }
-
     // ------------------------------------------------------------------
     // Background work
     // ------------------------------------------------------------------
@@ -544,6 +464,18 @@ public final class MainActivity extends BaseActivity {
         void done(T value, String problem);
     }
 
+    interface Action {
+        void run() throws Exception;
+    }
+
+    /** As {@link #background}, for work with nothing to hand back: `done` gets TRUE once it is done. */
+    void send(final Action action, final Done<Boolean> done) {
+        background(() -> {
+            action.run();
+            return Boolean.TRUE;
+        }, done);
+    }
+
     /** Runs `task` on a worker and hands its result, or a sentence about its failure, back here. */
     <T> void background(final Task<T> task, final Done<T> done) {
         work.execute(() -> {
@@ -554,7 +486,7 @@ public final class MainActivity extends BaseActivity {
             } catch (InterruptedException stopping) {
                 Thread.currentThread().interrupt();
                 return;
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 problem = reason(e);
             } catch (RuntimeException e) {
                 problem = "Canvas sent something this app couldn't read.";
@@ -669,14 +601,12 @@ public final class MainActivity extends BaseActivity {
         }
         if (!TurnInJob.claim(item.id)) return;
         redraw();
-        background(() -> {
-            backend.turnIn(draft, item, extensions, (piece, done, total) -> main.post(() -> {
-                progress.put(piece, new long[] { done, total });
-                Screen screen = top();
-                if (screen instanceof AssignmentScreen) ((AssignmentScreen) screen).progress(piece);
-            }));
-            return Boolean.TRUE;
-        }, (ok, problem) -> {
+        send(() -> backend.turnIn(draft, item, extensions, (piece, done, total) -> main.post(() -> {
+            progress.put(piece, new long[] { done, total });
+            Screen screen = top();
+            // Only the page of the work going up shows how far it has got.
+            if (screen instanceof AssignmentScreen) screen.refresh();
+        })), (ok, problem) -> {
             TurnInJob.release(item.id);
             progress.clear();
             if (ok != null) {
@@ -705,7 +635,7 @@ public final class MainActivity extends BaseActivity {
     private void queue(Draft draft) {
         try {
             backend.saveDraft(draft.queued(true, System.currentTimeMillis()));
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             toast("Couldn't save on the phone.");
             return;
         }
@@ -719,7 +649,7 @@ public final class MainActivity extends BaseActivity {
         if (screen != null) screen.focusNext = "turnin";
         try {
             backend.saveDraft(draft.queued(false, System.currentTimeMillis()));
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             toast("Couldn't save on the phone.");
         }
         redraw();
@@ -734,7 +664,7 @@ public final class MainActivity extends BaseActivity {
             Assignment item = assignment(draft.key.substring(0, colon), draft.key.substring(colon + 1));
             if (item == null || TurnInJob.active(item.id)) continue;
             List<String> extensions = new ArrayList<>();
-            com.canvas.xp3.data.Detail detail = backend.cachedDetail(item);
+            Detail detail = backend.cachedDetail(item);
             if (detail != null) extensions = detail.extensions;
             turnIn(item, draft.queued(false, draft.savedAt), extensions, true);
         }
