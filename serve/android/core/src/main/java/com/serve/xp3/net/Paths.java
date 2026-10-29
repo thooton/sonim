@@ -1,7 +1,7 @@
 package com.serve.xp3.net;
 
 import java.io.ByteArrayOutputStream;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +18,7 @@ public final class Paths {
      * cannot name a file (bad %-escapes, a NUL, a slash hidden in an escape).
      */
     public static List<String> segments(String path) {
-        List<String> names = new ArrayList<String>();
+        List<String> names = new ArrayList<>();
         for (String raw : path.split("/")) {
             String name = decode(raw);
             if (name == null || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.indexOf('\0') >= 0) {
@@ -45,7 +45,7 @@ public final class Paths {
     /** A decoded path made safe for an href or a Location: each name %-escaped, the slashes kept. */
     public static String href(String path) {
         StringBuilder out = new StringBuilder();
-        for (byte b : utf8(path)) {
+        for (byte b : path.getBytes(StandardCharsets.UTF_8)) {
             int c = b & 0xff;
             if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
                     || "/-._~!$&'()*+,;=:@".indexOf(c) >= 0) {
@@ -73,23 +73,11 @@ public final class Paths {
                 i += 3;
             } else {
                 int next = raw.offsetByCodePoints(i, 1);
-                byte[] encoded = utf8(raw.substring(i, next));
+                byte[] encoded = raw.substring(i, next).getBytes(StandardCharsets.UTF_8);
                 bytes.write(encoded, 0, encoded.length);
                 i = next;
             }
         }
-        try {
-            return bytes.toString("UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static byte[] utf8(String text) {
-        try {
-            return text.getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException(e);
-        }
+        return new String(bytes.toByteArray(), StandardCharsets.UTF_8);
     }
 }

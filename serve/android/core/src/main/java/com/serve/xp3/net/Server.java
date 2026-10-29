@@ -2,6 +2,7 @@ package com.serve.xp3.net;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,9 +12,11 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,17 +47,13 @@ public final class Server {
 
     private static final int IDLE_MS = 15000;
     private static final int MAX_HEAD = 16 * 1024;
-    private static final Set<String> UNLISTED = new HashSet<String>();
-    static {
-        // As serve-handler leaves out by default.
-        UNLISTED.add(".git");
-        UNLISTED.add(".DS_Store");
-    }
+    /** As serve-handler leaves out by default. */
+    private static final Set<String> UNLISTED = new HashSet<>(Arrays.asList(".git", ".DS_Store"));
 
     private final File root;
     private final String rootPath;
     private final int port;
-    private final Set<Socket> open = Collections.synchronizedSet(new HashSet<Socket>());
+    private final Set<Socket> open = Collections.synchronizedSet(new HashSet<>());
     private ServerSocket listener;
     private Thread accepting;
     private volatile boolean stopped;
@@ -82,7 +81,7 @@ public final class Server {
             throw new IOException("Port " + port + " is in use", e);
         }
         listener = socket;
-        accepting = new Thread(() -> accept(), "serve-accept");
+        accepting = new Thread(this::accept, "serve-accept");
         accepting.setDaemon(true);
         accepting.start();
     }
@@ -116,7 +115,7 @@ public final class Server {
         }
         List<Socket> clients;
         synchronized (open) {
-            clients = new ArrayList<Socket>(open);
+            clients = new ArrayList<>(open);
         }
         for (Socket each : clients) closeQuietly(each);
     }
@@ -174,10 +173,8 @@ public final class Server {
         }
         boolean head = "HEAD".equals(request.method);
         if (!head && !"GET".equals(request.method)) {
-            Map<String, String> allow = new HashMap<String, String>();
-            allow.put("Allow", "GET, HEAD");
             send(out, 405, "Method Not Allowed", "text/plain; charset=utf-8",
-                bytes("Method Not Allowed"), allow, head, keepAlive);
+                bytes("Method Not Allowed"), Collections.singletonMap("Allow", "GET, HEAD"), head, keepAlive);
             return keepAlive;
         }
 
@@ -196,10 +193,8 @@ public final class Server {
         if (target.isDirectory()) {
             String path = Paths.join(parts, true);
             if (!request.path.endsWith("/")) {
-                Map<String, String> location = new HashMap<String, String>();
-                location.put("Location", Paths.href(path) + request.query);
-                send(out, 301, "Moved Permanently", "text/plain; charset=utf-8",
-                    bytes("Redirecting to " + path), location, head, keepAlive);
+                send(out, 301, "Moved Permanently", "text/plain; charset=utf-8", bytes("Redirecting to " + path),
+                    Collections.singletonMap("Location", Paths.href(path) + request.query), head, keepAlive);
                 return keepAlive;
             }
             File index = new File(target, "index.html");
@@ -220,7 +215,7 @@ public final class Server {
     }
 
     private List<Listing.Entry> entries(File folder) {
-        List<Listing.Entry> entries = new ArrayList<Listing.Entry>();
+        List<Listing.Entry> entries = new ArrayList<>();
         String[] names = folder.list();
         if (names == null) return entries;
         for (String name : names) {
@@ -250,7 +245,7 @@ public final class Server {
     private void file(OutputStream out, File file, Request request, boolean head, boolean keepAlive)
             throws IOException {
         long length = file.length();
-        Map<String, String> headers = new HashMap<String, String>();
+        Map<String, String> headers = new HashMap<>();
         headers.put("Accept-Ranges", "bytes");
         headers.put("Last-Modified", httpDate(file.lastModified()));
 
@@ -279,8 +274,7 @@ public final class Server {
         long count = end - start + 1;
         status(out, status, reason, Mime.of(file.getName()), count, headers, keepAlive);
         if (head || count <= 0) return;
-        RandomAccessFile input = new RandomAccessFile(file, "r");
-        try {
+        try (RandomAccessFile input = new RandomAccessFile(file, "r")) {
             input.seek(start);
             byte[] buffer = new byte[32 * 1024];
             long left = count;
@@ -290,8 +284,6 @@ public final class Server {
                 out.write(buffer, 0, read);
                 left -= read;
             }
-        } finally {
-            input.close();
         }
     }
 
@@ -321,7 +313,7 @@ public final class Server {
             }
         }
         head.append("\r\n");
-        out.write(head.toString().getBytes("ISO-8859-1"));
+        out.write(head.toString().getBytes(StandardCharsets.ISO_8859_1));
     }
 
     private static String httpDate(long millis) {
@@ -331,14 +323,10 @@ public final class Server {
     }
 
     private static byte[] bytes(String text) {
-        try {
-            return text.getBytes("UTF-8");
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
+        return text.getBytes(StandardCharsets.UTF_8);
     }
 
-    private static void closeQuietly(java.io.Closeable closeable) {
+    private static void closeQuietly(Closeable closeable) {
         if (closeable == null) return;
         try {
             closeable.close();
@@ -354,7 +342,7 @@ public final class Server {
         String query = "";
         String version = "HTTP/1.0";
         boolean bad;
-        final Map<String, String> headers = new HashMap<String, String>();
+        final Map<String, String> headers = new HashMap<>();
 
         boolean keepAlive() {
             if (bad) return false;

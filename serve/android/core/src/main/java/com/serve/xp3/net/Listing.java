@@ -85,7 +85,7 @@ public final class Listing {
 
     /** The listing of the folder at this decoded path ("/a/b/"). */
     public static String render(String path, List<Entry> entries) {
-        List<Entry> sorted = new ArrayList<Entry>(entries);
+        List<Entry> sorted = new ArrayList<>(entries);
         Collections.sort(sorted, (a, b) -> {
             if (a.folder != b.folder) return a.folder ? -1 : 1;
             int folded = a.name.toLowerCase(Locale.ROOT).compareTo(b.name.toLowerCase(Locale.ROOT));

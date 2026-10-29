@@ -149,7 +149,7 @@ public final class ServeService extends Service {
         String address = addresses.isEmpty() ? "No network" : MainActivity.url(addresses.get(0));
         return new Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(getResources().getColor(R.color.primary))
+            .setColor(getColor(R.color.primary))
             .setContentTitle(folder == null ? "Starting…" : "Serving " + folder.getName())
             .setContentText(address)
             .setContentIntent(open)
