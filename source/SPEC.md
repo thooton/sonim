@@ -136,8 +136,7 @@ Menu closes it. Rows appear only when they apply:
 - **Theme** (Light / Dark): switches at once and is remembered.
 - **Command center** (its host): a dialog with the address and the token
   (dots when one is saved, and a blank token keeps it). Save sets the status
-  "Saved: host", or the error, such as "Both the address and the token are
-  needed".
+  "Saved: host", or the error, such as "Address and token needed".
 
 ### Result page (Song, Album or Book)
 

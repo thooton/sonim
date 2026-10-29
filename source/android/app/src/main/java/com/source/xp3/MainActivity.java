@@ -937,7 +937,7 @@ public final class MainActivity extends Tonal {
                 if (typed.trim().length() == 0 && login.ready()) typed = login.token();
                 try {
                     Login next = Login.of(server.getText().toString(), typed);
-                    if (!next.ready()) throw new IllegalArgumentException("Both the address and the token are needed");
+                    if (!next.ready()) throw new IllegalArgumentException("Address and token needed");
                     login = next;
                     prefs().edit().putString("login", next.toJson()).apply();
                     say("Saved: " + next.host());
