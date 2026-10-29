@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Installs APKs for the other apps here (Delta, Updater) without the system
+    <!-- Installs APKs for the other apps here (the Updater) without the system
          installer's screen, which on the XP3 refuses anything not signed by
          Sonim or on Sonim's Scout whitelist. That only works because this app
-         is the device owner; see README.md. -->
+         is the device owner; see AGENTS.md. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Only an app signed with the same key as this one may call
@@ -34,8 +34,8 @@
             </intent-filter>
         </activity>
 
-        <!-- Started for a result with an APK's content URI. Exported so Delta
-             and the Updater can reach it, but guarded by the signature
+        <!-- Started for a result with an APK's content URI. Exported so the
+             Updater can reach it, but guarded by the signature
              permission above, so only an app with the shared key can call
              it. -->
         <activity
