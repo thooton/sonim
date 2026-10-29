@@ -48,7 +48,7 @@ public final class ChargingRepository {
             List<JSONObject> normalized = Normalizer.sortedSites(raw, origin);
             JSONArray sites = new JSONArray();
             for (JSONObject site : normalized) sites.put(site);
-            return new JSONObject().put("origin", origin).put("radiusMiles", radiusMiles).put("count", sites.length()).put("sites", sites);
+            return new JSONObject().put("origin", origin).put("sites", sites);
         } catch (ApiException e) { throw e; }
         catch (Exception e) { throw new ApiException("Could not search for chargers.", 500, e); }
     }

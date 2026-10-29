@@ -178,12 +178,7 @@ public final class MainActivity extends BaseActivity {
             // The session just ended: an open charger detail is still
             // showing a disabled Start button, so redraw it to hand
             // charging back to the user.
-            if (
-                !sessionActive() &&
-                detailVisible &&
-                currentHistorySession == null &&
-                currentSite != null
-            ) renderSite();
+            if (!sessionActive() && siteVisible()) renderSite();
         };
 
     @Override
@@ -297,10 +292,14 @@ public final class MainActivity extends BaseActivity {
     /** Collects live favorite data behind the loading screen. */
     private void applyFavoriteRefresh(int generation, String id, JSONObject refreshed) {
         if (generation != favoritesRefreshGeneration || !favorites.contains(id)) return;
+        replaceFavorite(id, refreshed);
+    }
+
+    private void replaceFavorite(String id, JSONObject site) {
         for (int i = 0; i < favoriteSites.size(); i++) {
             if (id.equals(favoriteSites.get(i).optString("id"))) {
-                favoriteSites.set(i, refreshed);
-                break;
+                favoriteSites.set(i, site);
+                return;
             }
         }
     }
@@ -386,15 +385,7 @@ public final class MainActivity extends BaseActivity {
         // announcing a refresh. The stored rows contain place metadata only,
         // so every dash now means "waiting" rather than looking like a live
         // price or stall count that silently went stale.
-        for (JSONObject bookmark : bookmarks) {
-            String id = bookmark.optString("id");
-            for (int i = 0; i < favoriteSites.size(); i++) {
-                if (id.equals(favoriteSites.get(i).optString("id"))) {
-                    favoriteSites.set(i, bookmark);
-                    break;
-                }
-            }
-        }
+        for (JSONObject bookmark : bookmarks) replaceFavorite(bookmark.optString("id"), bookmark);
         if (currentTab == FAVORITES && !detailVisible) renderFavorites(false);
         // Site fetches run in parallel, up to the favorites limit, and the
         // screen redraws once every bookmark has reported.
@@ -434,10 +425,7 @@ public final class MainActivity extends BaseActivity {
         find.setOnClickListener(view -> showSearchDialog());
         find.setOnKeyListener(
             (view, keyCode, event) -> {
-                if (
-                    keyCode != KeyEvent.KEYCODE_DPAD_DOWN ||
-                    event.getAction() != KeyEvent.ACTION_DOWN
-                ) return false;
+                if (keyCode != KeyEvent.KEYCODE_DPAD_DOWN || event.getAction() != KeyEvent.ACTION_DOWN) return false;
                 if (adapter.getCount() == 0) return false;
                 list.requestFocus();
                 adapter.setSelectedPosition(0);
@@ -459,6 +447,11 @@ public final class MainActivity extends BaseActivity {
             : resultSummary();
     }
 
+    /** Whether a charger's detail is what is on screen. */
+    private boolean siteVisible() {
+        return detailVisible && currentHistorySession == null && currentSite != null;
+    }
+
     private boolean discoverVisible() {
         return currentTab == DISCOVER && !detailVisible && discoverStatus != null;
     }
@@ -476,10 +469,7 @@ public final class MainActivity extends BaseActivity {
         // had nothing to delete and new text landed in front of the old.
         input.setSelection(input.length());
         input.setHint(R.string.search_hint);
-        input.setInputType(
-            InputType.TYPE_CLASS_TEXT |
-                InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS
-        );
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS);
         input.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         input.setSelectAllOnFocus(false);
 
@@ -496,10 +486,7 @@ public final class MainActivity extends BaseActivity {
         frame.setPadding(side, dp(6), side, dp(10));
         frame.addView(
             input,
-            new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+            new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         );
 
         final AlertDialog dialog = builder.setView(frame).create();
@@ -553,11 +540,9 @@ public final class MainActivity extends BaseActivity {
                 searchOrigin = result.optJSONObject("origin");
                 searchResults.clear();
                 JSONArray sites = result.optJSONArray("sites");
-                if (sites != null) for (
-                    int i = 0;
-                    i < sites.length();
-                    i++
-                ) if (sites.optJSONObject(i) != null) searchResults.add(sites.optJSONObject(i));
+                for (int i = 0; sites != null && i < sites.length(); i++) {
+                    if (sites.optJSONObject(i) != null) searchResults.add(sites.optJSONObject(i));
+                }
                 if (searchResults.isEmpty()) searchError = "No chargers found";
                 if (!discoverVisible()) return;
                 final SiteAdapter adapter = discoverAdapter;
@@ -583,11 +568,7 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void wireSiteList(ListView list, final SiteAdapter adapter, final View aboveList) {
-        wireList(list, adapter, aboveList, position -> openSite(adapter.getItem(position)), position -> {});
-    }
-
-    private void openSite(final JSONObject listItem) {
-        openSite(listItem.optString("id"));
+        wireList(list, adapter, aboveList, position -> openSite(adapter.getItem(position).optString("id")), position -> {});
     }
 
     private void openSite(final String locationGuid) {
@@ -607,19 +588,13 @@ public final class MainActivity extends BaseActivity {
                 // flight: the screen it was asked for is gone, and drawing
                 // it now would cover whatever took its place with a detail
                 // that Back no longer knows how to leave.
-                if (
-                    generation != pendingSiteGeneration ||
-                    !locationGuid.equals(pendingSiteGuid)
-                ) return;
+                if (generation != pendingSiteGeneration || !locationGuid.equals(pendingSiteGuid)) return;
                 pendingSiteGuid = null;
                 currentSite = site;
                 renderSite();
             },
             error -> {
-                if (
-                    generation != pendingSiteGeneration ||
-                    !locationGuid.equals(pendingSiteGuid)
-                ) return;
+                if (generation != pendingSiteGeneration || !locationGuid.equals(pendingSiteGuid)) return;
                 pendingSiteGuid = null;
                 showErrorDialog(error);
             }
@@ -633,9 +608,7 @@ public final class MainActivity extends BaseActivity {
         // Same order as the list rows: street address as the title, city line
         // beneath it. Tesla's site name is a restatement of both.
         String street = Normalizer.addressStreet(currentSite);
-        root.addView(
-            heading(street.length() > 0 ? street : currentSite.optString("name", "Charger"))
-        );
+        root.addView(heading(street.length() > 0 ? street : currentSite.optString("name", "Charger")));
         root.addView(body(Normalizer.addressLocality(currentSite)));
         root.addView(divider());
         if (chargingOperation == CHARGING_STARTING) {
@@ -649,18 +622,8 @@ public final class MainActivity extends BaseActivity {
         JSONObject schedule = currentSite.optJSONObject("schedule");
         JSONObject rate = currentSite.optJSONObject("rate");
         String price = "Unavailable";
-        if (schedule != null && !schedule.isNull("currentPrice")) price =
-            SiteAdapter.pricePerUnit(
-                schedule.optDouble("currentPrice"),
-                schedule.optString("currency", "USD"),
-                schedule.optString("uom", "kWh")
-            );
-        else if (rate != null && !rate.isNull("price")) price =
-            SiteAdapter.pricePerUnit(
-                rate.optDouble("price"),
-                rate.optString("currency", "USD"),
-                rate.optString("uom", "kWh")
-            );
+        if (schedule != null && !schedule.isNull("currentPrice")) price = price(schedule, "currentPrice");
+        else if (rate != null && !rate.isNull("price")) price = price(rate, "price");
         root.addView(metric("Price", price));
         root.addView(
             metric(
@@ -678,9 +641,7 @@ public final class MainActivity extends BaseActivity {
         );
 
         if (!currentSite.isNull("outage")) root.addView(warning(currentSite.optString("outage")));
-        if (!currentSite.isNull("criticalInfo")) root.addView(
-            warning(currentSite.optString("criticalInfo"))
-        );
+        if (!currentSite.isNull("criticalInfo")) root.addView(warning(currentSite.optString("criticalInfo")));
         if (currentSite.optBoolean("payToPark")) root.addView(
             warning("Paid parking may apply. " + currentSite.optString("payToParkInstructions"))
         );
@@ -705,10 +666,7 @@ public final class MainActivity extends BaseActivity {
                                   fee.optString("currency", "USD"),
                                   fee.optString("uom")
                               )
-                            : SiteAdapter.money(
-                                  fee.optDouble("price"),
-                                  fee.optString("currency", "USD")
-                              )
+                            : SiteAdapter.money(fee.optDouble("price"), fee.optString("currency", "USD"))
                     )
                 );
             }
@@ -724,11 +682,7 @@ public final class MainActivity extends BaseActivity {
             root.addView(small(names.toString()));
         }
 
-        Button favorite = action(
-            favorites.contains(currentSite.optString("id"))
-                ? "Remove favorite"
-                : "Add favorite"
-        );
+        Button favorite = action(favorites.contains(currentSite.optString("id")) ? "Remove favorite" : "Add favorite");
         favorite.setOnClickListener(
             view -> {
                 String id = currentSite.optString("id");
@@ -767,15 +721,26 @@ public final class MainActivity extends BaseActivity {
         start.setEnabled(canStart);
         start.setOnClickListener(view -> chooseStall());
         root.addView(start);
+        showDetail(scroll, root);
+    }
+
+    /**
+     * A detail screen, opened at its name rather than its buttons. Focusing a
+     * button inside a ScrollView scrolls it into view, which lands you at the
+     * bottom of the screen having never seen the price. Focus is parked on the
+     * scroller so the first press walks down through the content instead.
+     */
+    private void showDetail(ScrollView scroll, View root) {
         scroll.addView(root);
         Ui.fill(content, scroll);
-        // Open at the name, not at the buttons. Focusing a button inside a
-        // ScrollView scrolls it into view, which lands you at the bottom of the
-        // screen having never seen the price. Park focus on the scroller so the
-        // first press walks down through the content instead.
         scroll.setFocusableInTouchMode(true);
         scroll.setDescendantFocusability(ViewGroup.FOCUS_BEFORE_DESCENDANTS);
         scroll.requestFocus();
+    }
+
+    /** `key` of a price object (with its currency and unit) as "$0.42/kWh". */
+    private static String price(JSONObject from, String key) {
+        return SiteAdapter.pricePerUnit(from.optDouble(key), from.optString("currency", "USD"), from.optString("uom", "kWh"));
     }
 
     private void addPricingSchedule(LinearLayout root, JSONObject schedule) {
@@ -799,11 +764,7 @@ public final class MainActivity extends BaseActivity {
             int end = start + 1;
             while (end < hours.length()) {
                 JSONObject next = hours.optJSONObject(end);
-                if (
-                    next == null ||
-                    next.isNull("price") ||
-                    Double.compare(next.optDouble("price"), price) != 0
-                ) break;
+                if (next == null || next.isNull("price") || Double.compare(next.optDouble("price"), price) != 0) break;
                 end++;
             }
             bands.add(new String[] {
@@ -832,10 +793,7 @@ public final class MainActivity extends BaseActivity {
     private void chooseStall() {
         // Backstop for the disabled Start button: the active session may have
         // arrived from a poll between the render and the press.
-        if (chargingOperation != CHARGING_IDLE) {
-            toast("A charging request is already in progress.");
-            return;
-        }
+        if (operationPending()) return;
         if (sessionActive()) {
             renderSite();
             toast("A charging session is already in progress.");
@@ -867,27 +825,20 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void confirmStart(final JSONObject charger) {
-        if (chargingOperation != CHARGING_IDLE) {
-            toast("A charging request is already in progress.");
-            return;
-        }
+        if (operationPending()) return;
         // The title says what is about to happen and the button says it again,
         // so the message says neither: it names the stall being committed to and
         // the card that will pay for it, which is what is worth a second look.
         final AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Start charging session?")
-            .setMessage(confirmMessage(charger)).setPositiveButton(
-                "Start",
-                (d, which) -> {
-                    startSession(charger.optString("id"));
-                }
-            ).setNegativeButton("Cancel", null).show();
+            .setMessage(confirmMessage(charger))
+            .setPositiveButton("Start", (d, which) -> startSession(charger.optString("id")))
+            .setNegativeButton("Cancel", null)
+            .show();
         // A card that arrives while this is on screen still belongs on it: the
         // press it is meant to inform has not happened yet.
-        if (paymentMethod == null) loadPaymentMethod(
-            () -> {
-                if (dialog.isShowing()) dialog.setMessage(confirmMessage(charger));
-            }
-        );
+        if (paymentMethod == null) loadPaymentMethod(() -> {
+            if (dialog.isShowing()) dialog.setMessage(confirmMessage(charger));
+        });
     }
 
     private String confirmMessage(JSONObject charger) {
@@ -896,10 +847,7 @@ public final class MainActivity extends BaseActivity {
 
         JSONObject hold = currentSite.optJSONObject("holdAmount");
         if (hold != null) {
-            String amount = SiteAdapter.money(
-                hold.optDouble("price"),
-                hold.optString("currency", "USD")
-            );
+            String amount = SiteAdapter.money(hold.optDouble("price"), hold.optString("currency", "USD"));
             message.append("\n» ").append(amount).append(" pre-authorization requirement");
         }
         return message.toString();
@@ -935,10 +883,7 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void startSession(final String chargerId) {
-        if (chargingOperation != CHARGING_IDLE) {
-            toast("A charging request is already in progress.");
-            return;
-        }
+        if (operationPending()) return;
         final String siteId = currentSite == null
             ? ""
             : currentSite.optString("id");
@@ -963,12 +908,7 @@ public final class MainActivity extends BaseActivity {
             error -> {
                 if (generation != chargingOperationGeneration) return;
                 chargingOperation = CHARGING_IDLE;
-                if (
-                    detailVisible &&
-                    currentHistorySession == null &&
-                    currentSite != null &&
-                    siteId.equals(currentSite.optString("id"))
-                ) renderSite();
+                if (siteVisible() && siteId.equals(currentSite.optString("id"))) renderSite();
                 showErrorDialog(error);
             }
         );
@@ -978,20 +918,13 @@ public final class MainActivity extends BaseActivity {
         if (currentSession == null) {
             // No ScrollView here: the empty state wants the weighted centring
             // that a scrolling parent's unbounded height would collapse.
-            LinearLayout empty = vertical();
-            empty.addView(
-                emptyMessage(
-                    sessionLookupError == null
-                        ? "No active charging session"
-                        : "Could not check for a charging session.\n\n" + sessionLookupError
-                ),
-                Ui.weighted()
+            emptyScreen(
+                sessionLookupError == null
+                    ? "No active charging session"
+                    : "Could not check for a charging session.\n\n" + sessionLookupError,
+                "Check again",
+                this::resumeActiveSession
             );
-            Button refresh = action("Check again");
-            refresh.setOnClickListener(v -> resumeActiveSession());
-            empty.addView(refresh);
-            Ui.fill(content, empty);
-            refresh.requestFocus();
             return;
         }
 
@@ -1014,8 +947,7 @@ public final class MainActivity extends BaseActivity {
             "stopping".equals(phase) ||
             currentSession.optBoolean("awaitingUnplug") ||
             !currentSession.optBoolean("active");
-        boolean stopPending =
-            chargingOperation == CHARGING_STOPPING && !sessionReflectsStop;
+        boolean stopPending = chargingOperation == CHARGING_STOPPING && !sessionReflectsStop;
         int statusColor = stopPending
             ? color(R.color.warning)
             : "charging".equals(phase)
@@ -1024,12 +956,7 @@ public final class MainActivity extends BaseActivity {
               ? color(R.color.warning)
               : color(R.color.text);
         banner.addView(
-            status(
-                stopPending
-                    ? "Stopping…"
-                    : currentSession.optString("statusText", "Session"),
-                statusColor
-            )
+            status(stopPending ? "Stopping…" : currentSession.optString("statusText", "Session"), statusColor)
         );
 
         // Same address-first order as the lists. The city line and the stall
@@ -1041,13 +968,8 @@ public final class MainActivity extends BaseActivity {
         String stall = currentSession.isNull("stallLabel")
             ? ""
             : "Stall " + currentSession.optString("stallLabel");
-        String beneath =
-            locality.length() > 0 && stall.length() > 0
-                ? locality + " · " + stall
-                : locality + stall;
-        if (beneath.length() > 0) banner.addView(
-            centeredText(beneath, 12, color(R.color.text_muted))
-        );
+        String beneath = locality.length() > 0 && stall.length() > 0 ? locality + " · " + stall : locality + stall;
+        if (beneath.length() > 0) banner.addView(centeredText(beneath, 12, color(R.color.text_muted)));
         root.addView(banner);
         root.addView(divider());
         // Said before the numbers, because it is about them: a reading that did
@@ -1061,33 +983,18 @@ public final class MainActivity extends BaseActivity {
             "stopping".equals(phase) ||
             currentSession.optBoolean("hasEnergyReading")
         ) {
-            root.addView(
-                metric(
-                    "Power",
-                    String.format(Locale.US, "%.1f kW", currentSession.optDouble("powerKw"))
-                )
-            );
-            root.addView(
-                metric(
-                    "Energy",
-                    String.format(Locale.US, "%.2f kWh", currentSession.optDouble("energyKwh"))
-                )
-            );
+            root.addView(metric("Power", String.format(Locale.US, "%.1f kW", currentSession.optDouble("powerKw"))));
+            root.addView(metric("Energy", String.format(Locale.US, "%.2f kWh", currentSession.optDouble("energyKwh"))));
             root.addView(
                 metric(
                     "Cost",
-                    SiteAdapter.money(
-                        currentSession.optDouble("cost"),
-                        currentSession.optString("currency", "USD")
-                    )
+                    SiteAdapter.money(currentSession.optDouble("cost"), currentSession.optString("currency", "USD"))
                 )
             );
             // Charge level and time remaining share a row. They answer one
             // question, and separating them is what pushed Stop charging off
             // the bottom of a 320px screen.
-            boolean hasEta =
-                !currentSession.isNull("timeToBulkSecs") &&
-                currentSession.optDouble("powerKw") > 0;
+            boolean hasEta = !currentSession.isNull("timeToBulkSecs") && currentSession.optDouble("powerKw") > 0;
             String eta = hasEta
                 ? HistoryAdapter.duration(currentSession.optLong("timeToBulkSecs")) + " to 80%"
                 : "";
@@ -1099,16 +1006,7 @@ public final class MainActivity extends BaseActivity {
             }
         } else {
             JSONObject rate = currentSession.optJSONObject("rate");
-            if (rate != null && !rate.isNull("currentPrice")) root.addView(
-                metric(
-                    "Rate",
-                    SiteAdapter.pricePerUnit(
-                        rate.optDouble("currentPrice"),
-                        rate.optString("currency", "USD"),
-                        rate.optString("uom", "kWh")
-                    )
-                )
-            );
+            if (rate != null && !rate.isNull("currentPrice")) root.addView(metric("Rate", price(rate, "currentPrice")));
         }
         // Tesla only itemizes congestion once the completed-session summary is
         // ready. Keep a zero-height slot beside the other figures so an actual
@@ -1119,9 +1017,7 @@ public final class MainActivity extends BaseActivity {
             root.addView(congestionFees);
             loadCongestionFees(congestionFees);
         }
-        if (currentSession.optBoolean("awaitingUnplug")) root.addView(
-            warning("Charging has stopped")
-        );
+        if (currentSession.optBoolean("awaitingUnplug")) root.addView(warning("Charging has stopped"));
         // Same rule as the banner: a session that has already moved past the
         // stop offers nothing to press, so it keeps no button. Waiting for an
         // unplug is not an action anyone can take here.
@@ -1149,10 +1045,7 @@ public final class MainActivity extends BaseActivity {
 
         LinearLayout root = vertical();
         if (historySessions.isEmpty()) {
-            root.addView(
-                emptyMessage("No charging sessions yet"),
-                Ui.weighted()
-            );
+            root.addView(emptyMessage("No charging sessions yet"), Ui.weighted());
             Ui.fill(content, root);
             return;
         }
@@ -1186,16 +1079,7 @@ public final class MainActivity extends BaseActivity {
             error -> {
                 if (generation != historyLoadGeneration) return;
                 if (currentTab != HISTORY) return;
-                LinearLayout root = vertical();
-                root.addView(
-                    emptyMessage("Could not load your charging history.\n\n" + error.getMessage()),
-                    Ui.weighted()
-                );
-                Button retry = action("Try again");
-                retry.setOnClickListener(v -> loadHistory());
-                root.addView(retry);
-                Ui.fill(content, root);
-                retry.requestFocus();
+                emptyScreen("Could not load your charging history.\n\n" + error.getMessage(), "Try again", this::loadHistory);
             }
         );
     }
@@ -1239,10 +1123,7 @@ public final class MainActivity extends BaseActivity {
     private void updateHistoryFooter() {
         if (historyAdapter == null) return;
         if (historyLoadingMore) historyAdapter.setFooter("Loading more…", true);
-        else if (historyMoreError != null) historyAdapter.setFooter(
-            historyMoreError,
-            false
-        );
+        else if (historyMoreError != null) historyAdapter.setFooter(historyMoreError, false);
         else if (historyHasMore) historyAdapter.setFooter("Load older sessions", false);
         else historyAdapter.setFooter(null, false);
     }
@@ -1258,16 +1139,14 @@ public final class MainActivity extends BaseActivity {
         }
     }
 
-    /** OK on the footer, which is the same request whether it is the first
-     *  attempt at a page or a retry of one that failed. */
-    private void openHistoryFooter() {
-        historyMoreError = null;
-        loadMoreHistory();
-    }
-
     private void wireHistoryList(ListView list, final HistoryAdapter adapter) {
         wireList(list, adapter, null, position -> {
-            if (adapter.isFooter(position)) openHistoryFooter();
+            // OK on the footer is the same request whether it is the first
+            // attempt at a page or a retry of one that failed.
+            if (adapter.isFooter(position)) {
+                historyMoreError = null;
+                loadMoreHistory();
+            }
             else openHistorySession(adapter.getItem(position));
         }, this::maybeLoadMoreHistory);
         // Touch scrolling reaching the end asks for the next page too: the key
@@ -1357,8 +1236,7 @@ public final class MainActivity extends BaseActivity {
             anchorTop = targetRow.getTop();
         } else {
             View currentRow = list.getChildAt(current - firstVisible);
-            anchorTop =
-                currentRow == null ? list.getPaddingTop() : currentRow.getTop();
+            anchorTop = currentRow == null ? list.getPaddingTop() : currentRow.getTop();
         }
 
         adapter.setSelectedPosition(target);
@@ -1424,8 +1302,7 @@ public final class MainActivity extends BaseActivity {
         // Under a resolved street: the city, or failing that the name the
         // session was filed under. Under an unresolved one: nothing, since the
         // heading is already that name.
-        String secondary =
-            locality.length() > 0 ? locality : street.length() > 0 ? label : "";
+        String secondary = locality.length() > 0 ? locality : street.length() > 0 ? label : "";
         if (secondary.length() > 0) root.addView(body(secondary));
         root.addView(divider());
 
@@ -1433,31 +1310,19 @@ public final class MainActivity extends BaseActivity {
         if (!session.isNull("startedAt")) root.addView(
             metric("Started", HistoryAdapter.at(session.optLong("startedAt")))
         );
-        if (!session.isNull("endedAt")) root.addView(
-            metric("Ended", HistoryAdapter.at(session.optLong("endedAt")))
-        );
+        if (!session.isNull("endedAt")) root.addView(metric("Ended", HistoryAdapter.at(session.optLong("endedAt"))));
         if (!session.isNull("durationSecs")) root.addView(
             metric("Charged for", HistoryAdapter.duration(session.optLong("durationSecs")))
         );
         // Only worth a row once it is long enough to be a decision someone
         // made rather than the seconds it takes to put a cable away.
         if (!session.isNull("idleSecs") && session.optLong("idleSecs") >= 300) {
-            root.addView(
-                metric("Plugged in after", HistoryAdapter.duration(session.optLong("idleSecs")))
-            );
+            root.addView(metric("Plugged in after", HistoryAdapter.duration(session.optLong("idleSecs"))));
         }
-        root.addView(
-            metric(
-                "Energy",
-                String.format(Locale.US, "%.2f kWh", session.optDouble("energyKwh", 0))
-            )
-        );
+        root.addView(metric("Energy", String.format(Locale.US, "%.2f kWh", session.optDouble("energyKwh", 0))));
         if (!session.isNull("pricePerKwh")) {
             root.addView(
-                metric(
-                    "Cost per kWh",
-                    SiteAdapter.money(session.optDouble("pricePerKwh"), currency) + "/kWh"
-                )
+                metric("Cost per kWh", SiteAdapter.money(session.optDouble("pricePerKwh"), currency) + "/kWh")
             );
         }
 
@@ -1479,11 +1344,7 @@ public final class MainActivity extends BaseActivity {
             charger.setOnClickListener(view -> openSite(locationGuid));
             root.addView(charger);
         }
-        scroll.addView(root);
-        Ui.fill(content, scroll);
-        scroll.setFocusableInTouchMode(true);
-        scroll.setDescendantFocusability(ViewGroup.FOCUS_BEFORE_DESCENDANTS);
-        scroll.requestFocus();
+        showDetail(scroll, root);
     }
 
     /** Itemized totals for everything billed during the session. */
@@ -1499,15 +1360,13 @@ public final class MainActivity extends BaseActivity {
                 root.addView(section("Charges"));
                 titled = true;
             }
-            root.addView(
-                metric(
-                    fee.optString("label"),
-                    fee.optBoolean("waived") && total == 0
-                        ? "Waived"
-                        : SiteAdapter.money(total, fee.optString("currency", currency))
-                )
-            );
+            root.addView(metric(fee.optString("label"), feeAmount(fee, total, currency)));
         }
+    }
+
+    /** What a fee came to: "Waived" when it was, rather than a zero. */
+    private static String feeAmount(JSONObject fee, double total, String currency) {
+        return fee.optBoolean("waived") && total == 0 ? "Waived" : SiteAdapter.money(total, fee.optString("currency", currency));
     }
 
     private void loadCongestionFees(final LinearLayout root) {
@@ -1524,30 +1383,11 @@ public final class MainActivity extends BaseActivity {
                     double total = fee.optDouble("total", 0);
                     if (total == 0 && !fee.optBoolean("waived")) continue;
                     hasCongestionFee = true;
-                    root.addView(
-                        metric(
-                            "Congestion fee",
-                            fee.optBoolean("waived") && total == 0
-                                ? "Waived"
-                                : SiteAdapter.money(
-                                      total,
-                                      fee.optString(
-                                          "currency",
-                                          summary.optString("currency", "USD")
-                                      )
-                                  )
-                        )
-                    );
+                    root.addView(metric("Congestion fee", feeAmount(fee, total, summary.optString("currency", "USD"))));
                 }
-                if (hasCongestionFee) root.addView(
-                    metric(
-                        "Total",
-                        SiteAdapter.money(
-                            summary.optDouble("total"),
-                            summary.optString("currency", "USD")
-                        )
-                    )
-                );
+                if (hasCongestionFee) {
+                    root.addView(metric("Total", SiteAdapter.money(summary.optDouble("total"), summary.optString("currency", "USD"))));
+                }
             },
             error -> {
                 // Congestion is optional supporting detail. The running
@@ -1558,10 +1398,7 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void confirmStop() {
-        if (chargingOperation != CHARGING_IDLE) {
-            toast("A charging request is already in progress.");
-            return;
-        }
+        if (operationPending()) return;
         final boolean charging = currentSession.optBoolean("charging");
         new AlertDialog.Builder(this).setTitle(charging ? "Stop charging?" : "Cancel session?")
             .setPositiveButton(
@@ -1571,10 +1408,7 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void stopSession() {
-        if (chargingOperation != CHARGING_IDLE) {
-            toast("A charging request is already in progress.");
-            return;
-        }
+        if (operationPending()) return;
         final String id = currentSession.optString("authorizationSessionId");
         if (id.length() == 0) {
             showErrorDialog(new ApiException("The active session could not be identified.", 400));
@@ -1612,11 +1446,7 @@ public final class MainActivity extends BaseActivity {
                 sessionError = null;
                 sessionLookupError = null;
                 if (currentTab == SESSION) renderSession();
-                else if (
-                    detailVisible &&
-                    currentHistorySession == null &&
-                    currentSite != null
-                ) renderSite();
+                else if (siteVisible()) renderSite();
                 watchOrRelease();
             },
             error -> {
@@ -1627,6 +1457,13 @@ public final class MainActivity extends BaseActivity {
                 } else if (currentTab == SESSION) showErrorDialog(error);
             }
         );
+    }
+
+    /** Whether a start or stop is still awaiting Tesla, said when it is. */
+    private boolean operationPending() {
+        if (chargingOperation == CHARGING_IDLE) return false;
+        toast("A charging request is already in progress.");
+        return true;
     }
 
     /** True while a charging session is running, so nothing else offers to
@@ -1781,8 +1618,7 @@ public final class MainActivity extends BaseActivity {
                 messagePanel.setVisibility(View.VISIBLE);
             },
             error -> {
-                if (generation != accountRequestGeneration) return;
-                if (!dialog.isShowing()) return;
+                if (generation != accountRequestGeneration || !dialog.isShowing()) return;
                 dialog.setMessage("Your account could not be loaded.\n\n" + error.getMessage());
                 loadingPanel.setVisibility(View.GONE);
                 messagePanel.setVisibility(View.VISIBLE);
@@ -1801,11 +1637,7 @@ public final class MainActivity extends BaseActivity {
 
         JSONObject payment = account.optJSONObject("payment");
         if (payment == null) {
-            text.append(
-                account.isNull("paymentError")
-                    ? "No card on file"
-                    : account.optString("paymentError")
-            );
+            text.append(account.isNull("paymentError") ? "No card on file" : account.optString("paymentError"));
         } else {
             String brand = payment.isNull("brand")
                 ? null
@@ -1837,9 +1669,7 @@ public final class MainActivity extends BaseActivity {
                 // Said as an amount so it lines up with the owed lines below
                 // it. An empty list names no currency of its own, so the zero
                 // is priced in the account's.
-                text.append(
-                    SiteAdapter.money(0, account.optString("currency", "USD"))
-                ).append(" owed");
+                text.append(SiteAdapter.money(0, account.optString("currency", "USD"))).append(" owed");
             }
             for (int i = 0; entries != null && i < entries.length(); i++) {
                 JSONObject entry = entries.optJSONObject(i);
@@ -1890,9 +1720,7 @@ public final class MainActivity extends BaseActivity {
         );
 
         if (!account.isNull("signInExpiresAt")) {
-            text.append("\n\n-- Sign-in --\n» ").append(
-                signInExpiry(account.optLong("signInExpiresAt"))
-            );
+            text.append("\n\n-- Sign-in --\n» ").append(signInExpiry(account.optLong("signInExpiresAt")));
         }
 
         return text.toString();
@@ -1954,24 +1782,18 @@ public final class MainActivity extends BaseActivity {
         final Success<T> success,
         final Failure failure
     ) {
-        network.submit(
-            () -> {
-                try {
-                    final T result = task.call();
-                    main.post(
-                        () -> {
-                            if (!isFinishing()) success.accept(result);
-                        }
-                    );
-                } catch (final Exception error) {
-                    main.post(
-                        () -> {
-                            if (!isFinishing()) failure.accept(error);
-                        }
-                    );
-                }
+        network.submit(() -> {
+            try {
+                final T result = task.call();
+                main.post(() -> {
+                    if (!isFinishing()) success.accept(result);
+                });
+            } catch (final Exception error) {
+                main.post(() -> {
+                    if (!isFinishing()) failure.accept(error);
+                });
             }
-        );
+        });
     }
 
     private void showErrorDialog(Exception error) {
@@ -2033,10 +1855,7 @@ public final class MainActivity extends BaseActivity {
                 ? getResources().getColorStateList(R.color.btn_primary_text)
                 : ColorStateList.valueOf(color(R.color.text))
         );
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(42)
-        );
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
         params.setMargins(dp(8), dp(5), dp(8), dp(3));
         button.setLayoutParams(params);
         return button;
@@ -2058,6 +1877,17 @@ public final class MainActivity extends BaseActivity {
         view.setLineSpacing(dp(3), 1f);
         view.setPadding(dp(16), dp(16), dp(16), dp(16));
         return view;
+    }
+
+    /** A screen with nothing on it but why, and the one button that might help. */
+    private void emptyScreen(String message, String label, Runnable press) {
+        LinearLayout root = vertical();
+        root.addView(emptyMessage(message), Ui.weighted());
+        Button button = action(label);
+        button.setOnClickListener(v -> press.run());
+        root.addView(button);
+        Ui.fill(content, root);
+        button.requestFocus();
     }
 
     /** Quiet all-caps label grouping the rows beneath it. Capitals carry the
@@ -2098,7 +1928,6 @@ public final class MainActivity extends BaseActivity {
     /** Label left, value right: the shape every number in the app is read in. */
     private View metric(String label, String value) {
         LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setBackgroundColor(color(R.color.row));
         row.setMinimumHeight(dp(30));
@@ -2129,9 +1958,7 @@ public final class MainActivity extends BaseActivity {
     private View divider() {
         View line = new View(this);
         line.setBackgroundColor(color(R.color.divider));
-        line.setLayoutParams(
-            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1))
-        );
+        line.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
         return line;
     }
 
@@ -2140,16 +1967,9 @@ public final class MainActivity extends BaseActivity {
      *  them. Falls back to the platform's usual 24dp if the theme is silent. */
     private int dialogTextInset(Context themed) {
         TypedValue value = new TypedValue();
-        boolean found = themed.getTheme().resolveAttribute(
-                android.R.attr.dialogPreferredPadding,
-                value,
-                true
-            );
+        boolean found = themed.getTheme().resolveAttribute(android.R.attr.dialogPreferredPadding, value, true);
         if (!found || value.type != TypedValue.TYPE_DIMENSION) return dp(24);
-        return TypedValue.complexToDimensionPixelSize(
-            value.data,
-            getResources().getDisplayMetrics()
-        );
+        return TypedValue.complexToDimensionPixelSize(value.data, getResources().getDisplayMetrics());
     }
 
     private interface Success<T> {

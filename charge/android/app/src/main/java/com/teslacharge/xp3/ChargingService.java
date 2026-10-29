@@ -80,9 +80,7 @@ public final class ChargingService extends Service {
 
     static void start(Context context, String sessionId) {
         if (sessionId == null || sessionId.length() == 0) return;
-        context.startService(
-            new Intent(context, ChargingService.class).putExtra(EXTRA_SESSION_ID, sessionId)
-        );
+        context.startService(new Intent(context, ChargingService.class).putExtra(EXTRA_SESSION_ID, sessionId));
     }
 
     static void stop(Context context) {
@@ -227,11 +225,7 @@ public final class ChargingService extends Service {
             return;
         }
         notifications.notify(NOTIFICATION, notification(latest, latestError));
-        schedule(
-            session == null
-                ? FAILURE_POLL_MS
-                : listener != null ? WATCHED_POLL_MS : BACKGROUND_POLL_MS
-        );
+        schedule(session == null ? FAILURE_POLL_MS : listener != null ? WATCHED_POLL_MS : BACKGROUND_POLL_MS);
     }
 
     private void finish() {
@@ -250,12 +244,7 @@ public final class ChargingService extends Service {
                     Intent.FLAG_ACTIVITY_CLEAR_TOP |
                     Intent.FLAG_ACTIVITY_SINGLE_TOP
             );
-        PendingIntent tap = PendingIntent.getActivity(
-            this,
-            0,
-            open,
-            PendingIntent.FLAG_UPDATE_CURRENT
-        );
+        PendingIntent tap = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT);
 
         return new Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_notification)
             .setColor(getResources().getColor(R.color.primary)).setContentTitle(
@@ -277,9 +266,7 @@ public final class ChargingService extends Service {
             parts.add(session.optInt("stateOfCharge") + "%");
         }
         parts.add(String.format(Locale.US, "%.2f kWh", session.optDouble("energyKwh", 0)));
-        parts.add(
-            SiteAdapter.money(session.optDouble("cost", 0), session.optString("currency", "USD"))
-        );
+        parts.add(SiteAdapter.money(session.optDouble("cost", 0), session.optString("currency", "USD")));
         StringBuilder line = new StringBuilder();
         for (String part : parts) {
             if (line.length() > 0) line.append("  ·  ");
