@@ -109,9 +109,8 @@ public class MainActivity extends Activity {
     private ScrollView home;
     private ScrollView entry;
     private TextView headword;
-    private TextView tabDefinitions;
-    private TextView tabThesaurus;
-    private TextView tabShorthand;
+    /** Definitions, Thesaurus and Shorthand, indexed by tab. */
+    private TextView[] tabs;
     private TextView body;
     private ScrollView results;
     private LinearLayout rows;
@@ -133,9 +132,7 @@ public class MainActivity extends Activity {
         home = findViewById(R.id.home);
         entry = findViewById(R.id.entry);
         headword = findViewById(R.id.headword);
-        tabDefinitions = findViewById(R.id.tab_definitions);
-        tabThesaurus = findViewById(R.id.tab_thesaurus);
-        tabShorthand = findViewById(R.id.tab_shorthand);
+        tabs = new TextView[] {findViewById(R.id.tab_definitions), findViewById(R.id.tab_thesaurus), findViewById(R.id.tab_shorthand)};
         body = findViewById(R.id.body);
         results = findViewById(R.id.results);
         rows = findViewById(R.id.rows);
@@ -243,7 +240,6 @@ public class MainActivity extends Activity {
         }
         if (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
             if (first && page != HOME) {
-                TextView[] tabs = {tabDefinitions, tabThesaurus, tabShorthand};
                 int step = key == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1;
                 for (int next = tab + step; next >= 0 && next < tabs.length; next += step) {
                     if (tabs[next].getVisibility() == View.VISIBLE) {
@@ -344,7 +340,6 @@ public class MainActivity extends Activity {
         for (Dictionary.Sense sense : senses) any |= !synonyms(word, sense).isEmpty();
         boolean[] shown = {wordNet, any, group >= 0};
         if (!shown[tab]) tab = wordNet ? DEFINITIONS : SHORTHAND;
-        TextView[] tabs = {tabDefinitions, tabThesaurus, tabShorthand};
         boolean firstShown = true;
         for (int t = 0; t < tabs.length; t++) {
             tabs[t].setVisibility(shown[t] ? View.VISIBLE : View.GONE);
@@ -387,10 +382,8 @@ public class MainActivity extends Activity {
 
     /** The page a shorthand group opens: the word's own page when WordNet has it. */
     private int pageFor(int group) {
-        String key = shorthand.key(group);
-        int at = dictionary.lowerBound(key);
-        if (at < dictionary.size() && dictionary.word(at).equals(key)) return at;
-        return ONLY_SHORTHAND - group;
+        int at = wordNetPage(shorthand.key(group));
+        return at >= 0 ? at : ONLY_SHORTHAND - group;
     }
 
     /** A page's word, as the search and its recents compare them. */
@@ -405,10 +398,16 @@ public class MainActivity extends Activity {
 
     /** The page for a word, either dictionary's, or -1. */
     private int pageOf(String word) {
-        int at = dictionary.lowerBound(word);
-        if (at < dictionary.size() && dictionary.word(at).equals(word)) return at;
+        int at = wordNetPage(word);
+        if (at >= 0) return at;
         int group = shorthand.find(word);
         return group >= 0 ? ONLY_SHORTHAND - group : -1;
+    }
+
+    /** WordNet's page for exactly `word`, or -1. */
+    private int wordNetPage(String word) {
+        int at = dictionary.lowerBound(word);
+        return at < dictionary.size() && dictionary.word(at).equals(word) ? at : -1;
     }
 
     /**
@@ -522,14 +521,14 @@ public class MainActivity extends Activity {
             return;
         }
         String query = search.getText().toString();
-        if (Dictionary.normalize(query).isEmpty()) return;
+        String q = Dictionary.normalize(query);
+        if (q.isEmpty()) return;
         if (outlineSearch) {
             // The first row: the best reading, or a phrase's first that opens.
             if (!items.isEmpty()) found(items.get(0), itemTabs.get(0));
             return;
         }
         int found = dictionary.find(query);
-        String q = Dictionary.normalize(query);
         if (found < 0 || (!dictionary.word(found).equals(q) && dictionary.word(found).startsWith(q))) {
             // Only a word it begins: a word only the shorthand has (into) comes first.
             int exact = pageOf(q);
@@ -645,8 +644,9 @@ public class MainActivity extends Activity {
             english.append(read.isEmpty() ? "?" : shorthand.translation(read.get(0).entry));
             any |= !read.isEmpty();
         }
-        showNone(!any && joined.isEmpty());
-        if (!any && joined.isEmpty()) return;
+        boolean none = !any && joined.isEmpty();
+        showNone(none);
+        if (none) return;
         List<Integer> shown = new ArrayList<>();
         for (Shorthand.Match match : joined) {
             if (match.kind != Shorthand.EXACT) continue;
@@ -662,8 +662,7 @@ public class MainActivity extends Activity {
             if (page != -1) {
                 addRow(page, DEFINITIONS, R.drawable.ic_search_thin, s);
             } else {
-                TextView reading = text("", 12.5f, R.color.ink, sans);
-                reading.setText(s);
+                TextView reading = text(s, 12.5f, R.color.ink, sans);
                 reading.setPadding(dp(12), dp(6), dp(12), dp(4));
                 rows.addView(reading);
             }
@@ -722,8 +721,7 @@ public class MainActivity extends Activity {
         ImageView start = new ImageView(this);
         start.setImageResource(icon);
         line.addView(start, new LinearLayout.LayoutParams(dp(13), dp(13)));
-        TextView label = text("", 12.5f, R.color.ink, sans);
-        label.setText(text);
+        TextView label = text(text, 12.5f, R.color.ink, sans);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
@@ -923,7 +921,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private TextView text(String value, float size, int color, Typeface typeface) {
+    private TextView text(CharSequence value, float size, int color, Typeface typeface) {
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextSize(size);
