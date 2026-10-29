@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Anki's dark window on black, with light status bar icons. -->
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorPrimary">@color/canvas</item>
+        <item name="android:colorPrimaryDark">@color/canvas</item>
+        <item name="android:colorAccent">@color/focus</item>
+        <item name="android:colorControlHighlight">#244F8EF7</item>
+        <item name="android:navigationBarColor">@color/canvas</item>
+        <item name="android:statusBarColor">@color/canvas</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/canvas</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>

@@ -35,6 +35,24 @@ or typing to study.
 
 The app opens on the deck list. There is no header naming the app.
 
+### Menus
+
+Menu opens Anki's pop-up menu, drawn over the window (not a platform
+dialog, so Night Shift and Dark mode reach it) at the bottom: a bordered
+panel on the elevated colour with 5dp corners; a check column at the left
+(`✓` for Night Shift and Dark mode when on); the label; the digit that picks
+the item at the right in grey (1 to 9); hairlines between groups (Options and
+Stats; Sync and Import; Night Shift and Dark mode; Command center). The
+highlighted item has a blue bar and white text. Up and Down move (wrapping),
+OK picks (on release), a digit picks that item, Menu and Back close it. Import's
+list of `.fkv` files is the same menu, scrolling.
+
+- **Night Shift** warms the whole screen toward yellow (as in Books), is
+  kept between runs, and is off by default.
+- **Dark mode** is an OLED dark theme: pure black canvas, Anki's night
+  colours, kept between runs, off by default, independent of the phone's
+  setting. Switching it reopens the app on the deck list.
+
 ### Deck list
 
 - A header row, `Deck` then `New`, `Learn`, `Due` in small grey, then one
@@ -49,12 +67,9 @@ The app opens on the deck list. There is no header naming the app.
   Down on the last row stay there. Returning to the list keeps the row last
   selected (or the newly imported deck after an import).
 - OK opens the deck's overview.
-- Menu on a deck row: a dialog titled with the deck's name: Options, Stats,
-  Sync, Import, Night Shift, Command center. With no deck selected: titled
-  `Flashcards` with Sync, Import, Night Shift, Command center.
-- `Night Shift: off` / `Night Shift: on` in Menu flips Night Shift, which
-  warms the whole screen toward yellow (as in Books), is kept between runs
-  and is off by default. Dialogs are not warmed.
+- Menu on a deck row opens an Anki-style pop-up menu (see Menus) with:
+  Options, Stats, Sync, Import, Night Shift, Dark mode, Command center.
+  With no deck selected the same without Options and Stats.
 - Back leaves the app.
 - No decks, signed in: `No decks` centred (`Syncing` while a sync runs).
   No decks, not signed in: only the pairing panel, centred. Menu works on
@@ -96,7 +111,7 @@ The app opens on the deck list. There is no header naming the app.
 - The interval shown on a button is exactly what that key gives.
 - After an answer the next card shows at once. When nothing more is due
   (or, in Review Ahead, no other card), the overview returns.
-- Menu: a dialog `Card` with `Remove from deck` and the Night Shift switch. Choosing it removes the
+- Menu: the Anki-style menu with `Remove from deck`, Night Shift and Dark mode. Choosing it removes the
   card at once without asking, shows the next card, and toasts `Removed
   from <deck>`. Cancel or Back closes the dialog and leaves the card.
 - Back: the overview, its counts updated. The answer is not lost: an

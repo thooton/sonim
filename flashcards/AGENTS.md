@@ -78,7 +78,7 @@ The tablet's `session.earliest` is the same rule.
   it, digits type it, below 0 is Auto, Back keeps it), `StatsPane` (Anki's
   Statistics window: Stats beside Options and in Menu; the deck's or, with
   Left and Right, the collection's; Up and Down scroll; Card Counts' pie and
-  the histograms in Anki's colours), `Anki` (the look).
+  the histograms in Anki's colours), `Anki` (the look), `AnkiMenu` (Anki's pop-up menu, a view over the window that `MainActivity.dispatchKeyEvent` hands every key to while open; not a platform dialog, so `NightShift`'s filter reaches it), `NightShift` (colour filter on the decor view). Dark mode is `res/values-night`, forced by `MainActivity.attachBaseContext` from the `dark` preference rather than by the system; add any new colour to both `values` and `values-night`.
 - `android/app/src/main/assets/decks/`: the Spanish deck and its starting
   state, built from an Anki profile by `tools/import_anki_spanish.py`.
   Only the first run of 1.2 reads them, to bring the deck (with the state

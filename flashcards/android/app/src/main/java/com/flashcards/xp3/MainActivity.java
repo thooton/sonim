@@ -3,10 +3,12 @@ package com.flashcards.xp3;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
+import android.content.res.Configuration;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -86,6 +88,8 @@ public final class MainActivity extends BaseActivity {
     private static final String PREFS = "flashcards";
     /** Options > Show progress, kept on this device for every deck. */
     private static final String PREF_PROGRESS = "show_progress";
+    private static final String PREF_DARK = "dark";
+    private static final String PREF_NIGHT = "nightShift";
     /** The deck the app bundled before the command center kept them. */
     private static final String[] BUNDLED = {
         "spanish-words", "Spanish words", "decks/spanish-words.tsv", "decks/spanish-words.state"};
@@ -112,6 +116,8 @@ public final class MainActivity extends BaseActivity {
     private Deck open;
     private int deckAt;
     private ReviewPane review;
+    /** The Anki-style menu laid over the window, while one is open. */
+    private AnkiMenu menu;
 
     private boolean syncing;
     private boolean syncAgain;
@@ -128,6 +134,16 @@ public final class MainActivity extends BaseActivity {
     private final Runnable refresh = () -> {
         if (screen == Screen.OVERVIEW) showOverview();
     };
+
+    /** Dark mode is the app's own switch: it picks the night resources whatever the system is in. */
+    @Override
+    protected void attachBaseContext(Context base) {
+        boolean dark = base.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_DARK, false);
+        Configuration config = new Configuration(base.getResources().getConfiguration());
+        config.uiMode = (config.uiMode & ~Configuration.UI_MODE_NIGHT_MASK)
+            | (dark ? Configuration.UI_MODE_NIGHT_YES : Configuration.UI_MODE_NIGHT_NO);
+        super.attachBaseContext(base.createConfigurationContext(config));
+    }
 
     @Override
     protected void onCreate(Bundle onIce) {
@@ -536,18 +552,44 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void deckMenu(final Deck deck) {
-        List<String> items = deck == null
-            ? Arrays.asList("Sync", "Import", nightShiftItem(), "Command center")
-            : Arrays.asList("Options", "Stats", "Sync", "Import", nightShiftItem(), "Command center");
-        listDialog(deck == null ? "Flashcards" : deck.name, items, at -> {
-            String chose = items.get(at);
-            if (chose.equals("Options")) showOptions(deck);
-            else if (chose.equals("Stats")) showStats(deck);
-            else if (chose.equals("Sync")) syncNow();
-            else if (chose.equals("Import")) chooseImport();
-            else if (chose.equals(nightShiftItem())) toggleNightShift();
-            else askLogin();
-        }, null);
+        List<AnkiMenu.Item> items = new ArrayList<>();
+        if (deck != null) {
+            items.add(new AnkiMenu.Item("Options", () -> showOptions(deck)));
+            items.add(new AnkiMenu.Item("Stats", () -> showStats(deck)));
+        }
+        items.add(new AnkiMenu.Item("Sync", this::syncNow).group());
+        items.add(new AnkiMenu.Item("Import", this::chooseImport));
+        items.addAll(lookItems());
+        items.add(new AnkiMenu.Item("Command center", this::askLogin).group());
+        showMenu(items);
+    }
+
+    /** Night Shift and Dark mode, checked when on. */
+    private List<AnkiMenu.Item> lookItems() {
+        List<AnkiMenu.Item> items = new ArrayList<>();
+        items.add(new AnkiMenu.Item("Night Shift", this::toggleNightShift).checked(nightShift()).group());
+        items.add(new AnkiMenu.Item("Dark mode", this::toggleDark).checked(dark()));
+        return items;
+    }
+
+    private void showMenu(List<AnkiMenu.Item> items) {
+        closeMenu();
+        menu = new AnkiMenu(this, items, this::closeMenu);
+        ((ViewGroup) findViewById(android.R.id.content)).addView(menu,
+            new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private void closeMenu() {
+        if (menu == null) return;
+        ((ViewGroup) menu.getParent()).removeView(menu);
+        menu = null;
+    }
+
+    /** While a menu is open it takes every key. */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (menu != null) return menu.onKey(event);
+        return super.dispatchKeyEvent(event);
     }
 
     private void syncNow() {
@@ -585,9 +627,9 @@ public final class MainActivity extends BaseActivity {
             return;
         }
         Collections.sort(found, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
-        List<String> shown = new ArrayList<>();
-        for (File file : found) shown.add(deckName(file));
-        listDialog("Import", shown, at -> importFile(found.get(at)), null);
+        List<AnkiMenu.Item> shown = new ArrayList<>();
+        for (File file : found) shown.add(new AnkiMenu.Item(deckName(file), () -> importFile(file)));
+        showMenu(shown);
     }
 
     private static String deckName(File file) {
@@ -818,11 +860,8 @@ public final class MainActivity extends BaseActivity {
         final DeckCard card = session(open).current();
         if (card == null || review == null) return;
         final ReviewPane shown = review;
-        listDialog("Card", Arrays.asList("Remove from deck", nightShiftItem()), at -> {
-            if (at == 1) {
-                toggleNightShift();
-                return;
-            }
+        List<AnkiMenu.Item> items = new ArrayList<>();
+        items.add(new AnkiMenu.Item("Remove from deck", () -> {
             if (screen != Screen.REVIEW || review != shown || session(open).current() != card) return;
             collection.remove(card, System.currentTimeMillis());
             review.showNext();
@@ -830,7 +869,9 @@ public final class MainActivity extends BaseActivity {
             // Saved and synced as an answer is: later, off the key press.
             later(saveSoon, SAVE_AFTER_MS);
             later(syncSoon, SYNC_AFTER_MS);
-        }, null);
+        }));
+        items.addAll(lookItems());
+        showMenu(items);
     }
 
     // ---------------------------------------------------------------------
@@ -904,17 +945,23 @@ public final class MainActivity extends BaseActivity {
     // The command center login
 
     private boolean nightShift() {
-        return prefs().getBoolean("nightShift", false);
+        return prefs().getBoolean(PREF_NIGHT, false);
     }
 
-    private String nightShiftItem() {
-        return nightShift() ? "Night Shift: on" : "Night Shift: off";
+    private boolean dark() {
+        return prefs().getBoolean(PREF_DARK, false);
     }
 
     private void toggleNightShift() {
         boolean on = !nightShift();
-        prefs().edit().putBoolean("nightShift", on).apply();
+        prefs().edit().putBoolean(PREF_NIGHT, on).apply();
         NightShift.apply(getWindow().getDecorView(), on);
+    }
+
+    /** The colours are fixed when a screen is built, so the app opens again, on the deck list. */
+    private void toggleDark() {
+        prefs().edit().putBoolean(PREF_DARK, !dark()).commit();
+        recreate();
     }
 
     private SharedPreferences prefs() {
