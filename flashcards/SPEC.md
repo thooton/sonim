@@ -115,7 +115,7 @@ The app opens on the deck list. There is no header naming the app.
 - Up and Down move the ring between `New cards/day` and, under a `Display`
   heading, `Show progress` (`‹  Off  ›`, off by default). Left, Right and OK
   flip it. It is kept on this device for every deck, never synced. When on,
-  the reviewer shows `N%` in small grey at the right of the counts line:
+  the reviewer shows `N.NN%` (two decimals, rounded down) in small grey at the right of the counts line:
   100% minus the share of the deck's cards still New.
 - Back saves the value (if changed it syncs) and shows the deck's overview,
   whose counts reflect it. There is no Cancel.

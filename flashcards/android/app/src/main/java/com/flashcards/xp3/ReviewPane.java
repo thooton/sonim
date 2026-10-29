@@ -164,7 +164,10 @@ final class ReviewPane extends LinearLayout {
         else if (state == State.LEARNING || state == State.RELEARNING) queue = 1;
         else queue = 2;
         counts.setText(Anki.counts(getContext(), session.counts(now()), queue));
-        if (showProgress) progress.setText(session.progress() + "%");
+        if (showProgress) {
+            int p = session.progress();
+            progress.setText(String.format(java.util.Locale.US, "%d.%02d%%", p / 100, p % 100));
+        }
     }
 
     private void reveal() {
