@@ -1,0 +1,15 @@
+plugins {
+    id "com.android.application"
+}
+
+apply from: rootProject.file("gradle/app.gradle")
+
+android {
+    namespace "com.video.xp3"
+
+    defaultConfig {
+        applicationId "com.video.xp3"
+        versionCode 1
+        versionName "1.0.0"
+    }
+}
