@@ -9,6 +9,8 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.print.xp3.ipp.Capabilities;
+import com.xp3.common.ui.Ui;
 
 /**
  * Printing (screens 09, 10 and 11) for one job: how sending is going, then
@@ -117,28 +119,28 @@ final class PrintingScreen extends Screen implements Queue.Listener {
         Context c = app;
         LinearLayout page = Parts.column(c);
         page.setGravity(Gravity.CENTER_HORIZONTAL);
-        page.setPadding(0, Look.dp(c, 12), 0, 0);
+        page.setPadding(0, Ui.dp(c, 12), 0, 0);
         FrameLayout art = new FrameLayout(c);
         ImageView printer = new ImageView(c);
         printer.setImageResource(Readiness.picture(entry.printer));
-        art.addView(printer, new FrameLayout.LayoutParams(Look.dp(c, 140), Look.dp(c, 98)));
+        art.addView(printer, new FrameLayout.LayoutParams(Ui.dp(c, 140), Ui.dp(c, 98)));
         LinearLayout sheet = Parts.column(c);
         sheet.setBackground(Look.outlined(Look.WHITE, 0, 1, 0xFFDCDEE3, c));
-        sheet.setPadding(Look.dp(c, 6), Look.dp(c, 5), Look.dp(c, 6), 0);
+        sheet.setPadding(Ui.dp(c, 6), Ui.dp(c, 5), Ui.dp(c, 6), 0);
         for (int i = 0; i < 3; i++) {
             View rule = new View(c);
             rule.setBackgroundColor(0xFFC7CBD4);
-            LinearLayout.LayoutParams lp = Parts.line(i == 1 ? Look.dp(c, 32) : Parts.FILL, Look.dp(c, 2));
-            lp.bottomMargin = Look.dp(c, 3);
+            LinearLayout.LayoutParams lp = Parts.line(i == 1 ? Ui.dp(c, 32) : Parts.FILL, Ui.dp(c, 2));
+            lp.bottomMargin = Ui.dp(c, 3);
             sheet.addView(rule, lp);
         }
-        FrameLayout.LayoutParams sheetAt = new FrameLayout.LayoutParams(Look.dp(c, 52), Look.dp(c, 34));
-        sheetAt.leftMargin = Look.dp(c, 44);
-        sheetAt.topMargin = Look.dp(c, 73);
+        FrameLayout.LayoutParams sheetAt = new FrameLayout.LayoutParams(Ui.dp(c, 52), Ui.dp(c, 34));
+        sheetAt.leftMargin = Ui.dp(c, 44);
+        sheetAt.topMargin = Ui.dp(c, 73);
         art.addView(sheet, sheetAt);
-        page.addView(art, Parts.line(Look.dp(c, 140), Look.dp(c, 112)));
+        page.addView(art, Parts.line(Ui.dp(c, 140), Ui.dp(c, 112)));
         // A page feeding out, over and over.
-        feed = ObjectAnimator.ofFloat(sheet, "translationY", -Look.dp(c, 10), 0);
+        feed = ObjectAnimator.ofFloat(sheet, "translationY", -Ui.dp(c, 10), 0);
         feed.setDuration(1800);
         feed.setRepeatCount(ValueAnimator.INFINITE);
         feed.start();
@@ -146,32 +148,29 @@ final class PrintingScreen extends Screen implements Queue.Listener {
         headline = Look.text(c, "", 15, Look.BOLD, Look.INK);
         headline.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = Parts.line(Parts.FILL, Parts.WRAP);
-        lp.topMargin = Look.dp(c, 6);
+        lp.topMargin = Ui.dp(c, 6);
         page.addView(headline, lp);
         bar = new Parts.Bar(c);
-        LinearLayout.LayoutParams barAt = Parts.line(Parts.FILL, Look.dp(c, 6));
-        barAt.setMargins(Look.dp(c, 16), Look.dp(c, 8), Look.dp(c, 16), 0);
+        LinearLayout.LayoutParams barAt = Parts.line(Parts.FILL, Ui.dp(c, 6));
+        barAt.setMargins(Ui.dp(c, 16), Ui.dp(c, 8), Ui.dp(c, 16), 0);
         page.addView(bar, barAt);
-        TextView about = Look.text(c, entry.title + " · " + copies() + "\nto " + entry.printer.shown(), 10.5f, Look.REGULAR, Look.MUTE);
+        TextView about = Look.text(c, entry.title + " · " + Parts.count(entry.options.copies, "copy", "copies")
+            + "\nto " + entry.printer.shown(), 10.5f, Look.REGULAR, Look.MUTE);
         about.setGravity(Gravity.CENTER);
         about.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams aboutAt = Parts.line(Parts.FILL, Parts.WRAP);
-        aboutAt.setMargins(Look.dp(c, 16), Look.dp(c, 4), Look.dp(c, 16), 0);
+        aboutAt.setMargins(Ui.dp(c, 16), Ui.dp(c, 4), Ui.dp(c, 16), 0);
         page.addView(about, aboutAt);
-        TextView hide = Parts.button(c, "Hide", Parts.PRIMARY, () -> app.home());
+        TextView hide = Parts.button(c, "Hide", Parts.PRIMARY, app::home);
         TextView cancel = Parts.button(c, "Cancel print", Parts.DANGER, this::askCancel);
         LinearLayout.LayoutParams buttonsAt = Parts.line(Parts.FILL, Parts.WRAP);
-        buttonsAt.topMargin = Look.dp(c, 10);
+        buttonsAt.topMargin = Ui.dp(c, 10);
         page.addView(Parts.pair(c, hide, cancel), buttonsAt);
         frame.addView(page);
         progress();
         return hide;
     }
 
-    private String copies() {
-        int copies = entry.options.copies;
-        return copies + (copies == 1 ? " copy" : " copies");
-    }
 
     private void progress() {
         Job.Status status = entry.status;
@@ -198,29 +197,27 @@ final class PrintingScreen extends Screen implements Queue.Listener {
         String message = pages + (pages == 1 ? " page is" : " pages are") + " printing on\n" + entry.printer.shown()
             + (where.isEmpty() ? "." : " in the " + where + ".");
         if (entry.state == Queue.DONE && entry.status != null && entry.status.text.equals("Printed")) {
-            message = pages + (pages == 1 ? " page" : " pages") + " printed on\n" + entry.printer.shown() + ".";
+            message = Parts.count(pages, "page", "pages") + " printed on\n" + entry.printer.shown() + ".";
         }
-        TextView done = Parts.button(c, "Done", Parts.PRIMARY, () -> app.home());
-        TextView another = Parts.button(c, "Print another PDF", Parts.SECONDARY, () -> {
-            app.home();
-            app.allowed(() -> app.open(new LocationsScreen()));
-        });
-        frame.addView(Parts.status(c, Parts.badge(c, R.drawable.ic_check, 0xFFE3F5EB, Look.OK), 56,
-            "Sent to the printer", message, null, Parts.buttons(c, done, another), 34));
-        return done;
+        return over(Parts.badge(c, R.drawable.ic_check, 0xFFE3F5EB, Look.OK), "Sent to the printer", message);
     }
 
     private View buildCanceled() {
+        String text = entry.status == null ? "" : entry.status.text;
+        return over(Parts.badge(app, R.drawable.ic_cross, Look.GREY, Look.MUTE),
+            text.equals("Canceled at the printer") ? "Canceled at the printer" : "Print canceled",
+            entry.title + " won't print.");
+    }
+
+    /** The job is over here: a status page with Done (focused, and returned) and Print another PDF. */
+    private View over(View badge, String headline, String message) {
         Context c = app;
-        TextView done = Parts.button(c, "Done", Parts.PRIMARY, () -> app.home());
+        TextView done = Parts.button(c, "Done", Parts.PRIMARY, app::home);
         TextView another = Parts.button(c, "Print another PDF", Parts.SECONDARY, () -> {
             app.home();
             app.allowed(() -> app.open(new LocationsScreen()));
         });
-        String text = entry.status == null ? "" : entry.status.text;
-        frame.addView(Parts.status(c, Parts.badge(c, R.drawable.ic_cross, Look.GREY, Look.MUTE), 56,
-            text.equals("Canceled at the printer") ? "Canceled at the printer" : "Print canceled",
-            entry.title + " won't print.", null, Parts.buttons(c, done, another), 34));
+        frame.addView(Parts.status(c, badge, 56, headline, message, null, Parts.buttons(c, done, another), 34));
         return done;
     }
 
@@ -364,9 +361,9 @@ final class PrintingScreen extends Screen implements Queue.Listener {
 
         /** "Black ink", "Cyan toner": the empty supply, from what the printer last said; "Ink" when it didn't say. */
         private static String empty(Queue.Entry entry) {
-            com.print.xp3.ipp.Capabilities caps = entry.printer.ipp;
+            Capabilities caps = entry.printer.ipp;
             if (caps != null) {
-                for (com.print.xp3.ipp.Capabilities.Marker marker : caps.markers) {
+                for (Capabilities.Marker marker : caps.markers) {
                     if (marker.level == 0) return Readiness.supply(marker);
                 }
             }

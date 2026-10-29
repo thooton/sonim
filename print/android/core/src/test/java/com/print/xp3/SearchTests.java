@@ -22,7 +22,7 @@ final class SearchTests {
             check.same("inside a word", 2, T9.rank("Lint", T9.match("Lint", "468")));
         });
         check.run("names: digits as numbers", () -> {
-            List<String> names = new ArrayList<String>(Arrays.asList("Scan_10", "scan_2", "Scan_100", "Scan_1", "Scan_02b", "Scan_9", "Invoice"));
+            List<String> names = new ArrayList<>(Arrays.asList("Scan_10", "scan_2", "Scan_100", "Scan_1", "Scan_02b", "Scan_9", "Invoice"));
             Collections.sort(names, T9::compare);
             check.same("order", Arrays.asList("Invoice", "Scan_1", "scan_2", "Scan_02b", "Scan_9", "Scan_10", "Scan_100"), names);
             check.ok("case aside", T9.compare("apple", "Banana") < 0);

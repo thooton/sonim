@@ -143,7 +143,7 @@ public final class FindTests {
         });
 
         check.run("merge", () -> {
-            final List<Printer> told = new ArrayList<Printer>();
+            final List<Printer> told = new ArrayList<>();
             Finder finder = new Finder(told::add);
             Printer raw = new Printer("10.0.0.9");
             raw.rawPort = 9100;

@@ -1,10 +1,11 @@
 package com.print.xp3;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
+import com.xp3.common.ui.Ui;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -25,11 +26,7 @@ final class QueueScreen extends Screen implements Queue.Listener {
     View build() {
         Context c = app;
         list = Parts.column(c);
-        ScrollView scroll = new ScrollView(c);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setDefaultFocusHighlightEnabled(false);
-        scroll.addView(list);
-        return Parts.page(c, Parts.nav(c, "Print Queue", true, null), scroll);
+        return Parts.page(c, Parts.nav(c, "Print Queue", true, null), Parts.scroll(c, list));
     }
 
     @Override
@@ -48,7 +45,7 @@ final class QueueScreen extends Screen implements Queue.Listener {
         Queue.unlisten(this);
     }
 
-    private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Handler main = new Handler(Looper.getMainLooper());
     private boolean pending;
 
     /** Progress comes several times a second; the list is redrawn at most twice. */
@@ -74,8 +71,8 @@ final class QueueScreen extends Screen implements Queue.Listener {
                 "No print jobs", "Jobs you send from this phone show up here until midnight.", null, null, 40));
             return;
         }
-        List<Queue.Entry> active = new ArrayList<Queue.Entry>();
-        List<Queue.Entry> finished = new ArrayList<Queue.Entry>();
+        List<Queue.Entry> active = new ArrayList<>();
+        List<Queue.Entry> finished = new ArrayList<>();
         for (Queue.Entry entry : shown) (entry.active() ? active : finished).add(entry);
         View refocus = null;
         boolean nextShown = false;
@@ -105,14 +102,7 @@ final class QueueScreen extends Screen implements Queue.Listener {
     private View row(Context c, final Queue.Entry entry, boolean next) {
         Parts.Row row = new Parts.Row(c, entry.state == Queue.RUNNING ? 50 : 44);
         row.setTag(entry.id);
-        final ImageView thumb = new ImageView(c);
-        thumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        thumb.setBackgroundColor(0xFFDCDEE3);
-        thumb.setPadding(1, 1, 1, 1);
-        row.lead(thumb, Look.dp(c, 24), Look.dp(c, 31));
-        Pages.draw(entry.file, 0, Look.dp(c, 22), Look.dp(c, 29), bitmap -> {
-            if (bitmap != null) thumb.setImageBitmap(bitmap);
-        });
+        Parts.thumbOf(row, entry.file);
         String printer = RecentScreen.shortName(entry.printer.shown());
         row.titled(entry.title, line(entry) + " · " + printer);
         if (entry.status != null && entry.status.problem && entry.active()) row.sub.setTextColor(Look.WARN_TEXT);
@@ -121,8 +111,8 @@ final class QueueScreen extends Screen implements Queue.Listener {
             Parts.Bar bar = new Parts.Bar(c);
             int percent = entry.status == null ? -1 : entry.status.phase < Job.PRINTING ? Math.max(0, entry.status.percent) : -1;
             bar.set(percent);
-            LinearLayout.LayoutParams lp = Parts.line(Look.dp(c, 110), Look.dp(c, 3));
-            lp.topMargin = Look.dp(c, 4);
+            LinearLayout.LayoutParams lp = Parts.line(Ui.dp(c, 110), Ui.dp(c, 3));
+            lp.topMargin = Ui.dp(c, 4);
             row.text.addView(bar, lp);
             row.chevron();
         } else if (entry.state == Queue.WAITING) {

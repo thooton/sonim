@@ -62,7 +62,7 @@ public final class Sweep {
         int mask = bits == 0 ? 0 : -1 << (32 - bits);
         int network = self & mask;
         int size = 1 << (32 - bits);
-        List<String> out = new ArrayList<String>();
+        List<String> out = new ArrayList<>();
         for (int i = 1; i < size - 1; i++) {
             int address = network + i;
             if (address != self) out.add(dotted(address));

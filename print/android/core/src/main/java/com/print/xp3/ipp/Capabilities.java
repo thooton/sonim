@@ -92,7 +92,7 @@ public final class Capabilities {
         if (!pclmBack.isEmpty()) out.pclmBackSide = pclmBack;
         Ipp.Attribute operations = printer.get("operations-supported");
         if (operations != null) {
-            List<Integer> ops = new ArrayList<Integer>();
+            List<Integer> ops = new ArrayList<>();
             for (Object value : operations.values) if (value instanceof Integer) ops.add((Integer) value);
             out.operations = ops;
         }
@@ -122,7 +122,7 @@ public final class Capabilities {
 
     /** The resolutions in an `urf-supported` "RS300-600" entry. */
     public List<Integer> urfResolutions() {
-        List<Integer> out = new ArrayList<Integer>();
+        List<Integer> out = new ArrayList<>();
         for (String entry : urf) {
             if (!entry.startsWith("RS")) continue;
             for (String part : entry.substring(2).split("-")) {
@@ -158,7 +158,7 @@ public final class Capabilities {
         List<String> colors = strings(printer, "marker-colors");
         List<String> types = strings(printer, "marker-types");
         Ipp.Attribute lows = printer.get("marker-low-levels");
-        List<Marker> out = new ArrayList<Marker>();
+        List<Marker> out = new ArrayList<>();
         for (int i = 0; i < levels.values.size(); i++) {
             Object level = levels.values.get(i);
             int value = level instanceof Integer ? (Integer) level : -1;
@@ -181,13 +181,13 @@ public final class Capabilities {
     }
 
     private static List<String> lower(List<String> values) {
-        List<String> out = new ArrayList<String>();
+        List<String> out = new ArrayList<>();
         for (String value : values) out.add(value.toLowerCase(Locale.ROOT));
         return out;
     }
 
     private static List<Integer> dpis(Ipp.Attribute attribute) {
-        List<Integer> out = new ArrayList<Integer>();
+        List<Integer> out = new ArrayList<>();
         if (attribute == null) return out;
         for (Object value : attribute.values) {
             if (!(value instanceof int[])) continue;

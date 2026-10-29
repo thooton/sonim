@@ -2,6 +2,7 @@ package com.print.xp3.find;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,7 +19,7 @@ public final class Dns {
     public static final int TXT = 16;
     public static final int SRV = 33;
 
-    private static final Charset UTF8 = Charset.forName("UTF-8");
+    private static final Charset UTF8 = StandardCharsets.UTF_8;
 
     /** One answer. Names are compared in lower case; `name` keeps its case for showing. */
     public static final class Record {
@@ -28,7 +29,7 @@ public final class Dns {
         /** PTR's target, SRV's host, A's address as dotted digits. */
         public String target = "";
         public int port;
-        public final Map<String, String> txt = new LinkedHashMap<String, String>();
+        public final Map<String, String> txt = new LinkedHashMap<>();
     }
 
     public static byte[] query(int id, List<String> names, List<Integer> types) {
@@ -67,7 +68,7 @@ public final class Dns {
      * service's "_" are kept as one.
      */
     static List<String> labels(String name) {
-        List<String> out = new ArrayList<String>();
+        List<String> out = new ArrayList<>();
         int service = name.indexOf("._");
         String head = service > 0 ? name.substring(0, service) : null;
         String rest = service > 0 ? name.substring(service + 1) : name;
@@ -87,7 +88,7 @@ public final class Dns {
                 in.name();
                 in.at += 4;
             }
-            List<Record> out = new ArrayList<Record>();
+            List<Record> out = new ArrayList<>();
             for (int i = 0; i < answers; i++) {
                 Record record = new Record();
                 record.name = in.name();

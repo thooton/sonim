@@ -12,9 +12,11 @@ import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.widget.TextView;
+import com.xp3.common.ui.Ui;
 
 /**
  * The Keypad Grid proposal's visual system (see AGENTS.md): its palette, its
@@ -73,10 +75,6 @@ final class Look {
         return weight == BOLD ? bold : weight == SEMIBOLD ? semibold : regular;
     }
 
-    static int dp(Context context, float value) {
-        return Math.round(value * context.getResources().getDisplayMetrics().density);
-    }
-
     static TextView text(Context context, CharSequence value, float size, int weight, int color) {
         TextView view = new TextView(context);
         style(view, size, weight, color);
@@ -108,29 +106,42 @@ final class Look {
     static GradientDrawable rounded(int fill, float radius, Context context) {
         GradientDrawable shape = new GradientDrawable();
         shape.setColor(fill);
-        shape.setCornerRadius(dp(context, radius));
+        shape.setCornerRadius(Ui.dp(context, radius));
         return shape;
     }
 
     static GradientDrawable outlined(int fill, float radius, float stroke, int strokeColor, Context context) {
         GradientDrawable shape = rounded(fill, radius, context);
-        shape.setStroke(Math.max(1, dp(context, stroke)), strokeColor);
+        shape.setStroke(Math.max(1, Ui.dp(context, stroke)), strokeColor);
+        return shape;
+    }
+
+    /** A filled circle (an icon's backing, a status dot). */
+    static GradientDrawable oval(int fill) {
+        GradientDrawable shape = new GradientDrawable();
+        shape.setShape(GradientDrawable.OVAL);
+        shape.setColor(fill);
         return shape;
     }
 
     /**
-     * A list row: white at rest; focused, the focus fill with a 3dp brand
-     * blue edge on the left.
+     * What the hand-drawn faces below share: each draws itself one way at
+     * rest and another when focused (or pressed), and ignores alpha and
+     * colour filters.
      */
-    static final class RowFocus extends Drawable {
-        private final Paint paint = new Paint();
-        private final int edge;
-        private final int rest;
-        private boolean on;
+    abstract static class Face extends Drawable {
+        private final int opacity;
+        boolean on;
 
-        RowFocus(Context context, int rest) {
-            this.edge = dp(context, 3);
-            this.rest = rest;
+        Face(int opacity) {
+            this.opacity = opacity;
+        }
+
+        static boolean focused(int[] state) {
+            for (int each : state) {
+                if (each == android.R.attr.state_focused || each == android.R.attr.state_pressed) return true;
+            }
+            return false;
         }
 
         @Override
@@ -140,14 +151,38 @@ final class Look {
 
         @Override
         protected boolean onStateChange(int[] state) {
-            boolean focused = false;
-            for (int each : state) {
-                if (each == android.R.attr.state_focused || each == android.R.attr.state_pressed) focused = true;
-            }
+            boolean focused = focused(state);
             if (focused == on) return false;
             on = focused;
             invalidateSelf();
             return true;
+        }
+
+        @Override
+        public void setAlpha(int alpha) {}
+
+        @Override
+        public void setColorFilter(ColorFilter filter) {}
+
+        @Override
+        public int getOpacity() {
+            return opacity;
+        }
+    }
+
+    /**
+     * A list row: white at rest; focused, the focus fill with a 3dp brand
+     * blue edge on the left.
+     */
+    static final class RowFocus extends Face {
+        private final Paint paint = new Paint();
+        private final int edge;
+        private final int rest;
+
+        RowFocus(Context context, int rest) {
+            super(PixelFormat.OPAQUE);
+            this.edge = Ui.dp(context, 3);
+            this.rest = rest;
         }
 
         @Override
@@ -160,17 +195,6 @@ final class Look {
                 canvas.drawRect(b.left, b.top, b.left + edge, b.bottom, paint);
             }
         }
-
-        @Override
-        public void setAlpha(int alpha) {}
-
-        @Override
-        public void setColorFilter(ColorFilter filter) {}
-
-        @Override
-        public int getOpacity() {
-            return PixelFormat.OPAQUE;
-        }
     }
 
     /**
@@ -178,7 +202,7 @@ final class Look {
      * the focus ring, which the proposal draws outside the body: 2dp of white,
      * then 1.5dp of blue.
      */
-    static final class ButtonFace extends Drawable {
+    static final class ButtonFace extends Face {
         static final int PRIMARY = 0;
         static final int SECONDARY = 1;
         static final int DANGER = 2;
@@ -189,10 +213,10 @@ final class Look {
         private final float ring;
         private final float radius;
         private final float density;
-        private boolean on;
         private boolean enabled = true;
 
         ButtonFace(Context context, int kind) {
+            super(PixelFormat.TRANSLUCENT);
             this.kind = kind;
             this.density = context.getResources().getDisplayMetrics().density;
             this.ring = 3.5f * density;
@@ -200,19 +224,12 @@ final class Look {
             stroke.setStyle(Paint.Style.STROKE);
         }
 
-        @Override
-        public boolean isStateful() {
-            return true;
-        }
-
+        /** A disabled button is drawn flat too, so this one also follows the enabled state. */
         @Override
         protected boolean onStateChange(int[] state) {
-            boolean focused = false;
+            boolean focused = focused(state);
             boolean isEnabled = false;
-            for (int each : state) {
-                if (each == android.R.attr.state_focused || each == android.R.attr.state_pressed) focused = true;
-                if (each == android.R.attr.state_enabled) isEnabled = true;
-            }
+            for (int each : state) if (each == android.R.attr.state_enabled) isEnabled = true;
             if (focused == on && isEnabled == enabled) return false;
             on = focused;
             enabled = isEnabled;
@@ -244,54 +261,26 @@ final class Look {
             canvas.drawRoundRect(new RectF(body.left + half, body.top + half, body.right - half, body.bottom - half),
                 radius, radius, stroke);
         }
-
-        @Override
-        public void setAlpha(int alpha) {}
-
-        @Override
-        public void setColorFilter(ColorFilter filter) {}
-
-        @Override
-        public int getOpacity() {
-            return PixelFormat.TRANSLUCENT;
-        }
     }
 
     /**
      * A home tile: a top-to-bottom gradient; focused, slightly brighter, with
      * a 2dp navy ring at its edge and a 2dp white ring inside that.
      */
-    static final class TileFace extends Drawable {
+    static final class TileFace extends Face {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final int top;
         private final int bottom;
         private final float width;
-        private boolean on;
 
         TileFace(Context context, int top, int bottom) {
+            super(PixelFormat.OPAQUE);
             this.top = top;
             this.bottom = bottom;
             this.width = 2 * context.getResources().getDisplayMetrics().density;
             ring.setStyle(Paint.Style.STROKE);
             ring.setStrokeWidth(width);
-        }
-
-        @Override
-        public boolean isStateful() {
-            return true;
-        }
-
-        @Override
-        protected boolean onStateChange(int[] state) {
-            boolean focused = false;
-            for (int each : state) {
-                if (each == android.R.attr.state_focused || each == android.R.attr.state_pressed) focused = true;
-            }
-            if (focused == on) return false;
-            on = focused;
-            invalidateSelf();
-            return true;
         }
 
         @Override
@@ -315,48 +304,20 @@ final class Look {
             int b = Math.min(255, Math.round((color & 0xFF) * 1.12f));
             return 0xFF000000 | (r << 16) | (g << 8) | b;
         }
-
-        @Override
-        public void setAlpha(int alpha) {}
-
-        @Override
-        public void setColorFilter(ColorFilter filter) {}
-
-        @Override
-        public int getOpacity() {
-            return PixelFormat.OPAQUE;
-        }
     }
 
     /** The printer banner: a navy gradient left to right; focused, brighter, with a white ring 2dp inside its edge. */
-    static final class BannerFace extends Drawable {
+    static final class BannerFace extends Face {
         private final Paint paint = new Paint();
         private final Paint ring = new Paint();
         private final float width;
-        private boolean on;
 
         BannerFace(Context context) {
+            super(PixelFormat.OPAQUE);
             width = 2 * context.getResources().getDisplayMetrics().density;
             ring.setStyle(Paint.Style.STROKE);
             ring.setStrokeWidth(width);
             ring.setColor(WHITE);
-        }
-
-        @Override
-        public boolean isStateful() {
-            return true;
-        }
-
-        @Override
-        protected boolean onStateChange(int[] state) {
-            boolean focused = false;
-            for (int each : state) {
-                if (each == android.R.attr.state_focused || each == android.R.attr.state_pressed) focused = true;
-            }
-            if (focused == on) return false;
-            on = focused;
-            invalidateSelf();
-            return true;
         }
 
         @Override
@@ -372,17 +333,6 @@ final class Look {
                 canvas.drawRect(b.left + inset, b.top + inset, b.right - inset, b.bottom - inset, ring);
             }
         }
-
-        @Override
-        public void setAlpha(int alpha) {}
-
-        @Override
-        public void setColorFilter(ColorFilter filter) {}
-
-        @Override
-        public int getOpacity() {
-            return PixelFormat.OPAQUE;
-        }
     }
 
     /** A number box (page numbers, address parts): grey edge; focused, a blue edge and a soft halo. */
@@ -390,8 +340,8 @@ final class Look {
         // The halo sits in a 2dp margin every box keeps, so focus doesn't move the text.
         GradientDrawable halo = on ? outlined(0xFFDCE7FD, 5, 0, 0, context) : rounded(0, 5, context);
         GradientDrawable edge = on ? outlined(WHITE, 3, 1.5f, BLUE, context) : outlined(WHITE, 3, 1, 0xFFB9BDC8, context);
-        android.graphics.drawable.LayerDrawable both = new android.graphics.drawable.LayerDrawable(new Drawable[] {halo, edge});
-        int in = dp(context, 2);
+        LayerDrawable both = new LayerDrawable(new Drawable[] {halo, edge});
+        int in = Ui.dp(context, 2);
         both.setLayerInset(1, in, in, in, in);
         return both;
     }

@@ -31,7 +31,7 @@ public final class Choices {
 
     /** The sides it can print: always one-sided, then long and short edge when it can. */
     public static List<Integer> sides(Printer printer) {
-        List<Integer> out = new ArrayList<Integer>();
+        List<Integer> out = new ArrayList<>();
         out.add(Frame.ONE_SIDED);
         boolean two;
         if (printer == null) {
@@ -60,7 +60,7 @@ public final class Choices {
                 }
             }
         }
-        return new ArrayList<String>(Arrays.asList(Media.COMMON));
+        return new ArrayList<>(Arrays.asList(Media.COMMON));
     }
 
     /** `options`, changed only where the printer can't do what they ask, then returned. */

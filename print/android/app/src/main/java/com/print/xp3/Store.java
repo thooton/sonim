@@ -8,10 +8,13 @@ import com.xp3.common.Json;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * What the app keeps between runs: the printing defaults and app settings
@@ -56,44 +59,44 @@ final class Store {
 
     private final Context context;
     private final SharedPreferences prefs;
-    private final Map<String, Printer> printers = new LinkedHashMap<String, Printer>();
+    private final Map<String, Printer> printers = new LinkedHashMap<>();
     /** The printers kept between runs: the ones chosen or added by address. Others are known for this run only. */
-    private final java.util.Set<String> kept = new java.util.LinkedHashSet<String>();
-    private final List<Print> history = new ArrayList<Print>();
+    private final Set<String> kept = new LinkedHashSet<>();
+    private final List<Print> history = new ArrayList<>();
 
     private Store(Context context) {
         this.context = context;
         prefs = context.getSharedPreferences("print", Context.MODE_PRIVATE);
-        String saved = Disk.read(file("printers.json"), 1 << 20);
-        if (saved != null) {
-            try {
-                for (Object each : Json.array(Json.parse(saved))) {
-                    Printer printer = Printer.load(Json.object(each));
-                    if (printer != null) {
-                        printers.put(printer.key(), printer);
-                        kept.add(printer.key());
-                    }
+        try {
+            for (Object each : load("printers.json")) {
+                Printer printer = Printer.load(Json.object(each));
+                if (printer != null) {
+                    printers.put(printer.key(), printer);
+                    kept.add(printer.key());
                 }
-            } catch (RuntimeException ignored) {
-                // Unreadable: start again.
             }
+        } catch (RuntimeException ignored) {
+            // Unreadable: start again.
         }
-        String past = Disk.read(file("history.json"), 1 << 20);
-        if (past != null) {
-            try {
-                for (Object each : Json.array(Json.parse(past))) {
-                    Map<String, Object> m = Json.object(each);
-                    history.add(new Print(text(m, "path"), text(m, "title"), text(m, "printer"),
-                        text(m, "printerName"), number(m, "when"), (int) number(m, "pages"), options(Json.child(m, "options"))));
-                }
-            } catch (RuntimeException ignored) {
-                // Unreadable: start again.
+        try {
+            for (Object each : load("history.json")) {
+                Map<String, Object> m = Json.object(each);
+                history.add(new Print(text(m, "path"), text(m, "title"), text(m, "printer"),
+                    text(m, "printerName"), number(m, "when"), (int) number(m, "pages"), options(Json.child(m, "options"))));
             }
+        } catch (RuntimeException ignored) {
+            // Unreadable: start again.
         }
     }
 
     private File file(String name) {
         return new File(context.getFilesDir(), name);
+    }
+
+    /** A saved JSON array; empty when there is no file. Throws when the file isn't one. */
+    private List<Object> load(String name) {
+        String saved = Disk.read(file(name), 1 << 20);
+        return saved == null ? Collections.emptyList() : Json.array(Json.parse(saved));
     }
 
     private static String text(Map<String, Object> m, String key) {
@@ -110,7 +113,7 @@ final class Store {
 
     /** The known printers: kept ones first, then those found since the app started. */
     List<Printer> printers() {
-        return new ArrayList<Printer>(printers.values());
+        return new ArrayList<>(printers.values());
     }
 
     Printer printer(String key) {
@@ -119,9 +122,7 @@ final class Store {
 
     /** The printer jobs go to unless another is picked; null before one is chosen. */
     Printer current() {
-        Printer chosen = printer(prefs.getString("current", null));
-        if (chosen != null) return chosen;
-        return null;
+        return printer(prefs.getString("current", null));
     }
 
     void setCurrent(Printer printer) {
@@ -183,7 +184,7 @@ final class Store {
     }
 
     private void savePrinters() {
-        List<Object> out = new ArrayList<Object>();
+        List<Object> out = new ArrayList<>();
         for (Printer printer : printers.values()) if (kept.contains(printer.key())) out.add(printer.save());
         write("printers.json", Json.write(out));
     }
@@ -263,7 +264,7 @@ final class Store {
     // History.
 
     List<Print> history() {
-        return new ArrayList<Print>(history);
+        return new ArrayList<>(history);
     }
 
     /** The newest print, for Print again; null when there is none. */
@@ -272,7 +273,7 @@ final class Store {
     }
 
     void printed(String path, String title, Printer printer, int pages, Options options) {
-        for (int i = history.size() - 1; i >= 0; i--) if (history.get(i).path.equals(path)) history.remove(i);
+        drop(path);
         history.add(0, new Print(path, title, printer.key(), printer.shown(), System.currentTimeMillis(), pages, copy(options)));
         while (history.size() > HISTORY) history.remove(history.size() - 1);
         saveHistory();
@@ -280,8 +281,12 @@ final class Store {
 
     /** Takes a file off Recent. */
     void unlist(String path) {
-        for (int i = history.size() - 1; i >= 0; i--) if (history.get(i).path.equals(path)) history.remove(i);
+        drop(path);
         saveHistory();
+    }
+
+    private void drop(String path) {
+        for (int i = history.size() - 1; i >= 0; i--) if (history.get(i).path.equals(path)) history.remove(i);
     }
 
     void clearHistory() {
@@ -290,7 +295,7 @@ final class Store {
     }
 
     private void saveHistory() {
-        List<Object> out = new ArrayList<Object>();
+        List<Object> out = new ArrayList<>();
         for (Print each : history) {
             out.add(Json.map("path", each.path, "title", each.title, "printer", each.printer,
                 "printerName", each.printerName, "when", (double) each.when, "pages", (double) each.pages,

@@ -21,7 +21,7 @@ public final class Plan {
     private Plan() {}
 
     public static List<Route> routes(Printer printer, Options options, int pageCount) {
-        List<Route> out = new ArrayList<Route>();
+        List<Route> out = new ArrayList<>();
         boolean all = options.allPages(pageCount);
         Capabilities caps = printer.ipp;
         if (printer.ippPort > 0 && caps != null) ipp(out, caps, options, all, printer);

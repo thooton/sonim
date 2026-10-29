@@ -4,8 +4,8 @@ import android.os.Handler;
 import android.os.Looper;
 import com.print.xp3.find.Sweep;
 import com.print.xp3.ipp.Capabilities;
+import com.xp3.common.ui.Ui;
 import java.io.IOException;
-import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 
@@ -20,6 +20,10 @@ final class Readiness {
     static final int PROBLEM = 4;
     static final int UNREACHABLE = 5;
 
+    static final Readiness CHECKING_NOW = new Readiness(CHECKING, "Checking…");
+    private static final Readiness READY_NOW = new Readiness(READY, "Ready");
+    private static final Readiness CANT_REACH = new Readiness(UNREACHABLE, "Can't reach the printer");
+
     final int kind;
     final String text;
 
@@ -32,7 +36,7 @@ final class Readiness {
         void checked(Readiness readiness);
     }
 
-    private static final ExecutorService WORKERS = com.xp3.common.ui.Ui.workers("check", 3);
+    private static final ExecutorService WORKERS = Ui.workers("check", 3);
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     /** Asks the printer how it is now, off the main thread; answers on it. */
@@ -55,19 +59,16 @@ final class Readiness {
                 Probe.ipp(printer);
                 return of(printer);
             } catch (IOException e) {
-                if (raw == 0) return new Readiness(UNREACHABLE, "Can't reach the printer");
+                if (raw == 0) return CANT_REACH;
             }
         }
         if (raw > 0) {
-            if (!Sweep.open(printer.address, raw, 3000)) return new Readiness(UNREACHABLE, "Can't reach the printer");
+            if (!Sweep.open(printer.address, raw, 3000)) return CANT_REACH;
             Probe.pjl(printer);
-            return new Readiness(READY, "Ready");
+            return READY_NOW;
         }
-        if (!printer.lpdQueue.isEmpty()) {
-            return Sweep.open(printer.address, 515, 3000) ? new Readiness(READY, "Ready")
-                : new Readiness(UNREACHABLE, "Can't reach the printer");
-        }
-        return new Readiness(UNREACHABLE, "Can't reach the printer");
+        if (!printer.lpdQueue.isEmpty()) return Sweep.open(printer.address, 515, 3000) ? READY_NOW : CANT_REACH;
+        return CANT_REACH;
     }
 
     /** From what the printer last said about itself. */
@@ -76,14 +77,14 @@ final class Readiness {
         synchronized (printer) {
             caps = printer.ipp;
         }
-        if (caps == null) return new Readiness(READY, "Ready");
+        if (caps == null) return READY_NOW;
         String problem = Reasons.printer(caps.reasons);
         if (!problem.isEmpty()) return new Readiness(PROBLEM, problem);
         String low = low(caps);
         if (!low.isEmpty()) return new Readiness(WARNING, low);
         if (caps.state == 4) return new Readiness(BUSY, "Printing");
         if (caps.state == 5) return new Readiness(PROBLEM, "Stopped");
-        return new Readiness(READY, "Ready");
+        return READY_NOW;
     }
 
     /** "Cyan ink low", "Toner low", or "". */
@@ -169,10 +170,5 @@ final class Readiness {
         if (all.contains("canon")) return R.drawable.printer_dark;
         if (all.contains("brother") || all.contains("lexmark") || all.contains("kyocera")) return R.drawable.printer_pale;
         return R.drawable.printer_light;
-    }
-
-    static boolean anyLow(List<Capabilities.Marker> markers) {
-        for (Capabilities.Marker marker : markers) if (marker.isLow()) return true;
-        return false;
     }
 }

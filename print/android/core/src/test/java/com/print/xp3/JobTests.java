@@ -29,9 +29,9 @@ final class JobTests {
         final ServerSocket server;
         final List<String> formats;
         /** Formats it says it takes but refuses anyway, as some do with PDF. */
-        final List<String> refuses = new ArrayList<String>();
-        final List<Ipp.Message> jobs = new ArrayList<Ipp.Message>();
-        final List<byte[]> documents = new ArrayList<byte[]>();
+        final List<String> refuses = new ArrayList<>();
+        final List<Ipp.Message> jobs = new ArrayList<>();
+        final List<byte[]> documents = new ArrayList<>();
         int finalState = 9;
         String finalReason = "job-completed-successfully";
         /** The one path it answers at (404 elsewhere), or null for any. */
@@ -149,7 +149,7 @@ final class JobTests {
 
     /** Three pages; page n is drawn in grey level n * 60, in strips of 10 rows. */
     static final class Pages implements Job.Document {
-        final List<Integer> drawn = new ArrayList<Integer>();
+        final List<Integer> drawn = new ArrayList<>();
 
         @Override
         public int pages() {
@@ -208,7 +208,7 @@ final class JobTests {
                 options.copies = 2;
                 options.media = "na_letter_8.5x11in";
                 Pages pages = new Pages();
-                final List<Job.Status> statuses = new ArrayList<Job.Status>();
+                final List<Job.Status> statuses = new ArrayList<>();
                 Job job = new Job(printer, options, pages, pdf, spool, "Report", statuses::add);
                 job.pollMillis = 10;
                 job.run();
@@ -237,7 +237,7 @@ final class JobTests {
                 fake.finalState = 8;
                 fake.finalReason = "media-jam";
                 Printer printer = printer(fake);
-                final List<Job.Status> statuses = new ArrayList<Job.Status>();
+                final List<Job.Status> statuses = new ArrayList<>();
                 Options options = new Options();
                 options.to = 3;
                 Job job = new Job(printer, options, new Pages(), pdf, pdf.getParentFile(), "", statuses::add);
@@ -264,7 +264,7 @@ final class JobTests {
         check.run("job: nothing takes it", () -> {
             try (FakePrinter fake = new FakePrinter("image/jpeg")) {
                 Printer printer = printer(fake);
-                final List<Job.Status> statuses = new ArrayList<Job.Status>();
+                final List<Job.Status> statuses = new ArrayList<>();
                 Job job = new Job(printer, new Options(), new Pages(), null, null, "", statuses::add);
                 job.run();
                 Job.Status last = statuses.get(statuses.size() - 1);
@@ -280,7 +280,7 @@ final class JobTests {
             printer.ipp = PlanTests.caps("application/pdf");
             File pdf = File.createTempFile("doc", ".pdf");
             pdf.deleteOnExit();
-            final List<Job.Status> statuses = new ArrayList<Job.Status>();
+            final List<Job.Status> statuses = new ArrayList<>();
             new Job(printer, new Options(), new Pages(), pdf, null, "", statuses::add).run();
             check.same("unreachable", "The printer can't be reached", statuses.get(statuses.size() - 1).text);
         });

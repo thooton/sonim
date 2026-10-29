@@ -17,7 +17,7 @@ import java.util.zip.DeflaterOutputStream;
 public final class Pclm extends Format {
 
     private final int strip;
-    private final List<Long> offsets = new ArrayList<Long>();
+    private final List<Long> offsets = new ArrayList<>();
     private Counting counted;
     private byte[] buffer;
     private int filled;

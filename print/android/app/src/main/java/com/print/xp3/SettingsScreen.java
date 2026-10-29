@@ -6,7 +6,8 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import java.util.ArrayList;
+import com.xp3.common.ui.Ui;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -36,10 +37,7 @@ final class SettingsScreen extends Screen {
 
         color = new Parts.SettingRow(c, "Color", 30, true);
         color.row.setOnClickListener(v -> {
-            List<MainActivity.Choice> choices = new ArrayList<MainActivity.Choice>();
-            choices.add(new MainActivity.Choice("Color", null));
-            choices.add(new MainActivity.Choice("Black & white", null));
-            app.choose("Color", choices, store.color() ? 0 : 1, null, which -> {
+            app.choose("Color", MainActivity.Choice.plain(Arrays.asList("Color", "Black & white")), store.color() ? 0 : 1, null, which -> {
                 store.setColor(which == 0);
                 refresh();
             });
@@ -59,13 +57,11 @@ final class SettingsScreen extends Screen {
         paper = new Parts.SettingRow(c, "Paper size", 30, true);
         paper.row.setOnClickListener(v -> {
             final List<String> offered = Choices.media(store.current());
-            List<MainActivity.Choice> choices = new ArrayList<MainActivity.Choice>();
-            for (String media : offered) choices.add(new MainActivity.Choice(Media.shown(media), Media.dimensions(media)));
             int selected = offered.indexOf(store.media());
             if (selected < 0) {
                 for (int i = 0; i < offered.size(); i++) if (Media.shown(offered.get(i)).equals(Media.shown(store.media()))) selected = i;
             }
-            app.choose("Paper size", choices, Math.max(0, selected), null, which -> {
+            app.choose("Paper size", MainActivity.Choice.papers(offered), Math.max(0, selected), null, which -> {
                 store.setMedia(offered.get(which));
                 refresh();
             });
@@ -97,12 +93,8 @@ final class SettingsScreen extends Screen {
         about.noDivider();
         list.addView(about);
 
-        ScrollView scroll = new ScrollView(c);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setDefaultFocusHighlightEnabled(false);
-        scroll.addView(list);
         refresh();
-        return Parts.page(c, Parts.nav(c, "Settings", true, null), scroll);
+        return Parts.page(c, Parts.nav(c, "Settings", true, null), Parts.scroll(c, list));
     }
 
     private static String version(Context c) {
@@ -153,9 +145,9 @@ final class SettingsScreen extends Screen {
             list.addView(Parts.header(c, "Keys"));
             for (String[] key : keys) {
                 LinearLayout row = Parts.row(c);
-                row.setPadding(Look.dp(c, 11), Look.dp(c, 5), Look.dp(c, 10), Look.dp(c, 5));
+                row.setPadding(Ui.dp(c, 11), Ui.dp(c, 5), Ui.dp(c, 10), Ui.dp(c, 5));
                 TextView name = Look.text(c, key[0], 11.5f, Look.BOLD, Look.BLUE);
-                row.addView(name, Parts.line(Look.dp(c, 70), Parts.WRAP));
+                row.addView(name, Parts.line(Ui.dp(c, 70), Parts.WRAP));
                 row.addView(Look.text(c, key[1], 11, Look.REGULAR, Look.INK), Parts.weighted());
                 list.addView(row);
             }
@@ -164,7 +156,7 @@ final class SettingsScreen extends Screen {
                 + "printer that reads PDFs, and otherwise draws the pages on the phone in a language the printer takes. "
                 + "A printer it doesn't find can be added by its IP address, which the printer's own menu shows.",
                 10.5f, Look.REGULAR, Look.MUTE);
-            about.setPadding(Look.dp(c, 11), 0, Look.dp(c, 11), Look.dp(c, 10));
+            about.setPadding(Ui.dp(c, 11), 0, Ui.dp(c, 11), Ui.dp(c, 10));
             about.setLineSpacing(0, 1.15f);
             list.addView(about);
             ScrollView scroll = new ScrollView(c);

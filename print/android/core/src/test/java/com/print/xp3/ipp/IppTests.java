@@ -14,10 +14,10 @@ public final class IppTests {
         check.run("ipp codec", () -> {
             Ipp.Message request = Ipp.request(Ipp.PRINT_JOB, 7, "ipp://10.0.0.5/ipp/print");
             request.group(Ipp.OPERATION).add("requesting-user-name", Ipp.NAME, "xp3");
-            List<Ipp.Attribute> size = new ArrayList<Ipp.Attribute>();
+            List<Ipp.Attribute> size = new ArrayList<>();
             size.add(new Ipp.Attribute("x-dimension", Ipp.INTEGER, 21590));
             size.add(new Ipp.Attribute("y-dimension", Ipp.INTEGER, 27940));
-            List<Ipp.Attribute> media = new ArrayList<Ipp.Attribute>();
+            List<Ipp.Attribute> media = new ArrayList<>();
             media.add(new Ipp.Attribute("media-size", Ipp.BEGIN_COLLECTION, size));
             request.add(Ipp.JOB)
                 .add("copies", Ipp.INTEGER, 2)

@@ -210,7 +210,7 @@ public final class Job {
 
     /** The pages in the order sent: the range, again for each copy made by repeating. */
     static List<Integer> sequence(Options options, Route route) {
-        List<Integer> out = new ArrayList<Integer>();
+        List<Integer> out = new ArrayList<>();
         int pages = options.to - options.from + 1;
         for (int copy = 0; copy < route.repeat; copy++) {
             for (int p = options.from; p <= options.to; p++) out.add(p - 1);
@@ -394,7 +394,7 @@ public final class Job {
             Ipp.Attribute stateAttribute = answer.get("job-state");
             int state = stateAttribute == null ? 0 : stateAttribute.integer(0);
             Ipp.Attribute reasonsAttribute = answer.get("job-state-reasons");
-            List<String> reasons = reasonsAttribute == null ? new ArrayList<String>() : reasonsAttribute.strings();
+            List<String> reasons = reasonsAttribute == null ? new ArrayList<>() : reasonsAttribute.strings();
             switch (state) {
                 case 9:
                     report(DONE, "Printed", 100);

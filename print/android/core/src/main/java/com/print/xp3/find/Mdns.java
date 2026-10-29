@@ -56,17 +56,17 @@ public final class Mdns {
 
     private static final InetSocketAddress GROUP = new InetSocketAddress("224.0.0.251", 5353);
 
-    private final Map<String, Set<String>> instances = new HashMap<String, Set<String>>();
-    private final Map<String, Dns.Record> srv = new HashMap<String, Dns.Record>();
-    private final Map<String, Map<String, String>> txt = new HashMap<String, Map<String, String>>();
-    private final Map<String, String> hosts = new HashMap<String, String>();
-    private final Map<String, String> senders = new HashMap<String, String>();
-    private final Set<String> told = new HashSet<String>();
-    private final Map<String, String> casing = new HashMap<String, String>();
+    private final Map<String, Set<String>> instances = new HashMap<>();
+    private final Map<String, Dns.Record> srv = new HashMap<>();
+    private final Map<String, Map<String, String>> txt = new HashMap<>();
+    private final Map<String, String> hosts = new HashMap<>();
+    private final Map<String, String> senders = new HashMap<>();
+    private final Set<String> told = new HashSet<>();
+    private final Map<String, String> casing = new HashMap<>();
 
     /** Looks for `types` for `millis`, then returns. */
     public void browse(final List<String> types, long millis, final Listener listener) {
-        final List<DatagramSocket> sockets = new ArrayList<DatagramSocket>();
+        final List<DatagramSocket> sockets = new ArrayList<>();
         try {
             DatagramSocket direct = new DatagramSocket();
             sockets.add(direct);
@@ -82,7 +82,7 @@ public final class Mdns {
         } catch (IOException | RuntimeException e) {
             // Something else holds 5353: direct answers still come.
         }
-        List<Thread> readers = new ArrayList<Thread>();
+        List<Thread> readers = new ArrayList<>();
         for (final DatagramSocket socket : sockets) {
             Thread reader = new Thread(() -> read(socket, types, listener), "mdns");
             reader.setDaemon(true);
@@ -105,7 +105,7 @@ public final class Mdns {
                 }
                 Thread.sleep(250);
                 if (next > 1) followUp(sockets.get(0));
-                for (Service service : take(new ArrayList<Dns.Record>(), "", types)) listener.found(service);
+                for (Service service : take(new ArrayList<>(), "", types)) listener.found(service);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -115,13 +115,13 @@ public final class Mdns {
     }
 
     private void ask(DatagramSocket socket, List<String> types) {
-        List<Integer> kinds = new ArrayList<Integer>();
+        List<Integer> kinds = new ArrayList<>();
         for (int i = 0; i < types.size(); i++) kinds.add(Dns.PTR);
         send(socket, Dns.query(0, types, kinds));
     }
 
     /** What has been asked for again, and when. */
-    private final Map<String, Long> chased = new HashMap<String, Long>();
+    private final Map<String, Long> chased = new HashMap<>();
 
     private boolean chase(String what) {
         if (chased.containsKey(what)) return false;
@@ -131,8 +131,8 @@ public final class Mdns {
 
     /** Asks for what a service's announcement left out: its SRV and TXT, its host's address. */
     private void followUp(DatagramSocket socket) {
-        List<String> names = new ArrayList<String>();
-        List<Integer> kinds = new ArrayList<Integer>();
+        List<String> names = new ArrayList<>();
+        List<Integer> kinds = new ArrayList<>();
         synchronized (this) {
             for (Set<String> each : instances.values()) {
                 for (String instance : each) {
@@ -181,7 +181,7 @@ public final class Mdns {
 
     /** Files the records away, returning the services they complete. */
     synchronized List<Service> take(List<Dns.Record> records, String sender, List<String> types) {
-        Set<String> wanted = new HashSet<String>();
+        Set<String> wanted = new HashSet<>();
         for (String type : types) wanted.add(type.toLowerCase(Locale.ROOT));
         for (Dns.Record record : records) {
             String name = record.name.toLowerCase(Locale.ROOT);
@@ -191,7 +191,7 @@ public final class Mdns {
                     String instance = record.target.toLowerCase(Locale.ROOT);
                     casing.put(instance, record.target);
                     Set<String> set = instances.get(name);
-                    if (set == null) instances.put(name, set = new HashSet<String>());
+                    if (set == null) instances.put(name, set = new HashSet<>());
                     set.add(instance);
                     senders.put(instance, sender);
                     break;
@@ -210,7 +210,7 @@ public final class Mdns {
                     break;
             }
         }
-        List<Service> out = new ArrayList<Service>();
+        List<Service> out = new ArrayList<>();
         for (Map.Entry<String, Set<String>> entry : instances.entrySet()) {
             for (String instance : entry.getValue()) {
                 if (told.contains(instance)) continue;
@@ -232,7 +232,7 @@ public final class Mdns {
                 String own = shown.toLowerCase(Locale.ROOT).endsWith(suffix)
                     ? shown.substring(0, shown.length() - suffix.length()) : shown;
                 out.add(new Service(own, entry.getKey(), address, where.port,
-                    text == null ? new LinkedHashMap<String, String>() : text));
+                    text == null ? new LinkedHashMap<>() : text));
             }
         }
         return out;

@@ -11,9 +11,11 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import com.xp3.common.ui.Ui;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -43,7 +45,7 @@ final class FilesScreen extends Screen {
     private TextView mode;
     private TextView meta;
     private final StringBuilder query = new StringBuilder();
-    private final List<Line> lines = new ArrayList<Line>();
+    private final List<Line> lines = new ArrayList<>();
     private int sort;
 
     /** One row and what it shows. */
@@ -65,7 +67,7 @@ final class FilesScreen extends Screen {
     /** The PDFs of a location, as scanned. */
     FilesScreen(Library.Location location, List<Library.Pdf> pdfs) {
         this.title = location.name;
-        this.pdfs = pdfs == null ? new ArrayList<Library.Pdf>() : new ArrayList<Library.Pdf>(pdfs);
+        this.pdfs = pdfs == null ? new ArrayList<>() : new ArrayList<>(pdfs);
         this.folder = null;
     }
 
@@ -83,24 +85,24 @@ final class FilesScreen extends Screen {
         LinearLayout body = Parts.column(c);
 
         field = Parts.row(c);
-        field.setPadding(Look.dp(c, 8), 0, Look.dp(c, 8), 0);
+        field.setPadding(Ui.dp(c, 8), 0, Ui.dp(c, 8), 0);
         field.setDefaultFocusHighlightEnabled(false);
         field.addView(Parts.image(c, R.drawable.ic_search, Look.MUTE, 12));
         fieldText = Look.line(c, "Type to search", 11, Look.REGULAR, Look.MUTE);
         LinearLayout.LayoutParams lp = Parts.weighted();
-        lp.leftMargin = Look.dp(c, 6);
+        lp.leftMargin = Ui.dp(c, 6);
         field.addView(fieldText, lp);
         mode = Look.line(c, "T9", 9, Look.BOLD, Look.BLUE);
         mode.setBackground(Look.rounded(Look.ICON_FILL, 3, c));
-        mode.setPadding(Look.dp(c, 4), Look.dp(c, 1), Look.dp(c, 4), Look.dp(c, 1));
+        mode.setPadding(Ui.dp(c, 4), Ui.dp(c, 1), Ui.dp(c, 4), Ui.dp(c, 1));
         field.addView(mode);
-        LinearLayout.LayoutParams at = Parts.line(Parts.FILL, Look.dp(c, 26));
-        at.setMargins(Look.dp(c, 9), Look.dp(c, 6), Look.dp(c, 9), Look.dp(c, 4));
+        LinearLayout.LayoutParams at = Parts.line(Parts.FILL, Ui.dp(c, 26));
+        at.setMargins(Ui.dp(c, 9), Ui.dp(c, 6), Ui.dp(c, 9), Ui.dp(c, 4));
         body.addView(field, at);
         fieldLook(false);
 
         meta = Look.line(c, "", 9.5f, Look.REGULAR, Look.MUTE);
-        meta.setPadding(Look.dp(c, 11), Look.dp(c, 3), Look.dp(c, 11), Look.dp(c, 4));
+        meta.setPadding(Ui.dp(c, 11), Ui.dp(c, 3), Ui.dp(c, 11), Ui.dp(c, 4));
         body.addView(meta);
 
         list = Parts.column(c);
@@ -138,27 +140,22 @@ final class FilesScreen extends Screen {
         String typed = query.toString();
         int total = 0;
         String shownMatch = null;
-        if (pdfs != null) {
-            Library.sort(pdfs, sort);
-            List<Library.Pdf> shown = new ArrayList<Library.Pdf>(pdfs);
-            // A search puts names that start with what was typed first, then a later word's start.
-            if (!typed.isEmpty()) Collections.sort(shown, (a, b) -> Integer.compare(rank(a.name, typed), rank(b.name, typed)));
-            for (Library.Pdf pdf : shown) {
-                int[] match = typed.isEmpty() ? null : T9.match(pdf.name, typed);
-                if (!typed.isEmpty() && match == null) continue;
-                total++;
-                if (shownMatch == null && match != null) shownMatch = pdf.name.substring(match[0], match[1]);
-                if (lines.size() < MOST) addPdf(c, pdf.file, pdf, match);
-            }
-        } else {
-            List<File> shown = new ArrayList<File>(entries);
-            if (!typed.isEmpty()) Collections.sort(shown, (a, b) -> Integer.compare(rank(display(a), typed), rank(display(b), typed)));
-            for (File entry : shown) {
-                int[] match = typed.isEmpty() ? null : T9.match(display(entry), typed);
-                if (!typed.isEmpty() && match == null) continue;
-                total++;
-                if (shownMatch == null && match != null) shownMatch = display(entry).substring(match[0], match[1]);
-                if (lines.size() >= MOST) continue;
+        if (pdfs != null) Library.sort(pdfs, sort);
+        // A location's PDFs, or a folder's folders and PDFs (as Files).
+        List<Object> items = new ArrayList<>(pdfs != null ? pdfs : entries);
+        // A search puts names that start with what was typed first, then a later word's start.
+        if (!typed.isEmpty()) Collections.sort(items, (a, b) -> Integer.compare(rank(name(a), typed), rank(name(b), typed)));
+        for (Object item : items) {
+            String name = name(item);
+            int[] match = typed.isEmpty() ? null : T9.match(name, typed);
+            if (!typed.isEmpty() && match == null) continue;
+            total++;
+            if (shownMatch == null && match != null) shownMatch = name.substring(match[0], match[1]);
+            if (lines.size() >= MOST) continue;
+            if (item instanceof Library.Pdf) {
+                addPdf(c, ((Library.Pdf) item).file, (Library.Pdf) item, match);
+            } else {
+                File entry = (File) item;
                 if (entry.isDirectory()) addFolder(c, entry, match);
                 else addPdf(c, entry, new Library.Pdf(entry), match);
             }
@@ -173,11 +170,11 @@ final class FilesScreen extends Screen {
             fieldText.setText(shown);
             fieldText.setTextColor(Look.INK);
             meta.setText(total == 0 ? "No PDFs match “" + shown + "”"
-                : total + (total == 1 ? " result" : " results") + " for “" + shown + "”");
+                : Parts.count(total, "result", "results") + " for “" + shown + "”");
         } else {
             fieldText.setText("Type to search");
             fieldText.setTextColor(Look.MUTE);
-            if (pdfs != null) meta.setText(total + (total == 1 ? " PDF" : " PDFs") + " · " + Library.SORTS[sort]);
+            if (pdfs != null) meta.setText(Parts.count(total, "PDF", "PDFs") + " · " + Library.SORTS[sort]);
             else meta.setText(total == 0 ? "No folders or PDFs here" : folderSummary());
         }
         if (total > lines.size()) {
@@ -200,12 +197,15 @@ final class FilesScreen extends Screen {
             else files++;
         }
         StringBuilder out = new StringBuilder();
-        if (folders > 0) out.append(folders).append(folders == 1 ? " folder" : " folders");
-        if (files > 0) out.append(out.length() > 0 ? " · " : "").append(files).append(files == 1 ? " PDF" : " PDFs");
+        if (folders > 0) out.append(Parts.count(folders, "folder", "folders"));
+        if (files > 0) out.append(out.length() > 0 ? " · " : "").append(Parts.count(files, "PDF", "PDFs"));
         return out.toString();
     }
 
-    private static String display(File entry) {
+    /** What a row is called, and searched by. */
+    private static String name(Object item) {
+        if (item instanceof Library.Pdf) return ((Library.Pdf) item).name;
+        File entry = (File) item;
         return entry.isDirectory() ? entry.getName() : Library.title(entry);
     }
 
@@ -218,11 +218,8 @@ final class FilesScreen extends Screen {
 
     private void addPdf(Context c, final File file, Library.Pdf pdf, int[] match) {
         Parts.Row row = new Parts.Row(c, 44);
-        ImageView thumb = new ImageView(c);
-        thumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        thumb.setBackgroundColor(0xFFDCDEE3);
-        thumb.setPadding(1, 1, 1, 1);
-        row.lead(thumb, Look.dp(c, 24), Look.dp(c, 31));
+        ImageView thumb = Parts.thumb(c);
+        row.lead(thumb, Ui.dp(c, 24), Ui.dp(c, 31));
         row.titled(marked(pdf.name, match), about(pdf));
         row.setOnClickListener(v -> app.open(new PreviewScreen(file, null)));
         list.addView(row, Parts.line(Parts.FILL, Parts.WRAP));
@@ -231,7 +228,7 @@ final class FilesScreen extends Screen {
 
     private void addFolder(Context c, final File dir, int[] match) {
         Parts.Row row = new Parts.Row(c, 40);
-        row.lead(Parts.square(c, R.drawable.ic_folder), Look.dp(c, 26), Look.dp(c, 26));
+        row.lead(Parts.square(c, R.drawable.ic_folder), Ui.dp(c, 26), Ui.dp(c, 26));
         row.titled(marked(dir.getName(), match), "Folder");
         row.chevron();
         row.setOnClickListener(v -> app.open(new FilesScreen(dir.getName(), dir)));
@@ -243,7 +240,7 @@ final class FilesScreen extends Screen {
     private static String about(Library.Pdf pdf) {
         int pages = Pages.known(pdf.file);
         String count = pages == Pages.LOCKED ? "Protected" : pages == Pages.BROKEN ? "Can't be read"
-            : pages > 0 ? pages + (pages == 1 ? " page" : " pages") : null;
+            : pages > 0 ? Parts.count(pages, "page", "pages") : null;
         return (count == null ? "" : count + " · ") + Library.size(pdf.size) + " · " + when(pdf.modified);
     }
 
@@ -253,20 +250,20 @@ final class FilesScreen extends Screen {
         then.setTimeInMillis(time);
         long midnight = Queue.midnight();
         if (time >= midnight) return "Today";
-        if (time >= midnight - 24L * 60 * 60 * 1000) return "Yesterday";
+        if (time >= midnight - Queue.DAY) return "Yesterday";
         boolean thisYear = then.get(Calendar.YEAR) == Calendar.getInstance().get(Calendar.YEAR);
         return new SimpleDateFormat(thisYear ? "MMM d" : "MMM d, yyyy", Locale.US).format(new Date(time));
     }
 
     /** Draws the thumbnails of the rows in sight (and a few past them), each once. */
     private void loadVisible() {
-        int top = scroll.getScrollY() - Look.dp(app, 100);
-        int bottom = scroll.getScrollY() + scroll.getHeight() + Look.dp(app, 200);
+        int top = scroll.getScrollY() - Ui.dp(app, 100);
+        int bottom = scroll.getScrollY() + scroll.getHeight() + Ui.dp(app, 200);
         for (final Line line : lines) {
             if (line.asked || line.pdf == null) continue;
             if (line.row.getBottom() < top || (line.row.getTop() > bottom && line.row.getTop() > 0)) continue;
             line.asked = true;
-            Pages.draw(line.file, 0, Look.dp(app, 22), Look.dp(app, 29), (Bitmap bitmap) -> {
+            Pages.draw(line.file, 0, Ui.dp(app, 22), Ui.dp(app, 29), (Bitmap bitmap) -> {
                 if (bitmap != null) line.thumb.setImageBitmap(bitmap);
                 else if (Pages.known(line.file) == Pages.LOCKED) line.thumb.setImageDrawable(Look.icon(app, R.drawable.ic_lock, Look.MUTE));
                 line.row.sub.setText(about(line.pdf));
@@ -344,9 +341,7 @@ final class FilesScreen extends Screen {
     void options(List<Option> out) {
         if (pdfs == null) return;
         out.add(new Option("Sort", () -> {
-            List<MainActivity.Choice> choices = new ArrayList<MainActivity.Choice>();
-            for (String each : Library.SORTS) choices.add(new MainActivity.Choice(each, null));
-            app.choose("Sort", choices, sort, null, which -> {
+            app.choose("Sort", MainActivity.Choice.plain(Arrays.asList(Library.SORTS)), sort, null, which -> {
                 sort = which;
                 Store.get(app).setSort(sort);
                 rows();

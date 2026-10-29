@@ -1,14 +1,16 @@
 package com.print.xp3;
 
 import android.content.Context;
+import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import com.print.xp3.raster.Frame;
+import com.xp3.common.ui.Ui;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -54,9 +56,9 @@ final class PrintSettingsScreen extends Screen {
         stepper.addView(step(c, "◀"));
         copies = Look.text(c, "", 13, Look.BOLD, Look.INK);
         copies.setGravity(Gravity.CENTER);
-        copies.setMinWidth(Look.dp(c, 18));
+        copies.setMinWidth(Ui.dp(c, 18));
         LinearLayout.LayoutParams mid = Parts.line(Parts.WRAP, Parts.WRAP);
-        mid.leftMargin = mid.rightMargin = Look.dp(c, 6);
+        mid.leftMargin = mid.rightMargin = Ui.dp(c, 6);
         stepper.addView(copies, mid);
         stepper.addView(step(c, "▶"));
         copiesRow.trailing(stepper);
@@ -85,11 +87,7 @@ final class PrintSettingsScreen extends Screen {
             print.run();
         })));
 
-        ScrollView scroll = new ScrollView(c);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setDefaultFocusHighlightEnabled(false);
-        scroll.addView(list);
-        body.addView(scroll, new LinearLayout.LayoutParams(Parts.FILL, 0, 1));
+        body.addView(Parts.scroll(c, list), new LinearLayout.LayoutParams(Parts.FILL, 0, 1));
         refresh();
         return Parts.page(c, Parts.nav(c, "Print Settings", true, null), body);
     }
@@ -97,12 +95,10 @@ final class PrintSettingsScreen extends Screen {
     private static TextView step(Context c, String arrow) {
         TextView view = Look.text(c, arrow, 8, Look.REGULAR, Look.BLUE);
         view.setGravity(Gravity.CENTER);
-        android.graphics.drawable.GradientDrawable circle = new android.graphics.drawable.GradientDrawable();
-        circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        circle.setColor(Look.WHITE);
-        circle.setStroke(Math.max(1, Look.dp(c, 1)), 0xFFBFD0F6);
+        GradientDrawable circle = Look.oval(Look.WHITE);
+        circle.setStroke(Math.max(1, Ui.dp(c, 1)), 0xFFBFD0F6);
         view.setBackground(circle);
-        view.setLayoutParams(new LinearLayout.LayoutParams(Look.dp(c, 16), Look.dp(c, 16)));
+        view.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(c, 16), Ui.dp(c, 16)));
         return view;
     }
 
@@ -128,14 +124,11 @@ final class PrintSettingsScreen extends Screen {
         sides.value.setText(Choices.sidesName(draft.options.duplex));
         paper.value.setText(Media.shown(draft.options.media));
         int sheets = Choices.sheets(draft.options);
-        foot.setText("Uses " + sheets + (sheets == 1 ? " sheet" : " sheets") + " of " + Media.shown(draft.options.media) + " paper");
+        foot.setText("Uses " + Parts.count(sheets, "sheet", "sheets") + " of " + Media.shown(draft.options.media) + " paper");
     }
 
     private void chooseColor() {
-        List<MainActivity.Choice> choices = new ArrayList<MainActivity.Choice>();
-        choices.add(new MainActivity.Choice("Color", null));
-        choices.add(new MainActivity.Choice("Black & white", null));
-        app.choose("Color", choices, draft.options.color ? 0 : 1, null, which -> {
+        app.choose("Color", MainActivity.Choice.plain(Arrays.asList("Color", "Black & white")), draft.options.color ? 0 : 1, null, which -> {
             draft.options.color = which == 0;
             refresh();
         });
@@ -143,7 +136,7 @@ final class PrintSettingsScreen extends Screen {
 
     private void chooseSides() {
         final List<Integer> offered = Choices.sides(draft.printer);
-        List<MainActivity.Choice> choices = new ArrayList<MainActivity.Choice>();
+        List<MainActivity.Choice> choices = new ArrayList<>();
         for (int duplex : offered) {
             String sub = duplex == Frame.LONG_EDGE ? "Turn pages like a book" : duplex == Frame.SHORT_EDGE ? "Turn pages like a notepad" : "One side of each sheet";
             choices.add(new MainActivity.Choice(Choices.sidesName(duplex), sub));
@@ -156,10 +149,8 @@ final class PrintSettingsScreen extends Screen {
 
     private void choosePaper() {
         final List<String> offered = Choices.media(draft.printer);
-        List<MainActivity.Choice> choices = new ArrayList<MainActivity.Choice>();
-        for (String media : offered) choices.add(new MainActivity.Choice(Media.shown(media), Media.dimensions(media)));
         boolean said = draft.printer != null && draft.printer.ipp != null && !draft.printer.ipp.media.isEmpty();
-        app.choose("Paper size", choices, Math.max(0, offered.indexOf(draft.options.media)),
+        app.choose("Paper size", MainActivity.Choice.papers(offered), Math.max(0, offered.indexOf(draft.options.media)),
             said ? "Only sizes this printer supports are listed." : "This printer doesn't say which sizes it takes.",
             which -> {
                 draft.options.media = offered.get(which);

@@ -29,11 +29,16 @@ final class Draft {
     /** "2 copies · B&W · 2-sided", leaving out what is as usual. */
     String summary() {
         StringBuilder out = new StringBuilder();
-        out.append(options.copies).append(options.copies == 1 ? " copy" : " copies");
+        out.append(Parts.count(options.copies, "copy", "copies"));
         out.append(" · ").append(options.color ? "Color" : "B&W");
         if (options.duplex != Frame.ONE_SIDED) out.append(" · 2-sided");
         if (!allPages()) out.append(" · ").append(pagesShown());
         return out.toString();
+    }
+
+    /** "Page 1", "Pages 1–6": every page of the file. */
+    String pagesAll() {
+        return pages == 1 ? "Page 1" : "Pages 1–" + pages;
     }
 
     /** "All (1–6)", "2–4", "Page 3". */

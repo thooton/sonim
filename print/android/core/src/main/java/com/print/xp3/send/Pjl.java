@@ -8,6 +8,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -22,13 +23,13 @@ public final class Pjl {
     private Pjl() {}
 
     static final String UEL = "\u001b%-12345X";
-    private static final Charset ASCII = Charset.forName("US-ASCII");
+    private static final Charset ASCII = StandardCharsets.US_ASCII;
 
     /** What a printer said about itself. */
     public static final class Info {
         public String model = "";
         /** Upper case, as the printer says them: PCL, POSTSCRIPT, PDF, ... */
-        public final List<String> languages = new ArrayList<String>();
+        public final List<String> languages = new ArrayList<>();
 
         public boolean speaks(String language) {
             for (String each : languages) if (each.startsWith(language)) return true;

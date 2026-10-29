@@ -1,12 +1,14 @@
 package com.print.xp3;
 
 import android.content.Context;
+import android.graphics.drawable.ColorDrawable;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.xp3.common.ui.Ui;
 
 /**
  * Pages (screen 08): all of them, a range typed into two boxes, or only the
@@ -54,8 +56,8 @@ final class PagesScreen extends Screen {
             final int which = i;
             Parts.Row row = new Parts.Row(c, i == RANGE ? 58 : 40);
             Parts.Radio radio = new Parts.Radio(c, false);
-            row.lead(radio, Look.dp(c, 14), Look.dp(c, 14));
-            row.titled(titles[i], i == ALL ? (draft.pages == 1 ? "Page 1" : "Pages 1–" + draft.pages)
+            row.lead(radio, Ui.dp(c, 14), Ui.dp(c, 14));
+            row.titled(titles[i], i == ALL ? draft.pagesAll()
                 : i == CURRENT ? "Page " + (draft.page + 1) : null);
             if (i == RANGE) {
                 LinearLayout range = Parts.row(c);
@@ -66,7 +68,7 @@ final class PagesScreen extends Screen {
                 toBox = numberBox(c);
                 range.addView(toBox, boxAt(c));
                 LinearLayout.LayoutParams under = Parts.line(Parts.WRAP, Parts.WRAP);
-                under.topMargin = Look.dp(c, 2);
+                under.topMargin = Ui.dp(c, 2);
                 row.text.addView(range, under);
             }
             row.setOnClickListener(v -> {
@@ -82,7 +84,7 @@ final class PagesScreen extends Screen {
             body.addView(row);
         }
         strip = Parts.row(c);
-        strip.setPadding(Look.dp(c, 12), Look.dp(c, 6), Look.dp(c, 12), 0);
+        strip.setPadding(Ui.dp(c, 12), Ui.dp(c, 6), Ui.dp(c, 12), 0);
         body.addView(strip);
         foot = Parts.foot(c, "");
         body.addView(foot);
@@ -94,14 +96,14 @@ final class PagesScreen extends Screen {
     private static TextView numberBox(Context c) {
         TextView box = Look.text(c, "", 11.5f, Look.BOLD, Look.INK);
         box.setGravity(Gravity.CENTER);
-        box.setMinWidth(Look.dp(c, 30));
-        box.setPadding(Look.dp(c, 6), Look.dp(c, 4), Look.dp(c, 6), Look.dp(c, 4));
+        box.setMinWidth(Ui.dp(c, 30));
+        box.setPadding(Ui.dp(c, 6), Ui.dp(c, 4), Ui.dp(c, 6), Ui.dp(c, 4));
         return box;
     }
 
     private static LinearLayout.LayoutParams boxAt(Context c) {
-        LinearLayout.LayoutParams lp = Parts.line(Parts.WRAP, Look.dp(c, 24));
-        lp.leftMargin = lp.rightMargin = Look.dp(c, 3);
+        LinearLayout.LayoutParams lp = Parts.line(Parts.WRAP, Ui.dp(c, 24));
+        lp.leftMargin = lp.rightMargin = Ui.dp(c, 3);
         return lp;
     }
 
@@ -131,7 +133,7 @@ final class PagesScreen extends Screen {
         toBox.setBackground(Look.box(app, typing && box == 1));
         int[] range = chosen();
         int count = range[1] - range[0] + 1;
-        foot.setText(count + " of " + draft.pages + (draft.pages == 1 ? " page" : " pages") + " selected");
+        foot.setText(count + " of " + Parts.count(draft.pages, "page", "pages") + " selected");
         drawStrip(range);
     }
 
@@ -147,17 +149,17 @@ final class PagesScreen extends Screen {
             cell.setGravity(Gravity.CENTER_HORIZONTAL);
             final ImageView thumb = new ImageView(c);
             thumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            thumb.setBackground(in ? Look.outlined(Look.WHITE, 0, 1.5f, Look.BLUE, c) : Parts.fill(0xFFDCDEE3));
-            int pad = in ? Look.dp(c, 1.5f) : 1;
+            thumb.setBackground(in ? Look.outlined(Look.WHITE, 0, 1.5f, Look.BLUE, c) : new ColorDrawable(0xFFDCDEE3));
+            int pad = in ? Ui.dp(c, 1.5f) : 1;
             thumb.setPadding(pad, pad, pad, pad);
             thumb.setAlpha(in ? 1f : 0.4f);
-            cell.addView(thumb, Parts.line(Look.dp(c, 28), Look.dp(c, 36)));
+            cell.addView(thumb, Parts.line(Ui.dp(c, 28), Ui.dp(c, 36)));
             TextView number = Look.text(c, String.valueOf(p), 8.5f, Look.SEMIBOLD, in ? Look.BLUE : Look.MUTE);
             LinearLayout.LayoutParams under = Parts.line(Parts.WRAP, Parts.WRAP);
-            under.topMargin = Look.dp(c, 2);
+            under.topMargin = Ui.dp(c, 2);
             cell.addView(number, under);
             strip.addView(cell, new LinearLayout.LayoutParams(0, Parts.WRAP, 1));
-            Pages.draw(draft.file, p - 1, Look.dp(c, 26), Look.dp(c, 34), bitmap -> {
+            Pages.draw(draft.file, p - 1, Ui.dp(c, 26), Ui.dp(c, 34), bitmap -> {
                 if (bitmap != null) thumb.setImageBitmap(bitmap);
             });
         }

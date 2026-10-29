@@ -78,7 +78,7 @@ public final class Probe {
 
     /** As {@link #ippAt(String, int)}, over TLS from the start when `tls` (443, ipps). */
     public static List<Printer> ippAt(String address, int port, boolean tls) {
-        List<Printer> out = new ArrayList<Printer>();
+        List<Printer> out = new ArrayList<>();
         for (String path : PATHS) {
             try {
                 IppClient client = new IppClient(address, port, path, tls).readTimeout(5000);

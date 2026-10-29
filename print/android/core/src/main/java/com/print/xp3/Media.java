@@ -82,8 +82,8 @@ public final class Media {
      * envelopes, borderless or tray-specific variants, each size once.
      */
     public static List<String> offered(List<String> supported) {
-        List<String> out = new ArrayList<String>();
-        List<String> seen = new ArrayList<String>();
+        List<String> out = new ArrayList<>();
+        List<String> seen = new ArrayList<>();
         for (String media : supported) {
             double[] size = points(media);
             if (size == null) continue;
