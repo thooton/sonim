@@ -18,6 +18,7 @@ import android.widget.FrameLayout;
 
 import com.books.xp3.shelf.Shelf;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.NightShift;
 import com.xp3.common.ui.CardGrant;
 import com.xp3.common.ui.Ui;
 

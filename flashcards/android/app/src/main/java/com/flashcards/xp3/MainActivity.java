@@ -37,6 +37,7 @@ import com.flashcards.xp3.sync.Center;
 import com.xp3.common.Disk;
 import com.xp3.common.Login;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.NightShift;
 import com.xp3.common.ui.Card;
 import com.xp3.common.ui.CardGrant;
 import com.xp3.common.ui.Ui;

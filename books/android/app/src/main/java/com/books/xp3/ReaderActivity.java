@@ -14,6 +14,7 @@ import com.books.xp3.book.Section;
 import com.books.xp3.book.TocEntry;
 import com.books.xp3.shelf.Shelf;
 import com.xp3.common.ui.BaseActivity;
+import com.xp3.common.ui.NightShift;
 import com.xp3.common.ui.Ui;
 
 import java.io.File;

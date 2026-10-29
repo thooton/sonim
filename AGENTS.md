@@ -136,12 +136,13 @@ builds every app and runs every self-test. One app is `:<app>:app` (and
   Source, Places and Mail sign in); and, as test fixtures, `Check` (the test
   harness) and `TestServer` (a loopback HTTP server).
 - `common/ui` (Android, `com.xp3.common.ui`): `BaseActivity` (`dp`, `color`,
-  `toast`, `alert`, `vertical`, `text`, `listDialog`), `Ui` (workers, `fill`,
+  `toast`, `alert`, `vertical`, `text`, `listDialog`), `Ui` (workers, `fill`, `sampleSize`,
   `weighted`, `isOk`, `onSelect`), `Card` (the SD card, where downloads
   go), `CardGrant` (Android's grant for the whole card, which Android 8.1
   wants before an app writes there, and sometimes before it reads what
   another app put there), `Tabs` (tab bar with d-pad cycling),
-  `SelectableAdapter` (rows that paint their own highlight), `Markdown`, and
+  `SelectableAdapter` (rows that paint their own highlight), `NightShift` (the
+  warm colour filter Books and Flashcards draw through), `Markdown`, and
   the shared tab, focus and Markdown drawables. An app's own colors and
   dimens override the defaults in its `res/values`. `Family` and the
   `family_*` resources are the look the light apps share; see `DESIGN.md`
