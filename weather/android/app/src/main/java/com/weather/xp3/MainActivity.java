@@ -169,8 +169,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         String body = Disk.read(cache(), 2000000);
         if (body == null) return;
         try {
-            Forecast f = OpenMeteo.parse(body, place.name, prefs.getLong("fetched", 0));
-            view.forecast = f;
+            view.forecast = OpenMeteo.parse(body, place.name, prefs.getLong("fetched", 0));
             view.invalidate();
         } catch (IOException e) {
             // A damaged cache is no cache.
@@ -398,11 +397,24 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
     }
 
     private void closeLocation() {
+        hideLocation();
+        view.forceStatusBar();
+        if (view.forecast == null && place == null) finish();
+    }
+
+    /** Back to the forecast from Location. */
+    private void hideLocation() {
         locationLayer.setVisibility(View.GONE);
         view.covered = false;
         view.requestFocus();
-        view.forceStatusBar();
-        if (view.forecast == null && place == null) finish();
+    }
+
+    /** Location says `message` in place of any places. */
+    private void say(String message) {
+        locationView.rows.clear();
+        locationView.selected = -1;
+        locationView.message = message;
+        locationView.invalidate();
     }
 
     private void search(String query) {
@@ -522,9 +534,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
             .putString("recent", Place.write(recent)).apply();
         sample = null;
         searching++;
-        locationLayer.setVisibility(View.GONE);
-        view.covered = false;
-        view.requestFocus();
+        hideLocation();
         view.scrollToTop();
         view.offset = 0;
         view.forecast = null;
@@ -550,10 +560,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
             requestPermissions(new String[] {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, ASK_LOCATION);
             return;
         }
-        locationView.rows.clear();
-        locationView.selected = -1;
-        locationView.message = "Finding where the phone is";
-        locationView.invalidate();
+        say("Finding where the phone is");
         final int ask = ++searching;
         Location fix = lastKnown();
         if (fix != null && System.currentTimeMillis() - fix.getTime() < 30 * 60 * 1000L) {
@@ -584,8 +591,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
             if (stale != null) {
                 name(stale, ask);
             } else {
-                locationView.message = "Couldn't find where the phone is";
-                locationView.invalidate();
+                say("Couldn't find where the phone is");
             }
         }, 45000);
     }
@@ -628,10 +634,7 @@ public final class MainActivity extends BaseActivity implements WeatherView.Chro
         if (mayLocate()) {
             locate();
         } else {
-            locationView.message = "Weather may not use the phone's location";
-            locationView.rows.clear();
-            locationView.selected = -1;
-            locationView.invalidate();
+            say("Weather may not use the phone's location");
         }
     }
 }
