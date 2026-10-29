@@ -134,6 +134,7 @@ public final class MainActivity extends BaseActivity {
         super.onCreate(onIce);
         setContentView(R.layout.activity_main);
         content = findViewById(R.id.content);
+        NightShift.apply(getWindow().getDecorView(), nightShift());
         login = loadLogin(prefs());
         collection = load();
         collection.zone = zone.getId();
@@ -536,14 +537,15 @@ public final class MainActivity extends BaseActivity {
 
     private void deckMenu(final Deck deck) {
         List<String> items = deck == null
-            ? Arrays.asList("Sync", "Import", "Command center")
-            : Arrays.asList("Options", "Stats", "Sync", "Import", "Command center");
+            ? Arrays.asList("Sync", "Import", nightShiftItem(), "Command center")
+            : Arrays.asList("Options", "Stats", "Sync", "Import", nightShiftItem(), "Command center");
         listDialog(deck == null ? "Flashcards" : deck.name, items, at -> {
             String chose = items.get(at);
             if (chose.equals("Options")) showOptions(deck);
             else if (chose.equals("Stats")) showStats(deck);
             else if (chose.equals("Sync")) syncNow();
             else if (chose.equals("Import")) chooseImport();
+            else if (chose.equals(nightShiftItem())) toggleNightShift();
             else askLogin();
         }, null);
     }
@@ -816,7 +818,11 @@ public final class MainActivity extends BaseActivity {
         final DeckCard card = session(open).current();
         if (card == null || review == null) return;
         final ReviewPane shown = review;
-        listDialog("Card", Arrays.asList("Remove from deck"), at -> {
+        listDialog("Card", Arrays.asList("Remove from deck", nightShiftItem()), at -> {
+            if (at == 1) {
+                toggleNightShift();
+                return;
+            }
             if (screen != Screen.REVIEW || review != shown || session(open).current() != card) return;
             collection.remove(card, System.currentTimeMillis());
             review.showNext();
@@ -896,6 +902,20 @@ public final class MainActivity extends BaseActivity {
 
     // ---------------------------------------------------------------------
     // The command center login
+
+    private boolean nightShift() {
+        return prefs().getBoolean("nightShift", false);
+    }
+
+    private String nightShiftItem() {
+        return nightShift() ? "Night Shift: on" : "Night Shift: off";
+    }
+
+    private void toggleNightShift() {
+        boolean on = !nightShift();
+        prefs().edit().putBoolean("nightShift", on).apply();
+        NightShift.apply(getWindow().getDecorView(), on);
+    }
 
     private SharedPreferences prefs() {
         return getSharedPreferences(PREFS, MODE_PRIVATE);

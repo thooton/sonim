@@ -50,8 +50,11 @@ The app opens on the deck list. There is no header naming the app.
   selected (or the newly imported deck after an import).
 - OK opens the deck's overview.
 - Menu on a deck row: a dialog titled with the deck's name: Options, Stats,
-  Sync, Import, Command center. With no deck selected: titled `Flashcards`
-  with Sync, Import, Command center.
+  Sync, Import, Night Shift, Command center. With no deck selected: titled
+  `Flashcards` with Sync, Import, Night Shift, Command center.
+- `Night Shift: off` / `Night Shift: on` in Menu flips Night Shift, which
+  warms the whole screen toward yellow (as in Books), is kept between runs
+  and is off by default. Dialogs are not warmed.
 - Back leaves the app.
 - No decks, signed in: `No decks` centred (`Syncing` while a sync runs).
   No decks, not signed in: only the pairing panel, centred. Menu works on
@@ -93,7 +96,7 @@ The app opens on the deck list. There is no header naming the app.
 - The interval shown on a button is exactly what that key gives.
 - After an answer the next card shows at once. When nothing more is due
   (or, in Review Ahead, no other card), the overview returns.
-- Menu: a dialog `Card` with `Remove from deck`. Choosing it removes the
+- Menu: a dialog `Card` with `Remove from deck` and the Night Shift switch. Choosing it removes the
   card at once without asking, shows the next card, and toasts `Removed
   from <deck>`. Cancel or Back closes the dialog and leaves the card.
 - Back: the overview, its counts updated. The answer is not lost: an
