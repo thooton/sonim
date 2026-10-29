@@ -2,6 +2,7 @@ package com.hbsa.xp3;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -130,7 +131,7 @@ public final class Dates {
             if (hour >= 1 && hour <= 9) hour += 12;
             addTime(found, m.start(), m.end(), hour * 60 + Integer.parseInt(m.group(2)));
         }
-        sort(found);
+        Collections.sort(found, (a, b) -> Integer.compare(a.start, b.start));
         return merge(caption, found);
     }
 
@@ -266,6 +267,7 @@ public final class Dates {
     private static final Pattern ABBREVIATION = Pattern.compile(
         "(?i)(?:\\b(?:jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec|mon|tues?|wed|thur?s?|fri|sat|sun"
         + "|st|rm|rd|ave|bldg|dr|mr|mrs|ms|prof|vs)\\.$)");
+    private static final Pattern SENTENCE_END = Pattern.compile("[.!?](\\s|$)");
     private static final Pattern MERIDIEM_DOT = Pattern.compile("(?i)\\b[ap]\\.m\\.$");
     /** "today", "tonight", "tomorrow night" and the like, which go stale in a name. */
     private static final Pattern RELATIVE_WORDS = Pattern.compile(
@@ -288,10 +290,8 @@ public final class Dates {
             String bare = RELATIVE_WORDS.matcher(text).replaceAll("")
                 .replaceAll("\\s+([.!?,])", "$1").replaceAll("\\s+", " ")
                 .replaceAll("^[^\\p{L}\\p{N}]+", "").trim();
-            int letters = 0;
-            for (int i = 0; i < bare.length(); i++) if (Character.isLetter(bare.charAt(i))) letters++;
-            if (letters >= 2 && !bare.equals(text)) text = Character.toUpperCase(bare.charAt(0)) + bare.substring(1);
-            Matcher end = Pattern.compile("[.!?](\\s|$)").matcher(text);
+            if (letters(bare) >= 2 && !bare.equals(text)) text = Character.toUpperCase(bare.charAt(0)) + bare.substring(1);
+            Matcher end = SENTENCE_END.matcher(text);
             while (end.find()) {
                 if (end.start() < 8) continue;
                 String before = text.substring(0, end.start() + 1);
@@ -384,18 +384,17 @@ public final class Dates {
     }
 
     private static void add(List<Mention> found, int start, int end, long day, boolean exact) {
-        if (day < 0) return;
-        for (Mention m : found) if (start < m.end && end > m.start) return;
-        found.add(new Mention(start, end, day, -1, exact));
+        if (day >= 0) keep(found, new Mention(start, end, day, -1, exact));
     }
 
     private static void addTime(List<Mention> found, int start, int end, int minutes) {
-        for (Mention m : found) if (start < m.end && end > m.start) return;
-        found.add(new Mention(start, end, -1, minutes, false));
+        keep(found, new Mention(start, end, -1, minutes, false));
     }
 
-    private static void sort(List<Mention> found) {
-        java.util.Collections.sort(found, (a, b) -> Integer.compare(a.start, b.start));
+    /** Adds `mention` unless an earlier pattern already took part of its text. */
+    private static void keep(List<Mention> found, Mention mention) {
+        for (Mention m : found) if (mention.start < m.end && mention.end > m.start) return;
+        found.add(mention);
     }
 
     /**

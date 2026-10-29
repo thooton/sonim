@@ -18,6 +18,7 @@ import android.widget.ListView;
 import android.widget.PopupMenu;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.xp3.common.Http;
 import com.xp3.common.ui.BaseActivity;
@@ -237,7 +238,7 @@ public final class MainActivity extends BaseActivity {
         try {
             activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (ActivityNotFoundException e) {
-            android.widget.Toast.makeText(activity, "No browser on this phone", android.widget.Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity, "No browser on this phone", Toast.LENGTH_SHORT).show();
         }
     }
 

@@ -29,10 +29,6 @@ public final class Post {
         this.carouselCount = carouselCount;
     }
 
-    public String cover() {
-        return images.isEmpty() ? "" : images.get(0);
-    }
-
     Map<String, Object> toJson() {
         return Json.map(
             "shortcode", shortcode,

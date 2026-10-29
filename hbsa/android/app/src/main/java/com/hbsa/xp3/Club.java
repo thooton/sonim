@@ -27,14 +27,11 @@ final class Club {
 
     static synchronized List<Post> posts(Context context) {
         if (posts == null) {
-            posts = new ArrayList<Post>();
             String saved = Disk.read(file(context), 4000000);
-            if (saved != null) {
-                try {
-                    posts = Post.read(saved);
-                } catch (RuntimeException e) {
-                    posts = new ArrayList<Post>();
-                }
+            try {
+                posts = saved == null ? new ArrayList<Post>() : Post.read(saved);
+            } catch (RuntimeException e) {
+                posts = new ArrayList<Post>();
             }
         }
         return posts;

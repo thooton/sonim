@@ -20,6 +20,7 @@ import android.widget.TextView;
 
 import com.xp3.common.ui.BaseActivity;
 import com.xp3.common.ui.Family;
+import com.xp3.common.ui.Ui;
 
 import java.util.List;
 import java.util.TimeZone;
@@ -175,7 +176,7 @@ public final class PostActivity extends BaseActivity {
             default:
                 break;
         }
-        if (com.xp3.common.ui.Ui.isOk(key)) {
+        if (Ui.isOk(key)) {
             int count = entry().post.images.size();
             if (down && event.getRepeatCount() == 0 && count > 1) {
                 picture = (picture + 1) % count;
