@@ -136,6 +136,25 @@ public final class SelfTest {
             check.same("short first sentence", "Fall Social at the MU!", Dates.title("Fall Social at the MU! Food and games."));
         });
 
+        check.run("caption quirks", () -> {
+            long tue = at("2026-10-27T12:00:00-07:00");
+            List<Dates.Event> bake = Dates.events(new Post("B", "u", tue, "Bake sale this Friday at 11am outside the library! Everything is 1/2 price after 2pm.", Arrays.asList("a"), 0), PHOENIX);
+            check.same("fraction isn't a date", 1, bake.size());
+            check.same("the Friday", at("2026-10-30T00:00:00-07:00"), bake.get(0).day);
+            check.same("its 11am", 11 * 60, bake.get(0).minutes);
+            check.same("1/2 alone is still Jan 2", 1, Dates.find("Dues due 1/2", tue, PHOENIX).size());
+            List<Dates.Event> blocks = Dates.events(new Post("G", "u", tue, "Two events this week!\n\nGarba Night\nDate: Nov 4\nTime: 7pm\n\nMovie Night\nDate: Nov 7\nTime: 8pm", Arrays.asList("a"), 0), PHOENIX);
+            check.same("Garba", "Garba Night", blocks.get(0).title);
+            check.same("Movie", "Movie Night", blocks.get(1).title);
+            check.same("Movie time", 20 * 60, blocks.get(1).minutes);
+            check.same("emoji line skipped", "Diwali Night on Nov 8 at 6pm in the MU ballroom!", Dates.title("\u2728\uD83E\uDE94\u2728\nDiwali Night on Nov 8 at 6pm in the MU ballroom! Tickets $10 at the door."));
+            List<Dates.Event> ghost = Dates.events(new Post("T", "u", at("2026-10-26T12:00:00-07:00"), "Ghost tour Oct 31 & Nov 1 at 8pm, meet at the MU.", Arrays.asList("a"), 0), PHOENIX);
+            check.same("two nights", 2, ghost.size());
+            check.same("shared time", 20 * 60, ghost.get(0).minutes);
+            check.same("second time", 20 * 60, ghost.get(1).minutes);
+            check.same("joiner dropped", "Ghost tour, meet at the MU.", ghost.get(0).title);
+        });
+
         check.run("events", () -> {
             List<Dates.Event> one = Dates.events(new Post("S", "u", posted1, "Fall Social at the MU! Food and games.\n📅 Saturday, Oct 31\n⏰ 6-9 PM", Arrays.asList("a"), 0), PHOENIX);
             check.same("one event", 1, one.size());

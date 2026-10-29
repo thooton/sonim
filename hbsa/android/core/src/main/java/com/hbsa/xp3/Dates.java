@@ -34,6 +34,12 @@ public final class Dates {
         "\\b" + DAY + "(?:\\s+of)?\\s+" + MONTH + "(?![a-z])(?:,?\\s+(20[0-9]{2})\\b)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMERIC = Pattern.compile(
         "(?<![0-9/$.])(1[0-2]|0?[1-9])/(3[01]|[12][0-9]|0?[1-9])(?:/(20[0-9]{2}|[0-9]{2}))?(?![0-9/])");
+    /** What follows "1/2" when it is a fraction, not a date: "1/2 price", "3/4 of the seats". */
+    private static final Pattern FRACTION_OF = Pattern.compile(
+        "\\s*(?:price|off|of|full|empty|a|an|cup|cups|mile|miles|hour|hours|hr|hrs|pound|lb|size|way|day|the|discount|sale|priced|cost|more|less)\\b",
+        Pattern.CASE_INSENSITIVE);
+    /** Words that join dates sharing one time: "Oct 31 & Nov 1 at 8pm". */
+    private static final String JOINER = "(?i)[\\s,]*(?:&|and|\\+)?[\\s,]*";
     private static final Pattern WEEKDAYS = Pattern.compile("\\b" + WEEKDAY + "\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern RELATIVE = Pattern.compile("\\b(today|tonight|tomorrow)\\b", Pattern.CASE_INSENSITIVE);
     /** "6pm", "6:30 PM", "6.30pm", "7-9pm", "7pm - 9pm", "noon". */
@@ -105,6 +111,7 @@ public final class Dates {
         }
         m = NUMERIC.matcher(caption);
         while (m.find()) {
+            if (m.group(3) == null && FRACTION_OF.matcher(caption.substring(m.end())).lookingAt()) continue;
             add(found, m.start(), m.end(), day(posted, zone, Integer.parseInt(m.group(1)) - 1, Integer.parseInt(m.group(2)), year(m.group(3))), true);
         }
         m = WEEKDAYS.matcher(caption);
@@ -150,6 +157,7 @@ public final class Dates {
             Mention date = dates.get(i);
             int minutes = date.minutes >= 0 ? date.minutes
                 : timeFor(post.caption, mentions, date, i + 1 < dates.size() ? dates.get(i + 1).start : post.caption.length());
+            if (minutes < 0) minutes = sharedTime(post.caption, dates, i);
             boolean merged = false;
             for (int k = 0; k < events.size(); k++) {
                 Event e = events.get(k);
@@ -162,6 +170,14 @@ public final class Dates {
             events.add(new Event(post, date.day, minutes, title != null ? title : title(post.caption)));
         }
         return events;
+    }
+
+    /** The time of dates[i] when only "&", "and" or a comma joins it to a later date that has one: "Oct 31 & Nov 1 at 8pm". */
+    private static int sharedTime(String caption, List<Mention> dates, int i) {
+        for (int j = i; j + 1 < dates.size() && caption.substring(dates.get(j).end, dates.get(j + 1).start).matches(JOINER); j++) {
+            if (dates.get(j + 1).minutes >= 0) return dates.get(j + 1).minutes;
+        }
+        return -1;
     }
 
     /**
@@ -191,21 +207,40 @@ public final class Dates {
         if (end < 0) end = caption.length();
         StringBuilder line = new StringBuilder();
         int at = start;
+        boolean any = false;
         for (Mention m : mentions) {
             if (m.end <= start || m.start >= end) continue;
-            line.append(caption, at, Math.max(at, m.start)).append(' ');
+            if (!any || !caption.substring(at, Math.max(at, m.start)).matches(JOINER)) line.append(caption, at, Math.max(at, m.start));
+            line.append(' ');
             at = Math.max(at, m.end);
+            any = true;
         }
         line.append(caption, at, end);
         String text = line.toString()
             .replaceAll("(?i)\\b(date|when|time|where|on|at|from|by|this|next)\\s*:?\\s*(?=[^\\p{L}]*$)", "")
             .replaceAll("(?i)^[^\\p{L}\\p{N}]*(date|when|time)\\s*:", "")
             .replaceAll("\\s+", " ")
+            .replaceAll("\\s+([,.;!?])", "$1")
             .replaceAll("^[^\\p{L}\\p{N}]+|[\\s\\-–—|@,:;·•(]+$", "")
             .trim();
+        if (letters(text) >= 2) return text;
+        // "Garba Night / Date: Nov 4 / Time: 7pm": the line above the date names it.
+        for (int to = start - 1; to > 0; ) {
+            int from = caption.lastIndexOf('\n', to - 1) + 1;
+            int lineEnd = to;
+            to = from - 1;
+            String above = caption.substring(from, lineEnd).trim();
+            if (letters(above) < 2) continue;
+            for (Mention m : mentions) if (m.end > from && m.start < lineEnd) return null;
+            return above;
+        }
+        return null;
+    }
+
+    private static int letters(String text) {
         int letters = 0;
         for (int i = 0; i < text.length(); i++) if (Character.isLetter(text.charAt(i))) letters++;
-        return letters >= 2 ? text : null;
+        return letters;
     }
 
     /** "Saturday, Oct 31", with the year when it isn't this one: always the day and date, never "Today". */
@@ -242,9 +277,14 @@ public final class Dates {
      * wrong day): the event's name.
      */
     public static String title(String caption) {
+        String first = "";
         for (String line : caption.split("\n")) {
             String text = line.trim();
             if (text.isEmpty()) continue;
+            if (letters(text) < 2) { // an emoji-only line names nothing
+                if (first.isEmpty()) first = text;
+                continue;
+            }
             String bare = RELATIVE_WORDS.matcher(text).replaceAll("")
                 .replaceAll("\\s+([.!?,])", "$1").replaceAll("\\s+", " ")
                 .replaceAll("^[^\\p{L}\\p{N}]+", "").trim();
@@ -261,7 +301,7 @@ public final class Dates {
             }
             return text;
         }
-        return "";
+        return first;
     }
 
     /** Local midnight on the day of `time`. */

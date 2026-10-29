@@ -167,6 +167,13 @@ Events (from captions; full rules in AGENTS.md "Events"):
   sentence) doesn't end the sentence. When a post names several days, each
   event's own line with the date and time taken out ("Diwali Night - Nov 8,
   6pm" is "Diwali Night").
+- A slash date with no year followed by a word like "price", "off" or "of"
+  ("1/2 price", "3/4 of the seats") is a fraction, not a date.
+- Dates joined only by "&", "and" or a comma share the time that follows
+  ("Oct 31 & Nov 1 at 8pm"), and the joiner is left out of each name.
+- An event's own line that is nothing but its date ("Date: Nov 4") takes the
+  nearest line above it with words in it ("Garba Night"). A caption line with
+  no words (only emoji) is never the name.
 - Days and "past" use the phone's time zone; an event is past once its day
   has ended.
 
