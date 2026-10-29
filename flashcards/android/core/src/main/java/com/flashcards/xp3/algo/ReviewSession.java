@@ -17,7 +17,8 @@ import java.time.ZonedDateTime;
  * on and its default deck options, except for how new cards come in:
  *
  * - learning and relearning cards come first once due (steps 1m 10m, 10m),
- * - then the day's reviews, due before the next 4am rollover, oldest first,
+ * - then the day's reviews, due before the next 4am rollover, earliest day first and shuffled
+ *   within a day (Anki's "Due date, then random"),
  *   with new cards mixed in among them, spread evenly, as Anki's default
  *   "Mix with reviews" does; new cards come in deck order, and how many:
  *   on a deck with a number, that many a day, as Anki does, counting every
@@ -92,7 +93,7 @@ public final class ReviewSession {
             long due = dueOf(card);
             if (isLearning(card)) {
                 if (due < dayEnd && (learning == null || due < dueOf(learning))) learning = card;
-            } else if (due < dayEnd && (review == null || due < dueOf(review))) {
+            } else if (due < dayEnd && (review == null || reviewFirst(card, review, now))) {
                 review = card;
             }
         }
@@ -106,6 +107,30 @@ public final class ReviewSession {
         else if (learning != null && dueOf(learning) <= now + LEARN_AHEAD) current = learning;
         else current = ahead ? earliest(now) : null;
         return current;
+    }
+
+    /**
+     * Anki's "Due date, then random" for reviews: the earlier Anki day first
+     * (overdue cards before today's), and within a day in an order that is
+     * shuffled but fixed for that day, so a card stays where it is across
+     * sessions, and the phone and the tablet can agree.
+     */
+    private boolean reviewFirst(DeckCard a, DeckCard b, long now) {
+        long dayA = day(dueOf(a));
+        long dayB = day(dueOf(b));
+        if (dayA != dayB) return dayA < dayB;
+        return shuffle(a, now) < shuffle(b, now);
+    }
+
+    /** A card's place in today's shuffle: a hash of its identity and the Anki day. */
+    private long shuffle(DeckCard card, long now) {
+        long h = card.def.identity.hashCode() * 0x9E3779B97F4A7C15L + day(now);
+        h ^= h >>> 33;
+        h *= 0xFF51AFD7ED558CCDL;
+        h ^= h >>> 33;
+        h *= 0xC4CEB9FE1A85EC53L;
+        h ^= h >>> 33;
+        return h;
     }
 
     /**

@@ -40,6 +40,7 @@ public final class AlgoTests {
         autoTakesNewCardsAsTheyAreLearned(c);
         autoTopsUpToTheTarget(c);
         newCardsMixIntoReviews(c);
+        reviewsShuffledWithinADay(c);
         numberedDeckLimitsNew(c);
         dueReviewsOnly(c);
         learningComesBackWhenDue(c);
@@ -399,6 +400,33 @@ public final class AlgoTests {
             c.ok("a review first", seen.charAt(0) == 'r');
             c.ok("new cards among the reviews, not after them: " + seen, seen.indexOf('n') < 4 && seen.lastIndexOf('r') > 6);
             c.ok("no long run of either: " + seen, !seen.contains("rrrr") && !seen.contains("nnnn"));
+        });
+    }
+
+    private static void reviewsShuffledWithinADay(Check c) {
+        c.run("reviews: overdue days first, shuffled within a day", () -> {
+            Deck deck = deckOf(12);
+            // Ten reviews due this morning, in deck order; two a day overdue.
+            for (int i = 0; i < 10; i++) deck.cards().get(i).fsrs = dueAt(NOON - 3600L - i);
+            deck.cards().get(10).fsrs = dueAt(NOON - DAY);
+            deck.cards().get(11).fsrs = dueAt(NOON - DAY + 60);
+            deck.newPerDay = 0;
+            ReviewSession s = session(deck);
+            List<DeckCard> order = new ArrayList<>();
+            long now = NOON;
+            DeckCard card;
+            while ((card = s.next(now)) != null) {
+                order.add(card);
+                s.rate(4, now);
+                now += 10;
+            }
+            c.same("all twelve", 12, order.size());
+            c.ok("yesterday's first", order.indexOf(deck.cards().get(10)) < 2 && order.indexOf(deck.cards().get(11)) < 2);
+            boolean inDeckOrder = true;
+            for (int i = 0; i < 9; i++) {
+                if (order.indexOf(deck.cards().get(i)) > order.indexOf(deck.cards().get(i + 1))) inDeckOrder = false;
+            }
+            c.ok("not simply by due time", !inDeckOrder);
         });
     }
 

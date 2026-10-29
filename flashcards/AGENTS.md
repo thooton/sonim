@@ -31,7 +31,7 @@ user leaves. An early answer is scheduled from the Anki days actually
 elapsed, by the script's review formulas, as if the deck were a normal one:
 in Anki the script leaves a filtered deck's intervals to the SM-2 ones, which
 these cards don't have. The queue keeps its own rules where they differ
-from Anki: no review limit, reviews in order of exact due time, new cards
+from Anki: no review limit, reviews by due day then shuffled (as Anki), new cards
 mixed in card by card, Review Ahead by lowest recall.
 The tablet's `session.earliest` is the same rule.
 

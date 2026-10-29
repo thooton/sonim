@@ -175,7 +175,8 @@ list of `.fkv` files is the same menu, scrolling.
 
 **Queue (per deck).** Learning and relearning cards first once due (steps
 1m 10m; relearning 10m); then the day's reviews (due before the next 4am),
-earliest due first, with new cards mixed in evenly, a review first; then
+earliest day first and in a random order within a day (Anki's "Due date, then
+random"; fixed for the day, so a card keeps its place), with new cards mixed in evenly, a review first; then
 learning cards due within 20 minutes; then the deck is done. New cards come
 in deck order. A deck with a number lets that many new cards in per Anki
 day, counting cards first answered on either device since 4am. Auto lets in
