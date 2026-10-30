@@ -63,6 +63,11 @@ final class AnkiMenu extends FrameLayout {
     private int at;
 
     AnkiMenu(Context context, List<Item> items, Runnable close) {
+        this(context, null, items, close);
+    }
+
+    /** `title`, when not null, heads the panel above the items. */
+    AnkiMenu(Context context, String title, List<Item> items, Runnable close) {
         super(context);
         this.items = items;
         this.close = close;
@@ -79,6 +84,18 @@ final class AnkiMenu extends FrameLayout {
         int inset = Ui.dp(context, 3);
         panel.setPadding(0, inset, 0, inset);
         panel.setClickable(true);
+
+        if (title != null) {
+            TextView head = new TextView(context);
+            head.setText(title);
+            head.setTextSize(11);
+            head.setSingleLine(true);
+            head.setIncludeFontPadding(false);
+            head.setTextColor(context.getColor(R.color.text_subtle));
+            head.setPadding(Ui.dp(context, 24), Ui.dp(context, 3), Ui.dp(context, 10), Ui.dp(context, 3));
+            panel.addView(head, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
 
         for (int i = 0; i < items.size(); i++) {
             Item item = items.get(i);

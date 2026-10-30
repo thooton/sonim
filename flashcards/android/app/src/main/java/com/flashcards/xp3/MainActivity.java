@@ -573,8 +573,12 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void showMenu(List<AnkiMenu.Item> items) {
+        showMenu(null, items);
+    }
+
+    private void showMenu(String title, List<AnkiMenu.Item> items) {
         closeMenu();
-        menu = new AnkiMenu(this, items, this::closeMenu);
+        menu = new AnkiMenu(this, title, items, this::closeMenu);
         ((ViewGroup) findViewById(android.R.id.content)).addView(menu,
             new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
@@ -629,7 +633,7 @@ public final class MainActivity extends BaseActivity {
         Collections.sort(found, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
         List<AnkiMenu.Item> shown = new ArrayList<>();
         for (File file : found) shown.add(new AnkiMenu.Item(deckName(file), () -> importFile(file)));
-        showMenu(shown);
+        showMenu("Import", shown);
     }
 
     private static String deckName(File file) {

@@ -45,7 +45,7 @@ the item at the right in grey (1 to 9); hairlines between groups (Options and
 Stats; Sync and Import; Night Shift and Dark mode; Command center). The
 highlighted item has a blue bar and white text. Up and Down move (wrapping),
 OK picks (on release), a digit picks that item, Menu and Back close it. Import's
-list of `.fkv` files is the same menu, scrolling.
+list of `.fkv` files is the same menu, scrolling, under an `Import` heading.
 
 - **Night Shift** warms the whole screen toward yellow (as in Books), is
   kept between runs, and is off by default.
