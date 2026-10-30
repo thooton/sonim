@@ -291,6 +291,11 @@ public final class MainActivity extends BaseActivity implements ServeService.Lis
             .setNegativeButton("Cancel", null)
             .create();
         dialog.setOnKeyListener((shown, keyCode, event) -> {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                // Stay on the last row instead of moving focus to Cancel.
+                ListView list = dialog.getListView();
+                return list.hasFocus() && list.getSelectedItemPosition() == list.getCount() - 1;
+            }
             if (keyCode != KeyEvent.KEYCODE_BACK) return false;
             if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
                 dialog.dismiss();
