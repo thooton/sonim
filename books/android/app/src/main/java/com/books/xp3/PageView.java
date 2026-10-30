@@ -11,6 +11,8 @@ import android.text.TextPaint;
 import android.text.TextUtils;
 import android.view.View;
 
+import com.xp3.common.ui.Ui;
+
 /**
  * The page: the book's text, edge to edge on black, with only how far
  * through the book it is, small and grey in the bottom corner.
@@ -216,6 +218,6 @@ final class PageView extends View {
     }
 
     private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(getContext(), value);
     }
 }

@@ -14,6 +14,8 @@ import android.view.View;
 import com.books.xp3.book.Run;
 import com.books.xp3.shelf.Shelf;
 
+import com.xp3.common.ui.Ui;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -352,6 +354,6 @@ final class LibraryView extends View {
     }
 
     private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(getContext(), value);
     }
 }
