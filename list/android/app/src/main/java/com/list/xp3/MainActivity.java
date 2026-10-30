@@ -435,6 +435,9 @@ public final class MainActivity extends BaseActivity {
      * keeps it on screen. Its rows are built fresh on every opening.
      */
 
+    /** Height of a menu row in dp; keep in step with menu_row in dimens.xml. */
+    private static final int MENU_ROW_DP = 36;
+
     private final List<Integer> menuIds = new ArrayList<>();
     private final List<String> menuTitles = new ArrayList<>();
 
@@ -487,7 +490,11 @@ public final class MainActivity extends BaseActivity {
         } else if (menuRow < 0) {
             y = (row.getTop() + row.getBottom()) / 2f;
         } else {
-            y = Math.max(0, Math.min(row.getBottom(), listView.getHeight()));
+            // Just below the row, but no lower than lets the whole menu fit
+            // above the bottom of the list, so Delete is never cut off.
+            float tall = menuIds.size() * dp(MENU_ROW_DP) + dp(16);
+            float lowest = Math.max(0, listView.getHeight() - tall);
+            y = Math.max(0, Math.min(row.getBottom(), Math.min(lowest, listView.getHeight())));
         }
         listView.showContextMenu(x, y);
     }

@@ -14,6 +14,7 @@
         <item name="android:popupMenuStyle">@style/TasksPopupMenu</item>
         <item name="android:contextPopupMenuStyle">@style/TasksPopupMenu</item>
         <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:listPreferredItemHeightSmall">@dimen/menu_row</item>
     </style>
 
     <!-- Material 3's menu: a blue-grey surface with small corners. -->

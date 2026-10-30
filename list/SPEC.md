@@ -93,6 +93,8 @@ highlighted, in this order:
 | Completed heading | Add a task, Delete all completed |
 
 - **Move up** is missing on the first open task, **Move down** on the last.
+- The whole menu always fits on screen: its rows are compact and, on a task
+  near the bottom, it opens higher so Delete is visible.
 - Up/Down move within the menu, OK chooses, Back or Menu closes it without
   doing anything.
 
