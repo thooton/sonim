@@ -13,6 +13,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.MediaStore;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -52,6 +53,7 @@ public class MainActivity extends Activity {
     private LinearLayout controls;
     private boolean playing;
     private Uri current;
+    private String currentName = "";
     private int resumeAt = -1;
 
     private final Runnable tick = new Runnable() {
@@ -77,7 +79,7 @@ public class MainActivity extends Activity {
         list = new ListView(this);
         list.setSelector(new InsetDrawable(focusCard(), dp(4), 0, dp(4), 0));
         list.setDivider(null);
-        list.setOnItemClickListener((p, v, i, id) -> play(uris.get(i)));
+        list.setOnItemClickListener((p, v, i, id) -> play(uris.get(i), names.get(i)));
         root.addView(list, new FrameLayout.LayoutParams(-1, -1));
 
         empty = new TextView(this);
@@ -112,29 +114,29 @@ public class MainActivity extends Activity {
 
         video.setOnCompletionListener(m -> stop());
         video.setOnErrorListener((m, w, e) -> {
-            Toast.makeText(this, "Can't play this video", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Can't play " + currentName, Toast.LENGTH_LONG).show();
             stop();
             return true;
         });
 
         if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
-                == PackageManager.PERMISSION_GRANTED) {
-            load();
-        } else {
+                != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
         }
     }
 
     @Override public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
-        if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED) {
-            load();
-        } else {
+        // A grant is picked up by onResume, which runs right after this.
+        if (res.length == 0 || res[0] != PackageManager.PERMISSION_GRANTED) {
             empty.setText("Allow storage access to see videos");
             empty.setVisibility(View.VISIBLE);
         }
     }
 
     private void load() {
+        Uri selected = list.getSelectedItemPosition() >= 0
+                && list.getSelectedItemPosition() < uris.size()
+                ? uris.get(list.getSelectedItemPosition()) : null;
         uris.clear();
         names.clear();
         try (Cursor c = getContentResolver().query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
@@ -152,12 +154,16 @@ public class MainActivity extends Activity {
                 t.setTextColor(Color.WHITE);
                 t.setTextSize(15);
                 t.setSingleLine(true);
+                t.setEllipsize(TextUtils.TruncateAt.MIDDLE);
                 t.setPadding(dp(10), 0, dp(10), 0);
                 return t;
             }
         });
+        empty.setText("No videos found");
         empty.setVisibility(uris.isEmpty() ? View.VISIBLE : View.GONE);
         list.requestFocus();
+        int at = selected == null ? -1 : uris.indexOf(selected);
+        if (at >= 0) list.setSelection(at);
     }
 
     private GradientDrawable focusCard() {
@@ -179,8 +185,9 @@ public class MainActivity extends Activity {
                 : View.SYSTEM_UI_FLAG_VISIBLE);
     }
 
-    private void play(Uri uri) {
+    private void play(Uri uri, String name) {
         current = uri;
+        currentName = name;
         resumeAt = -1;
         immersive(true);
         playing = true;
@@ -245,6 +252,10 @@ public class MainActivity extends Activity {
      *  video paused at the place we left it. */
     @Override protected void onResume() {
         super.onResume();
+        if (!playing && checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                == PackageManager.PERMISSION_GRANTED) {
+            load();
+        }
         if (playing && resumeAt >= 0 && current != null) {
             immersive(true);
             video.setVideoURI(current);
