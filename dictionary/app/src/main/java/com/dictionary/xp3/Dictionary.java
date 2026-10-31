@@ -167,7 +167,7 @@ final class Dictionary {
             // Plain lowercase as its page writes it: as its first meaning does.
             String cased = null;
             for (Sense sense : senses) {
-                example |= sense.gloss.contains("; \"");
+                example |= !examples(sense, w).isEmpty();
                 for (String form : sense.words) {
                     if (cased == null && form.equalsIgnoreCase(w)) cased = form;
                 }
@@ -175,6 +175,115 @@ final class Dictionary {
             if (example && w.equals(cased)) return at;
         }
         return 0;
+    }
+
+    /**
+     * The examples of a sense to show on {@code word}'s page: those that use
+     * the word itself, in any of its forms. A meaning is shared by all its
+     * words, and WordNet wrote each example for one of them, so on "dog" the
+     * meaning "frump, dog" would otherwise show "she got a reputation as a
+     * frump". The meaning's other spellings of the word count as the word
+     * (civilise, civilize; esthetic, aesthetic).
+     */
+    List<String> examples(Sense sense, String word) {
+        List<String> out = new ArrayList<>();
+        int at = sense.gloss.indexOf("; \"");
+        if (at < 0) return out;
+        List<List<String>> spellings = new ArrayList<>();
+        spellings.add(tokens(word));
+        String lower = word.toLowerCase(Locale.ROOT);
+        for (String other : sense.words) {
+            String o = other.toLowerCase(Locale.ROOT);
+            if (!o.equals(lower) && variant(o, lower)) spellings.add(tokens(o));
+        }
+        for (String example : sense.gloss.substring(at + 2).split("; (?=\")")) {
+            example = example.replace("\"", "").trim();
+            if (example.isEmpty()) continue;
+            List<String> tokens = tokens(example);
+            for (List<String> parts : spellings) {
+                if (uses(tokens, parts)) {
+                    out.add(example);
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Whether two words are spellings of one: at most one letter apart, two for longer words. */
+    private static boolean variant(String a, String b) {
+        int n = Math.min(a.length(), b.length());
+        if (n < 4) return false;
+        int limit = n < 6 ? 1 : 2;
+        if (Math.abs(a.length() - b.length()) > limit) return false;
+        int[] row = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) row[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            int diagonal = row[0];
+            row[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int above = row[j];
+                row[j] = Math.min(Math.min(row[j] + 1, row[j - 1] + 1),
+                    diagonal + (a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1));
+                diagonal = above;
+            }
+        }
+        return row[b.length()] <= limit;
+    }
+
+    /** Lowercase words, split at anything but letters, digits and apostrophes, without a trailing 's. */
+    private static List<String> tokens(String text) {
+        List<String> out = new ArrayList<>();
+        for (String t : text.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}']+")) {
+            t = t.replaceAll("^'+|'+$", "");
+            if (t.endsWith("'s") && t.length() > 2) t = t.substring(0, t.length() - 2);
+            if (!t.isEmpty()) out.add(t);
+        }
+        return out;
+    }
+
+    /**
+     * Whether {@code tokens} contain the word split into {@code parts}, in
+     * any of its forms; written closed or open alike (looseleaf, loose-leaf).
+     */
+    private boolean uses(List<String> tokens, List<String> parts) {
+        if (parts.isEmpty()) return false;
+        String closed = String.join("", parts);
+        for (int i = 0; i < tokens.size(); i++) {
+            if (i + parts.size() <= tokens.size()) {
+                boolean all = true;
+                for (int j = 0; j < parts.size() && all; j++) all = form(tokens.get(i + j), parts.get(j));
+                if (all) return true;
+            }
+            // The other way round: a closed word written open, or a phrase written closed.
+            String joined = "";
+            for (int j = i; j < tokens.size() && joined.length() < closed.length(); j++) {
+                joined += tokens.get(j);
+                if (j > i || parts.size() > 1) {
+                    if (form(joined, closed)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether {@code token} and {@code base} are forms of one word (dogs, went, stopped, bigger; cost, costs). */
+    private boolean form(String token, String base) {
+        if (token.equals(base)) return true;
+        for (int pos = 0; pos < 4; pos++) {
+            List<String> of = bases(token, pos);
+            if (of.contains(base)) return true;
+            for (String b : bases(base, pos)) {
+                if (b.equals(token) || of.contains(b)) return true;
+            }
+        }
+        // A doubled last letter (stopped, running, bigger), which morphy leaves to the exception lists.
+        if (token.length() > base.length() + 2 && token.startsWith(base)
+                && token.charAt(base.length()) == base.charAt(base.length() - 1)) {
+            String rest = token.substring(base.length() + 1);
+            return rest.equals("ed") || rest.equals("ing") || rest.equals("er") || rest.equals("est");
+        }
+        return false;
     }
 
     /** The first index whose word is not before {@code word}. */

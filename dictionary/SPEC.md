@@ -50,7 +50,7 @@ takes keys while searching. Menu acts on release, OK on press.
   blue. No back arrow.
 - The Word of the Day is a plain lowercase word of 6 to 12 letters (no
   capitals, digits, spaces or hyphens), a noun, verb or adjective, with an
-  example among its meanings. It is the same all day and changes at local
+  example on its page (one that uses the word, as above). It is the same all day and changes at local
   midnight; the same date always gives the same word.
 - **OK:** opens the Word of the Day's page on Definitions.
 - **Menu:** popup under the capsule: Word of the Day, Search, Shorthand.
@@ -73,7 +73,11 @@ takes keys while searching. Menu acts on release, OK on press.
   (noun, verb, adjective, adverb, in that order) as a serif heading; senses
   numbered from 1 under each heading, in a grey hanging margin; a sense with
   examples ends in ":" and its examples follow in italics, without quote
-  marks, behind a pale grey rule.
+  marks, behind a pale grey rule. A sense shows only the examples that use
+  the headword itself, in any form (dogs, went, kicked the bucket) or another
+  spelling of it in that sense (civilise, civilized): WordNet shares a
+  meaning among its synonyms, so on "dog" the meaning "frump, dog" never
+  shows "she got a reputation as a frump". A sense left with none has no ":".
 - **Thesaurus** (shown only if some sense has a synonym other than the word
   itself): per sense with synonyms, "noun as in <gist>" (gist: the gloss up
   to its first `;` or `(`, cut at a word to at most 34 letters plus "…"),

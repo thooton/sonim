@@ -354,7 +354,7 @@ public class MainActivity extends Activity {
         }
         if (tab == THESAURUS) body.setText(thesaurus(word, senses));
         else if (tab == SHORTHAND) body.setText(outlines(group));
-        else body.setText(definitions(senses));
+        else body.setText(definitions(word, senses));
         entry.scrollTo(0, 0);
     }
 
@@ -780,7 +780,7 @@ public class MainActivity extends Activity {
      * 1  a distinctive and pervasive quality or character; air; atmosphere:
      *    | an aura of respectability
      */
-    private CharSequence definitions(List<Dictionary.Sense> senses) {
+    private CharSequence definitions(String word, List<Dictionary.Sense> senses) {
         SpannableStringBuilder text = new SpannableStringBuilder();
         int muted = getColor(R.color.text_muted);
         char pos = 0;
@@ -792,17 +792,15 @@ public class MainActivity extends Activity {
                 gap(text, 12);
                 append(text, label(pos), new Spans.Font(serif), size(17));
             }
-            String gloss = sense.gloss;
-            int examples = gloss.indexOf("; \"");
+            List<String> examples = dictionary.examples(sense, word);
             gap(text, 5);
             int start = text.length();
-            text.append(definition(gloss)).append(examples < 0 ? "" : ":");
+            text.append(definition(sense.gloss)).append(examples.isEmpty() ? "" : ":");
             text.setSpan(new Spans.Number(++number, dp(15), sans, sp(11), muted),
                 start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            if (examples < 0) continue;
-            for (String example : gloss.substring(examples + 2).split("; (?=\")")) {
+            for (String example : examples) {
                 text.append("\n");
-                append(text, example.replace("\"", "").trim(),
+                append(text, example,
                     new Spans.Font(sansItalic),
                     new Spans.Example(dp(15), dp(2), dp(7), getColor(R.color.example_rule)));
             }
