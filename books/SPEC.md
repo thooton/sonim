@@ -193,6 +193,11 @@ Back or Menu returns to the page where it was (not to the settings sheet).
   black. Only the status bar and Android's own dialogs escape it.
 - **Covers** are cut once into small thumbnails in the cache; a card book that
   couldn't be read yet gets its title and cover once it can be.
+- **Books another app saved** on the card through Android's documents
+  provider (Source's downloads, a file manager's copies) can be misreported
+  to Books as empty when seeking to their end, though their size and bytes
+  are right; such a book is copied into the cache and read from there, so it
+  opens with its title and cover rather than "Not an EPUB". Decided 1.1.4.
 - **Screen**: stays on in the reader until 5 minutes after the last key;
   then the phone's normal timeout applies. The library has no such hold.
 - **Plain text**: Gutenberg's header and licence footer are left out.

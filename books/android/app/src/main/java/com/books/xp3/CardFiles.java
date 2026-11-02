@@ -4,6 +4,9 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.net.Uri;
 import android.provider.DocumentsContract;
+import android.system.ErrnoException;
+import android.system.Os;
+import android.system.OsConstants;
 
 import com.books.xp3.book.Mobi;
 import com.books.xp3.shelf.Shelf;
@@ -12,6 +15,7 @@ import com.xp3.common.ui.CardGrant;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -64,12 +68,17 @@ final class CardFiles implements Shelf.Reader {
         return onCard(file) && !canOpen(file) && !granted();
     }
 
-    /** `file` itself if it opens, else a copy of it read through the card's grant. */
+    /**
+     * `file` itself if it opens as it is, else a copy of it in the cache:
+     * read plainly when only its size is misreported (state()), through the
+     * card's grant when it can't be opened at all.
+     */
     @Override
     public File readable(File file) throws IOException {
-        if (canOpen(file)) return file;
-        Uri doc = document(file);
-        if (doc == null) throw new FileNotFoundException("Can’t read it");
+        int state = state(file);
+        if (state == OPENS) return file;
+        Uri doc = state == STALE ? null : document(file);
+        if (state == REFUSED && doc == null) throw new FileNotFoundException("Can’t read it");
         synchronized (LOCK) {
             // Under its own name, so the reader is chosen and titled as for the book.
             File dir = new File(copies, key(file));
@@ -82,7 +91,7 @@ final class CardFiles implements Shelf.Reader {
             if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Can’t copy it");
             InputStream in;
             try {
-                in = resolver.openInputStream(doc);
+                in = doc == null ? new FileInputStream(file) : resolver.openInputStream(doc);
             } catch (IOException | RuntimeException e) {
                 in = null;
             }
@@ -100,6 +109,10 @@ final class CardFiles implements Shelf.Reader {
                 throw e;
             } finally {
                 in.close();
+            }
+            if (copy.length() != file.length()) {
+                copy.delete();
+                throw new FileNotFoundException("Can’t read it");
             }
             return copy;
         }
@@ -184,11 +197,43 @@ final class CardFiles implements Shelf.Reader {
     }
 
     private static boolean canOpen(File file) {
+        return state(file) != REFUSED;
+    }
+
+    /** Opens and reads as it is. */
+    private static final int OPENS = 0;
+    /** Opens, but seeking to its end finds a stale size (see state()). */
+    private static final int STALE = 1;
+    /** Can't be opened here. */
+    private static final int REFUSED = 2;
+
+    /**
+     * Whether `file` can be read where it lies. A file another app wrote
+     * through Android's documents provider (Source's downloads, a file
+     * manager's copies) can keep, in this app's view of the card, the size
+     * it had when it was created empty: stat and reads give the whole file,
+     * but seeking to its end stops at 0, so java.util.zip, which finds a
+     * zip's end that way, calls the book "empty" and it is "Not an EPUB".
+     */
+    private static int state(File file) {
+        FileInputStream in;
         try {
-            new FileInputStream(file).close();
-            return true;
+            in = new FileInputStream(file);
         } catch (IOException e) {
-            return false;
+            return REFUSED;
+        }
+        try {
+            FileDescriptor fd = in.getFD();
+            long end = Os.lseek(fd, 0, OsConstants.SEEK_END);
+            return end == Os.fstat(fd).st_size ? OPENS : STALE;
+        } catch (ErrnoException | IOException e) {
+            return OPENS;
+        } finally {
+            try {
+                in.close();
+            } catch (IOException ignored) {
+                // Only read.
+            }
         }
     }
 

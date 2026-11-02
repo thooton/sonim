@@ -100,8 +100,9 @@ final class Covers {
     /** A file name for the book that changes when the book does. */
     private static String key(Shelf.Entry entry) {
         long hash = 1125899906842597L;
-        // "2": markers from before 1.1.1 were also left for books that couldn't be read.
-        String id = "2|" + entry.path + "|" + entry.size + "|" + entry.modified;
+        // "2": markers from before 1.1.1 were also left for books that couldn't be read;
+        // "3": and before 1.1.4 for books whose size the card misreported (CardFiles.state).
+        String id = "3|" + entry.path + "|" + entry.size + "|" + entry.modified;
         for (int i = 0; i < id.length(); i++) hash = 31 * hash + id.charAt(i);
         return Long.toHexString(hash);
     }

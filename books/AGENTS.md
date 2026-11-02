@@ -51,6 +51,15 @@ Source's downloads), while still listing them. So:
   can't be read at all is a `FileNotFoundException` ("Can't read X"), never
   "Not an EPUB"; the shelf leaves its title unset and Covers leave no marker,
   so both try again once it can be read.
+- A file another app wrote through the documents provider (Source's
+  downloads) can open fine and stat at its full size in Books' view of the
+  card, yet `lseek(SEEK_END)` gives 0: the sdcardfs inode on the XP3's 3.18
+  kernel keeps the size the empty file was created with. `java.util.zip`
+  finds a zip's end that way, so it says "zip file is empty" ("Not an
+  EPUB"). `CardFiles.state` compares the seek with `fstat` and, when they
+  differ, copies the book into `cache/card` with plain reads, which return
+  the whole file. Seen with a Source download on 1.1.3; an identical copy
+  pushed through adb read fine.
 - The grant (`CardGrant` in `common/ui`, shared with Source) is asked for
   once, with `StorageVolume.createAccessIntent(null)`: when a card book is
   opened that can't be read, or deleted or converted. Deleting and the

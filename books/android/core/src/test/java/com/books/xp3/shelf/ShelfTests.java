@@ -101,6 +101,15 @@ public final class ShelfTests {
             older.scan(roots);
             check.same("old untitled book titled", "Nested", older.get(nestedPath).title);
 
+            // And before 3, books whose size the card misreported to java.util.zip.
+            write(new File(refusing, "shelf.tsv"), "books-shelf 2\n" + Shelf.escape(nestedPath)
+                + "\t" + new File(nestedPath).length() + "\t" + new File(nestedPath).lastModified()
+                + "\t\t\t-1\t0\t0\n");
+            Shelf second = new Shelf(refusing);
+            check.ok("shelf 2 empty title dropped", second.get(nestedPath).title == null);
+            second.scan(roots);
+            check.same("shelf 2 untitled book titled", "Nested", second.get(nestedPath).title);
+
             write(new File(state, "shelf.tsv"), "garbage\n");
             check.same("damaged index is empty", 0, new Shelf(state).books().size());
         } finally {

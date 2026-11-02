@@ -33,13 +33,16 @@ import java.util.Map;
  */
 public final class Shelf {
 
-    private static final String HEADER = "books-shelf 2";
+    private static final String HEADER = "books-shelf 3";
     /**
      * Before 2, a book that couldn't be read was kept with an empty title, as
      * if it had none, and never looked at again; empty titles from it are
-     * read again.
+     * read again. Before 3 the same befell books whose size the SD card
+     * misreported to java.util.zip (CardFiles.state), so they are read again
+     * too.
      */
     private static final String HEADER_1 = "books-shelf 1";
+    private static final String HEADER_2 = "books-shelf 2";
     private static final int MAX_DEPTH = 5;
     private static final int MAX_FILES = 5000;
 
@@ -294,7 +297,7 @@ public final class Shelf {
         if (text == null) return;
         String[] lines = text.split("\n");
         if (lines.length == 0) return;
-        boolean old = lines[0].equals(HEADER_1);
+        boolean old = lines[0].equals(HEADER_1) || lines[0].equals(HEADER_2);
         if (!old && !lines[0].equals(HEADER)) return;
         for (int i = 1; i < lines.length; i++) {
             String[] fields = lines[i].split("\t", -1);
