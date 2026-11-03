@@ -44,8 +44,20 @@ again on the next request, in case it was replaced.
   goo.gl/maps and geo:. `Places.expand` follows a short link's redirects by
   hand (only to Google's hosts, sending nothing), and `Link` reads the full
   one for a place's id, a name or address, and a point. An id opens that
-  place's page; otherwise the name (or the point) is searched for near the
-  point and the first result opened, with the rest behind it.
+  place's page; a name is searched for near the point and the first result
+  opened, with the rest behind it; a link that is only a point (a dropped
+  pin, as `maps.app.goo.gl/...` links with coordinates expand to) is reverse
+  geocoded with `Places.reverseGeocode`, since the Text Search rejects raw
+  coordinates, and the nearest address is opened as the spot, its page
+  showing the point's coordinates. `MainActivity.openPin` does this, and
+  also handles coordinates typed straight into the header.
+
+- **Reverse geocode** is the one call to the Geocoding API rather than the
+  Places API: a different host (`maps.googleapis.com/maps/api/geocode/json`)
+  and key style (the key is a query parameter, and errors come back as a
+  `status` in an HTTP 200 body), so `Places` keeps its endpoint apart and
+  takes it as a fourth constructor argument for the tests. It bills as
+  Geocoding, so the key must have the Geocoding API enabled.
 
 Field masks decide what Google bills, so keep them the CLI's: search asks
 for nothing past the Enterprise tier, only a place's details ask for

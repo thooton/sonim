@@ -34,6 +34,8 @@ import java.util.Map;
 public final class Places {
 
     public static final String GOOGLE = "https://places.googleapis.com/v1";
+    /** The Geocoding API, which turns a point into the nearest address (a different host and key style). */
+    public static final String GEOCODE = "https://maps.googleapis.com/maps/api/geocode/json";
     /** Text Search's most per request. */
     public static final int PAGE_SIZE = 20;
     /** How hard results are pulled toward the anchor: a preference, not a limit. */
@@ -78,22 +80,42 @@ public final class Places {
         }
     }
 
+    /** A point's nearest address and its place id, as the Geocoding API answers; either may be "". */
+    public static final class Spot {
+        /** The nearest formatted address, or "" when Google has none. */
+        public final String address;
+        /** The place id at the point, or "", for a full look-up of it. */
+        public final String placeId;
+
+        Spot(String address, String placeId) {
+            this.address = address;
+            this.placeId = placeId;
+        }
+    }
+
     private final Http http = new Http();
     private final String center;
     private final String token;
     private final String google;
+    private final String geocode;
     private volatile String key;
 
     public Places(Login login) {
-        this(login.server(), login.token(), GOOGLE);
+        this(login.server(), login.token(), GOOGLE, GEOCODE);
     }
 
     /** Any command center and any Places endpoint, which is how the tests use it. */
     public Places(String center, String token, String google) {
+        this(center, token, google, GEOCODE);
+    }
+
+    /** The same, with the Geocoding endpoint named too, which is how the tests use it. */
+    public Places(String center, String token, String google, String geocode) {
         if (center == null || token == null) throw new IllegalArgumentException("There is no command center login");
         this.center = center;
         this.token = token;
         this.google = google;
+        this.geocode = geocode;
     }
 
     /** The point to search near: Google's best match for what was typed. */
@@ -147,6 +169,51 @@ public final class Places {
     public Place details(String id) throws IOException, InterruptedException {
         if (!id.matches("[A-Za-z0-9_-]+")) throw new IOException("That is not a place.");
         return new Place(google("/places/" + id, DETAIL_FIELDS, null));
+    }
+
+    /**
+     * The nearest address to a point, and its place id, from the Geocoding API:
+     * what a dropped-pin Maps link needs, since the Places Text Search rejects
+     * raw coordinates as a query. The Geocoding API answers HTTP 200 with a
+     * {@code status} of its own and takes the key as a query parameter, not the
+     * header, so it is called apart from {@link #google}. A point Google has no
+     * address for (the sea, say) comes back as an empty {@link Spot}.
+     */
+    public Spot reverseGeocode(double lat, double lng) throws IOException, InterruptedException {
+        String point = String.format(java.util.Locale.US, "%.7f,%.7f", lat, lng);
+        String url = geocode + (geocode.indexOf('?') < 0 ? "?" : "&") + "latlng=" + point + "&key=" + enc(key());
+        Http.Response response = http.send(Http.Request.to(URI.create(url)).timeout(30000));
+        if (response.status() / 100 != 2) {
+            if (response.status() == 400 || response.status() == 401 || response.status() == 403) key = null;
+            throw new IOException("Google Maps: " + problem(response));
+        }
+        Map<String, Object> root;
+        try {
+            root = Json.object(Json.parse(response.body()));
+        } catch (RuntimeException e) {
+            throw new IOException("Google Maps sent something unreadable.");
+        }
+        String status = Json.text(root, "status");
+        if ("ZERO_RESULTS".equals(status)) return new Spot("", "");
+        if (!"OK".equals(status)) {
+            String message = Json.text(root, "error_message");
+            throw new IOException("Google Maps: " + (message != null && message.trim().length() > 0 ? message.trim()
+                : status == null ? "no address" : status));
+        }
+        List<Object> results = Json.children(root, "results");
+        if (results.isEmpty() || !(results.get(0) instanceof Map)) return new Spot("", "");
+        Map<String, Object> first = Json.object(results.get(0));
+        String address = Json.text(first, "formatted_address");
+        String placeId = Json.text(first, "place_id");
+        return new Spot(address == null ? "" : address.trim(), placeId == null ? "" : placeId.trim());
+    }
+
+    private static String enc(String value) {
+        try {
+            return java.net.URLEncoder.encode(value, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            return value;
+        }
     }
 
     /**

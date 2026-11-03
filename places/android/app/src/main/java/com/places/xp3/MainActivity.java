@@ -116,6 +116,8 @@ public final class MainActivity extends BaseActivity {
     private int picked;
     /** Whether a place's sheet is up. */
     private boolean showing;
+    /** The point a dropped-pin link opened, shown on its page as coordinates; null for an ordinary search. */
+    private String pinCoordinates;
 
     private Future<?> job;
     private int generation;
@@ -336,6 +338,13 @@ public final class MainActivity extends BaseActivity {
             askLogin();
             return;
         }
+        // A point typed in, like a dropped-pin link: show the spot and its
+        // nearest address, since the Text Search rejects raw coordinates.
+        Anchor point = Anchor.coordinates(what);
+        if (point != null) {
+            openPin(point);
+            return;
+        }
         final String where = near.getText().toString().trim();
         saveNear();
         remember(what);
@@ -352,6 +361,7 @@ public final class MainActivity extends BaseActivity {
                     anchor = at;
                     prefs().edit().putString("anchor", at.toJson()).apply();
                 }
+                pinCoordinates = null;
                 results.clear();
                 results.addAll(found.places);
                 searched = found.query;
@@ -390,10 +400,14 @@ public final class MainActivity extends BaseActivity {
             String full = client.expand(link);
             final Link found = Link.parse(full);
             if (found == null) throw new java.io.IOException("Couldn't tell what that link points at.");
+            // A point with no name or id: look up the nearest address and show
+            // the pin, rather than feed the coordinates to the Text Search.
+            if (found.placeId == null && found.query == null) return () -> openPin(found.near);
             final Place exact = found.placeId != null ? client.details(found.placeId) : null;
-            final String what = exact != null ? exact.name() : found.query != null ? found.query : found.near.label;
+            final String what = exact != null ? exact.name() : found.query;
             final Places.Page page = exact != null ? null : client.search(what, found.near, null);
             return () -> {
+                pinCoordinates = null;
                 results.clear();
                 if (exact != null) {
                     results.add(exact);
@@ -415,6 +429,57 @@ public final class MainActivity extends BaseActivity {
                 list.setSelection(0);
                 refresh();
                 if (!results.isEmpty()) open();
+            };
+        });
+    }
+
+    /**
+     * A point with no place of its own — a dropped pin, from a Maps link or
+     * typed in. Google's Text Search rejects raw coordinates, so the nearest
+     * address is looked up instead (a reverse geocode) and shown as the spot,
+     * with the coordinates on its page. The address's own place opens when
+     * Google has one, so its page carries whatever else Google knows.
+     */
+    private void openPin(final Anchor point) {
+        if (point == null) return;
+        if (!login.ready()) {
+            askLogin();
+            return;
+        }
+        if (showing) close();
+        final Places client = places();
+        final String coordinates = String.format(java.util.Locale.US, "%.5f, %.5f", point.lat, point.lng);
+        say("Looking up that spot…");
+        start(() -> {
+            final Places.Spot spot = client.reverseGeocode(point.lat, point.lng);
+            Place found = Place.at("Dropped pin", spot.address, point.lat, point.lng);
+            if (spot.placeId.length() > 0) {
+                // Open the address's own place for whatever else Google has; the
+                // pin we already have stands in if that one request fails.
+                try {
+                    found = client.details(spot.placeId);
+                } catch (java.io.IOException ignored) {
+                }
+            }
+            final Place place = found;
+            return () -> {
+                pinCoordinates = coordinates;
+                results.clear();
+                results.add(place);
+                if (place.id().length() > 0) details.put(place.id(), place);
+                nextPage = null;
+                searched = spot.address.length() > 0 ? spot.address : coordinates;
+                searchedNear = point;
+                searchedOpen = false;
+                searchedRated = false;
+                picked = 0;
+                query.setText(searched);
+                remember(searched);
+                say("");
+                zone = Zone.LIST;
+                list.setSelection(0);
+                refresh();
+                open();
             };
         });
     }
@@ -647,7 +712,7 @@ public final class MainActivity extends BaseActivity {
         final Place listed = results.get(picked);
         final String id = listed.id();
         boolean known = details.containsKey(id);
-        page.show(current(), !known, System.currentTimeMillis(), searchedNear);
+        page.show(current(), !known, System.currentTimeMillis(), searchedNear, pinCoordinates);
         refresh();
         if (known || id.length() == 0) return;
         final Places client = places();
@@ -655,7 +720,7 @@ public final class MainActivity extends BaseActivity {
             final Place full = client.details(id);
             return () -> {
                 details.put(id, full);
-                if (showing && results.get(picked) == listed) page.update(full, System.currentTimeMillis(), searchedNear);
+                if (showing && results.get(picked) == listed) page.update(full, System.currentTimeMillis(), searchedNear, pinCoordinates);
             };
         });
     }
@@ -681,6 +746,9 @@ public final class MainActivity extends BaseActivity {
         }
         if (place.website().length() > 0) {
             choices.add(new Choice(R.drawable.ic_language, "Copy website URL", () -> copy("Website", place.website())));
+        }
+        if (pinCoordinates != null) {
+            choices.add(new Choice(R.drawable.ic_my_location, "Copy coordinates", () -> copy("Coordinates", pinCoordinates)));
         }
         if (choices.isEmpty()) {
             toast(busy() ? "Still loading." : "Nothing to call or copy.");
@@ -822,6 +890,9 @@ public final class MainActivity extends BaseActivity {
             }
             if (place.website().length() > 0) {
                 choices.add(new Choice(R.drawable.ic_language, "Copy website URL", () -> copy("Website", place.website())));
+            }
+            if (pinCoordinates != null) {
+                choices.add(new Choice(R.drawable.ic_my_location, "Copy coordinates", () -> copy("Coordinates", pinCoordinates)));
             }
             choices.add(new Choice(R.drawable.ic_arrow_back, "Back to results", () -> close()));
         } else {

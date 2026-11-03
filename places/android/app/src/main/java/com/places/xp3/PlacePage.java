@@ -51,6 +51,8 @@ final class PlacePage {
     private boolean partial;
     private long now;
     private Anchor near;
+    /** The coordinates of a dropped pin, shown under the address; null for an ordinary place. */
+    private String coordinates;
     private TextView name;
     private View rule;
 
@@ -64,23 +66,24 @@ final class PlacePage {
     }
 
     /** A place freshly opened, at the top. One that only has what the search returned is `partial`. */
-    void show(Place place, boolean partial, long now, Anchor near) {
-        fill(place, partial, now, near);
+    void show(Place place, boolean partial, long now, Anchor near, String coordinates) {
+        fill(place, partial, now, near, coordinates);
         scroll.scrollTo(0, 0);
         shrink(0);
     }
 
     /** The same place with its details come, staying where it was scrolled to. */
-    void update(Place place, long now, Anchor near) {
-        fill(place, false, now, near);
+    void update(Place place, long now, Anchor near, String coordinates) {
+        fill(place, false, now, near, coordinates);
         shrink(scroll.getScrollY());
     }
 
-    private void fill(Place place, boolean partial, long now, Anchor near) {
+    private void fill(Place place, boolean partial, long now, Anchor near, String coordinates) {
         this.place = place;
         this.partial = partial;
         this.now = now;
         this.near = near;
+        this.coordinates = coordinates;
         drawHead();
         body.removeAllViews();
         summary();
@@ -159,6 +162,8 @@ final class PlacePage {
     private void reach() {
         body.addView(rule(dp(12)));
         if (place.address().length() > 0) info(R.drawable.ic_place, look.text(place.localAddress(), 13f, R.color.text));
+        String spot = coordinates != null ? coordinates : "";
+        if (spot.length() > 0) info(R.drawable.ic_my_location, look.text(spot, 13f, R.color.text_muted));
         if (!partial) hours();
         if (place.website().length() > 0) info(R.drawable.ic_language, look.line(host(place.website()), 13f, R.color.text));
         if (place.phone().length() > 0) info(R.drawable.ic_call, look.line(place.phone(), 13f, R.color.text));

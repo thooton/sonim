@@ -110,7 +110,9 @@ Top to bottom:
 - Rating "4.3 ★★★★☆ (1,099)" with partly filled stars; "Coffee shop ·
   $1-10 · ♿"; "Closed · Opens 7:00 AM · 3.6 mi".
 - One photo, rounded, page-wide, 130dp tall (only when Google has one).
-- Rows each after a teal icon: the address without its country; the hours
+- Rows each after a teal icon: the address without its country; for a
+  dropped pin (see A Maps link), the coordinates "33.41742, -111.92406"
+  after a crosshair icon, in muted text; the hours
   (status, then "Mon  7:00 AM - 9:00 PM" a day a line, today in Medium, a
   split day's ranges on separate lines, then secondary hours such as Happy
   hour under their own caption); the website as its host ("avenuebrew.com");
@@ -132,19 +134,22 @@ Times are in the place's own UTC offset, not the phone's.
 | --- | --- |
 | Up/Down | Scroll the page by about 70dp; stops at the top and bottom |
 | Left/Right | Nothing |
-| OK | List of choices: Call, Copy address, Copy website URL (each only when the place has it). With none: toast "Still loading." while the details load, else "Nothing to call or copy." |
+| OK | List of choices: Call, Copy address, Copy website URL (each only when the place has it), Copy coordinates (only for a dropped pin). With none: toast "Still loading." while the details load, else "Nothing to call or copy." |
 | Call | The phone's number in the dialer (nothing is dialled); with no number, toast "No phone number listed." |
 | Back | Close the page (stopping the details load); the results are as they were, same row picked |
 | Letters/digits | Ignored |
 
 - Call puts the national number in the dialer (international if no other).
 - Copy address copies the address without its country and toasts "Address
-  copied"; Copy website URL copies the full URL and toasts "Website copied".
+  copied"; Copy website URL copies the full URL and toasts "Website copied";
+  Copy coordinates copies "33.41742, -111.92406" and toasts "Coordinates
+  copied".
 - An error loading details shows as a toast; the page stays as it was.
 - Opening the same place again uses the kept details: no request.
 
 **Menu on a place**: Stop (while loading), Call, Copy address, Copy website
-URL (each when present), Back to results, Test location, Command center...
+URL (each when present), Copy coordinates (for a dropped pin), Back to
+results, Test location, Command center...
 
 ### Command center dialog
 
@@ -162,13 +167,24 @@ even if it is already open; an open place page is closed first). It shows
 
 - a place id in the link opens that place's page, with it as the only
   result;
-- otherwise the name or address in it (or, failing that, its point) is put
-  in the header and searched near the link's point, without the filters,
-  and the first result opened; Back from it shows the rest;
+- a name or address in it is put in the header and searched near the link's
+  point, without the filters, and the first result opened; Back from it
+  shows the rest;
+- a link that is only a point — a dropped pin, like
+  `maps.app.goo.gl/...` or `maps.google.com/?q=33.4174193,-111.9240643`,
+  with no place id or name — shows "Looking up that spot...", then the
+  nearest address Google has for the point (a reverse geocode), opened as a
+  single result. Its page is headed by that address (or "Dropped pin" when
+  Google has none) and shows the point's coordinates. The raw coordinates
+  are never fed to the search, which would reject them;
 - a link it can't read shows "Couldn't tell what that link points at.";
   a short link redirecting off Google's hosts shows "That link is not a
   Google Maps link.";
-- the search is added to the recent searches.
+- the search (or the pin's address) is added to the recent searches.
+
+Coordinates typed straight into the header, like "33.4174193, -111.9240643",
+are treated the same way: the nearest address is looked up and shown as a
+dropped pin, rather than searched for as text.
 
 ## Behaviour
 

@@ -150,6 +150,18 @@ public final class SelfTest {
             check.ok("nothing to look up", Link.parse("https://www.google.com/maps") == null);
             check.ok("short", Link.isShort("https://maps.app.goo.gl/AbC123") && Link.isShort("https://goo.gl/maps/AbC"));
             check.ok("not short", !Link.isShort("https://goo.gl/xyz") && !Link.isShort("https://www.google.com/maps/@1,2,3z"));
+
+            // A dropped pin: a link that is a point alone, with no place to search for.
+            Link pin = Link.parse("https://maps.google.com?q=33.4174193,-111.9240643");
+            check.ok("a bare point is a pin", pin != null && pin.placeId == null && pin.query == null);
+            check.close("the pin's point", 33.4174193, pin.near.lat, 1e-9);
+            Place dropped = Place.at("Dropped pin", "1 Mill Ave, Tempe, AZ", 33.4174193, -111.9240643);
+            check.same("pin name", "Dropped pin", dropped.name());
+            check.same("pin address", "1 Mill Ave, Tempe, AZ", dropped.address());
+            check.same("pin coordinates", "33.41742, -111.92406", dropped.coordinates());
+            check.ok("a pin has a point", dropped.located());
+            check.same("a pin without an address", "", Place.at("Dropped pin", "", 1, 2).address());
+            check.same("no coordinates without a point", "", place("{}").coordinates());
         });
         check.run("client", () -> {
             final AtomicInteger keys = new AtomicInteger();
@@ -163,6 +175,18 @@ public final class SelfTest {
                 }
                 if (request.path.equals("/short/AbC")) {
                     return TestServer.Reply.of(302, "text/html", "").header("Location: /maps/place/Joe%27s/@33.4,-111.9,17z");
+                }
+                if (request.path.startsWith("/geocode")) {
+                    // The Geocoding API: key in the query, a status of its own in the body.
+                    if (request.path.contains("latlng=1.0000000,1.0000000")) {
+                        return TestServer.Reply.json("{\"status\":\"REQUEST_DENIED\","
+                            + "\"error_message\":\"The provided API key is invalid.\",\"results\":[]}");
+                    }
+                    if (request.path.contains("latlng=0.0000000,0.0000000")) {
+                        return TestServer.Reply.json("{\"status\":\"ZERO_RESULTS\",\"results\":[]}");
+                    }
+                    return TestServer.Reply.json("{\"status\":\"OK\",\"results\":[{"
+                        + "\"formatted_address\":\"1 Mill Ave, Tempe, AZ 85281, USA\",\"place_id\":\"ChIJpin\"}]}");
                 }
                 if (request.path.equals("/v1/img/one.jpg")) {
                     return TestServer.Reply.of(request.header("X-Goog-Api-Key") == null || request.header("X-Goog-Api-Key").isEmpty() ? 200 : 400, "image/jpeg", "JPEG");
@@ -195,7 +219,7 @@ public final class SelfTest {
             try {
                 String base = server.uri("").toString();
                 server0[0] = base;
-                Places places = new Places(base + "/cc", "tok", base + "/v1");
+                Places places = new Places(base + "/cc", "tok", base + "/v1", base + "/geocode");
                 check.fails("a refused key says why", "API key not valid", () -> places.locate("Tempe"));
                 key[0] = "key-2";
                 Anchor tempe = places.locate("Tempe");
@@ -250,6 +274,14 @@ public final class SelfTest {
                 check.same("a short link followed", base + "/maps/place/Joe%27s/@33.4,-111.9,17z", places.expand(base + "/short/AbC"));
                 check.same("a full link as it is", "https://maps.google.com/?q=x", places.expand("https://maps.google.com/?q=x"));
                 check.fails("only Google is followed", "not a Google Maps link", () -> places.expand("https://example.com/maps"));
+
+                Places.Spot spot = places.reverseGeocode(33.4174193, -111.9240643);
+                check.same("nearest address", "1 Mill Ave, Tempe, AZ 85281, USA", spot.address);
+                check.same("spot place id", "ChIJpin", spot.placeId);
+                check.ok("geocode sends the key in the query", last(server).path.contains("key=key-2"));
+                check.same("no address in the sea", "", places.reverseGeocode(0, 0).address);
+                check.same("no place in the sea", "", places.reverseGeocode(0, 0).placeId);
+                check.fails("a refused geocode says why", "API key is invalid", () -> places.reverseGeocode(1, 1));
 
                 Places stranger = new Places(base + "/cc", "wrong", base + "/v1");
                 check.fails("a bad token says so", "login", () -> stranger.search("coffee", null, null));

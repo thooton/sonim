@@ -83,6 +83,19 @@ public final class Place {
         this.raw = raw;
     }
 
+    /**
+     * A place that is only a point and, when Google knows one, the address at
+     * it: a dropped pin from a Maps link with coordinates but no place. It
+     * carries just a name, an address and the point, so its page shows those.
+     */
+    public static Place at(String name, String address, double lat, double lng) {
+        Map<String, Object> raw = Json.map(
+            "displayName", Json.map("text", name),
+            "location", Json.map("latitude", Double.valueOf(lat), "longitude", Double.valueOf(lng)));
+        if (address != null && address.trim().length() > 0) raw.put("formattedAddress", address.trim());
+        return new Place(raw);
+    }
+
     public String id() {
         return orEmpty(Json.text(raw, "id"));
     }
@@ -138,6 +151,12 @@ public final class Place {
 
     public double lng() {
         return Json.number(Json.child(raw, "location"), "longitude");
+    }
+
+    /** The point as "33.41742, -111.92406", or "" when the place has none. */
+    public String coordinates() {
+        if (!located()) return "";
+        return String.format(Locale.US, "%.5f, %.5f", lat(), lng());
     }
 
     /** "2.4 mi" from `near`, or "" when either end has no point. */
