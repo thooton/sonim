@@ -61,13 +61,18 @@ public final class ReviewSession {
         this.zone = zone;
     }
 
-    /** How far through the deck in hundredths of a percent: 100% minus the share of its cards still New. */
+    /**
+     * How much of the deck is learned, in hundredths of a percent (0..10000):
+     * each card's {@link Fsrs#learned} of its best-ever stability, averaged
+     * over the deck. Unseen cards count 0 and each review only raises a card's
+     * peak, so this climbs as the user studies and never falls back.
+     */
     public int progress() {
         int size = deck.size();
         if (size == 0) return 10000;
-        int fresh = 0;
-        for (DeckCard card : deck.cards()) if (card.isNew()) fresh++;
-        return (int) ((size - fresh) * 10000L / size);
+        double sum = 0;
+        for (DeckCard card : deck.cards()) sum += Fsrs.learned(card.peakStability());
+        return (int) Math.round(sum * 10000 / size);
     }
 
     public boolean hasCards() {
@@ -179,6 +184,9 @@ public final class ReviewSession {
             reviewsShown++;
         }
         card.fsrs = preview(card.fsrs, rating, now);
+        if (card.fsrs.getStability() != null && (card.peak == null || card.fsrs.getStability() > card.peak)) {
+            card.peak = card.fsrs.getStability();
+        }
         Collection.touch(card, now * 1000L);
         last = card;
         current = null;

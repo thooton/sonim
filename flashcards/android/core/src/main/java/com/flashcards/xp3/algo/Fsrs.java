@@ -121,6 +121,25 @@ public final class Fsrs {
     }
 
     /**
+     * How learned a card is, from 0 (unseen) to 1, given the best stability it
+     * has ever reached (days). A logistic curve in log-stability: a card with
+     * {@link #LEARNED_HALF}-day stability counts half, a mature one (21 days,
+     * Anki's threshold) exactly {@code 0.8}, and longer-lived cards tend to 1,
+     * each further review adding less than the last. Monotonic in stability,
+     * so summed over a deck's peak stabilities it gives a learned percentage
+     * that only rises as the user reviews.
+     */
+    public static double learned(double peakStability) {
+        if (!(peakStability > 0)) return 0;
+        return 1.0 / (1.0 + Math.pow(LEARNED_HALF / peakStability, LEARNED_SHAPE));
+    }
+
+    /** Stability (days) a card counts as half-learned at. */
+    public static final double LEARNED_HALF = 7.0;
+    /** The curve's steepness, set so 21-day (mature) stability reads 0.8. */
+    public static final double LEARNED_SHAPE = Math.log(4) / Math.log(3);
+
+    /**
      * The probability of recall after `elapsedDays` Anki days (0 when unseen).
      * A stability rounded to 0 counts as the one its next answer starts from,
      * as `review` does, rather than giving NaN.

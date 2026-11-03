@@ -133,8 +133,13 @@ list of `.fkv` files is the same menu, scrolling, under an `Import` heading.
 - Up and Down move the ring between `New cards/day` and, under a `Display`
   heading, `Show progress` (`‹  Off  ›`, off by default). Left, Right and OK
   flip it. It is kept on this device for every deck, never synced. When on,
-  the reviewer shows `N.NN%` (two decimals, rounded down) in small grey at the right of the counts line:
-  100% minus the share of the deck's cards still New.
+  the reviewer shows `N.NN%` (two decimals) in small grey at the right of the
+  counts line: how much of the deck is **learned**, the average over its cards
+  of a logistic curve of each card's best-ever FSRS stability (half at a
+  seven-day stability, 80% at Anki's 21-day maturity, tending to 100%). An
+  unseen card counts nothing, and because the peak stability only ever rises
+  (a lapse never lowers it), the figure climbs as the deck is studied and never
+  falls back.
 - Back saves the value (if changed it syncs) and shows the deck's overview,
   whose counts reflect it. There is no Cancel.
 - Menu does nothing.

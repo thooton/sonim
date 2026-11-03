@@ -23,6 +23,15 @@ public final class DeckCard {
     public int ord;
     /** When it was first answered, Unix seconds, or 0 (never, or unknown). */
     public long intro;
+    /**
+     * The highest stability this card has ever reached, in days, or null when
+     * it has never been reviewed. Unlike {@link Card#getStability()} (which a
+     * lapse lowers), this only ever rises, so the "learned" progress built on
+     * it ({@link com.flashcards.xp3.algo.ReviewSession#progress}) never goes
+     * backwards. It rides along with the FSRS state through sync, merged as a
+     * maximum so no device can lower it.
+     */
+    public Double peak;
     /** When it last changed, device milliseconds, for sync. */
     public long mod;
     /** Changed here since the last sync. */
@@ -43,6 +52,7 @@ public final class DeckCard {
         DeckCard copy = new DeckCard(def, fsrs);
         copy.ord = ord;
         copy.intro = intro;
+        copy.peak = peak;
         copy.mod = mod;
         copy.dirty = dirty;
         return copy;
@@ -51,6 +61,18 @@ public final class DeckCard {
     /** Whether the user has never reviewed this card. */
     public boolean isNew() {
         return fsrs.getLastReview() == null;
+    }
+
+    /**
+     * The best-ever stability to measure learning by: the stored {@link #peak}
+     * if it is higher than the current stability, else the current one (so a
+     * record from before peaks were kept, or one synced without a peak, still
+     * counts at least its stability). 0 for a card never reviewed.
+     */
+    public double peakStability() {
+        double s = fsrs.getStability() == null ? 0 : fsrs.getStability();
+        double p = peak == null ? 0 : peak;
+        return Math.max(s, p);
     }
 
     /** A stable, deterministic id derived from the deck definition. */

@@ -45,6 +45,7 @@ public final class AlgoTests {
         dueReviewsOnly(c);
         learningComesBackWhenDue(c);
         previewMatchesRating(c);
+        learnedProgress(c);
     }
 
     /* --- the scheduler --- */
@@ -311,6 +312,41 @@ public final class AlgoTests {
     }
 
     /* --- the Anki queue --- */
+
+    private static void learnedProgress(Check c) {
+        c.run("learned: the curve's anchors", () -> {
+            c.close("an unseen card counts nothing", 0, Fsrs.learned(0), 0);
+            c.close("half-learned at seven days", 0.5, Fsrs.learned(Fsrs.LEARNED_HALF), 1e-9);
+            c.close("a mature card reads 0.8", 0.8, Fsrs.learned(21), 1e-9);
+            c.ok("more stable is more learned", Fsrs.learned(40) > Fsrs.learned(21));
+            c.ok("it tends to 1 without reaching it",
+                Fsrs.learned(100000) > 0.999 && Fsrs.learned(100000) < 1);
+        });
+        c.run("learned: a review raises the card's peak", () -> {
+            Deck deck = deckOf(2);
+            ReviewSession s = session(deck);
+            c.same("a new deck is 0% learned", 0, s.progress());
+            DeckCard first = s.next(NOON);
+            s.rate(3, NOON);
+            c.ok("the peak is the new stability",
+                first.peak != null && first.peak.equals(first.fsrs.getStability()));
+            c.ok("progress rose above zero", s.progress() > 0);
+        });
+        c.run("learned: progress holds over a lapse", () -> {
+            List<DeckCard> cards = new ArrayList<>();
+            DeckCard card = new DeckCard(new CardDef("k", "v"));
+            card.fsrs = reviewed(100.0, 5.0, NOON - 10L * DAY);
+            card.peak = 100.0;
+            cards.add(card);
+            ReviewSession s = session(new Deck("test", cards));
+            int high = s.progress();
+            c.ok("a well-learned card shows high progress", high > 9000);
+            // A lapse drops the stability; the peak, and so the progress, holds.
+            card.fsrs = reviewed(5.0, 7.0, NOON);
+            c.same("progress holds at the peak", high, s.progress());
+            c.close("the peak is kept", 100.0, card.peakStability(), 0);
+        });
+    }
 
     private static Deck deckOf(int n) {
         List<DeckCard> cards = new ArrayList<>();

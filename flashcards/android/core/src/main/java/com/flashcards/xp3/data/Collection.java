@@ -281,7 +281,13 @@ public final class Collection {
             Card fsrs = id == null ? null : fsrsOf(c, DeckCard.idFor(id));
             if (deck == null || fsrs == null) continue;
             long mod = longOf(c, "mod", 0);
+            // The peak only ever rises, so it is merged as a maximum (a card's
+            // own stability is its floor), apart from the later-mod winner.
+            Double peakField = Json.number(c, "peak");
+            double incomingPeak = Math.max(fsrs.getStability() == null ? 0 : fsrs.getStability(),
+                peakField == null ? 0 : peakField);
             DeckCard card = cardsById.get(id);
+            double mergedPeak = incomingPeak;
             if (card == null) {
                 card = new DeckCard(new CardDef(text(c, "front"), text(c, "back"), text(c, "aux"), id), fsrs);
                 card.ord = (int) longOf(c, "ord", 0);
@@ -289,9 +295,12 @@ public final class Collection {
                 cardsById.put(id, card);
                 deckOf.put(id, deckId);
                 if (!touched.contains(deck)) touched.add(deck);
-            } else if (!local && card.dirty && card.mod > mod) {
-                continue;
             } else {
+                mergedPeak = Math.max(card.peakStability(), incomingPeak);
+                if (!local && card.dirty && card.mod > mod) {
+                    card.peak = mergedPeak > 0 ? mergedPeak : null;
+                    continue;
+                }
                 card.fsrs = fsrs;
                 // Text corrected on the command center.
                 CardDef def = new CardDef(text(c, "front"), text(c, "back"), text(c, "aux"), id);
@@ -300,6 +309,7 @@ public final class Collection {
                 }
             }
             card.intro = longOf(c, "intro", 0);
+            card.peak = mergedPeak > 0 ? mergedPeak : null;
             card.mod = mod;
             card.dirty = local && Json.flag(c, "dirty");
         }
@@ -382,6 +392,7 @@ public final class Collection {
             "due", f.getDue().getEpochSecond(),
             "last", f.getLastReview() == null ? 0L : f.getLastReview().getEpochSecond(),
             "intro", card.intro,
+            "peak", card.peak,
             "mod", card.mod);
         if (local && card.dirty) c.put("dirty", true);
         return c;
