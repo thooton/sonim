@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From the mockup's icons (mockups/index.html); drawn tinted. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M2.5 6.4v11.2a.9.9 0 0 0 1.4.74l7.7-5.6a.9.9 0 0 0 0-1.48l-7.7-5.6a.9.9 0 0 0-1.4.74zM12.5 6.4v11.2a.9.9 0 0 0 1.4.74l7.7-5.6a.9.9 0 0 0 0-1.48l-7.7-5.6a.9.9 0 0 0-1.4.74z" android:fillColor="#FF000000" />
+</vector>

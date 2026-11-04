@@ -1,0 +1,8 @@
+// The Android-free half of Música: reading SRT lyrics, finding the songs in
+// Musica, naming them, the play queue, and the pixel work behind the
+// blurred backgrounds.
+apply from: rootProject.file("gradle/core.gradle")
+
+dependencies {
+    api project(":common:core")
+}
